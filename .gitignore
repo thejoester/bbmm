@@ -1,3 +1,11 @@
+# FoundryVTT module extras
+*.zip
+.cache/
+.packages/
+*.log
+.vscode/
+.idea/
+
 # Logs
 logs
 *.log
