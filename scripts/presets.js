@@ -1,88 +1,99 @@
-/* Module Management+ — Feature A: Presets (v13-safe)
-   Rebuild by TheJoester & helper
-   - Save / Load / Delete / Export / Import module presets
-   - Uses DialogV2, no jQuery, v12/v13 compatible
-*/
-
-const MM_ID = "joesters-module-management";
+import { debugLog } from './settings.js';
+const MM_ID = "bbmm";
 const SETTING_PRESETS = "presets";  // { [name]: string[] }  enabled module ids
-
-//	Function for debugging
-function debugLog(intLogType, stringLogMsg, objObject = null) {
-	
-	// Get Timestamps
-	const now = new Date();
-	const timestamp = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
-	
-	// Handle the case where the first argument is a string
-	if (typeof intLogType === "string") {
-		objObject = stringLogMsg; // Shift arguments
-		stringLogMsg = intLogType;
-		intLogType = 1; // Default log type to 'all'
-	}
-	const debugLevel = game.settings.get(MM_ID, "debugLevel");
-
-	// Map debugLevel setting to numeric value for comparison
-	const levelMap = {
-		"none": 4,
-		"error": 3,
-		"warn": 2,
-		"all": 1
-	};
-
-	const currentLevel = levelMap[debugLevel] || 4; // Default to 'none' if debugLevel is undefined
-
-	// Check if the log type should be logged based on the current debug level
-	if (intLogType < currentLevel) return;
-
-	// Capture stack trace to get file and line number
-	const stack = new Error().stack.split("\n");
-	let fileInfo = "Unknown Source";
-	for (let i = 2; i < stack.length; i++) {
-		const line = stack[i].trim();
-		const fileInfoMatch = line.match(/(\/[^)]+):(\d+):(\d+)/); // Match file path and line number
-		if (fileInfoMatch) {
-			const [, filePath, lineNumber] = fileInfoMatch;
-			const fileName = filePath.split("/").pop(); // Extract just the file name
-		}
-	}
-
-	// Prepend the file and line info to the log message
-	const formattedLogMsg = `[${fileInfo}] ${stringLogMsg}`;
-	
-	if (objObject) {
-		switch (intLogType) {
-			case 1: // Info/Log (all)
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ${formattedLogMsg}`, "color: green; font-weight: bold;", objObject);
-				break;
-			case 2: // Warning
-				console.log(`%cTheJoester's Module Management [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;", objObject);
-				break;
-			case 3: // Critical/Error
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;", objObject);
-				break;
-			default:
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;", objObject);
-		}
-	} else {
-		switch (intLogType) {
-			case 1: // Info/Log (all)
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ${formattedLogMsg}`, "color: green; font-weight: bold;");
-				break;
-			case 2: // Warning
-				console.log(`%cTheJoester's Module Management [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;");
-				break;
-			case 3: // Critical/Error
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;");
-				break;
-			default:
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;");
-		}
-	}
-}
 
 /*	=====	HELPERS =====
 */
+
+// Validate Module Preset JSON structure	
+function validateModulePresetJSON(data) {
+
+	// Accept ONLY our known payloads
+	// 1) Current state export
+	if (data && typeof data === "object" && data.type === "bbmm-state" && Array.isArray(data.modules)) {
+		return { kind: "state", modules: [...new Set(data.modules.filter(x => typeof x === "string"))] };
+	}
+
+	// Everything else: reject
+	return null;
+}
+
+// Check if modules in preset are missing or have missing dependencies
+function validateModuleState(modIds) {
+	const unknown = [];			// { id, reason: "not installed" }
+	const depIssues = [];		// { id, depId, reason: "dependency missing" }
+
+	for (const id of modIds) {
+		if (!game.modules.has(id)) unknown.push({ id, reason: "not installed" });
+	}
+
+	for (const id of modIds) {
+		const mod = game.modules.get(id);
+		if (!mod) continue;
+		const requires = getRequiredIds(mod);
+		for (const depId of requires) {
+			if (!game.modules.has(depId)) {
+				depIssues.push({ id, depId, reason: "dependency missing" });
+			}
+		}
+	}
+
+	// Optional debug
+	if (!unknown.length && !depIssues.length) {
+		debugLog("validateModuleState(): No missing modules or dependencies");
+	} else {
+		debugLog("validateModuleState(): Missing modules or dependencies found!");
+	}
+
+	return { unknown, depIssues };
+}
+
+// Show dialog report of Import issues
+async function showImportIssuesDialog({ unknown, depIssues }) {
+	debugLog(`showImportIssuesDialog(): unknown: `, unknown);
+	debugLog(`showImportIssuesDialog(): depIssues: `, depIssues);
+
+	const lines = [];
+
+	if (unknown.length) {
+		lines.push(`<p><b>Modules not installed:</b></p>`);
+		lines.push(`<ul style="margin-top:.25rem;">${
+			unknown.map(it => `<li><code>${esc(it.id)}</code> — Module not installed</li>`).join("")
+		}</ul>`);
+	}
+
+	if (depIssues.length) {
+		// Group by module → list missing deps
+		const byMod = new Map();
+		for (const it of depIssues) {
+			const modId = it.module?.id ?? it.id;   // fall back if your shape is { id, depId }
+			const depId = it.dep?.id ?? it.depId;
+			if (!byMod.has(modId)) byMod.set(modId, []);
+			if (depId != null) byMod.get(modId).push(depId);
+		}
+		lines.push(`<p><b>Dependencies missing:</b></p>`);
+		lines.push(`<ul style="margin-top:.25rem;">${
+			[...byMod.entries()].map(([id, deps]) =>
+				`<li><code>${esc(id)}</code> → missing: ${deps.map(d => `<code>${esc(d)}</code>`).join(", ")}</li>`
+			).join("")
+		}</ul>`);
+	}
+
+	// Wrap DialogV2 in a Promise so we can await a boolean
+	return await new foundry.applications.api.DialogV2({
+		window: { title: "Import Check — Issues Detected" },
+		content: `
+			<div style="display:flex;flex-direction:column;gap:.5rem;">
+				<p class="notes">The imported preset was saved, but the following issues were found:</p>
+				${lines.join("\n")}
+			</div>
+		`,
+		buttons: [
+			{ action: "ok", label: "OK", default: true }
+		],
+		submit: (_res, _ev, button) => button?.action === "ok"
+	}).render(true);
+}
 
 // Open Dialog to export Module state json
 async function exportCurrentModuleStateDialog() {
@@ -98,13 +109,13 @@ async function exportCurrentModuleStateDialog() {
 			</div>
 		`,
 		buttons: [
-			{ action: "cancel", label: "Cancel" },
 			{
 				action: "ok",
 				label: "Export",
 				default: true,
 				callback: (ev, button) => button.form.elements.exportName?.value?.trim() || ""
-			}
+			},
+			{ action: "cancel", label: "Cancel" }
 		],
 		submit: (_result) => {
 			const baseName = _result;
@@ -118,7 +129,7 @@ async function exportCurrentModuleStateDialog() {
 			for (const id of enabled) versions[id] = game.modules.get(id)?.version ?? null;
 
 			saveJSONFile({
-				type: "mmplus-state",
+				type: "bbmm-state",
 				name: baseName,
 				created: new Date().toISOString(),
 				modules: enabled,
@@ -128,9 +139,28 @@ async function exportCurrentModuleStateDialog() {
 	}).render(true);
 }
 
-async function importModuleStateAsPreset(modules) {
+// Import module preset json file, validate it, save as preset. 
+async function importModuleStateAsPreset(data) {
+	// 1) validate shape
+	const validated = validateModulePresetJSON(data);
+	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
+		debugLog(3, "Not a BBMM export. Expected a file created by BBMM.");
+		await new foundry.applications.api.DialogV2({
+			window: { title: "Import Error" },
+			content: `<p>Error! Not a BBMM export. Expected a file created by BBMM.</p>`,
+			buttons: [{ action: "ok", label: "OK", default: true }],
+			submit: () => "ok"
+		}).render(true);
+		return;
+	}
+	const modules = validated.modules;
+
+	// 2) compute report now (no UI yet)
+	const report = validateModuleState(modules);
+
+	// 3) ask for preset name and save
 	new foundry.applications.api.DialogV2({
-		window: { title: "Import as Preset" },
+		window: { title: "Import as module preset" },
 		content: `
 			<div style="display:flex;flex-direction:column;gap:.5rem;">
 				<div style="display:flex;gap:.5rem;align-items:center;">
@@ -141,30 +171,24 @@ async function importModuleStateAsPreset(modules) {
 			</div>
 		`,
 		buttons: [
-			{ action: "cancel", label: "Cancel" },
-			{
-				action: "ok",
-				label: "Import",
-				default: true,
-				callback: (ev, button) => button.form.elements.presetName?.value?.trim() || ""
-			}
+			{ action: "ok", label: "Import", default: true, callback: (ev, button) => button.form.elements.presetName?.value?.trim() || "" },
+			{ action: "cancel", label: "Cancel" }
 		],
 		submit: async (_result) => {
 			const baseName = _result;
 			if (!baseName) { ui.notifications.warn("Please enter a preset name."); return; }
-			const key = `${slugify(baseName)}-${timestampStr()}`;
+			const key = `${baseName} (${formatDateD_Mon_YYYY()})`;
 
 			const p = getPresets();
 			p[key] = modules;
 			await setPresets(p);
-			
-			// Now run integrity check
-			const report = validateModuleState(modules);
-			if (report.unknown.length || report.depIssues.length) {
-				showImportIssuesDialog(report);
-			}
 
+			debugLog(`importModuleStateAsPreset(): Imported preset "${key}" (${modules.length} modules).`);
 			ui.notifications.info(`Imported preset "${key}" (${modules.length} modules).`);
+
+			// 4) show issues last (awaitable)
+			await showImportIssuesDialog(report);
+
 			openPresetManager();
 		}
 	}).render(true);
@@ -189,6 +213,13 @@ function slugify(s) {
 function timestampStr(d = new Date()) {
 	const p = (n, l=2) => String(n).padStart(l, "0");
 	return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+function formatDateD_Mon_YYYY(d = new Date()) {
+	const dd = String(d.getDate()).padStart(2, "0");
+	const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+	const yyyy = d.getFullYear();
+	return `${dd}-${MON}-${yyyy}`;
 }
 
 // Helper to export to .json file
@@ -240,72 +271,6 @@ function pickLocalJSONFile() {
 		}, { once: true });
 		input.click();
 	});
-}
-
-// validate Module state JSON
-function validateModuleState(modIds) {
-	const unknown = [];		// { id, reason: "not installed" }
-	const depIssues = [];	// { id, depId, reason: "dependency missing" }
-
-	// 1) not installed
-	for (const id of modIds) {
-		if (!game.modules.has(id)) unknown.push({ id, reason: "not installed" });
-	}
-
-	// 2) required dependencies
-	for (const id of modIds) {
-		const mod = game.modules.get(id);
-		if (!mod) continue; // already flagged above
-		const requires = getRequiredIds(mod); // you already have this helper
-		for (const depId of requires) {
-			// Require it to be installed; you can also enforce "present in preset" if you prefer
-			if (!game.modules.has(depId)) {
-				depIssues.push({ id, depId, reason: "dependency missing" });
-			}
-		}
-	}
-
-	return { unknown, depIssues };
-}
-
-//	show import issues
-function showImportIssuesDialog({ unknown, depIssues }) {
-	if ((!unknown || unknown.length === 0) && (!depIssues || depIssues.length === 0)) return;
-
-	const lines = [];
-
-	if (unknown.length) {
-		lines.push(`<p><b>Modules not installed:</b></p>`);
-		lines.push(`<ul style="margin-top:.25rem;">${
-			unknown.map(it => `<li><code>${esc(it.id)}</code> — Module not installed</li>`).join("")
-		}</ul>`);
-	}
-
-	if (depIssues.length) {
-		// Group by module → list missing deps
-		const byMod = new Map();
-		for (const it of depIssues) {
-			if (!byMod.has(it.id)) byMod.set(it.id, []);
-			byMod.get(it.id).push(it.depId);
-		}
-		lines.push(`<p><b>Dependencies missing:</b></p>`);
-		lines.push(`<ul style="margin-top:.25rem;">${
-			[...byMod.entries()].map(([id, deps]) =>
-				`<li><code>${esc(id)}</code> → missing: ${deps.map(d => `<code>${esc(d)}</code>`).join(", ")}</li>`
-			).join("")
-		}</ul>`);
-	}
-
-	new foundry.applications.api.DialogV2({
-		window: { title: "Import Check — Issues Detected" },
-		content: `
-			<div style="display:flex;flex-direction:column;gap:.5rem;">
-				<p class="notes">The imported preset was saved, but the following issues were found:</p>
-				${lines.join("\n")}
-			</div>
-		`,
-		buttons: [{ action: "ok", label: "OK", default: true }]
-	}).render(true);
 }
 
 /** Utility: read/set preset map */
@@ -388,7 +353,7 @@ function getRequiredIds(mod) {
 }
 
 //	Open Dialog to manage presets 
-async function openPresetManager() {
+export async function openPresetManager() {
 	debugLog("openPresetManager: start");
 
 	const presets = getPresets();
@@ -418,8 +383,8 @@ async function openPresetManager() {
 
 			<h3 style="margin:0;">Export/Import Current Module State</h3>
 			<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-				<button type="button" data-action="mmplus-export-state">Export to .json</button>
-				<button type="button" data-action="mmplus-import-state">Import from .json</button>
+				<button type="button" data-action="bbmm-export-state">Export to .json</button>
+				<button type="button" data-action="bbmm-import-state">Import from .json</button>
 			</div>
 
 			<p class="notes">Applying a preset updates <code>core.moduleConfiguration</code>. You may be prompted to reload.</p>
@@ -427,7 +392,7 @@ async function openPresetManager() {
 	`;
 
 	const dlg = new foundry.applications.api.DialogV2({
-		window: { title: "Module Management+ — Presets" },
+		window: { title: "BBMM Module Presets" },
 		content,
 		buttons: [{ action: "close", label: "Close", default: true }]
 	});
@@ -446,7 +411,7 @@ async function openPresetManager() {
 			const action = btn.dataset.action || "";
 
 			// Only handle our buttons; stop any other listeners
-			if (!action.startsWith("mmplus-") && !["save-current", "load", "delete"].includes(action)) return;
+			if (!action.startsWith("bbmm-") && !["save-current", "load", "delete"].includes(action)) return;
 			ev.preventDefault();
 			ev.stopPropagation();
 			ev.stopImmediatePropagation();
@@ -473,8 +438,8 @@ async function openPresetManager() {
 					const enabled = (getPresets()[selected] || []);
 					debugLog("load: applying preset", { name: selected, count: enabled.length });
 					const proceed = await foundry.applications.api.DialogV2.confirm({
-						window: { title: "Apply Preset" },
-						content: `<p>Apply preset <b>${esc(selected)}</b> to this world?</p>`,
+						window: { title: "Apply Module Preset" },
+						content: `<p>Apply module preset <b>${esc(selected)}</b> to this world?</p>`,
 						modal: true, ok: { label: "Apply" }
 					});
 					if (!proceed) return;
@@ -492,8 +457,8 @@ async function openPresetManager() {
 				else if (action === "delete") {
 					if (!selected) return ui.notifications.warn("Select a preset to delete.");
 					const ok = await foundry.applications.api.DialogV2.confirm({
-						window: { title: "Delete Preset" },
-						content: `<p>Delete preset <b>${esc(selected)}</b>?</p>`,
+						window: { title: "Delete Module Preset" },
+						content: `<p>Delete module preset <b>${esc(selected)}</b>?</p>`,
 						ok: { label: "Delete" }
 					});
 					if (!ok) return;
@@ -501,28 +466,18 @@ async function openPresetManager() {
 					ui.notifications.info(`Deleted preset "${selected}".`);
 					app.close(); openPresetManager();
 				}
-				else if (action === "mmplus-export-state") {
+				else if (action === "bbmm-export-state") {
 					exportCurrentModuleStateDialog();
 				}
-				else if (action === "mmplus-import-state") {
+				else if (action === "bbmm-import-state") {
 					const file = await pickLocalJSONFile();
 					if (!file) return;
 					let data;
 					try { data = JSON.parse(await file.text()); }
 					catch { ui.notifications.error("Invalid JSON file."); return; }
-
-					let modules = null;
-					if (data?.type === "mmplus-state" && Array.isArray(data.modules)) modules = data.modules;
-					else if (Array.isArray(data)) modules = data;
-					else if (data && typeof data === "object") {
-						const all = [];
-						for (const v of Object.values(data)) if (Array.isArray(v)) all.push(...v);
-						if (all.length) modules = [...new Set(all)];
-					}
-					if (!modules?.length) return ui.notifications.error("No module list found in JSON.");
 					
 					// Import file to preset
-					importModuleStateAsPreset(modules);
+					await importModuleStateAsPreset(data);
 				}
 			} catch (err) {
 				debugLog(3, "Dialog click handler error", err);
@@ -537,62 +492,15 @@ async function openPresetManager() {
 	debugLog("DialogV2.render returned");
 }
 
-Hooks.once("init", () => {
-	// Store presets as a world setting (object map name->array)
-	game.settings.register(MM_ID, SETTING_PRESETS, {
-		name: "Presets",
-		hint: "Stored module enable/disable presets.",
-		scope: "world",
-		config: false,
-		type: Object,
-		default: {}
-	});
-
-	// Add a menu entry in Configure Settings to open the Preset Manager
-	game.settings.registerMenu(MM_ID, "presetManager", {
-		name: "Module Presets",
-		label: "Open Preset Manager",
-		icon: "fas fa-layer-group",
-		restricted: true,
-		type: class extends FormApplication {
-			constructor(...args){ super(...args); }
-			static get defaultOptions() {
-				return foundry.utils.mergeObject(super.defaultOptions, {
-					id: "mmplus-preset-manager",
-					title: "Module Management+ — Presets",
-					template: null, // We’ll use DialogV2 instead
-					width: 600
-				});
-			}
-			async render(...args) {
-				await openPresetManager();
-				return this;
-			}
-			async _updateObject() {}
-		}
-	});
-	
-	// Debug level for THIS module
-	game.settings.register(MM_ID, "debugLevel", {
-		name: "Debug Level",
-		hint: "Logging: all, warn, error, none",
-		scope: "world",
-		config: true,
-		type: String,
-		choices: { all: "All", warn: "Warnings", error: "Errors", none: "None" },
-		default: "all"
-	});
-});
-
 Hooks.once("ready", () => {
-	const mod = game.modules.get("joesters-module-management");
+	window.openPresetManager = openPresetManager; // lets you run it from console
+	const mod = game.modules.get("bbmm");
 	if (!mod) return;
 	mod.api ??= {};
 	mod.api.openPresetManager = openPresetManager;
 	debugLog("API exposed: mod.api.openPresetManager ready");
 });
 
-Hooks.on("setup", () => debugLog("setup fired"));
+Hooks.on("setup", () => debugLog("presets.js | setup fired"));
 Hooks.once("ready", () => debugLog("ready fired"));
 
-window.openPresetManager = openPresetManager; // lets you run it from console

@@ -1,7 +1,3 @@
-#GitHub
-.github
-.git
-
 # FoundryVTT module extras
 *.zip
 .cache/
