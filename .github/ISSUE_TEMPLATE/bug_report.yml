@@ -13,14 +13,7 @@ body:
     id: foundry-version
     attributes:
       label: Foundry VTT Version
-      placeholder: e.g., 12.999
-    validations:
-      required: true
-  - type: input
-    id: pf2e-version
-    attributes:
-      label: Pathfinder 2E System Version
-      placeholder: e.g., 5.9.3
+      placeholder: e.g., 13.123
     validations:
       required: true
   - type: input
