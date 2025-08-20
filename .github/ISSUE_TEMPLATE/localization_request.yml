@@ -1,0 +1,50 @@
+---
+name: 🌐 Localization Request / issue
+description: Request support for a new localization or submit missing/incorrect localization for an existing language.
+title: "[Translation Request] <Language Name or Code>"
+labels: [localization, help wanted]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🌍 Translation Request
+
+        Use this form to request support for a new language or to help translate missing keys in an existing language.
+
+  - type: input
+    id: language-code
+    attributes:
+      label: Language Code
+      description: Use IETF format (e.g., pt-BR, fr, de, es-ES).
+      placeholder: e.g., pt-BR
+    validations:
+      required: true
+
+  - type: dropdown
+    id: request-type
+    attributes:
+      label: What kind of translation help is this?
+      options:
+        - Requesting a new translation file
+        - Adding missing keys to an existing translation
+        - Improving or correcting existing translations
+    validations:
+      required: true
+
+  - type: textarea
+    id: translation-content
+    attributes:
+      label: Translation Content or Details
+      description: Paste your translated keys here or describe what needs to be translated or added.
+      placeholder: |
+        Example:
+        "QUICK_ALCHEMY": "Alquimia Rápida",
+        "BTN_CANCEL": "Cancelar"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes or Additional Info
+      description: Anything else you’d like to share?
