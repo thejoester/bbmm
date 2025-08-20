@@ -1,0 +1,27 @@
+name: 💡 Feature Request
+description: Suggest an improvement or new feature for the module.
+title: "[Feature] <brief description>"
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Suggest a Feature or Improvement
+
+        Thanks for helping improve the module!
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Describe your suggestion
+      placeholder: What would you like to see added or improved?
+    validations:
+      required: true
+  - type: checkboxes
+    id: related
+    attributes:
+      label: Is it related to existing functionality?
+      options:
+        - label: Improves an existing feature
+        - label: Adds new feature
+        - label: Adds new localization functionality
+        - label: Other
