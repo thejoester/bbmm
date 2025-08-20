@@ -1,0 +1,50 @@
+name: 🐞 Bug Report
+description: Report a bug or unexpected behavior in the module.
+title: "[Bug] <brief description>"
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thanks for reporting a bug!
+
+        Please complete the form below to help us diagnose the issue.
+  - type: input
+    id: foundry-version
+    attributes:
+      label: Foundry VTT Version
+      placeholder: e.g., 12.999
+    validations:
+      required: true
+  - type: input
+    id: pf2e-version
+    attributes:
+      label: Pathfinder 2E System Version
+      placeholder: e.g., 5.9.3
+    validations:
+      required: true
+  - type: input
+    id: module-version
+    attributes:
+      label: Module Version
+      placeholder: e.g., 1.2.0
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      placeholder: Describe the bug and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: 1. Go to... 2. Click on... 3. See error
+  - type: textarea
+    id: console
+    attributes:
+      label: Relevant Debug Logs or Errors
+      description: Paste any relevant debugLog output or browser console errors here.
+      render: shell
