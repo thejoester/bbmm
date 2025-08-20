@@ -1,0 +1,25 @@
+{
+  "id": "bbmm",
+  "title": "Big Bad Module Manager",
+  "version": "0.0.1",
+  "authors": [
+        {
+            "name": "TheJoester",
+            "discord": "thejoester",
+            "url": "https://github.com/thejoester",
+            "flags": {}
+        }
+    ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "esmodules": [
+		"scripts/presets.js",
+		"scripts/settings.js"
+	],
+  "flags": {
+    "canUpload": true
+  },
+  "description": ""
+}
