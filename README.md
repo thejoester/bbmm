@@ -2,7 +2,7 @@
 
 A module management tool for FoundryVTT. 
 
-This module was inspired by [Module Management+](), which has not been updated since v9 and finally broke in v13. This module aims to replicate those features for v13.
+This module was inspired by [Module Management+](https://github.com/mouse0270/module-credits/), which has not been updated since v9 and finally broke in v13. This module aims to replicate those features for v13.
 
 > [!IMPORTANT]
 > This module is currently in beta and does not quite have a full feature set yet. I **HIGHLY ADVISE** you to make a backup before testing this module.
