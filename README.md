@@ -2,6 +2,8 @@
 
 A module management tool for FoundryVTT. 
 
+This module was inspired by [Module Management+](), which has not been updated since v9 and finally broke in v13. This module aims to replicate those features for v13.
+
 > [!IMPORTANT]
 > This module is currently in beta and does not quite have a full feature set yet. I **HIGHLY ADVISE** you to make a backup before testing this module.
 > Please [report any issues here](https://github.com/thejoester/bbmm/issues)!
