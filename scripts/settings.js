@@ -48,30 +48,30 @@ export function debugLog(intLogType, stringLogMsg, objObject = null) {
 	if (objObject) {
 		switch (intLogType) {
 			case 1: // Info/Log (all)
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ${formattedLogMsg}`, "color: green; font-weight: bold;", objObject);
+				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: green; font-weight: bold;", objObject);
 				break;
 			case 2: // Warning
-				console.log(`%cTheJoester's Module Management [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;", objObject);
+				console.log(`%cBBMM [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;", objObject);
 				break;
 			case 3: // Critical/Error
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;", objObject);
+				console.log(`%cBBMM [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;", objObject);
 				break;
 			default:
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;", objObject);
+				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;", objObject);
 		}
 	} else {
 		switch (intLogType) {
 			case 1: // Info/Log (all)
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ${formattedLogMsg}`, "color: green; font-weight: bold;");
+				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: green; font-weight: bold;");
 				break;
 			case 2: // Warning
-				console.log(`%cTheJoester's Module Management [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;");
+				console.log(`%cBBMM [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;");
 				break;
 			case 3: // Critical/Error
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;");
+				console.log(`%cBBMM [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;");
 				break;
 			default:
-				console.log(`%cTheJoester's Module Management [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;");
+				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;");
 		}
 	}
 }

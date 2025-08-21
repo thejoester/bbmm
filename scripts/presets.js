@@ -167,7 +167,6 @@ async function importModuleStateAsPreset(data) {
 					<label style="min-width:7rem;">Preset Name</label>
 					<input name="presetName" type="text" placeholder="e.g. staging" style="flex:1;">
 				</div>
-				<p class="notes">Preset will be saved as <code>{name}-{YYYYMMDD-HHMMSS}</code></p>
 			</div>
 		`,
 		buttons: [
@@ -177,14 +176,12 @@ async function importModuleStateAsPreset(data) {
 		submit: async (_result) => {
 			const baseName = _result;
 			if (!baseName) { ui.notifications.warn("Please enter a preset name."); return; }
-			const key = `${baseName} (${formatDateD_Mon_YYYY()})`;
-
-			const p = getPresets();
-			p[key] = modules;
-			await setPresets(p);
-
-			debugLog(`importModuleStateAsPreset(): Imported preset "${key}" (${modules.length} modules).`);
-			ui.notifications.info(`Imported preset "${key}" (${modules.length} modules).`);
+			const res = await savePreset(`${baseName} (${formatDateD_Mon_YYYY()})`, modules);
+			if (res.status !== "saved") return;
+			debugLog(`importModuleStateAsPreset(): Imported preset "${res.name}" (${modules.length} modules).`);
+			ui.notifications.info(`Imported preset "${res.name}" (${modules.length} modules).`);
+			await showImportIssuesDialog(report);
+			openPresetManager();
 
 			// 4) show issues last (awaitable)
 			await showImportIssuesDialog(report);
@@ -272,16 +269,122 @@ function pickLocalJSONFile() {
 	});
 }
 
-/** Utility: read/set preset map */
+// read preset map 
 function getPresets() {
 	return foundry.utils.duplicate(game.settings.get(MM_ID, SETTING_PRESETS) || {});
 }
 
+// set preset map
 async function setPresets(presets) {
 	await game.settings.set(MM_ID, SETTING_PRESETS, presets);
 }
 
-/** Current enabled module ids (exclude core/system) */
+// Normalize name to compare when saving
+function normalizePresetName(s) {
+	return String(s).normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+// Find if preset name exists
+function findExistingPresetKey(name) {
+	const wanted = normalizePresetName(name);
+	const presets = getPresets();
+	for (const k of Object.keys(presets)) {
+		if (normalizePresetName(k) === wanted) return k;
+	}
+	return null;
+}
+
+// Save Preset checking if it exists and prompting to overwrite or rename
+async function savePreset(name, modules) {
+	
+	// Prompt how to handle duplicate name 
+	function askPresetConflict(existingKey) {
+		return new Promise((resolve) => {
+			new foundry.applications.api.DialogV2({
+				window: { title: "Preset Exists", modal: true },
+				content: `
+					<p>A preset named <b>${esc(existingKey)}</b> already exists.</p>
+					<p>What would you like to do?</p>
+				`,
+				buttons: [
+					{ action: "overwrite", label: "Overwrite", default: true, callback: () => "overwrite" },
+					{ action: "rename", label: "Rename", callback: () => "rename" },
+					{ action: "cancel", label: "Cancel", callback: () => "cancel" }
+				],
+				submit: (result) => resolve(result ?? "cancel"),
+				rejectClose: false
+			}).render(true);
+		});
+	}
+	
+	// Rename preset
+	function promptRename(rawInput) {
+		return new Promise((resolve) => {
+			new foundry.applications.api.DialogV2({
+				window: { title: "Rename Preset", modal: true },
+				content: `
+					<div style="display:flex;gap:.5rem;align-items:center;">
+						<label style="min-width:7rem;">New Name</label>
+						<input name="newName" type="text" value="${esc(rawInput)}" autofocus style="flex:1;">
+					</div>
+				`,
+				buttons: [
+					{ action: "ok",     label: "Save",   default: true,
+					  callback: (_ev, btn) => resolve(btn.form.elements.newName?.value?.trim() || "") },
+					{ action: "cancel", label: "Cancel", callback: () => resolve(null) }
+				],
+				submit: () => {},
+				rejectClose: false
+			}).render(true);
+		});
+	}
+	
+	// keep what the user typed for the rename dialog
+	const rawInput = String(name).trim();
+	debugLog(`savePreset(): rawInput: '${rawInput}'`);
+
+	// use normalized copy only for matching
+	const normalizedWanted = normalizePresetName(rawInput);
+	debugLog(`savePreset(): normalizedWanted: '${normalizedWanted}'`);
+	const presets = getPresets();
+
+	let existingKey = null;
+	for (const k of Object.keys(presets)) {
+		if (normalizePresetName(k) === normalizedWanted) { existingKey = k; break; }
+	}
+
+	// default final name is the raw input (preserve casing/spaces the user typed)
+	let finalName = rawInput;
+
+	debugLog(`savePreset(): existingKey: ${existingKey}`);
+	
+	if (existingKey) {
+		debugLog(`savePreset(): existingKey condition fired!`);
+		const choice = await askPresetConflict(existingKey);
+		debugLog(`savePreset(): choice: ${choice}`);
+		if (choice === "cancel") return { status: "cancel" };
+		else if (choice === "overwrite") {
+			debugLog(`savePreset(): Chose overwrite`);
+			// proceed with overwrite
+			finalName = existingKey;
+		}
+		else if (choice === "rename") {
+			debugLog(`savePreset(): Chose rename`);
+			const newName = await promptRename(rawInput);
+			debugLog(`savePreset(): newName = '${newName}'`);
+			if (!newName) return { status: "cancel" };
+			finalName = newName.trim();
+		}
+	}
+
+	const p = getPresets();
+	p[finalName] = modules;
+	await setPresets(p);
+	debugLog(`savePreset(): saved presets: `, p);
+	return { status: "saved", name: finalName };
+}
+
+// Current enabled module ids (exclude core/system) 
 function getEnabledModuleIds() {
 	const list = [];
 	for (const m of game.modules.values()) {
@@ -291,12 +394,12 @@ function getEnabledModuleIds() {
 	return list;
 }
 
-/** Read moduleConfiguration safely */
+// Read moduleConfiguration safely 
 function getModuleConfig() {
 	return foundry.utils.duplicate(game.settings.get("core", "moduleConfiguration") || {});
 }
 
-/** Apply a set of enabled ids -> update core.moduleConfiguration */
+// Apply a set of enabled ids -> update core.moduleConfiguration 
 async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 	const config = getModuleConfig();
 
@@ -386,7 +489,7 @@ export async function openPresetManager() {
 				<button type="button" data-action="bbmm-import-state">Import from .json</button>
 			</div>
 
-			<p class="notes">Applying a preset updates <code>core.moduleConfiguration</code>. You may be prompted to reload.</p>
+			<p class="notes">After applying a preset, You may be prompted to reload.</p>
 		</div>
 	`;
 
@@ -427,10 +530,12 @@ export async function openPresetManager() {
 				if (action === "save-current") {
 					if (!newName) { ui.notifications.warn("Enter a name for the new preset."); return; }
 					const enabled = getEnabledModuleIds();
-					debugLog("save-current: enabled modules", enabled);
-					const p = getPresets(); p[newName] = enabled; await setPresets(p);
-					ui.notifications.info(`Saved preset "${newName}" (${enabled.length} modules).`);
-					app.close(); openPresetManager();
+					const res = await savePreset(newName, enabled);
+					if (res.status !== "saved") return;
+					ui.notifications.info(`Saved preset "${res.name}" (${enabled.length} modules).`);
+					app.close();
+					openPresetManager();
+					return;
 				}
 				else if (action === "load") {
 					if (!selected) return ui.notifications.warn("Select a preset to load.");
@@ -505,6 +610,9 @@ Hooks.once("ready", () => debugLog("ready fired"));
 
 // Add button to module managment screen
 Hooks.on("renderModuleManagement", (app, html/*HTMLElement*/) => {
+	
+	debugLog(`renderModuleManagement hook fired!`);
+	
 	// Robust root + footer lookup
 	const root = html instanceof HTMLElement ? html : (html?.[0] ?? null);
 	if (!root) return;
