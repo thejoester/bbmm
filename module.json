@@ -16,14 +16,15 @@
   },
   "esmodules": [
 		"scripts/presets.js",
-		"scripts/settings.js"
+		"scripts/settings.js",
+		"scripts/settings-presets.js"
 	],
   "flags": {
     "canUpload": true
   },
-  "description": "",
+  "description": "Utility to manage modules and settings.",
   "manifest": "https://raw.githubusercontent.com/thejoester/bbmm/master/module.json",
-  "download": "https://github.com/thejoester/bbmm/releases/latest/download/bbmm.zip",
+  "download": "https://github.com/thejoester/bbmm/releases/download/0.0.4/bbmm.zip",
   "readme": "https://github.com/thejoester/bbmm#readme",
   "bugs": "https://github.com/thejoester/bbmm/issues",
   "changelog": "https://github.com/thejoester/bbmm/releases"

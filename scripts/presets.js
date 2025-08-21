@@ -1,6 +1,6 @@
 import { debugLog } from './settings.js';
 const MM_ID = "bbmm";
-const SETTING_PRESETS = "presets";  // { [name]: string[] }  enabled module ids
+const MODULE_SETTING_PRESETS = "module-presets";  // { [name]: string[] }  enabled module ids
 
 /*	=====	HELPERS =====
 */
@@ -50,6 +50,27 @@ function validateModuleState(modIds) {
 
 // Show dialog report of Import issues
 async function showImportIssuesDialog({ unknown, depIssues }) {
+	
+	function displayIssues(lines) {
+		// Wrap DialogV2 in a Promise so we can await a boolean
+		return new Promise((resolve) => {
+			new foundry.applications.api.DialogV2({
+				window: { title: "Import Check — Issues Detected" },
+				content: `
+					<div style="display:flex;flex-direction:column;gap:.5rem;">
+						<p class="notes">The imported preset was saved, but the following issues were found:</p>
+						${lines.join("\n")}
+					</div>
+				`,
+				buttons: [
+					{ action: "ok", label: "OK", default: true }
+				],
+				submit: (_res, _ev, button) => button?.action === "ok"
+			}).render(true);
+		})
+	}
+	
+	
 	debugLog(`showImportIssuesDialog(): unknown: `, unknown);
 	debugLog(`showImportIssuesDialog(): depIssues: `, depIssues);
 
@@ -79,20 +100,12 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 		}</ul>`);
 	}
 
-	// Wrap DialogV2 in a Promise so we can await a boolean
-	return await new foundry.applications.api.DialogV2({
-		window: { title: "Import Check — Issues Detected" },
-		content: `
-			<div style="display:flex;flex-direction:column;gap:.5rem;">
-				<p class="notes">The imported preset was saved, but the following issues were found:</p>
-				${lines.join("\n")}
-			</div>
-		`,
-		buttons: [
-			{ action: "ok", label: "OK", default: true }
-		],
-		submit: (_res, _ev, button) => button?.action === "ok"
-	}).render(true);
+	if (!lines.length) return;
+	
+	debugLog(`showImportIssuesDialog(): Issues with import found`);
+	const issues = await displayIssues(lines);
+	return;
+		
 }
 
 // Open Dialog to export Module state json
@@ -176,17 +189,20 @@ async function importModuleStateAsPreset(data) {
 		submit: async (_result) => {
 			const baseName = _result;
 			if (!baseName) { ui.notifications.warn("Please enter a preset name."); return; }
+
 			const res = await savePreset(`${baseName} (${formatDateD_Mon_YYYY()})`, modules);
 			if (res.status !== "saved") return;
-			debugLog(`importModuleStateAsPreset(): Imported preset "${res.name}" (${modules.length} modules).`);
+
 			ui.notifications.info(`Imported preset "${res.name}" (${modules.length} modules).`);
-			await showImportIssuesDialog(report);
-			openPresetManager();
 
-			// 4) show issues last (awaitable)
-			await showImportIssuesDialog(report);
+			// Show issues once (if any), do NOT reopen the manager here.
+			const report = validateModuleState(modules);
+			if (report.unknown.length || report.depIssues.length) {
+				await showImportIssuesDialog(report);
+			}
 
-			openPresetManager();
+			// Return to caller so it can decide whether to close/refresh the manager.
+			return res;
 		}
 	}).render(true);
 }
@@ -271,12 +287,12 @@ function pickLocalJSONFile() {
 
 // read preset map 
 function getPresets() {
-	return foundry.utils.duplicate(game.settings.get(MM_ID, SETTING_PRESETS) || {});
+	return foundry.utils.duplicate(game.settings.get(MM_ID, MODULE_SETTING_PRESETS) || {});
 }
 
 // set preset map
 async function setPresets(presets) {
-	await game.settings.set(MM_ID, SETTING_PRESETS, presets);
+	await game.settings.set(MM_ID, MODULE_SETTING_PRESETS, presets);
 }
 
 // Normalize name to compare when saving
@@ -581,7 +597,13 @@ export async function openPresetManager() {
 					catch { ui.notifications.error("Invalid JSON file."); return; }
 					
 					// Import file to preset
-					await importModuleStateAsPreset(data);
+					const res = await importModuleStateAsPreset(data);
+					// If the import saved a preset, close and reopen the manager ONCE
+					if (res?.status === "saved") {
+						app.close();
+						openPresetManager();
+					}
+					return;
 				}
 			} catch (err) {
 				debugLog(3, "Dialog click handler error", err);
@@ -608,33 +630,3 @@ Hooks.once("ready", () => {
 Hooks.on("setup", () => debugLog("presets.js | setup fired"));
 Hooks.once("ready", () => debugLog("ready fired"));
 
-// Add button to module managment screen
-Hooks.on("renderModuleManagement", (app, html/*HTMLElement*/) => {
-	
-	debugLog(`renderModuleManagement hook fired!`);
-	
-	// Robust root + footer lookup
-	const root = html instanceof HTMLElement ? html : (html?.[0] ?? null);
-	if (!root) return;
-	const footer = root.querySelector("footer.form-footer");
-	if (!footer) return;
-
-	// Prevent duplicates
-	if (footer.querySelector(".bbmm-btn")) return;
-
-	// Create button
-	const btn = document.createElement("button");
-	btn.type = "button";
-	btn.className = "bbmm-btn";
-	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i> Preset Manager`;
-
-	// Click → open your manager
-	btn.addEventListener("click", (ev) => {
-		ev.preventDefault();
-		ev.stopPropagation();
-		if (typeof openPresetManager === "function") openPresetManager();
-	});
-
-	// Append at the end (next to “Deactivate All Modules”)
-	footer.appendChild(btn);
-});

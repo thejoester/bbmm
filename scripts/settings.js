@@ -1,7 +1,9 @@
 import { openPresetManager } from './presets.js';
-const MM_ID = "bbmm";
-const SETTING_PRESETS = "presets";  // { [name]: string[] }  enabled module ids
+import { openSettingsPresetManager } from './settings-presets.js';
 
+const MM_ID = "bbmm";
+const MODULE_SETTING_PRESETS = "module-presets";  // { [name]: string[] }  enabled module ids
+const SETTING_SETTINGS_PRESETS = "settingsPresets"; 
 //	Function for debugging
 export function debugLog(intLogType, stringLogMsg, objObject = null) {
 	
@@ -78,9 +80,19 @@ export function debugLog(intLogType, stringLogMsg, objObject = null) {
 
 Hooks.once("init", () => {
 	
-	// Store presets as a world setting (object map name->array)
-	game.settings.register(MM_ID, SETTING_PRESETS, {
-		name: "Presets",
+	// Module Presets button
+	game.settings.register(MM_ID, MODULE_SETTING_PRESETS, {
+		name: "Module Presets",
+		hint: "Stored module enable/disable presets.",
+		scope: "world",
+		config: false,
+		type: Object,
+		default: {}
+	});
+	
+	// Settings Presets button
+	game.settings.register(MM_ID, SETTING_SETTINGS_PRESETS, {
+		name: "Settings Presets",
 		hint: "Stored module enable/disable presets.",
 		scope: "world",
 		config: false,
@@ -89,7 +101,7 @@ Hooks.once("init", () => {
 	});
 
 	// Add a menu entry in Configure Settings to open the Preset Manager
-	game.settings.registerMenu(MM_ID, "presetManager", {
+	game.settings.registerMenu(MM_ID, "modulePresetManager", {
 		name: "Module Presets",
 		label: "Open Module Preset Manager",
 		icon: "fas fa-layer-group",
@@ -98,8 +110,8 @@ Hooks.once("init", () => {
 			constructor(...args){ super(...args); }
 			static get defaultOptions() {
 				return foundry.utils.mergeObject(super.defaultOptions, {
-					id: "mmplus-preset-manager",
-					title: "Module Management+ — Presets",
+					id: "bbmm-module-preset-manager",
+					title: "BBBM Module Presets",
 					template: null, // We’ll use DialogV2 instead
 					width: 600
 				});
@@ -111,6 +123,31 @@ Hooks.once("init", () => {
 			async _updateObject() {}
 		}
 	});
+	
+	// Add a menu entry in Configure Settings to open the Preset Manager
+	game.settings.registerMenu(MM_ID, "settingsPresetManager", {
+		name: "Settings Presets",
+		label: "Open Settings Preset Manager",
+		icon: "fas fa-layer-group",
+		restricted: true,
+		type: class extends FormApplication {
+			constructor(...args){ super(...args); }
+			static get defaultOptions() {
+				return foundry.utils.mergeObject(super.defaultOptions, {
+					id: "bbmm-settings-preset-manager",
+					title: "BBBM Settings Presets",
+					template: null, // We’ll use DialogV2 instead
+					width: 600
+				});
+			}
+			async render(...args) {
+				await openSettingsPresetManager();
+				return this;
+			}
+			async _updateObject() {}
+		}
+	});
+	
 	
 	// Debug level for THIS module
 	game.settings.register(MM_ID, "debugLevel", {
@@ -126,3 +163,78 @@ Hooks.once("init", () => {
 
 Hooks.on("setup", () => debugLog("settings.js | setup fired"));
 Hooks.once("ready", () => debugLog("settings.js | ready fired"));
+
+// Open a small chooser dialog, then launch the selected manager
+export async function openBBMMLauncher() {
+	debugLog("openBBMMLauncher()");
+
+	const choice = await new Promise((resolve) => {
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: "Big Bad Module Manager" },
+			content: `
+				<div style="min-width:420px;display:flex;flex-direction:column;gap:.75rem;">
+					<p class="notes">Choose which manager to open:</p>
+				</div>
+			`,
+			buttons: [
+				{ action: "modules",	label: "Module Preset Manager",	default: true, callback: () => "modules" },
+				{ action: "settings",	label: "Settings Preset Manager", callback: () => "settings" },
+				{ action: "cancel",		label: "Cancel" , callback: () => "cancel" }
+			],
+			submit: (res/*, _ev, _btn*/) => resolve(res ?? "cancel"),
+			rejectClose: false,
+			render: (app) => {
+				// make the standard footer vertical
+				const form = app.element?.querySelector("form");
+				const footer = form?.querySelector("footer");
+				if (footer) {
+					footer.style.display = "flex";
+					footer.style.flexDirection = "column";
+					footer.style.gap = ".5rem";
+					footer.style.alignItems = "stretch";
+				}
+			}
+		});
+		dlg.render(true);
+	});
+
+	debugLog(`openBBMMLauncher(): choice = ${choice}`);
+
+	if (choice === "modules") {
+		openPresetManager();
+	} else if (choice === "settings") {
+		openSettingsPresetManager();
+	} 
+	// "cancel" → do nothing
+}
+
+// Add button to module managment screen
+Hooks.on("renderModuleManagement", (app, html/*HTMLElement*/) => {
+	
+	debugLog(`renderModuleManagement hook fired!`);
+	
+	// Robust root + footer lookup
+	const root = html instanceof HTMLElement ? html : (html?.[0] ?? null);
+	if (!root) return;
+	const footer = root.querySelector("footer.form-footer");
+	if (!footer) return;
+
+	// Prevent duplicates
+	if (footer.querySelector(".bbmm-btn")) return;
+
+	// Create button
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "bbmm-btn";
+	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i> BBMM`;
+
+	// Click → open your manager
+	btn.addEventListener("click", (ev) => {
+		ev.preventDefault();
+		ev.stopPropagation();
+		openBBMMLauncher();
+	});
+
+	// Append at the end (next to “Deactivate All Modules”)
+	footer.appendChild(btn);
+});
