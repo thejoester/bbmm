@@ -118,7 +118,7 @@ function collectAllModuleSettings({ includeDisabled = false } = {}) {
 	for (const def of game.settings.settings.values()) {
 		const { namespace, key, scope, config } = def;
 		// skip hidden settings
-		if (config === false) continue;
+		//if (config === false) continue;
 
 		// scope filter by permission
 		if (scope === "world" && !isGM) continue;
