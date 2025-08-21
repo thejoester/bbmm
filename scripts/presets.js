@@ -66,7 +66,7 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 		// Group by module → list missing deps
 		const byMod = new Map();
 		for (const it of depIssues) {
-			const modId = it.module?.id ?? it.id;   // fall back if your shape is { id, depId }
+			const modId = it.module?.id ?? it.id;   // fall back if shape is { id, depId }
 			const depId = it.dep?.id ?? it.depId;
 			if (!byMod.has(modId)) byMod.set(modId, []);
 			if (depId != null) byMod.get(modId).push(depId);
@@ -155,7 +155,7 @@ async function importModuleStateAsPreset(data) {
 	}
 	const modules = validated.modules;
 
-	// 2) compute report now (no UI yet)
+	// 2) compute report now
 	const report = validateModuleState(modules);
 
 	// 3) ask for preset name and save
@@ -224,12 +224,11 @@ function formatDateD_Mon_YYYY(d = new Date()) {
 
 // Helper to export to .json file
 async function saveJSONFile(data, filename) {
-	// 1) Foundry's native helper (best across Electron + browsers)
+	// 1) Foundry's native helper 
 	if (typeof saveDataToFile === "function") {
 		return saveDataToFile(JSON.stringify(data, null, 2), "application/json", filename);
 	}
 
-	// 2) Modern browsers over HTTPS/localhost: File System Access API
 	if (window.showSaveFilePicker) {
 		try {
 			const handle = await showSaveFilePicker({
@@ -334,7 +333,7 @@ async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 	await game.settings.set("core", "moduleConfiguration", config);
 }
 
-/** Get required dependency ids declared by a module (v10+ manifest) */
+// Get required dependency ids declared by a module 
 function getRequiredIds(mod) {
 	// Supports both legacy and modern manifest styles
 	const data = mod?.manifest || mod?.data?.manifest || {};
@@ -493,7 +492,7 @@ export async function openPresetManager() {
 }
 
 Hooks.once("ready", () => {
-	window.openPresetManager = openPresetManager; // lets you run it from console
+	window.openPresetManager = openPresetManager; // run it from console
 	const mod = game.modules.get("bbmm");
 	if (!mod) return;
 	mod.api ??= {};
@@ -504,3 +503,30 @@ Hooks.once("ready", () => {
 Hooks.on("setup", () => debugLog("presets.js | setup fired"));
 Hooks.once("ready", () => debugLog("ready fired"));
 
+// Add button to module managment screen
+Hooks.on("renderModuleManagement", (app, html/*HTMLElement*/) => {
+	// Robust root + footer lookup
+	const root = html instanceof HTMLElement ? html : (html?.[0] ?? null);
+	if (!root) return;
+	const footer = root.querySelector("footer.form-footer");
+	if (!footer) return;
+
+	// Prevent duplicates
+	if (footer.querySelector(".bbmm-btn")) return;
+
+	// Create button
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "bbmm-btn";
+	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i> Preset Manager`;
+
+	// Click → open your manager
+	btn.addEventListener("click", (ev) => {
+		ev.preventDefault();
+		ev.stopPropagation();
+		if (typeof openPresetManager === "function") openPresetManager();
+	});
+
+	// Append at the end (next to “Deactivate All Modules”)
+	footer.appendChild(btn);
+});

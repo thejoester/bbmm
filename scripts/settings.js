@@ -126,31 +126,3 @@ Hooks.once("init", () => {
 
 Hooks.on("setup", () => debugLog("settings.js | setup fired"));
 Hooks.once("ready", () => debugLog("settings.js | ready fired"));
-
-Hooks.on("renderApplication", (app, html) => {
-	// Only target the Module Management screen
-	if (app.constructor.name !== "ModuleManagement") return;
-	debugLog(`settings.js: ModuleManagement app rendered!`);
-
-	// Find the footer
-	const footer = html[0].querySelector("footer.form-footer");
-	if (!footer) return;
-
-	// Prevent duplicate injection
-	if (footer.querySelector(".bbmm-btn")) return;
-
-	// Create button
-	const btn = document.createElement("button");
-	btn.type = "button";
-	btn.className = "bbmm-btn";
-	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i> Preset Manager`;
-
-	// Add click handler
-	btn.addEventListener("click", ev => {
-		ev.preventDefault();
-		openPresetManager(); // your existing function
-	});
-
-	// Insert just before the "Deactivate All" or at the end
-	footer.appendChild(btn);
-});
