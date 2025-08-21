@@ -52,5 +52,14 @@ jobs:
           prerelease: ${{ github.event.release.prerelease }}
           name: ${{ steps.get_version.outputs.version-without-v }}
           body: ${{ steps.changelog.outputs.release-notes }}
-          artifacts: "./module.json, ./bbmm.zip"
+          artifacts: |
+            module.json
+            bbmm.zip
           
+      - name: Publish Module to FoundryVTT Website
+        id: publish-to-foundry-website
+        if: ${{ ! github.event.release.prerelease}}
+        uses: cs96and/FoundryVTT-release-package@v1
+        with:
+          package-token: ${{ secrets.FOUNDRY_RELEASE_TOKEN }}
+          manifest-url: https://github.com/${{github.repository}}/releases/download/${{github.event.release.tag_name}}/module.json
