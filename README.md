@@ -25,7 +25,7 @@ A module management tool for FoundryVTT.
 
 <img width="1180" height="851" alt="image" src="https://github.com/user-attachments/assets/325d0ec3-c1e9-4e6b-a507-2e88f2098f6a" />
 <br/><br />
-<img width="682" height="481" alt="image" src="https://github.com/user-attachments/assets/13de204d-e9ff-48ca-9a35-7b9d375c0e09" />
+<img width="682" height="481" alt="image" src="https://github.com/user-attachments/assets/c16735dc-fa68-4d1b-ac8f-4ff7ce7415d0" />
 <br/><br />
 <img width="556" height="440" alt="image" src="https://github.com/user-attachments/assets/115ae28b-fcab-4ff8-8538-a2d49e0ce2b6" />
 <br/><br />
