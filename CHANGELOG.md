@@ -5,10 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.6] - 2025-08-24
+### Added
+- **Settings Preset Manager:** When importing, you can now choose to import all settings, specify which module, 
+### Fixed
+- **Settings Preset Manager:** Fixed bug preventing certain data types being saved (for example the new Reach Enforcement setting for pf2e system). 
+- **Settings Preset Manager:** Excluding saving settings of presets for this module (BBMM), resulting in presets being overwriten as well as dramatically increasing file size of .json. Should be MUCH smaller now. 
+- **Macros:** Added macro to inpspect preset and view values (click values to expand if needed).
+
 ## [0.0.5] - 2025-08-21
 ### Fixed
 - **Settings Preset Manager:** Fixed bug not saving settings on a separate template page. 
-
+- **Settings Preset Manager:** Blocking importing preset settings to prevent them being overwritten when importing, and siginificantly reducing the size of export. 
+### Added
+- **Settings Preset Manager:** 	
 ## [0.0.4] - 2025-08-21
 ### Added
 - **Settings Preset Manager:**
