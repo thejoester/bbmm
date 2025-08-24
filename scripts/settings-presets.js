@@ -1120,7 +1120,6 @@ export async function openSettingsPresetManager() {
 					openSettingsPresetManager();
 					return;
 				}
-
 				if (action === "load") {
 					if (!selected) return ui.notifications.warn("Select a settings preset to load.");
 					const preset = getSettingsPresets()[selected];
@@ -1134,10 +1133,56 @@ export async function openSettingsPresetManager() {
 					});
 					if (!ok) return;
 
-					await applySettingsExport(preset);
+					/*
+						Convert stored preset shapes into the official bbmm-settings export shape.
+						Supported inputs:
+						- Full bbmm export (has type:"bbmm-settings") → use as-is
+						- { items:[{ namespace,key,value,scope }] }
+						- { entries:[ ...same as items... ] }
+					*/
+					let payload = preset;
+
+					// { items: [...] } or { entries: [...] } → hydrate to bbmm-settings
+					const flat = Array.isArray(preset?.items) ? preset.items
+						: (Array.isArray(preset?.entries) ? preset.entries : null);
+
+					if (!preset?.type && flat) {
+						// {Comment} Build a proper bbmm-settings export envelope
+						const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {} };
+
+						for (const e of flat) {
+							if (!e || typeof e.namespace !== "string" || typeof e.key !== "string") continue;
+							const scope = (e.scope === "world") ? "world" : "client";
+							out[scope][e.namespace] ??= {};
+							out[scope][e.namespace][e.key] = e.value;
+						}
+
+						payload = out;
+						debugLog("BBMM", `Load: converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
+					}
+
+					// Safety: ignore accidental nested {world:{<worldName>:{...}}} wrappers from other exporters
+					if (payload?.type === "bbmm-settings") {
+						const stripWorldNameNest = (bucket) => {
+							// {Comment} If bucket has exactly one key and that key looks like a world id/name, unwrap it
+							const keys = Object.keys(bucket || {});
+							if (keys.length === 1) {
+								const k = keys[0];
+								const maybe = bucket[k];
+								if (maybe && typeof maybe === "object" && Object.values(maybe).every(v => v && typeof v === "object")) {
+									return maybe; // unwrap
+								}
+							}
+							return bucket;
+						};
+						payload.world = stripWorldNameNest(payload.world);
+						payload.client = stripWorldNameNest(payload.client);
+					}
+
+					// Apply
+					await applySettingsExport(payload);
 					return;
 				}
-
 				if (action === "delete") {
 					if (!selected) return ui.notifications.warn("Select a settings preset to delete.");
 					const ok = await foundry.applications.api.DialogV2.confirm({
