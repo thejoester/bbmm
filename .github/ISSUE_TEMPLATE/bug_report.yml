@@ -2,6 +2,8 @@ name: 🐞 Bug Report
 description: Report a bug or unexpected behavior in the module.
 title: "[Bug] <brief description>"
 labels: [bug]
+assignees:
+  - thejoester
 body:
   - type: markdown
     attributes:
