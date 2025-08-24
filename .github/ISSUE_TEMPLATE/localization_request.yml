@@ -3,6 +3,8 @@ name: 🌐 Localization Request / issue
 description: Request support for a new localization or submit missing/incorrect localization for an existing language.
 title: "[Translation Request] <Language Name or Code>"
 labels: [localization, help wanted]
+assignees:
+  - thejoester
 body:
   - type: markdown
     attributes:
