@@ -20,6 +20,7 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 - Load / delete preset.
 - Export settings state to .json
 - import .json to preset
+  - Choose which modules or specific settings to import
 
 ## Planned features
 - Changelog report: open new changelogs if the CHANGELOG.md is included in module
