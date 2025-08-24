@@ -2,6 +2,8 @@ name: 💡 Feature Request
 description: Suggest an improvement or new feature for the module.
 title: "[Feature] <brief description>"
 labels: [enhancement]
+assignees:
+  - thejoester
 body:
   - type: markdown
     attributes:
