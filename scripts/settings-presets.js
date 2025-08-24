@@ -9,7 +9,7 @@ const EXPORT_SKIP = new Map([
 const AppV2 = foundry?.applications?.api?.ApplicationV2;
 if (!AppV2) {
 	// Comment
-	debugLog("error", "BBMM: ApplicationV2 base class not found.");
+	debugLog(1, "ApplicationV2 base class not found.");
 }
 
 Hooks.once("init", () => {
@@ -184,6 +184,12 @@ function normalizeName(s) {
 	return String(s).normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+// Return true if this setting exists in the registry
+function isRegisteredSetting(namespace, key) {
+	const fullKey = `${namespace}.${key}`;
+	return game.settings?.settings?.has(fullKey) === true;
+}
+
 // Normalize incoming settings export (BBMM format or fallback map).
 function normalizeImportedSettings(data) {
 	// Preferred BBMM shape
@@ -239,7 +245,7 @@ export async function openSettingsImportWizard(data) {
 		// If no data was passed in, prompt the user to pick a JSON file
 		const json = data || await pickJsonFile();
 		if (!json) {
-			debugLog("BBMM", "Import Wizard: no JSON provided/selected");
+			debugLog("openSettingsImportWizard(): no JSON provided/selected");
 			return;
 		}
 
@@ -278,16 +284,16 @@ export async function openSettingsImportWizard(data) {
 
 		if (!normalized.entries.length) {
 			ui.notifications.warn("No settings found in JSON.");
-			debugLog("BBMM", "Import Wizard: 0 entries after normalization", { json });
+			debugLog("openSettingsImportWizard(): Import Wizard: 0 entries after normalization", { json });
 			return;
 		}
 
-		debugLog("BBMM", `Import Wizard: normalized ${normalized.entries.length} entries from ${normalized.moduleList.length} namespaces`);
+		debugLog(`openSettingsImportWizard(): Import Wizard: normalized ${normalized.entries.length} entries from ${normalized.moduleList.length} namespaces`);
 
 		// Guard: verify base class is available before we construct
 		if (!AppV2) {
 			ui.notifications.error("BBMM Import Wizard: ApplicationV2 is unavailable.");
-			debugLog("error", "openSettingsImportWizard(): AppV2 base missing", { AppV2 });
+			debugLog("openSettingsImportWizard(): openSettingsImportWizard(): AppV2 base missing", { AppV2 });
 			return;
 		}
 
@@ -297,7 +303,7 @@ export async function openSettingsImportWizard(data) {
 			app = new BBMMImportWizard({ json, normalized });
 			app.render(true);	
 		} catch (ctorErr) {
-			debugLog("error", "BBMM Import Wizard: constructor failed", ctorErr);
+			debugLog("openSettingsImportWizard(): BBMM Import Wizard: constructor failed", ctorErr);
 			ui.notifications.error(`Import Wizard failed during construction: ${ctorErr?.message ?? ctorErr}`);
 			return;
 		}
@@ -306,13 +312,13 @@ export async function openSettingsImportWizard(data) {
 		try {
 			await app.render(true);
 		} catch (renderErr) {
-			debugLog("error", "BBMM Import Wizard: render failed", renderErr);
+			debugLog("openSettingsImportWizard(): BBMM Import Wizard render failed", renderErr);
 			ui.notifications.error(`Import Wizard failed during render: ${renderErr?.message ?? renderErr}`);
 			return;
 		}
 	} catch (err) {
 		// If anything else goes wrong, log and notify
-		debugLog("error", "openSettingsImportWizard: failed to open", err);
+		debugLog("openSettingsImportWizard(): failed to open", err);
 		ui.notifications.error("Failed to open Import Wizard (see console).");
 	}
 }
@@ -398,10 +404,10 @@ async function savePresetToSettings(presetName, selectedEntries) {
 
 		await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, current);
 
-		debugLog("BBMM", `savePresetToSettings(): saved preset "${presetName}" with ${selectedEntries.length} entries`);
+		debugLog(`savePresetToSettings(): saved preset "${presetName}" with ${selectedEntries.length} entries`);
 		return current[presetName];
 	} catch (e) {
-		debugLog("error", "savePresetToSettings(): failed", { message: e?.message, stack: e?.stack });
+		debugLog(3, "savePresetToSettings(): failed", { message: e?.message, stack: e?.stack });
 		throw e;
 	}
 }
@@ -489,7 +495,7 @@ class BBMMImportWizard extends AppV2 {
 			this._list = /** @type {HTMLElement|null} */ (contentRegion.querySelector("#bbmm-list"));
 
 			// Deep debug so we can see what exists right now
-			debugLog("BBMM", "Import Wizard _replaceHTML(): after inject", {
+			debugLog("_replaceHTML(): Import Wizard _replaceHTML(): after inject", {
 				hasWindowContent: !!win.querySelector(".window-content"),
 				rootTag: this._root?.tagName,
 				htmlLen: this._root?.innerHTML?.length ?? 0,
@@ -501,7 +507,7 @@ class BBMMImportWizard extends AppV2 {
 			// Wire listeners on next tick
 			setTimeout(() => this.activateListeners(), 0);
 		} catch (e) {
-			debugLog("error", "Import Wizard: _replaceHTML failed", e);
+			debugLog("BBMMImportWizard: _replaceHTML failed", e);
 			throw e;
 		}
 	}
@@ -510,7 +516,7 @@ class BBMMImportWizard extends AppV2 {
 	activateListeners() {
 		// Prevent double‑wiring if AppV2 rerenders or we get called twice
 		if (this._wired) {
-			debugLog("BBMM", "activateListeners skipped (already wired)");
+			debugLog("activateListeners(): activateListeners skipped (already wired)");
 			return;
 		}
 		this._wired = true;
@@ -520,14 +526,14 @@ class BBMMImportWizard extends AppV2 {
 		const form = this._form || /** @type {HTMLFormElement|null} */ (root?.querySelector("form.bbmm-import"));
 		const list = this._list || /** @type {HTMLElement|null} */ (root?.querySelector("#bbmm-list"));
 
-		debugLog("BBMM", "activateListeners called", {
+		debugLog("activateListeners(): activateListeners called", {
 			hasRoot: !!root,
 			hasForm: !!form,
 			hasList: !!list
 		});
 
 		if (!root || !form || !list) {
-			debugLog("error", "BBMM Import Wizard: form or #bbmm-list not found (post-activate)");
+			debugLog("activateListeners(): BBMM Import Wizard: form or #bbmm-list not found (post-activate)");
 			return;
 		}
 
@@ -555,13 +561,13 @@ class BBMMImportWizard extends AppV2 {
 
 			// Recalculate height and recenter so window never grows off-screen
 			this.setPosition({ height: "auto", left: null, top: null });
-			debugLog("BBMM", "paint() done and window re-centered", { mode });
+			debugLog("paint() done and window re-centered", { mode });
 		};
 
 		// Prevent default form submission (which could cause double events)
 		form.addEventListener("submit", (ev) => {
 			ev.preventDefault();
-			debugLog("BBMM", "blocked default form submit");
+			debugLog("BBMMImportWizard(): blocked default form submit");
 		});
 
 		// Mode changes repaint and recenter
@@ -569,7 +575,7 @@ class BBMMImportWizard extends AppV2 {
 
 		// Cancel button closes the wizard
 		form.querySelector('[data-action="cancel"]')?.addEventListener("click", () => {
-			debugLog("BBMM", "Import Wizard: cancel clicked — closing");
+			debugLog("BBMMImportWizard: cancel clicked — closing");
 			this.close();
 		});
 
@@ -616,23 +622,23 @@ class BBMMImportWizard extends AppV2 {
 
 				// Lightweight feedback + close immediately so it feels responsive
 				ui.notifications.info(`Importing ${selected.length} setting(s) into preset "${name}"…`);
-				debugLog("BBMM", `Import Wizard: starting import of ${selected.length} entries to "${name}"`);
+				debugLog(`BBMMImportWizard: starting import of ${selected.length} entries to "${name}"`);
 
 				// Close the window first; the async save continues in the background
 				this.close();
 
 				// Perform the save
 				const preset = await savePresetToSettings(name, selected);
-				debugLog("BBMM", "Import Wizard: savePresetToSettings OK", { name, count: selected.length });
+				debugLog("BBMMImportWizard: savePresetToSettings OK", { name, count: selected.length });
 				
-				debugLog("BBMM", "Reopening Settings Preset Manager after import");
+				debugLog("BBMMImportWizard: Reopening Settings Preset Manager after import");
 				openSettingsPresetManager();
 				Hooks.callAll("bbmm:importPreset", { name, items: preset.items });
 
 				// Final toast after completion
 				ui.notifications.info(`Imported ${selected.length} setting(s) into preset "${name}".`);
 			} catch (e) {
-				debugLog("error", "Import Wizard: failed to save preset", { message: e?.message, stack: e?.stack });
+				debugLog(3, "Import Wizard: failed to save preset", { message: e?.message, stack: e?.stack });
 				ui.notifications.error(`Failed to save preset: ${e?.message ?? "see console"}`);
 			} finally {
 				this._inFlight = false;
@@ -746,6 +752,7 @@ function defaultPresetName() {
 	const pad = (n) => `${n}`.padStart(2, "0");
 	return `Imported ${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
 function getSettingsPresets() {
 	return foundry.utils.duplicate(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
 }
@@ -840,7 +847,7 @@ function collectAllModuleSettings({ includeDisabled = false } = {}) {
 		
 		// skip this module presets to reduce export size
 		if (EXPORT_SKIP.get(namespace)?.has(key)) {
-			debugLog(`Export: skipping ${namespace}.${key}`);
+			debugLog(`collectAllModuleSettings(): Export: skipping ${namespace}.${key}`);
 			continue;
 		}
 		
@@ -851,7 +858,7 @@ function collectAllModuleSettings({ includeDisabled = false } = {}) {
 			const raw = game.settings.get(namespace, key); // keep this if you already switched to raw-get
 			bucket[namespace][key] = toJsonSafe(raw);
 		} catch (e) {
-			debugLog(`Export: collect FAILED ${fullKey} — ${e?.message ?? e}`);
+			debugLog(`collectAllModuleSettings(): Export: collect FAILED ${fullKey} — ${e?.message ?? e}`);
 			bucket[namespace][key] = null; // or `continue;` if you prefer to skip
 		}
 	}
@@ -910,7 +917,7 @@ async function applySettingsExport(exportData) {
 						else hydrated = new Map();
 					}
 
-					// ✅ NEW: if the schema expects a plain Object but we somehow have a Map, coerce to POJO
+					// if the schema expects a plain Object but we somehow have a Map, coerce to POJO
 					if (cfg?.type === Object && hydrated instanceof Map) {
 						hydrated = Object.fromEntries(hydrated);
 					}
@@ -1015,7 +1022,7 @@ export async function openSettingsPresetManager() {
 	// Close any existing instance so we reopen a fresh one
 	const existing = getWindowById(PRESET_MANAGER_ID);
 	if (existing) {
-		debugLog("BBMM", "Settings Preset Manager: closing existing instance before reopen");
+		debugLog("openSettingsPresetManager(): Settings Preset Manager: closing existing instance before reopen");
 		existing.close({ force: true });
 	}
 
@@ -1124,7 +1131,8 @@ export async function openSettingsPresetManager() {
 					if (!selected) return ui.notifications.warn("Select a settings preset to load.");
 					const preset = getSettingsPresets()[selected];
 					if (!preset) return;
-
+					const skippedMissing = [];	// Collect skipped items for a one-time notice
+					
 					const ok = await foundry.applications.api.DialogV2.confirm({
 						window: { title: "Apply Settings Preset" },
 						content: `<p>Apply settings preset <b>${esc(selected)}</b>?</p>`,
@@ -1133,13 +1141,6 @@ export async function openSettingsPresetManager() {
 					});
 					if (!ok) return;
 
-					/*
-						Convert stored preset shapes into the official bbmm-settings export shape.
-						Supported inputs:
-						- Full bbmm export (has type:"bbmm-settings") → use as-is
-						- { items:[{ namespace,key,value,scope }] }
-						- { entries:[ ...same as items... ] }
-					*/
 					let payload = preset;
 
 					// { items: [...] } or { entries: [...] } → hydrate to bbmm-settings
@@ -1152,13 +1153,19 @@ export async function openSettingsPresetManager() {
 
 						for (const e of flat) {
 							if (!e || typeof e.namespace !== "string" || typeof e.key !== "string") continue;
+							
+							// Skip if the setting is not registered (module missing or setting removed)
+							if (!isRegisteredSetting(e.namespace, e.key)) {
+								skippedMissing.push(`${e.namespace}.${e.key}`);
+								continue; // {Do not attempt to set this}
+							}
 							const scope = (e.scope === "world") ? "world" : "client";
 							out[scope][e.namespace] ??= {};
 							out[scope][e.namespace][e.key] = e.value;
 						}
 
 						payload = out;
-						debugLog("BBMM", `Load: converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
+						debugLog(`openSettingsPresetManager(): Load converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
 					}
 
 					// Safety: ignore accidental nested {world:{<worldName>:{...}}} wrappers from other exporters
@@ -1177,6 +1184,12 @@ export async function openSettingsPresetManager() {
 						};
 						payload.world = stripWorldNameNest(payload.world);
 						payload.client = stripWorldNameNest(payload.client);
+					}
+					
+					if (skippedMissing.length) {
+						const count = skippedMissing.length;
+						ui.notifications?.warn(`BBMM: Skipped ${count} setting${count !== 1 ? "s" : ""} for uninstalled or unregistered modules. Check console for details.`);
+						debugLog(`openSettingsPresetManager(): Skipped for missing modules/settings:\n${skippedMissing.join("\n")}`);
 					}
 
 					// Apply
@@ -1205,21 +1218,21 @@ export async function openSettingsPresetManager() {
 
 				if (action === "export") {
 					try {
-						debugLog("BBMM", "Export: start");
+						debugLog("openSettingsPresetManager():Export: start");
 						const payload = collectAllModuleSettings({ includeDisabled });
-						debugLog("BBMM", "Export: collected OK");
+						debugLog("openSettingsPresetManager():Export: collected OK");
 						schemaCorrectNonPlainTypes(payload);
-						debugLog("BBMM", "Export: schema corrected OK");
+						debugLog("openSettingsPresetManager():Export: schema corrected OK");
 
 						const base = game.user.isGM ? "settings-world-client" : "settings-client";
 						const fname = `bbmm-${base}-${timestampStr()}.json`;
 
-						debugLog("BBMM", `Export: saving ${fname}`);
+						debugLog(`openSettingsPresetManager(): Export: saving ${fname}`);
 						await saveJSONFile(payload, fname);
 						ui.notifications.info("Exported current settings.");
-						debugLog("BBMM", "Export: done");
+						debugLog("openSettingsPresetManager(): Export: done");
 					} catch (e) {
-						debugLog("error", `Export: FAILED — ${e?.message ?? e}`);
+						debugLog(3, `Export: FAILED — ${e?.message ?? e}`);
 						ui.notifications.error(`Export failed: ${e?.message ?? e}`);
 						throw e;
 					}

@@ -129,7 +129,7 @@ Hooks.once("init", () => {
 		name: "Settings Presets",
 		label: "Open Settings Preset Manager",
 		icon: "fas fa-layer-group",
-		restricted: true,
+		restricted: false,
 		type: class extends FormApplication {
 			constructor(...args){ super(...args); }
 			static get defaultOptions() {
