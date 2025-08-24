@@ -37,7 +37,7 @@
   "description": "Utility to manage modules and settings.",
   "manifest": "https://raw.githubusercontent.com/thejoester/bbmm/master/module.json",
   "download": "https://github.com/thejoester/bbmm/releases/latest/download/bbmm.zip",
-  "readme": "https://github.com/thejoester/bbmm#readme",
+  "readme": "https://github.com/thejoester/bbmm/blob/main/CHANGELOG.md",
   "bugs": "https://github.com/thejoester/bbmm/issues",
-  "changelog": "https://github.com/thejoester/bbmm/releases"
+  "changelog": "https://github.com/thejoester/bbmm/blob/main/README.md"
 }
