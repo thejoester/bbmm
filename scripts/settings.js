@@ -2,7 +2,7 @@ import { openPresetManager } from './presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 
 const MM_ID = "bbmm";
-const MODULE_SETTING_PRESETS = "module-presets";  // { [name]: string[] }  enabled module ids
+const MODULE_SETTING_PRESETS = "module-presets";  
 const SETTING_SETTINGS_PRESETS = "settingsPresets"; 
 //	Function for debugging
 export function debugLog(intLogType, stringLogMsg, objObject = null) {
@@ -238,3 +238,5 @@ Hooks.on("renderModuleManagement", (app, html/*HTMLElement*/) => {
 	// Append at the end (next to “Deactivate All Modules”)
 	footer.appendChild(btn);
 });
+
+window.openBBMMLauncher = openBBMMLauncher;
