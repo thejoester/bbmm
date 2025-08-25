@@ -1,4 +1,5 @@
 import { DL } from './settings.js';
+import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName } from './helpers.js';
 const BBMM_ID = "bbmm";
 const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  enabled module ids
 
@@ -48,25 +49,8 @@ function hlp_validateModuleState(modIds) {
 	return { unknown, depIssues };
 }
 
-// Tiny safe HTML escaper for labels/values
-function hlp_esc(s) {
-	return String(s).replace(/[&<>"']/g, (m) => ({
-		"&": "&amp;",
-		"<": "&lt;",
-		">": "&gt;",
-		'"': "&quot;",
-		"'": "&#39;"
-	}[m]));
-}
-
 function hlp_slugify(s) {
 	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-// get time stamp
-function hlp_timestampStr(d = new Date()) {
-	const p = (n, l=2) => String(n).padStart(l, "0");
-	return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
 function hlp_formatDateD_Mon_YYYY(d = new Date()) {
@@ -74,57 +58,6 @@ function hlp_formatDateD_Mon_YYYY(d = new Date()) {
 	const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
 	const yyyy = d.getFullYear();
 	return `${dd}-${MON}-${yyyy}`;
-}
-
-// Helper to export to .json file
-async function hlp_saveJSONFile(data, filename) {
-	// 1) Foundry's native helper 
-	if (typeof saveDataToFile === "function") {
-		return saveDataToFile(JSON.stringify(data, null, 2), "application/json", filename);
-	}
-
-	if (window.showSaveFilePicker) {
-		try {
-			const handle = await showSaveFilePicker({
-				suggestedName: filename,
-				types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
-			});
-			const stream = await handle.createWritable();
-			await stream.write(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-			return stream.close();
-		} catch (e) {
-			// user probably cancelled; just return
-			return;
-		}
-	}
-
-	// 3) Fallback: anchor download (uses browser download location / may not prompt)
-	const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement("a");
-	a.href = url;
-	a.download = filename;
-	document.body.appendChild(a);
-	a.click();
-	a.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-// prompt to pick .json file
-function hlp_pickLocalJSONFile() {
-	return new Promise((resolve) => {
-		const input = document.createElement("input");
-		input.type = "file";
-		input.accept = "application/json";
-		input.style.display = "none";
-		document.body.appendChild(input);
-		input.addEventListener("change", () => {
-			const file = input.files?.[0] ?? null;
-			document.body.removeChild(input);
-			resolve(file || null);
-		}, { once: true });
-		input.click();
-	});
 }
 
 // Get required dependency ids declared by a module 
@@ -153,11 +86,6 @@ function hlp_getPresets() {
 // set preset map
 async function hlp_setPresets(presets) {
 	await game.settings.set(BBMM_ID, MODULE_SETTING_PRESETS, presets);
-}
-
-// Normalize name to compare when saving
-function hlp_normalizePresetName(s) {
-	return String(s).normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 // Save Preset checking if it exists and prompting to overwrite or rename

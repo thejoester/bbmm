@@ -1,10 +1,12 @@
 import { DL } from './settings.js';
+import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName } from './helpers.js';
 const BBMM_ID = "bbmm";
 const SETTING_SETTINGS_PRESETS = "settingsPresetsUser"; 
 const PRESET_MANAGER_ID = "bbmm-settings-preset-manager"; // Stable window id for the Settings Preset Manager
 // Do not export these settings
 const EXPORT_SKIP = new Map([
-	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser"])]
+	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser"])],
+	["core", new Set(["moduleConfiguration"])]	// <- prevents overwriting enabled/disabled modules
 ]);
 const AppV2 = foundry?.applications?.api?.ApplicationV2;
 if (!AppV2) {
@@ -36,52 +38,12 @@ function hlp_defaultPresetName() {
 }
 
 function hlp_findExistingSettingsPresetKey(name) {
-	const wanted = hlp_normalizeName(name);
+	const wanted = hlp_normalizePresetName(name);
 	const presets = svc_getSettingsPresets();
 	for (const k of Object.keys(presets)) {
-		if (hlp_normalizeName(k) === wanted) return k;
+		if (hlp_normalizePresetName(k) === wanted) return k;
 	}
 	return null;
-}
-
-async function hlp_saveJSONFile(data, filename) {
-	if (typeof saveDataToFile === "function") {
-		return saveDataToFile(JSON.stringify(data, null, 2), "application/json", filename);
-	}
-	if (window.showSaveFilePicker) {
-		try {
-			const handle = await showSaveFilePicker({
-				suggestedName: filename,
-				types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
-			});
-			const stream = await handle.createWritable();
-			await stream.write(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-			return stream.close();
-		} catch {
-			return;
-		}
-	}
-	const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement("a");
-	a.href = url; a.download = filename;
-	document.body.appendChild(a);
-	a.click(); a.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function hlp_pickLocalJSONFile() {
-	return new Promise((resolve) => {
-		const input = document.createElement("input");
-		input.type = "file"; input.accept = "application/json"; input.style.display = "none";
-		document.body.appendChild(input);
-		input.addEventListener("change", () => {
-			const file = input.files?.[0] ?? null;
-			document.body.removeChild(input);
-			resolve(file || null);
-		}, { once: true });
-		input.click();
-	});
 }
 
 // JSON (de)hydration helpers so Sets/Maps survive JSON.stringify
@@ -210,26 +172,6 @@ function hlp_schemaCorrectNonPlainTypes(out) {
 			} catch {}
 		}
 	}
-}
-
-// Tiny esc
-function hlp_esc(s) {
-	return String(s).replace(/[&<>"']/g, (m) => ({
-		"&": "&amp;",
-		"<": "&lt;",
-		">": "&gt;",
-		"\"": "&quot;",
-		"'": "&#39;"
-	}[m]));
-}
-
-function hlp_timestampStr(d = new Date()) {
-	const p = (n, l=2) => String(n).padStart(l, "0");
-	return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-}
-
-function hlp_normalizeName(s) {
-	return String(s).normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 // Return true if this setting exists in the registry
@@ -448,125 +390,6 @@ async function svc_saveSettingsPreset(name, payload) {
 	all[finalName] = stored;
 	await svc_setSettingsPresets(all);
 	return { status: "saved", name: finalName };
-}
-
-// ===== UNUSED??? =====
-
-function slugify(s) {
-	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-function formatDateD_Mon_YYYY(d = new Date()) {
-	const dd = String(d.getDate()).padStart(2, "0");
-	const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
-	const yyyy = d.getFullYear();
-	return `${dd}-${MON}-${yyyy}`;
-}
-
-// Normalize incoming settings export (BBMM format or fallback map).
-function normalizeImportedSettings(data) {
-	// Preferred BBMM shape
-	if (data && typeof data === "object" && data.type === "bbmm-settings" && Array.isArray(data.entries)) {
-		// entries: [{ namespace, key, scope, value, config? }, ...]
-		return data.entries
-			.filter(e => e && typeof e.namespace === "string" && typeof e.key === "string")
-			.map(e => ({
-				namespace: e.namespace,
-				key: e.key,
-				scope: e.scope ?? "client",
-				config: !!e.config,
-				value: e.value
-			}));
-	}
-
-	// Accept { [namespace]: { [key]: value } } fallback
-	if (data && typeof data === "object") {
-		const entries = [];
-		for (const [ns, obj] of Object.entries(data)) {
-			if (!obj || typeof obj !== "object") continue;
-			for (const [key, val] of Object.entries(obj)) {
-				// Try to discover scope from registry; default client
-				const reg = game.settings.settings.get(`${ns}.${key}`);
-				const scope = reg?.scope ?? "client";
-				entries.push({ namespace: ns, key, scope, config: !!reg?.config, value: val });
-			}
-		}
-		return entries;
-	}
-
-	return [];
-}
-/*
-	Normalize input JSON → flat entries:
-		{ namespace, key, value, scope, config }
-	Accepts either:
-	- { type:"bbmm-settings", settings:{ ns:{ key:{value,scope,config} } } }
-	- Nested raw { ns:{ key:value } }
-	- Flat raw { "ns.key": value }
-*/
-function normalizeToEntries(json) {
-	/** @type {{namespace:string,key:string,value:any,scope:'world'|'client',config:boolean}[]} */
-	const entries = [];
-
-	// Case 1: Official BBMM shape
-	if (json?.type === "bbmm-settings" && json?.settings && typeof json.settings === "object") {
-		for (const [ns, group] of Object.entries(json.settings)) {
-			if (!group || typeof group !== "object") continue;
-			for (const [key, payload] of Object.entries(group)) {
-				const rec = (payload && typeof payload === "object" && "value" in payload)
-					? payload
-					: { value: payload, scope: "client", config: true };
-				entries.push({
-					namespace: ns,
-					key,
-					value: rec.value,
-					scope: rec.scope === "world" ? "world" : "client",
-					config: !!rec.config
-				});
-			}
-		}
-	}
-
-	// Case 2: Nested raw { ns:{ key:value } }
-	else if (json && typeof json === "object" && Object.values(json).every(v => v && typeof v === "object")) {
-		for (const [ns, group] of Object.entries(json)) {
-			if (!group || typeof group !== "object") continue;
-			for (const [key, value] of Object.entries(group)) {
-				entries.push({ namespace: ns, key, value, scope: "client", config: true });
-			}
-		}
-	}
-
-	// Case 3: Flat raw { "ns.key": value }
-	else if (json && typeof json === "object" && Object.keys(json).some(k => k.includes("."))) {
-		for (const [fullKey, value] of Object.entries(json)) {
-			const dot = fullKey.indexOf(".");
-			if (dot <= 0) continue;
-			const ns = fullKey.slice(0, dot);
-			const key = fullKey.slice(dot + 1);
-			entries.push({ namespace: ns, key, value, scope: "client", config: true });
-		}
-	}
-
-	// Build module grouping & setting labels
-	const byNs = new Map();
-	for (const e of entries) {
-		if (!byNs.has(e.namespace)) byNs.set(e.namespace, []);
-		byNs.get(e.namespace).push(e);
-	}
-	const moduleList = [...byNs.keys()].sort();
-
-	return { entries, moduleList };
-}
-
-// Group entries by namespace with counts
-function groupByNamespace(entries) {
-	const map = new Map();
-	for (const e of entries) {
-		if (!map.has(e.namespace)) map.set(e.namespace, []);
-		map.get(e.namespace).push(e);
-	}
-	return map;
 }
 
 // ===== UI =====
