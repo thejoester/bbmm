@@ -3,7 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres
+
+## [0.1.0] - 2025-08-25
+### Added
+- **Player Support:** - Settings Preset Manager accessible for users through Settings or View Active Modules screens. 
+### Changed
+- Moved button on Manage Modules window to toolbar
+- Added button on Settings window toolbar
+### Fixed
+- **Settings Preset Manager:** - export/import suppord for user scope settings. This is only for current user.
 
 ## [0.0.7] - 2025-08-25
 ### Fixed 

@@ -1,15 +1,15 @@
-import { debugLog } from './settings.js';
+import { DL } from './settings.js';
 const BBMM_ID = "bbmm";
-const SETTING_SETTINGS_PRESETS = "settingsPresets"; 
+const SETTING_SETTINGS_PRESETS = "settingsPresetsUser"; 
 const PRESET_MANAGER_ID = "bbmm-settings-preset-manager"; // Stable window id for the Settings Preset Manager
 // Do not export these settings
 const EXPORT_SKIP = new Map([
-	["bbmm", new Set(["settingsPresets", "module-presets"])]
+	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser"])]
 ]);
 const AppV2 = foundry?.applications?.api?.ApplicationV2;
 if (!AppV2) {
 	// Comment
-	debugLog(1, "ApplicationV2 base class not found.");
+	DL(1, "ApplicationV2 base class not found.");
 }
 
 Hooks.once("init", () => {
@@ -25,136 +25,195 @@ Hooks.once("init", () => {
 
 // ===== Helpers =====
 
+/*
+	Comment block
+	Default preset name suggestion
+*/
+function hlp_defaultPresetName() {
+	const d = new Date();
+	const pad = (n) => `${n}`.padStart(2, "0");
+	return `Imported ${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function hlp_findExistingSettingsPresetKey(name) {
+	const wanted = hlp_normalizeName(name);
+	const presets = svc_getSettingsPresets();
+	for (const k of Object.keys(presets)) {
+		if (hlp_normalizeName(k) === wanted) return k;
+	}
+	return null;
+}
+
+async function hlp_saveJSONFile(data, filename) {
+	if (typeof saveDataToFile === "function") {
+		return saveDataToFile(JSON.stringify(data, null, 2), "application/json", filename);
+	}
+	if (window.showSaveFilePicker) {
+		try {
+			const handle = await showSaveFilePicker({
+				suggestedName: filename,
+				types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
+			});
+			const stream = await handle.createWritable();
+			await stream.write(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+			return stream.close();
+		} catch {
+			return;
+		}
+	}
+	const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url; a.download = filename;
+	document.body.appendChild(a);
+	a.click(); a.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function hlp_pickLocalJSONFile() {
+	return new Promise((resolve) => {
+		const input = document.createElement("input");
+		input.type = "file"; input.accept = "application/json"; input.style.display = "none";
+		document.body.appendChild(input);
+		input.addEventListener("change", () => {
+			const file = input.files?.[0] ?? null;
+			document.body.removeChild(input);
+			resolve(file || null);
+		}, { once: true });
+		input.click();
+	});
+}
+
 // JSON (de)hydration helpers so Sets/Maps survive JSON.stringify
-	function toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
-		const here = path || "<root>";
-		const ROOT = depth === 0;
-		if (ROOT) debugLog(`toJsonSafe IN ${here}`, value);
+function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
+	const here = path || "<root>";
+	const ROOT = depth === 0;
+	if (ROOT) DL(`toJsonSafe IN ${here}`, value);
 
-		let out;
+	let out;
 
-		// primitives / null
-		if (value == null || (typeof value !== "object" && typeof value !== "function")) {
-			out = value;
-			if (ROOT) debugLog(`toJsonSafe OUT ${here}`, out);
-			return out;
-		}
-
-		// cycle guard
-		if (seen.has(value)) {
-			out = "[[Circular]]";
-			if (ROOT) debugLog(`toJsonSafe OUT ${here}`, out);
-			return out;
-		}
-		seen.add(value);
-
-		// Sets / Maps
-		if (value instanceof Set) {
-			out = { __type: "Set", value: [...value] };
-			if (ROOT) debugLog(`toJsonSafe OUT ${here}`, out);
-			return out;
-		}
-		if (value instanceof Map) {
-			out = { __type: "Map", value: Object.fromEntries(value) };
-			if (ROOT) debugLog(`toJsonSafe OUT ${here}`, out);
-			return out;
-		}
-
-		// Foundry Collection → plain object
-		try {
-			if (typeof foundry !== "undefined" && foundry.utils?.Collection && value instanceof foundry.utils.Collection) {
-				const obj = Object.fromEntries(value.entries());
-				out = {};
-				for (const [k, v] of Object.entries(obj)) out[k] = toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
-				if (ROOT) debugLog(`toJsonSafe OUT ${here}`, out);
-				return out;
-			}
-		} catch {}
-
-		// Arrays
-		if (Array.isArray(value)) {
-			out = value.map((v, i) => toJsonSafe(v, seen, `${here}[${i}]`, depth + 1));
-			if (ROOT) debugLog(`toJsonSafe OUT ${here}`, out);
-			return out;
-		}
-
-		// Generic objects: prefer Foundry duplicate, then fallback to safe enumerate
-		try {
-			if (foundry?.utils?.duplicate) {
-				const dup = foundry.utils.duplicate(value);
-				if (dup && dup !== value) {
-					if (Array.isArray(dup)) out = dup.map((v, i) => toJsonSafe(v, seen, `${here}[${i}]`, depth + 1));
-					else {
-						out = {};
-						for (const [k, v] of Object.entries(dup)) out[k] = toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
-					}
-					if (ROOT) debugLog(`toJsonSafe OUT ${here}`, out);
-					return out;
-				}
-			}
-		} catch {}
-
-		// Fallback: shallow enumerate safely
-		out = {};
-		for (const k of Object.keys(value)) {
-			let v;
-			try { v = value[k]; } catch { v = "[[GetterError]]"; }
-			out[k] = toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
-		}
-
-		if (ROOT) debugLog(`toJsonSafe OUT ${here}`, out);
+	// primitives / null
+	if (value == null || (typeof value !== "object" && typeof value !== "function")) {
+		out = value;
+		if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
 		return out;
 	}
-	
-	function fromJsonSafe(value) {
-		if (Array.isArray(value)) return value.map(v => fromJsonSafe(v));
-		if (value && typeof value === "object") {
-			if (value.__type === "Set") return new Set((value.value ?? []).map(v => fromJsonSafe(v)));
-			if (value.__type === "Map") return new Map(Object.entries(value.value ?? {}).map(([k, v]) => [k, fromJsonSafe(v)]));
-			const out = {};
-			for (const [k, v] of Object.entries(value)) out[k] = fromJsonSafe(v);
+
+	// cycle guard
+	if (seen.has(value)) {
+		out = "[[Circular]]";
+		if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		return out;
+	}
+	seen.add(value);
+
+	// Sets / Maps
+	if (value instanceof Set) {
+		out = { __type: "Set", value: [...value] };
+		if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		return out;
+	}
+	if (value instanceof Map) {
+		out = { __type: "Map", value: Object.fromEntries(value) };
+		if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		return out;
+	}
+
+	// Foundry Collection → plain object
+	try {
+		if (typeof foundry !== "undefined" && foundry.utils?.Collection && value instanceof foundry.utils.Collection) {
+			const obj = Object.fromEntries(value.entries());
+			out = {};
+			for (const [k, v] of Object.entries(obj)) out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
+			if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
 			return out;
 		}
-		return value;
+	} catch {}
+
+	// Arrays
+	if (Array.isArray(value)) {
+		out = value.map((v, i) => hlp_toJsonSafe(v, seen, `${here}[${i}]`, depth + 1));
+		if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		return out;
 	}
 
-	function isPlainEmptyObject(v) {
-		return v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0;
-	}
-	
-	function schemaCorrectNonPlainTypes(out) {
-		for (const [fullKey, cfg] of game.settings.settings.entries()) {
-			const [namespace, key] = fullKey.split(".");
-			const scope = cfg?.scope === "client" ? "client" : "world";
-			const bucket = out?.[scope]?.[namespace];
-			if (!bucket) continue;
-
-			const current = bucket[key];
-
-			// Fix Sets/Maps that flattened
-			if (cfg?.type === Set || cfg?.type === Map) {
-				const flattened = !current || (typeof current === "object" && !Array.isArray(current) && Object.keys(current).length === 0);
-				const wrongSet = cfg.type === Set && !(current && (current.__type === "Set" || Array.isArray(current)));
-				const wrongMap = cfg.type === Map && !(current && (current.__type === "Map" || (current && typeof current === "object" && !Array.isArray(current))));
-				if (flattened || wrongSet || wrongMap) {
-					try { bucket[key] = toJsonSafe(game.settings.get(namespace, key)); } catch { bucket[key] = cfg.type === Set ? { __type:"Set", value:[] } : { __type:"Map", value:{} }; }
+	// Generic objects: prefer Foundry duplicate, then fallback to safe enumerate
+	try {
+		if (foundry?.utils?.duplicate) {
+			const dup = foundry.utils.duplicate(value);
+			if (dup && dup !== value) {
+				if (Array.isArray(dup)) out = dup.map((v, i) => hlp_toJsonSafe(v, seen, `${here}[${i}]`, depth + 1));
+				else {
+					out = {};
+					for (const [k, v] of Object.entries(dup)) out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
 				}
-			}
-
-			// If schema expects Object and we captured {}, but live has data, re-pull it
-			if ((cfg?.type === Object || !cfg?.type) && current && typeof current === "object" && !Array.isArray(current) && Object.keys(current).length === 0) {
-				try {
-					const live = game.settings.get(namespace, key);
-					if (live && typeof live === "object" && Object.keys(live).length > 0) {
-						bucket[key] = toJsonSafe(live);
-					}
-				} catch {}
+				if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+				return out;
 			}
 		}
+	} catch {}
+
+	// Fallback: shallow enumerate safely
+	out = {};
+	for (const k of Object.keys(value)) {
+		let v;
+		try { v = value[k]; } catch { v = "[[GetterError]]"; }
+		out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
 	}
-	
+
+	if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+	return out;
+}
+
+function hlp_fromJsonSafe(value) {
+	if (Array.isArray(value)) return value.map(v => hlp_fromJsonSafe(v));
+	if (value && typeof value === "object") {
+		if (value.__type === "Set") return new Set((value.value ?? []).map(v => hlp_fromJsonSafe(v)));
+		if (value.__type === "Map") return new Map(Object.entries(value.value ?? {}).map(([k, v]) => [k, hlp_fromJsonSafe(v)]));
+		const out = {};
+		for (const [k, v] of Object.entries(value)) out[k] = hlp_fromJsonSafe(v);
+		return out;
+	}
+	return value;
+}
+
+function hlp_isPlainEmptyObject(v) {
+	return v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0;
+}
+
+function hlp_schemaCorrectNonPlainTypes(out) {
+	for (const [fullKey, cfg] of game.settings.settings.entries()) {
+		const [namespace, key] = fullKey.split(".");
+		const scope = cfg?.scope === "user" ? "user" : (cfg?.scope === "client" ? "client" : "world");
+		const bucket = out?.[scope]?.[namespace];
+		if (!bucket) continue;
+
+		const current = bucket[key];
+
+		// Fix Sets/Maps that flattened
+		if (cfg?.type === Set || cfg?.type === Map) {
+			const flattened = !current || (typeof current === "object" && !Array.isArray(current) && Object.keys(current).length === 0);
+			const wrongSet = cfg.type === Set && !(current && (current.__type === "Set" || Array.isArray(current)));
+			const wrongMap = cfg.type === Map && !(current && (current.__type === "Map" || (current && typeof current === "object" && !Array.isArray(current))));
+			if (flattened || wrongSet || wrongMap) {
+				try { bucket[key] = hlp_toJsonSafe(game.settings.get(namespace, key)); } catch { bucket[key] = cfg.type === Set ? { __type:"Set", value:[] } : { __type:"Map", value:{} }; }
+			}
+		}
+
+		// If schema expects Object and we captured {}, but live has data, re-pull it
+		if ((cfg?.type === Object || !cfg?.type) && current && typeof current === "object" && !Array.isArray(current) && Object.keys(current).length === 0) {
+			try {
+				const live = game.settings.get(namespace, key);
+				if (live && typeof live === "object" && Object.keys(live).length > 0) {
+					bucket[key] = hlp_toJsonSafe(live);
+				}
+			} catch {}
+		}
+	}
+}
+
 // Tiny esc
-function esc(s) {
+function hlp_esc(s) {
 	return String(s).replace(/[&<>"']/g, (m) => ({
 		"&": "&amp;",
 		"<": "&lt;",
@@ -164,13 +223,237 @@ function esc(s) {
 	}[m]));
 }
 
-function slugify(s) {
-	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-function timestampStr(d = new Date()) {
+function hlp_timestampStr(d = new Date()) {
 	const p = (n, l=2) => String(n).padStart(l, "0");
 	return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+function hlp_normalizeName(s) {
+	return String(s).normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+// Return true if this setting exists in the registry
+function hlp_isRegisteredSetting(namespace, key) {
+	const fullKey = `${namespace}.${key}`;
+	return game.settings?.settings?.has(fullKey) === true;
+}
+
+// ===== SERVICES =====
+
+function svc_getSettingsPresets() {
+	return foundry.utils.duplicate(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
+}
+
+async function svc_setSettingsPresets(obj) {
+	await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, obj);
+}
+
+/*	Collect / Apply Settings
+	Collect module settings by scope, optionally restricting to active modules.
+	- Skips config:false entries
+	- GM: world + client, Non‑GM: client only
+	- includeDisabled=false → skip modules that are not active (except core/system)
+*/
+function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
+	const isGM = game.user.isGM;
+	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
+	const sysId = game.system.id;
+
+	for (const def of game.settings.settings.values()) {
+		const { namespace, key, scope, config } = def;
+		// skip hidden settings
+		//if (config === false) continue;
+
+		// scope filter by permission
+		if (scope === "world" && !isGM) continue;
+
+		// module filter (active vs disabled)
+		if (!includeDisabled) {
+			if (namespace !== "core" && namespace !== sysId) {
+				const mod = game.modules.get(namespace);
+				if (!mod || !mod.active) continue;
+			}
+		}
+
+		let value;
+		try {
+			value = game.settings.get(namespace, key);
+		} catch {
+			continue;
+		}
+		
+		// skip this module presets to reduce export size
+		if (EXPORT_SKIP.get(namespace)?.has(key)) {
+			DL(`svc_collectAllModuleSettings(): Export: skipping ${namespace}.${key}`);
+			continue;
+		}
+		
+		const bucket = scope === "world" ? out.world : scope === "client" ? out.client : out.user;
+		bucket[namespace] ??= {};
+		const fullKey = `${namespace}.${key}`;
+		try {
+			const raw = game.settings.get(namespace, key); // keep this if you already switched to raw-get
+			bucket[namespace][key] = hlp_toJsonSafe(raw);
+		} catch (e) {
+			DL(`svc_collectAllModuleSettings(): Export: collect FAILED ${fullKey} — ${e?.message ?? e}`);
+			bucket[namespace][key] = null; // or `continue;` if you prefer to skip
+		}
+	}
+
+	return out;
+}
+
+/* 	Apply settings export (bbmm-settings).
+	- GM applies world + client; non‑GM applies client only
+	- Skips namespaces where module not installed (collects report)
+	- Always reloads after apply (per your requirement)
+*/
+async function svc_applySettingsExport(exportData) {
+	if (!exportData || exportData.type !== "bbmm-settings") {
+		ui.notifications.error("Not a BBMM settings export.");
+		return { applied: [], skipped: [], missingModules: new Set() };
+	}
+
+	const isGM = game.user.isGM;
+	const scopes = isGM ? ["world","client","user"] : ["client","user"];
+
+	const applied = [];
+	const skipped = [];
+	const missingModules = new Set();
+
+	for (const scope of scopes) {
+		const tree = exportData[scope] || {};
+		for (const [namespace, entries] of Object.entries(tree)) {
+			if (namespace !== "core" && namespace !== game.system.id && !game.modules.has(namespace)) {
+				missingModules.add(namespace);
+				continue;
+			}
+			for (const [key, value] of Object.entries(entries)) {
+				const def = [...game.settings.settings.values()].find(d => d.namespace === namespace && d.key === key);
+				if (!def) { skipped.push(`${namespace}.${key}`); continue; }
+				if (def.scope !== scope) { skipped.push(`${namespace}.${key}`); continue; }
+
+				// permission: world requires GM
+				if (def.scope === "world" && !isGM) { skipped.push(`${namespace}.${key}`); continue; }
+
+				try {
+					const cfg = game.settings.settings.get(`${namespace}.${key}`);
+					let hydrated = hlp_fromJsonSafe(value);
+
+					// Back-compat: old exports stored {} for Set/Map — treat as empty
+					if (cfg?.type === Set && hlp_isPlainEmptyObject(value)) hydrated = new Set();
+					if (cfg?.type === Map && hlp_isPlainEmptyObject(value)) hydrated = new Map();
+
+					// If caller didn’t tag but type is known, coerce
+					if (cfg?.type === Set && !(hydrated instanceof Set)) {
+						if (Array.isArray(hydrated)) hydrated = new Set(hydrated);
+						else hydrated = new Set();
+					}
+					if (cfg?.type === Map && !(hydrated instanceof Map)) {
+						if (hydrated && typeof hydrated === "object" && !Array.isArray(hydrated)) hydrated = new Map(Object.entries(hydrated));
+						else hydrated = new Map();
+					}
+
+					// if the schema expects a plain Object but we somehow have a Map, coerce to POJO
+					if (cfg?.type === Object && hydrated instanceof Map) {
+						hydrated = Object.fromEntries(hydrated);
+					}
+
+					await game.settings.set(namespace, key, hydrated);
+					applied.push(`${namespace}.${key}`);
+				} catch {
+					skipped.push(`${namespace}.${key}`);
+				}
+			}
+		}
+	}
+
+	// Always reload
+	const doReload = await foundry.applications.api.DialogV2.confirm({
+		window: { title: "Reload Foundry?" },
+		content: `<p>Settings preset applied. Reload now to ensure everything initializes correctly?</p>`,
+		ok: { label: "Reload" },
+		modal: true
+	});
+	if (doReload) location.reload();
+
+	return { applied, skipped, missingModules };
+}
+
+// Conflict-safe Preset Save
+function svc_askSettingsPresetConflict(existingKey) {
+	return new Promise((resolve) => {
+		new foundry.applications.api.DialogV2({
+			window: { title: "Preset Exists", modal: true },
+			content: `
+				<p>A settings preset named <b>${hlp_esc(existingKey)}</b> already exists.</p>
+				<p>What would you like to do?</p>
+			`,
+			buttons: [
+				{ action: "overwrite", label: "Overwrite", default: true, callback: () => resolve("overwrite") },
+				{ action: "rename", label: "Rename", callback: () => resolve("rename") },
+				{ action: "cancel", label: "Cancel", callback: () => resolve("cancel") }
+			],
+			submit: () => {},
+			rejectClose: false
+		}).render(true);
+	});
+}
+
+/*
+	Preset persistence
+	- Registers bbmm.presets (world, hidden) if needed
+	- Saves/updates presets[name] = { created, updated, items:[entry...] }
+*/
+async function svc_savePresetToSettings(presetName, selectedEntries) {
+	try {
+		const current = foundry.utils.duplicate(
+			game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS)
+		) || {};
+		const now = Date.now();
+
+		current[presetName] ??= { created: now, updated: now, items: [] };
+		current[presetName].updated = now;
+		current[presetName].items = selectedEntries;
+
+		await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, current);
+
+		DL(`svc_savePresetToSettings(): saved preset "${presetName}" with ${selectedEntries.length} entries`);
+		return current[presetName];
+	} catch (e) {
+		DL(3, "svc_savePresetToSettings(): failed", { message: e?.message, stack: e?.stack });
+		throw e;
+	}
+}
+
+// Save Settings Preset
+async function svc_saveSettingsPreset(name, payload) {
+	const rawInput = String(name).trim();
+	let finalName = rawInput;
+
+	const existingKey = hlp_findExistingSettingsPresetKey(rawInput);
+	if (existingKey) {
+		const choice = await svc_askSettingsPresetConflict(existingKey);
+		if (choice === "cancel") return { status: "cancel" };
+		if (choice === "overwrite") finalName = existingKey;
+		if (choice === "rename") {
+			const newName = await ui_promptRenamePreset(rawInput);
+			if (!newName) return { status: "cancel" };
+			finalName = newName;
+		}
+	}
+	const flatView = normalizeToEntries(payload)?.entries ?? [];
+	const stored = flatView.length ? { ...payload, entries: flatView } : payload;
+	const all = svc_getSettingsPresets();
+	all[finalName] = stored;
+	await svc_setSettingsPresets(all);
+	return { status: "saved", name: finalName };
+}
+
+// ===== UNUSED??? =====
+
+function slugify(s) {
+	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 function formatDateD_Mon_YYYY(d = new Date()) {
@@ -178,16 +461,6 @@ function formatDateD_Mon_YYYY(d = new Date()) {
 	const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
 	const yyyy = d.getFullYear();
 	return `${dd}-${MON}-${yyyy}`;
-}
-
-function normalizeName(s) {
-	return String(s).normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-// Return true if this setting exists in the registry
-function isRegisteredSetting(namespace, key) {
-	const fullKey = `${namespace}.${key}`;
-	return game.settings?.settings?.has(fullKey) === true;
 }
 
 // Normalize incoming settings export (BBMM format or fallback map).
@@ -223,106 +496,6 @@ function normalizeImportedSettings(data) {
 
 	return [];
 }
-
-function getWindowById(id) {
-	// ui.windows is a map of window apps keyed by numeric ids
-	return Object.values(ui.windows ?? {}).find(w => w?.id === id) ?? null;
-}
-
-// Group entries by namespace with counts
-function groupByNamespace(entries) {
-	const map = new Map();
-	for (const e of entries) {
-		if (!map.has(e.namespace)) map.set(e.namespace, []);
-		map.get(e.namespace).push(e);
-	}
-	return map;
-}
-
-// Open the import wizard. `data` is the parsed JSON object from file.
-export async function openSettingsImportWizard(data) {
-	try {
-		// If no data was passed in, prompt the user to pick a JSON file
-		const json = data || await pickJsonFile();
-		if (!json) {
-			debugLog("openSettingsImportWizard(): no JSON provided/selected");
-			return;
-		}
-
-		// Normalize (your existing compat function is fine to keep, or inline it here)
-		const normalizeToEntriesCompat = (jsonIn) => {
-			/** @type {{namespace:string,key:string,value:any,scope:'world'|'client',config:boolean}[]} */
-			const entries = [];
-
-			// Push all settings in a bucket into the flat entries array
-			const pushBucket = (bucket, scope) => {
-				if (!bucket || typeof bucket !== "object") return;
-				for (const [ns, settings] of Object.entries(bucket)) {
-					if (!settings || typeof settings !== "object") continue;
-					for (const [key, val] of Object.entries(settings)) {
-						const isObj = val && typeof val === "object";
-						const value = (isObj && "value" in val) ? val.value : val;
-						const cfg = (isObj && "config" in val) ? !!val.config : true;
-						const scp = (isObj && (val.scope === "world" || val.scope === "client")) ? val.scope : scope;
-						entries.push({ namespace: ns, key, value, scope: scp, config: cfg });
-					}
-				}
-			};
-
-			if (jsonIn?.world || jsonIn?.client) { // Current BBMM export shape with world/client
-				pushBucket(jsonIn.world, "world");
-				pushBucket(jsonIn.client, "client");
-			} else if (jsonIn?.settings && typeof jsonIn.settings === "object") { // Legacy “Module Management+” shape with .settings
-				pushBucket(jsonIn.settings, "client");
-			}
-
-			const moduleList = [...new Set(entries.map(e => e.namespace))].sort();
-			return { entries, moduleList };
-		};
-
-		const normalized = normalizeToEntriesCompat(json);
-
-		if (!normalized.entries.length) {
-			ui.notifications.warn("No settings found in JSON.");
-			debugLog("openSettingsImportWizard(): Import Wizard: 0 entries after normalization", { json });
-			return;
-		}
-
-		debugLog(`openSettingsImportWizard(): Import Wizard: normalized ${normalized.entries.length} entries from ${normalized.moduleList.length} namespaces`);
-
-		// Guard: verify base class is available before we construct
-		if (!AppV2) {
-			ui.notifications.error("BBMM Import Wizard: ApplicationV2 is unavailable.");
-			debugLog("openSettingsImportWizard(): openSettingsImportWizard(): AppV2 base missing", { AppV2 });
-			return;
-		}
-
-		// Construct with a try/catch to isolate ctor failures
-		let app;
-		try {
-			app = new BBMMImportWizard({ json, normalized });
-			app.render(true);	
-		} catch (ctorErr) {
-			debugLog("openSettingsImportWizard(): BBMM Import Wizard: constructor failed", ctorErr);
-			ui.notifications.error(`Import Wizard failed during construction: ${ctorErr?.message ?? ctorErr}`);
-			return;
-		}
-
-		// Render with a try/catch to isolate render failures
-		try {
-			await app.render(true);
-		} catch (renderErr) {
-			debugLog("openSettingsImportWizard(): BBMM Import Wizard render failed", renderErr);
-			ui.notifications.error(`Import Wizard failed during render: ${renderErr?.message ?? renderErr}`);
-			return;
-		}
-	} catch (err) {
-		// If anything else goes wrong, log and notify
-		debugLog("openSettingsImportWizard(): failed to open", err);
-		ui.notifications.error("Failed to open Import Wizard (see console).");
-	}
-}
-
 /*
 	Normalize input JSON → flat entries:
 		{ namespace, key, value, scope, config }
@@ -386,30 +559,128 @@ function normalizeToEntries(json) {
 	return { entries, moduleList };
 }
 
-/*
-	Preset persistence
-	- Registers bbmm.presets (world, hidden) if needed
-	- Saves/updates presets[name] = { created, updated, items:[entry...] }
-*/
-async function savePresetToSettings(presetName, selectedEntries) {
-	try {
-		const current = foundry.utils.duplicate(
-			game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS)
-		) || {};
-		const now = Date.now();
-
-		current[presetName] ??= { created: now, updated: now, items: [] };
-		current[presetName].updated = now;
-		current[presetName].items = selectedEntries;
-
-		await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, current);
-
-		debugLog(`savePresetToSettings(): saved preset "${presetName}" with ${selectedEntries.length} entries`);
-		return current[presetName];
-	} catch (e) {
-		debugLog(3, "savePresetToSettings(): failed", { message: e?.message, stack: e?.stack });
-		throw e;
+// Group entries by namespace with counts
+function groupByNamespace(entries) {
+	const map = new Map();
+	for (const e of entries) {
+		if (!map.has(e.namespace)) map.set(e.namespace, []);
+		map.get(e.namespace).push(e);
 	}
+	return map;
+}
+
+// ===== UI =====
+
+//	Rename Prompt
+function ui_promptRenamePreset(defaultName) {
+	return new Promise((resolve) => {
+		new foundry.applications.api.DialogV2({
+			window: { title: "Rename Settings Preset", modal: true },
+			content: `
+				<div style="display:flex;gap:.5rem;align-items:center;">
+					<label style="min-width:7rem;">New Name</label>
+					<input name="newName" type="text" value="${hlp_esc(defaultName)}" autofocus style="flex:1;">
+				</div>
+			`,
+			buttons: [
+				{ action: "ok",     label: "Save", default: true,
+				  callback: (_ev, btn) => resolve(btn.form.elements.newName?.value?.trim() || "") },
+				{ action: "cancel", label: "Cancel", callback: () => resolve(null) }
+			],
+			submit: () => {},
+			rejectClose: false
+		}).render(true);
+	});
+}
+
+// Open the import wizard. `data` is the parsed JSON object from file.
+export async function ui_openSettingsImportWizard(data) {
+	try {
+		// If no data was passed in, prompt the user to pick a JSON file
+		const json = data || await pickJsonFile();
+		if (!json) {
+			DL("ui_openSettingsImportWizard(): no JSON provided/selected");
+			return;
+		}
+
+		// Normalize (your existing compat function is fine to keep, or inline it here)
+		const normalizeToEntriesCompat = (jsonIn) => {
+			/** @type {{namespace:string,key:string,value:any,scope:'world'|'client'|'user',config:boolean}[]} */
+			const entries = [];
+
+			// Push all settings in a bucket into the flat entries array
+			const pushBucket = (bucket, scope) => {
+				if (!bucket || typeof bucket !== "object") return;
+				for (const [ns, settings] of Object.entries(bucket)) {
+					if (!settings || typeof settings !== "object") continue;
+					for (const [key, val] of Object.entries(settings)) {
+						const isObj = val && typeof val === "object";
+						const value = (isObj && "value" in val) ? val.value : val;
+						const cfg = (isObj && "config" in val) ? !!val.config : true;
+						const scp = (isObj && (val.scope === "world" || val.scope === "client" || val.scope === "user")) ? val.scope : scope;
+						entries.push({ namespace: ns, key, value, scope: scp, config: cfg });
+					}
+				}
+			};
+
+			if (jsonIn?.world || jsonIn?.client || jsonIn?.user) {
+				pushBucket(jsonIn.world, "world");
+				pushBucket(jsonIn.client, "client");
+				pushBucket(jsonIn.user, "user");
+			} else if (jsonIn?.settings && typeof jsonIn.settings === "object") {
+				pushBucket(jsonIn.settings, "client");
+			}
+
+			const moduleList = [...new Set(entries.map(e => e.namespace))].sort();
+			return { entries, moduleList };
+		};
+
+		const normalized = normalizeToEntriesCompat(json);
+
+		if (!normalized.entries.length) {
+			ui.notifications.warn("No settings found in JSON.");
+			DL("ui_openSettingsImportWizard(): Import Wizard: 0 entries after normalization", { json });
+			return;
+		}
+
+		DL(`ui_openSettingsImportWizard(): Import Wizard: normalized ${normalized.entries.length} entries from ${normalized.moduleList.length} namespaces`);
+
+		// Guard: verify base class is available before we construct
+		if (!AppV2) {
+			ui.notifications.error("BBMM Import Wizard: ApplicationV2 is unavailable.");
+			DL("ui_openSettingsImportWizard(): ui_openSettingsImportWizard(): AppV2 base missing", { AppV2 });
+			return;
+		}
+
+		// Construct with a try/catch to isolate ctor failures
+		let app;
+		try {
+			app = new BBMMImportWizard({ json, normalized });
+			app.render(true);	
+		} catch (ctorErr) {
+			DL("ui_openSettingsImportWizard(): BBMM Import Wizard: constructor failed", ctorErr);
+			ui.notifications.error(`Import Wizard failed during construction: ${ctorErr?.message ?? ctorErr}`);
+			return;
+		}
+
+		// Render with a try/catch to isolate render failures
+		try {
+			await app.render(true);
+		} catch (renderErr) {
+			DL("ui_openSettingsImportWizard(): BBMM Import Wizard render failed", renderErr);
+			ui.notifications.error(`Import Wizard failed during render: ${renderErr?.message ?? renderErr}`);
+			return;
+		}
+	} catch (err) {
+		// If anything else goes wrong, log and notify
+		DL("ui_openSettingsImportWizard(): failed to open", err);
+		ui.notifications.error("Failed to open Import Wizard (see console).");
+	}
+}
+
+function ui_getWindowById(id) {
+	// ui.windows is a map of window apps keyed by numeric ids
+	return Object.values(ui.windows ?? {}).find(w => w?.id === id) ?? null;
 }
 
 /*
@@ -495,7 +766,7 @@ class BBMMImportWizard extends AppV2 {
 			this._list = /** @type {HTMLElement|null} */ (contentRegion.querySelector("#bbmm-list"));
 
 			// Deep debug so we can see what exists right now
-			debugLog("_replaceHTML(): Import Wizard _replaceHTML(): after inject", {
+			DL("_replaceHTML(): Import Wizard _replaceHTML(): after inject", {
 				hasWindowContent: !!win.querySelector(".window-content"),
 				rootTag: this._root?.tagName,
 				htmlLen: this._root?.innerHTML?.length ?? 0,
@@ -507,7 +778,7 @@ class BBMMImportWizard extends AppV2 {
 			// Wire listeners on next tick
 			setTimeout(() => this.activateListeners(), 0);
 		} catch (e) {
-			debugLog("BBMMImportWizard: _replaceHTML failed", e);
+			DL("BBMMImportWizard: _replaceHTML failed", e);
 			throw e;
 		}
 	}
@@ -516,7 +787,7 @@ class BBMMImportWizard extends AppV2 {
 	activateListeners() {
 		// Prevent double‑wiring if AppV2 rerenders or we get called twice
 		if (this._wired) {
-			debugLog("activateListeners(): activateListeners skipped (already wired)");
+			DL("activateListeners(): activateListeners skipped (already wired)");
 			return;
 		}
 		this._wired = true;
@@ -526,14 +797,14 @@ class BBMMImportWizard extends AppV2 {
 		const form = this._form || /** @type {HTMLFormElement|null} */ (root?.querySelector("form.bbmm-import"));
 		const list = this._list || /** @type {HTMLElement|null} */ (root?.querySelector("#bbmm-list"));
 
-		debugLog("activateListeners(): activateListeners called", {
+		DL("activateListeners(): activateListeners called", {
 			hasRoot: !!root,
 			hasForm: !!form,
 			hasList: !!list
 		});
 
 		if (!root || !form || !list) {
-			debugLog("activateListeners(): BBMM Import Wizard: form or #bbmm-list not found (post-activate)");
+			DL("activateListeners(): BBMM Import Wizard: form or #bbmm-list not found (post-activate)");
 			return;
 		}
 
@@ -547,7 +818,7 @@ class BBMMImportWizard extends AppV2 {
 		const presetName = /** @type any */ (form.elements.namedItem("presetName"));
 
 		// Set a friendly default name if empty
-		if (!presetName.value) presetName.value = defaultPresetName();
+		if (!presetName.value) presetName.value = hlp_defaultPresetName();
 
 		/*
 			Paint the center panel based on mode and then recenter the window.
@@ -561,13 +832,13 @@ class BBMMImportWizard extends AppV2 {
 
 			// Recalculate height and recenter so window never grows off-screen
 			this.setPosition({ height: "auto", left: null, top: null });
-			debugLog("paint() done and window re-centered", { mode });
+			DL("paint() done and window re-centered", { mode });
 		};
 
 		// Prevent default form submission (which could cause double events)
 		form.addEventListener("submit", (ev) => {
 			ev.preventDefault();
-			debugLog("BBMMImportWizard(): blocked default form submit");
+			DL("BBMMImportWizard(): blocked default form submit");
 		});
 
 		// Mode changes repaint and recenter
@@ -575,7 +846,7 @@ class BBMMImportWizard extends AppV2 {
 
 		// Cancel button closes the wizard
 		form.querySelector('[data-action="cancel"]')?.addEventListener("click", () => {
-			debugLog("BBMMImportWizard: cancel clicked — closing");
+			DL("BBMMImportWizard: cancel clicked — closing");
 			this.close();
 		});
 
@@ -622,23 +893,23 @@ class BBMMImportWizard extends AppV2 {
 
 				// Lightweight feedback + close immediately so it feels responsive
 				ui.notifications.info(`Importing ${selected.length} setting(s) into preset "${name}"…`);
-				debugLog(`BBMMImportWizard: starting import of ${selected.length} entries to "${name}"`);
+				DL(`BBMMImportWizard: starting import of ${selected.length} entries to "${name}"`);
 
 				// Close the window first; the async save continues in the background
 				this.close();
 
 				// Perform the save
-				const preset = await savePresetToSettings(name, selected);
-				debugLog("BBMMImportWizard: savePresetToSettings OK", { name, count: selected.length });
+				const preset = await svc_savePresetToSettings(name, selected);
+				DL("BBMMImportWizard: savePresetToSettings OK", { name, count: selected.length });
 				
-				debugLog("BBMMImportWizard: Reopening Settings Preset Manager after import");
+				DL("BBMMImportWizard: Reopening Settings Preset Manager after import");
 				openSettingsPresetManager();
 				Hooks.callAll("bbmm:importPreset", { name, items: preset.items });
 
 				// Final toast after completion
 				ui.notifications.info(`Imported ${selected.length} setting(s) into preset "${name}".`);
 			} catch (e) {
-				debugLog(3, "Import Wizard: failed to save preset", { message: e?.message, stack: e?.stack });
+				DL(3, "Import Wizard: failed to save preset", { message: e?.message, stack: e?.stack });
 				ui.notifications.error(`Failed to save preset: ${e?.message ?? "see console"}`);
 			} finally {
 				this._inFlight = false;
@@ -743,271 +1014,8 @@ class BBMMImportWizard extends AppV2 {
 	}
 }
 
-/*
-	Comment block
-	Default preset name suggestion
-*/
-function defaultPresetName() {
-	const d = new Date();
-	const pad = (n) => `${n}`.padStart(2, "0");
-	return `Imported ${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
-function getSettingsPresets() {
-	return foundry.utils.duplicate(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
-}
-
-async function setSettingsPresets(obj) {
-	await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, obj);
-}
-
-function findExistingSettingsPresetKey(name) {
-	const wanted = normalizeName(name);
-	const presets = getSettingsPresets();
-	for (const k of Object.keys(presets)) {
-		if (normalizeName(k) === wanted) return k;
-	}
-	return null;
-}
-
-// Export helpers
-async function saveJSONFile(data, filename) {
-	if (typeof saveDataToFile === "function") {
-		return saveDataToFile(JSON.stringify(data, null, 2), "application/json", filename);
-	}
-	if (window.showSaveFilePicker) {
-		try {
-			const handle = await showSaveFilePicker({
-				suggestedName: filename,
-				types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
-			});
-			const stream = await handle.createWritable();
-			await stream.write(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-			return stream.close();
-		} catch {
-			return;
-		}
-	}
-	const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement("a");
-	a.href = url; a.download = filename;
-	document.body.appendChild(a);
-	a.click(); a.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function pickLocalJSONFile() {
-	return new Promise((resolve) => {
-		const input = document.createElement("input");
-		input.type = "file"; input.accept = "application/json"; input.style.display = "none";
-		document.body.appendChild(input);
-		input.addEventListener("change", () => {
-			const file = input.files?.[0] ?? null;
-			document.body.removeChild(input);
-			resolve(file || null);
-		}, { once: true });
-		input.click();
-	});
-}
-
-/*	Collect / Apply Settings
-	Collect module settings by scope, optionally restricting to active modules.
-	- Skips config:false entries
-	- GM: world + client, Non‑GM: client only
-	- includeDisabled=false → skip modules that are not active (except core/system)
-*/
-function collectAllModuleSettings({ includeDisabled = false } = {}) {
-	const isGM = game.user.isGM;
-	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {} };
-	const sysId = game.system.id;
-
-	for (const def of game.settings.settings.values()) {
-		const { namespace, key, scope, config } = def;
-		// skip hidden settings
-		//if (config === false) continue;
-
-		// scope filter by permission
-		if (scope === "world" && !isGM) continue;
-
-		// module filter (active vs disabled)
-		if (!includeDisabled) {
-			if (namespace !== "core" && namespace !== sysId) {
-				const mod = game.modules.get(namespace);
-				if (!mod || !mod.active) continue;
-			}
-		}
-
-		let value;
-		try {
-			value = game.settings.get(namespace, key);
-		} catch {
-			continue;
-		}
-		
-		// skip this module presets to reduce export size
-		if (EXPORT_SKIP.get(namespace)?.has(key)) {
-			debugLog(`collectAllModuleSettings(): Export: skipping ${namespace}.${key}`);
-			continue;
-		}
-		
-		const bucket = scope === "world" ? out.world : out.client;
-		bucket[namespace] ??= {};
-		const fullKey = `${namespace}.${key}`;
-		try {
-			const raw = game.settings.get(namespace, key); // keep this if you already switched to raw-get
-			bucket[namespace][key] = toJsonSafe(raw);
-		} catch (e) {
-			debugLog(`collectAllModuleSettings(): Export: collect FAILED ${fullKey} — ${e?.message ?? e}`);
-			bucket[namespace][key] = null; // or `continue;` if you prefer to skip
-		}
-	}
-
-	return out;
-}
-
-/* 	Apply settings export (bbmm-settings).
-	- GM applies world + client; non‑GM applies client only
-	- Skips namespaces where module not installed (collects report)
-	- Always reloads after apply (per your requirement)
-*/
-async function applySettingsExport(exportData) {
-	if (!exportData || exportData.type !== "bbmm-settings") {
-		ui.notifications.error("Not a BBMM settings export.");
-		return { applied: [], skipped: [], missingModules: new Set() };
-	}
-
-	const isGM = game.user.isGM;
-	const scopes = isGM ? ["world","client"] : ["client"];
-
-	const applied = [];
-	const skipped = [];
-	const missingModules = new Set();
-
-	for (const scope of scopes) {
-		const tree = exportData[scope] || {};
-		for (const [namespace, entries] of Object.entries(tree)) {
-			if (namespace !== "core" && namespace !== game.system.id && !game.modules.has(namespace)) {
-				missingModules.add(namespace);
-				continue;
-			}
-			for (const [key, value] of Object.entries(entries)) {
-				const def = [...game.settings.settings.values()].find(d => d.namespace === namespace && d.key === key);
-				if (!def) { skipped.push(`${namespace}.${key}`); continue; }
-				if (def.scope !== scope) { skipped.push(`${namespace}.${key}`); continue; }
-
-				// permission: world requires GM
-				if (def.scope === "world" && !isGM) { skipped.push(`${namespace}.${key}`); continue; }
-
-				try {
-					const cfg = game.settings.settings.get(`${namespace}.${key}`);
-					let hydrated = fromJsonSafe(value);
-
-					// Back-compat: old exports stored {} for Set/Map — treat as empty
-					if (cfg?.type === Set && isPlainEmptyObject(value)) hydrated = new Set();
-					if (cfg?.type === Map && isPlainEmptyObject(value)) hydrated = new Map();
-
-					// If caller didn’t tag but type is known, coerce
-					if (cfg?.type === Set && !(hydrated instanceof Set)) {
-						if (Array.isArray(hydrated)) hydrated = new Set(hydrated);
-						else hydrated = new Set();
-					}
-					if (cfg?.type === Map && !(hydrated instanceof Map)) {
-						if (hydrated && typeof hydrated === "object" && !Array.isArray(hydrated)) hydrated = new Map(Object.entries(hydrated));
-						else hydrated = new Map();
-					}
-
-					// if the schema expects a plain Object but we somehow have a Map, coerce to POJO
-					if (cfg?.type === Object && hydrated instanceof Map) {
-						hydrated = Object.fromEntries(hydrated);
-					}
-
-					await game.settings.set(namespace, key, hydrated);
-					applied.push(`${namespace}.${key}`);
-				} catch {
-					skipped.push(`${namespace}.${key}`);
-				}
-			}
-		}
-	}
-
-	// Always reload
-	const doReload = await foundry.applications.api.DialogV2.confirm({
-		window: { title: "Reload Foundry?" },
-		content: `<p>Settings preset applied. Reload now to ensure everything initializes correctly?</p>`,
-		ok: { label: "Reload" },
-		modal: true
-	});
-	if (doReload) location.reload();
-
-	return { applied, skipped, missingModules };
-}
-
-// Conflict-safe Preset Save
-function askSettingsPresetConflict(existingKey) {
-	return new Promise((resolve) => {
-		new foundry.applications.api.DialogV2({
-			window: { title: "Preset Exists", modal: true },
-			content: `
-				<p>A settings preset named <b>${esc(existingKey)}</b> already exists.</p>
-				<p>What would you like to do?</p>
-			`,
-			buttons: [
-				{ action: "overwrite", label: "Overwrite", default: true, callback: () => resolve("overwrite") },
-				{ action: "rename", label: "Rename", callback: () => resolve("rename") },
-				{ action: "cancel", label: "Cancel", callback: () => resolve("cancel") }
-			],
-			submit: () => {},
-			rejectClose: false
-		}).render(true);
-	});
-}
-
-//	Rename Prompt
-function promptRenamePreset(defaultName) {
-	return new Promise((resolve) => {
-		new foundry.applications.api.DialogV2({
-			window: { title: "Rename Settings Preset", modal: true },
-			content: `
-				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:7rem;">New Name</label>
-					<input name="newName" type="text" value="${esc(defaultName)}" autofocus style="flex:1;">
-				</div>
-			`,
-			buttons: [
-				{ action: "ok",     label: "Save", default: true,
-				  callback: (_ev, btn) => resolve(btn.form.elements.newName?.value?.trim() || "") },
-				{ action: "cancel", label: "Cancel", callback: () => resolve(null) }
-			],
-			submit: () => {},
-			rejectClose: false
-		}).render(true);
-	});
-}
-
-// Save Settings Preset
-async function saveSettingsPreset(name, payload) {
-	const rawInput = String(name).trim();
-	let finalName = rawInput;
-
-	const existingKey = findExistingSettingsPresetKey(rawInput);
-	if (existingKey) {
-		const choice = await askSettingsPresetConflict(existingKey);
-		if (choice === "cancel") return { status: "cancel" };
-		if (choice === "overwrite") finalName = existingKey;
-		if (choice === "rename") {
-			const newName = await promptRenamePreset(rawInput);
-			if (!newName) return { status: "cancel" };
-			finalName = newName;
-		}
-	}
-	const all = getSettingsPresets();
-	all[finalName] = payload;
-	await setSettingsPresets(all);
-	return { status: "saved", name: finalName };
-}
-
-// UI — Settings Preset Manager
+// Settings Preset Manager main
 export async function openSettingsPresetManager() {
 	// Stable id for this manager window so we can find/close it reliably
 	const PRESET_MANAGER_ID = "bbmm-settings-preset-manager";
@@ -1020,16 +1028,16 @@ export async function openSettingsPresetManager() {
 	};
 
 	// Close any existing instance so we reopen a fresh one
-	const existing = getWindowById(PRESET_MANAGER_ID);
+	const existing = ui_getWindowById(PRESET_MANAGER_ID);
 	if (existing) {
-		debugLog("openSettingsPresetManager(): Settings Preset Manager: closing existing instance before reopen");
+		DL("openSettingsPresetManager(): Settings Preset Manager: closing existing instance before reopen");
 		existing.close({ force: true });
 	}
 
 	// Build list of current presets
-	const presets = getSettingsPresets();
+	const presets = svc_getSettingsPresets();
 	const names = Object.keys(presets).sort((a,b)=>a.localeCompare(b));
-	const options = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+	const options = names.map(n => `<option value="${ hlp_esc(n)}">${ hlp_esc(n)}</option>`).join("");
 
 	// Content markup (make central area scrollable to avoid off‑screen growth)
 	const content = `
@@ -1060,7 +1068,7 @@ export async function openSettingsPresetManager() {
 				<button type="button" data-action="import">Import from .json</button>
 			</div>
 
-			<p class="notes">GM exports world+client settings; players export client only. Applying a settings preset will prompt to reload.</p>
+			<p class="notes">GM exports world+client+user settings; players export client+user. Applying a settings preset will prompt to reload.</p>
 		</section>
 	`;
 
@@ -1116,9 +1124,9 @@ export async function openSettingsPresetManager() {
 			try {
 				if (action === "save-current") {
 					if (!newName) { ui.notifications.warn("Enter a name for the new settings preset."); return; }
-					const payload = collectAllModuleSettings({ includeDisabled });
-					schemaCorrectNonPlainTypes(payload);
-					const res = await saveSettingsPreset(`${newName}`, payload);
+					const payload = svc_collectAllModuleSettings({ includeDisabled });
+					hlp_schemaCorrectNonPlainTypes(payload);
+					const res = await svc_saveSettingsPreset(`${newName}`, payload);
 					if (res.status !== "saved") return;
 					ui.notifications.info(`Saved settings preset "${res.name}".`);
 
@@ -1129,13 +1137,13 @@ export async function openSettingsPresetManager() {
 				}
 				if (action === "load") {
 					if (!selected) return ui.notifications.warn("Select a settings preset to load.");
-					const preset = getSettingsPresets()[selected];
+					const preset = svc_getSettingsPresets()[selected];
 					if (!preset) return;
 					const skippedMissing = [];	// Collect skipped items for a one-time notice
 					
 					const ok = await foundry.applications.api.DialogV2.confirm({
 						window: { title: "Apply Settings Preset" },
-						content: `<p>Apply settings preset <b>${esc(selected)}</b>?</p>`,
+						content: `<p>Apply settings preset <b>${hlp_esc(selected)}</b>?</p>`,
 						ok: { label: "Apply" },
 						modal: true
 					});
@@ -1143,35 +1151,35 @@ export async function openSettingsPresetManager() {
 
 					let payload = preset;
 
-					// { items: [...] } or { entries: [...] } → hydrate to bbmm-settings
+					// items: [...] } or { entries: [...] } → hydrate to bbmm-settings
 					const flat = Array.isArray(preset?.items) ? preset.items
 						: (Array.isArray(preset?.entries) ? preset.entries : null);
 
 					if (!preset?.type && flat) {
-						// {Comment} Build a proper bbmm-settings export envelope
-						const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {} };
+						// Build a proper bbmm-settings export envelope
+						const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
 
 						for (const e of flat) {
 							if (!e || typeof e.namespace !== "string" || typeof e.key !== "string") continue;
 							
 							// Skip if the setting is not registered (module missing or setting removed)
-							if (!isRegisteredSetting(e.namespace, e.key)) {
+							if (!hlp_isRegisteredSetting(e.namespace, e.key)) {
 								skippedMissing.push(`${e.namespace}.${e.key}`);
 								continue; // {Do not attempt to set this}
 							}
-							const scope = (e.scope === "world") ? "world" : "client";
+							const scope = (e.scope === "world") ? "world" : (e.scope === "user" ? "user" : "client");
 							out[scope][e.namespace] ??= {};
 							out[scope][e.namespace][e.key] = e.value;
 						}
 
 						payload = out;
-						debugLog(`openSettingsPresetManager(): Load converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
+						DL(`openSettingsPresetManager(): Load converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
 					}
 
 					// Safety: ignore accidental nested {world:{<worldName>:{...}}} wrappers from other exporters
 					if (payload?.type === "bbmm-settings") {
 						const stripWorldNameNest = (bucket) => {
-							// {Comment} If bucket has exactly one key and that key looks like a world id/name, unwrap it
+							// If bucket has exactly one key and that key looks like a world id/name, unwrap it
 							const keys = Object.keys(bucket || {});
 							if (keys.length === 1) {
 								const k = keys[0];
@@ -1184,30 +1192,31 @@ export async function openSettingsPresetManager() {
 						};
 						payload.world = stripWorldNameNest(payload.world);
 						payload.client = stripWorldNameNest(payload.client);
+						payload.user = stripWorldNameNest(payload.user);
 					}
 					
 					if (skippedMissing.length) {
 						const count = skippedMissing.length;
 						ui.notifications?.warn(`BBMM: Skipped ${count} setting${count !== 1 ? "s" : ""} for uninstalled or unregistered modules. Check console for details.`);
-						debugLog(`openSettingsPresetManager(): Skipped for missing modules/settings:\n${skippedMissing.join("\n")}`);
+						DL(`openSettingsPresetManager(): Skipped for missing modules/settings:\n${skippedMissing.join("\n")}`);
 					}
 
 					// Apply
-					await applySettingsExport(payload);
+					await svc_applySettingsExport(payload);
 					return;
 				}
 				if (action === "delete") {
 					if (!selected) return ui.notifications.warn("Select a settings preset to delete.");
 					const ok = await foundry.applications.api.DialogV2.confirm({
 						window: { title: "Delete Settings Preset" },
-						content: `<p>Delete settings preset <b>${esc(selected)}</b>?</p>`,
+						content: `<p>Delete settings preset <b>${hlp_esc(selected)}</b>?</p>`,
 						ok: { label: "Delete" }
 					});
 					if (!ok) return;
 
-					const all = getSettingsPresets();
+					const all = svc_getSettingsPresets();
 					delete all[selected];
-					await setSettingsPresets(all);
+					await svc_setSettingsPresets(all);
 					ui.notifications.info(`Deleted settings preset "${selected}".`);
 
 					// Close and reopen to refresh the list
@@ -1218,21 +1227,21 @@ export async function openSettingsPresetManager() {
 
 				if (action === "export") {
 					try {
-						debugLog("openSettingsPresetManager():Export: start");
-						const payload = collectAllModuleSettings({ includeDisabled });
-						debugLog("openSettingsPresetManager():Export: collected OK");
-						schemaCorrectNonPlainTypes(payload);
-						debugLog("openSettingsPresetManager():Export: schema corrected OK");
+						DL("openSettingsPresetManager():Export: start");
+						const payload = svc_collectAllModuleSettings({ includeDisabled });
+						DL("openSettingsPresetManager():Export: collected OK");
+						hlp_schemaCorrectNonPlainTypes(payload);
+						DL("openSettingsPresetManager():Export: schema corrected OK");
 
-						const base = game.user.isGM ? "settings-world-client" : "settings-client";
-						const fname = `bbmm-${base}-${timestampStr()}.json`;
+						const base = game.user.isGM ? "settings-world-client-user" : "settings-client-user";
+						const fname = `bbmm-${base}-${hlp_timestampStr()}.json`;
 
-						debugLog(`openSettingsPresetManager(): Export: saving ${fname}`);
-						await saveJSONFile(payload, fname);
+						DL(`openSettingsPresetManager(): Export: saving ${fname}`);
+						await hlp_saveJSONFile(payload, fname);
 						ui.notifications.info("Exported current settings.");
-						debugLog("openSettingsPresetManager(): Export: done");
+						DL("openSettingsPresetManager(): Export: done");
 					} catch (e) {
-						debugLog(3, `Export: FAILED — ${e?.message ?? e}`);
+						DL(3, `Export: FAILED — ${e?.message ?? e}`);
 						ui.notifications.error(`Export failed: ${e?.message ?? e}`);
 						throw e;
 					}
@@ -1241,7 +1250,7 @@ export async function openSettingsPresetManager() {
 
 				if (action === "import") {
 					// Choose file
-					const file = await pickLocalJSONFile();
+					const file = await hlp_pickLocalJSONFile();
 					if (!file) return;
 
 					// Parse
@@ -1261,11 +1270,11 @@ export async function openSettingsPresetManager() {
 					}
 
 					// Hand off to the Import Wizard (selection UI + import)
-					await openSettingsImportWizard(data);
+					await ui_openSettingsImportWizard(data);
 					return;
 				}
 			} catch (err) {
-				debugLog("error", "BBMM Settings Presets error", { message: err?.message, stack: err?.stack });
+				DL("error", "BBMM Settings Presets error", { message: err?.message, stack: err?.stack });
 				ui.notifications.error("An error occurred; see console for details.");
 			}
 		});
