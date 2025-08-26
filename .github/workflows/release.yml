@@ -34,7 +34,7 @@ jobs:
           download: https://github.com/${{github.repository}}/releases/download/${{github.event.release.tag_name}}/bbmm.zip
 
       - name: Create Module Archive
-        run: zip -r bbmm.zip module.json README.md LICENSE.md CHANGELOG.md scripts/ packs/
+        run: zip -r bbmm.zip module.json README.md LICENSE.md CHANGELOG.md scripts/ packs/ styles/
 
       - uses: release-flow/keep-a-changelog-action@v3
         id: changelog
