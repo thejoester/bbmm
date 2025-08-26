@@ -391,14 +391,17 @@ async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 
 //	Open Dialog to manage presets 
 export async function openPresetManager() {
+	// Start
 	DL("openPresetManager: start");
 
+	// Load existing presets and build the select options
 	const presets = hlp_getPresets();
 	DL("openPresetManager: presets loaded", presets);
 
 	const names = Object.keys(presets).sort((a, b) => a.localeCompare(b));
 	const options = names.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`).join("");
 
+	// Dialog content (adds "Update" button next to Load/Delete)
 	const content = `
 		<div style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
 
@@ -406,6 +409,7 @@ export async function openPresetManager() {
 				<label style="min-width:10rem;">Saved Presets</label>
 				<select name="presetName" style="flex:1;">${options}</select>
 				<button type="button" data-action="load">Load</button>
+				<button type="button" data-action="update">Update</button>
 				<button type="button" data-action="delete">Delete</button>
 			</div>
 
@@ -424,36 +428,44 @@ export async function openPresetManager() {
 				<button type="button" data-action="bbmm-import-state">Import from .json</button>
 			</div>
 
-			<p class="notes">After applying a preset, You may be prompted to reload.</p>
+			<p class="notes">After applying a preset, you may be prompted to reload.</p>
 		</div>
 	`;
 
+	// Create the DialogV2
 	const dlg = new foundry.applications.api.DialogV2({
 		window: { title: "BBMM Module Presets" },
 		content,
 		buttons: [{ action: "close", label: "Close", default: true }]
 	});
 
+	/*
+		Hook to wire up the click handlers once the dialog is rendered
+	*/
 	const onRender = (app) => {
 		if (app !== dlg) return;
 		Hooks.off("renderDialogV2", onRender);
 		DL("renderDialogV2 fired for Preset Manager", { appId: app.appId });
 
 		const form = app.element?.querySelector("form");
-		if (!form) { DL(2, "form not found"); return; }
+		if (!form) { DL(2, "openPresetManager(): form not found"); return; }
 
+		// Defensive: ensure buttons don’t submit the form
+		form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
+
+		// Single delegated click handler
 		form.addEventListener("click", async (ev) => {
 			const btn = ev.target;
 			if (!(btn instanceof HTMLButtonElement)) return;
 			const action = btn.dataset.action || "";
 
-			// Only handle our buttons; stop any other listeners
-			if (!action.startsWith("bbmm-") && !["save-current", "load", "delete"].includes(action)) return;
+			// Only handle our buttons; stop other listeners
+			if (!action.startsWith("bbmm-") && !["save-current", "load", "update", "delete"].includes(action)) return;
 			ev.preventDefault();
 			ev.stopPropagation();
 			ev.stopImmediatePropagation();
 
-			DL(`Dialog click: ${action}`);
+			DL(`openPresetManager(): click ${action}`);
 
 			const sel = form.elements.namedItem("presetName");
 			const txt = form.elements.namedItem("newName");
@@ -462,24 +474,59 @@ export async function openPresetManager() {
 			const newName = (txt instanceof HTMLInputElement) ? txt.value.trim() : "";
 
 			try {
+				/*
+					Save Current → create/overwrite preset with current enabled modules
+				*/
 				if (action === "save-current") {
 					if (!newName) { ui.notifications.warn("Enter a name for the new preset."); return; }
+
 					const enabled = hlp_getEnabledModuleIds();
+					DL("save-current: collected enabled module ids", { count: enabled.length });
+
 					const res = await hlp_savePreset(newName, enabled);
-					if (res.status !== "saved") return;
+					if (res?.status !== "saved") return;
 					ui.notifications.info(`Saved preset "${res.name}" (${enabled.length} modules).`);
+
+					// Refresh UI list
 					app.close();
 					openPresetManager();
 					return;
 				}
-				else if (action === "load") {
+
+				/*
+					Update → overwrite the SELECTED preset with CURRENT enabled modules
+				*/
+				if (action === "update") {
+					if (!selected) { ui.notifications.warn("Select a preset to update."); return; }
+
+					const enabled = hlp_getEnabledModuleIds();
+					DL("update: collected enabled module ids", { count: enabled.length, target: selected });
+
+					const res = await hlp_savePreset(selected, enabled);
+					if (res?.status !== "saved") return;
+
+					ui.notifications.info(`Updated preset "${selected}" (${enabled.length} modules).`);
+
+					// Refresh UI list (names unchanged, but keep flow consistent)
+					app.close();
+					openPresetManager();
+					return;
+				}
+
+				/*
+					Load → apply preset (then optional reload)
+				*/
+				if (action === "load") {
 					if (!selected) return ui.notifications.warn("Select a preset to load.");
+
 					const enabled = (hlp_getPresets()[selected] || []);
 					DL("load: applying preset", { name: selected, count: enabled.length });
+
 					const proceed = await foundry.applications.api.DialogV2.confirm({
 						window: { title: "Apply Module Preset" },
 						content: `<p>Apply module preset <b>${hlp_esc(selected)}</b> to this world?</p>`,
-						modal: true, ok: { label: "Apply" }
+						modal: true,
+						ok: { label: "Apply" }
 					});
 					if (!proceed) return;
 
@@ -492,32 +539,55 @@ export async function openPresetManager() {
 						ok: { label: "Reload" }
 					});
 					if (reload) location.reload();
+					return;
 				}
-				else if (action === "delete") {
+
+				/*
+					Delete → remove preset
+				*/
+				if (action === "delete") {
 					if (!selected) return ui.notifications.warn("Select a preset to delete.");
+
 					const ok = await foundry.applications.api.DialogV2.confirm({
 						window: { title: "Delete Module Preset" },
 						content: `<p>Delete module preset <b>${hlp_esc(selected)}</b>?</p>`,
 						ok: { label: "Delete" }
 					});
 					if (!ok) return;
-					const p = hlp_getPresets(); delete p[selected]; await hlp_setPresets(p);
+
+					const p = hlp_getPresets();
+					delete p[selected];
+					await hlp_setPresets(p);
+
 					ui.notifications.info(`Deleted preset "${selected}".`);
-					app.close(); openPresetManager();
+					app.close();
+					openPresetManager();
+					return;
 				}
-				else if (action === "bbmm-export-state") {
+
+				/*
+					Export current module state to file
+				*/
+				if (action === "bbmm-export-state") {
+					DL("export-current: starting");
 					exportCurrentModuleStateDialog();
+					return;
 				}
-				else if (action === "bbmm-import-state") {
+
+				/*
+					Import module state from a file and save as preset
+				*/
+				if (action === "bbmm-import-state") {
 					const file = await hlp_pickLocalJSONFile();
 					if (!file) return;
+
 					let data;
 					try { data = JSON.parse(await file.text()); }
 					catch { ui.notifications.error("Invalid JSON file."); return; }
-					
-					// Import file to preset
+
 					const res = await importModuleStateAsPreset(data);
-					// If the import saved a preset, close and reopen the manager ONCE
+					DL("import-state: result", res);
+
 					if (res?.status === "saved") {
 						app.close();
 						openPresetManager();
@@ -525,13 +595,16 @@ export async function openPresetManager() {
 					return;
 				}
 			} catch (err) {
-				DL(3, "Dialog click handler error", err);
+				DL(3, "openPresetManager(): click handler error", {
+					name: err?.name, message: err?.message, stack: err?.stack
+				});
 				ui.notifications.error("An error occurred; see console for details.");
 			}
 		});
 	};
 	Hooks.on("renderDialogV2", onRender);
 
+	// Render
 	DL("rendering DialogV2…");
 	dlg.render(true);
 	DL("DialogV2.render returned");

@@ -53,9 +53,12 @@ function getWindowById(id) {
 /*
 	Convert a bbmm-settings export envelope:
 	{ world:{ns:{key:val}}, client:{...}, user:{...} }
-	→ flat entries: [{namespace,key,scope,value}, ...]
+	-> flat entries: [{namespace,key,scope,value}, ...]
 */
 function hlp_normalizeToEntries(bbmmExport) {
+	// Build skip map once (EXPORT_SKIP + userExclusions)
+	const skip = getSkipMap();
+
 	// Debug
 	DL("hlp_normalizeToEntries(): start");
 
@@ -67,10 +70,22 @@ function hlp_normalizeToEntries(bbmmExport) {
 			if (!bucket || typeof bucket !== "object") continue;
 
 			for (const namespace of Object.keys(bucket)) {
+				// Skip whole module if excluded
+				if (isExcludedWith(skip, namespace)) {
+					DL(`hlp_normalizeToEntries(): excluded module "${namespace}" (scope=${scope})`);
+					continue;
+				}
+
 				const settings = bucket[namespace];
 				if (!settings || typeof settings !== "object") continue;
 
 				for (const key of Object.keys(settings)) {
+					// Skip specific setting if excluded
+					if (isExcludedWith(skip, namespace, key)) {
+						DL(`hlp_normalizeToEntries(): excluded setting "${namespace}.${key}" (scope=${scope})`);
+						continue;
+					}
+
 					const value = settings[key];
 					entries.push({
 						namespace,
@@ -87,7 +102,7 @@ function hlp_normalizeToEntries(bbmmExport) {
 		throw e;
 	}
 
-	// Stable sort: scope → namespace → key
+	// Stable sort: scope -> namespace -> key
 	entries.sort((a, b) =>
 		String(a.scope ?? "").localeCompare(String(b.scope ?? "")) ||
 		String(a.namespace ?? "").localeCompare(String(b.namespace ?? "")) ||
@@ -96,6 +111,17 @@ function hlp_normalizeToEntries(bbmmExport) {
 
 	DL("hlp_normalizeToEntries(): produced entries", { count: entries.length });
 	return entries;
+}
+
+function hlp_entriesToEnvelope(entries) {
+	// Comment
+	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
+	for (const e of entries || []) {
+		const scope = (e.scope === "world") ? "world" : (e.scope === "user" ? "user" : "client");
+		out[scope][e.namespace] ??= {};
+		out[scope][e.namespace][e.key] = e.value;
+	}
+	return out;
 }
 
 /*
@@ -152,7 +178,7 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 		return out;
 	}
 
-	// Foundry Collection → plain object
+	// Foundry Collection -> plain object
 	try {
 		if (typeof foundry !== "undefined" && foundry.utils?.Collection && value instanceof foundry.utils.Collection) {
 			const obj = Object.fromEntries(value.entries());
@@ -278,7 +304,7 @@ async function svc_setSettingsPresets(obj) {
 	Collect module settings by scope, optionally restricting to active modules.
 	- Skips config:false entries
 	- GM: world + client, Non‑GM: client only
-	- includeDisabled=false → skip modules that are not active (except core/system)
+	- includeDisabled=false -> skip modules that are not active (except core/system)
 */
 function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 	// Build a bbmm-settings envelope
@@ -352,13 +378,18 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 	- Always reloads after apply (per your requirement)
 */
 async function svc_applySettingsExport(exportData) {
+	// Validate envelope
 	if (!exportData || exportData.type !== "bbmm-settings") {
 		ui.notifications.error("Not a BBMM settings export.");
 		return { applied: [], skipped: [], missingModules: new Set() };
 	}
 
+	// Scope permissions
 	const isGM = game.user.isGM;
 	const scopes = isGM ? ["world","client","user"] : ["client","user"];
+
+	// Exclusions: build once
+	const skip = getSkipMap();
 
 	const applied = [];
 	const skipped = [];
@@ -367,51 +398,74 @@ async function svc_applySettingsExport(exportData) {
 	for (const scope of scopes) {
 		const tree = exportData[scope] || {};
 		for (const [namespace, entries] of Object.entries(tree)) {
+			// Exclude entire namespace first
+			if (isExcludedWith(skip, namespace)) {
+				DL(`svc_applySettingsExport(): excluded module "${namespace}" — skipping all keys in scope=${scope}`);
+				continue;
+			}
+
+			// If module isn't core/system and not installed, record as missing and skip
 			if (namespace !== "core" && namespace !== game.system.id && !game.modules.has(namespace)) {
 				missingModules.add(namespace);
 				continue;
 			}
+
 			for (const [key, value] of Object.entries(entries)) {
+				// Exclude specific setting if needed
+				if (isExcludedWith(skip, namespace, key)) {
+					DL(`svc_applySettingsExport(): excluded setting "${namespace}.${key}" (scope=${scope})`);
+					continue;
+				}
+
+				// Ensure setting exists and scope matches
 				const def = [...game.settings.settings.values()].find(d => d.namespace === namespace && d.key === key);
 				if (!def) { skipped.push(`${namespace}.${key}`); continue; }
 				if (def.scope !== scope) { skipped.push(`${namespace}.${key}`); continue; }
 
-				// permission: world requires GM
+				// Permission: world requires GM
 				if (def.scope === "world" && !isGM) { skipped.push(`${namespace}.${key}`); continue; }
 
 				try {
+					// Type info
 					const cfg = game.settings.settings.get(`${namespace}.${key}`);
+
+					// Hydrate from JSON-safe
 					let hydrated = hlp_fromJsonSafe(value);
 
-					// Back-compat: old exports stored {} for Set/Map — treat as empty
+					/* Back-compat: old exports stored {} for Set/Map — treat as empty */
 					if (cfg?.type === Set && hlp_isPlainEmptyObject(value)) hydrated = new Set();
 					if (cfg?.type === Map && hlp_isPlainEmptyObject(value)) hydrated = new Map();
 
-					// If caller didn’t tag but type is known, coerce
+					/* Coerce if caller didn't tag but type is known */
 					if (cfg?.type === Set && !(hydrated instanceof Set)) {
 						if (Array.isArray(hydrated)) hydrated = new Set(hydrated);
 						else hydrated = new Set();
 					}
 					if (cfg?.type === Map && !(hydrated instanceof Map)) {
-						if (hydrated && typeof hydrated === "object" && !Array.isArray(hydrated)) hydrated = new Map(Object.entries(hydrated));
-						else hydrated = new Map();
+						if (hydrated && typeof hydrated === "object" && !Array.isArray(hydrated)) {
+							hydrated = new Map(Object.entries(hydrated));
+						} else {
+							hydrated = new Map();
+						}
 					}
 
-					// if the schema expects a plain Object but we somehow have a Map, coerce to POJO
+					/* If schema expects POJO but we have a Map, coerce */
 					if (cfg?.type === Object && hydrated instanceof Map) {
 						hydrated = Object.fromEntries(hydrated);
 					}
 
+					// Apply
 					await game.settings.set(namespace, key, hydrated);
 					applied.push(`${namespace}.${key}`);
-				} catch {
+				} catch (e) {
+					DL(2, "svc_applySettingsExport(): set failed", { ns: namespace, key, message: e?.message });
 					skipped.push(`${namespace}.${key}`);
 				}
 			}
 		}
 	}
 
-	// Always reload
+	// Prompt reload
 	const doReload = await foundry.applications.api.DialogV2.confirm({
 		window: { title: "Reload Foundry?" },
 		content: `<p>Settings preset applied. Reload now to ensure everything initializes correctly?</p>`,
@@ -601,13 +655,6 @@ export async function ui_openSettingsImportWizard(data) {
 		ui.notifications.error("Failed to open Import Wizard (see console).");
 	}
 }
-
-/*
-function ui_getWindowById(id) {
-	// ui.windows is a map of window apps keyed by numeric ids
-	return Object.values(ui.windows ?? {}).find(w => w?.id === id) ?? null;
-}
-*/
 
 /*
 	ApplicationV2: BBMMImportWizard
@@ -970,11 +1017,8 @@ export async function openSettingsPresetManager() {
 	const existing = getWindowById(PRESET_MANAGER_ID);
 	if (existing) {
 		DL("openSettingsPresetManager(): Settings Preset Manager: closing existing instance before reopen");
-		try {
-			await existing.close({ force: true });
-		} catch (e) {
-			DL(2, "openSettingsPresetManager(): failed to close existing instance", e);
-		}
+		try { await existing.close({ force: true }); }
+		catch (e) { DL(2, "openSettingsPresetManager(): failed to close existing instance", e); }
 	}
 
 	// Build list of current presets
@@ -989,6 +1033,7 @@ export async function openSettingsPresetManager() {
 				<label style="min-width:12rem;">Saved Settings Presets</label>
 				<select name="presetName" style="flex:1;">${options}</select>
 				<button type="button" data-action="load">Load</button>
+				<button type="button" data-action="update">Update</button>
 				<button type="button" data-action="delete">Delete</button>
 			</div>
 
@@ -1039,7 +1084,7 @@ export async function openSettingsPresetManager() {
 		try { dlg.setPosition({ height: "auto", left: null, top: null }); } catch {}
 
 		const root = app.element;
-		const form = root?.querySelector("form");		// DialogV2 wraps content in a form
+		const form = root?.querySelector("form");	// DialogV2 wraps content in a form
 		if (!form) return;
 
 		// Ensure all action buttons are non-submitting buttons (defensive)
@@ -1050,7 +1095,7 @@ export async function openSettingsPresetManager() {
 			const btn = ev.target;
 			if (!(btn instanceof HTMLButtonElement)) return;
 			const action = btn.dataset.action || "";
-			if (!["save-current","load","delete","export","import"].includes(action)) return;
+			if (!["save-current","load","update","delete","export","import"].includes(action)) return;
 
 			ev.preventDefault();
 			ev.stopPropagation();
@@ -1067,14 +1112,16 @@ export async function openSettingsPresetManager() {
 
 			DL(`openSettingsPresetManager(): \naction = ${action} \nselected = ${selected} \nnewName = ${newName} \nincludeDisabled = ${includeDisabled}`);
 
-			// Guard if name is empty
+			// Guard: name required for save-current
 			if (action === "save-current" && !newName) {
 				ui.notifications.warn("Enter a name for the new settings preset.");
 				return;
 			}
 
 			try {
-				// Save current settings as a preset
+				/*
+					SAVE CURRENT -> new named preset
+				*/
 				if (action === "save-current") {
 					const payload = svc_collectAllModuleSettings({ includeDisabled });
 					DL("openSettingsPresetManager(): save-current — collected payload", {
@@ -1085,44 +1132,67 @@ export async function openSettingsPresetManager() {
 						}
 					});
 
-					// Normalize schema types first
-					try {
-						hlp_schemaCorrectNonPlainTypes(payload);
-						DL("openSettingsPresetManager(): save-current — schema corrected");
-					} catch (e) {
-						DL(3, "openSettingsPresetManager(): save-current — schema correction failed", {
-							name: e?.name, message: e?.message, stack: e?.stack
-						});
-						throw e;
-					}
+					// Normalize schema types
+					hlp_schemaCorrectNonPlainTypes(payload);
+					DL("openSettingsPresetManager(): save-current — schema corrected");
 
-					// Save preset
-					try {
-						DL("openSettingsPresetManager(): save-current — calling svc_saveSettingsPreset", { name: newName });
-						const res = await svc_saveSettingsPreset(`${newName}`, payload);
-						DL("openSettingsPresetManager(): save-current — save result", res);
-						if (res?.status !== "saved") return;
-						ui.notifications.info(`Saved settings preset "${res.name}".`);
-					} catch (e) {
-						DL(3, "openSettingsPresetManager(): save-current — svc_saveSettingsPreset threw", {
-							name: e?.name, message: e?.message, stack: e?.stack
-						});
-						throw e;
-					}
+					// Save preset (overwrites if same name already exists)
+					DL("openSettingsPresetManager(): save-current — calling svc_saveSettingsPreset", { name: newName });
+					const res = await svc_saveSettingsPreset(`${newName}`, payload);
+					DL("openSettingsPresetManager(): save-current — save result", res);
+					if (res?.status !== "saved") return;
 
-					// Close and reopen to refresh the list
+					ui.notifications.info(`Saved settings preset "${res.name}".`);
+
+					// Refresh list
 					app.close();
 					openSettingsPresetManager();
 					return;
 				}
 
-				// Load a preset
+				/*
+					UPDATE -> overwrite the SELECTED preset with CURRENT settings
+				*/
+				if (action === "update") {
+					if (!selected) { ui.notifications.warn("Select a settings preset to update."); return; }
+
+					// Collect fresh current settings
+					const payload = svc_collectAllModuleSettings({ includeDisabled });
+					DL("openSettingsPresetManager(): update — collected payload", {
+						counts: {
+							world: Object.keys(payload.world ?? {}).length,
+							client: Object.keys(payload.client ?? {}).length,
+							user: Object.keys(payload.user ?? {}).length
+						}
+					});
+
+					// Normalize schema types
+					hlp_schemaCorrectNonPlainTypes(payload);
+					DL("openSettingsPresetManager(): update — schema corrected");
+
+					// Save over the selected name
+					DL("openSettingsPresetManager(): update — calling svc_saveSettingsPreset", { name: selected });
+					const res = await svc_saveSettingsPreset(`${selected}`, payload);
+					DL("openSettingsPresetManager(): update — save result", res);
+					if (res?.status !== "saved") return;
+
+					ui.notifications.info(`Updated settings preset "${selected}".`);
+
+					// Refresh list (no need to rebuild options, but keep consistent)
+					app.close();
+					openSettingsPresetManager();
+					return;
+				}
+
+				/*
+					LOAD -> apply preset
+				*/
 				if (action === "load") {
 					if (!selected) return ui.notifications.warn("Select a settings preset to load.");
 					const preset = svc_getSettingsPresets()[selected];
 					if (!preset) return;
 
-					const skippedMissing = [];	// Collect skipped items for a one-time notice
+					const skippedMissing = [];
 
 					const ok = await foundry.applications.api.DialogV2.confirm({
 						window: { title: "Apply Settings Preset" },
@@ -1134,7 +1204,7 @@ export async function openSettingsPresetManager() {
 
 					let payload = preset;
 
-					// items: [...] or entries: [...] → hydrate to bbmm-settings envelope
+					// items: [...] or entries: [...] -> hydrate to bbmm-settings envelope
 					const flat = Array.isArray(preset?.items) ? preset.items
 						: (Array.isArray(preset?.entries) ? preset.entries : null);
 
@@ -1145,13 +1215,7 @@ export async function openSettingsPresetManager() {
 						for (const e of flat) {
 							if (!e || typeof e.namespace !== "string" || typeof e.key !== "string") continue;
 
-							// Skip excluded first
-							if (isExcluded(e.namespace) || isExcluded(e.namespace, e.key)) {
-								skippedMissing.push(`${e.namespace}.${e.key} (excluded)`);
-								continue;
-							}
-
-							// Skip if setting not registered
+							// Skip unregistered
 							if (!hlp_isRegisteredSetting(e.namespace, e.key)) {
 								skippedMissing.push(`${e.namespace}.${e.key}`);
 								continue;
@@ -1163,7 +1227,6 @@ export async function openSettingsPresetManager() {
 						}
 
 						payload = out;
-
 						DL(`openSettingsPresetManager(): Load converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
 					}
 
@@ -1176,7 +1239,7 @@ export async function openSettingsPresetManager() {
 								const k = keys[0];
 								const maybe = bucket[k];
 								if (maybe && typeof maybe === "object" && Object.values(maybe).every(v => v && typeof v === "object")) {
-									return maybe; // unwrap
+									return maybe;
 								}
 							}
 							return bucket;
@@ -1188,8 +1251,8 @@ export async function openSettingsPresetManager() {
 
 					if (skippedMissing.length) {
 						const count = skippedMissing.length;
-						ui.notifications?.warn(`BBMM: Skipped ${count} setting${count !== 1 ? "s" : ""} for uninstalled, unregistered, or excluded modules/settings. Check console for details.`);
-						DL(`openSettingsPresetManager(): Skipped for missing/excluded:\n${skippedMissing.join("\n")}`);
+						ui.notifications?.warn(`BBMM: Skipped ${count} setting${count !== 1 ? "s" : ""} for uninstalled or unregistered modules. Check console for details.`);
+						DL(`openSettingsPresetManager(): Skipped for missing modules/settings:\n${skippedMissing.join("\n")}`);
 					}
 
 					// Apply
@@ -1197,7 +1260,9 @@ export async function openSettingsPresetManager() {
 					return;
 				}
 
-				// Delete a preset
+				/*
+					DELETE -> remove a preset
+				*/
 				if (action === "delete") {
 					if (!selected) return ui.notifications.warn("Select a settings preset to delete.");
 					const ok = await foundry.applications.api.DialogV2.confirm({
@@ -1212,13 +1277,15 @@ export async function openSettingsPresetManager() {
 					await svc_setSettingsPresets(all);
 					ui.notifications.info(`Deleted settings preset "${selected}".`);
 
-					// Close and reopen to refresh the list
+					// Refresh list
 					app.close();
 					openSettingsPresetManager();
 					return;
 				}
 
-				// Export current settings
+				/*
+					EXPORT -> file
+				*/
 				if (action === "export") {
 					try {
 						DL("openSettingsPresetManager(): Export: start");
@@ -1261,18 +1328,33 @@ export async function openSettingsPresetManager() {
 						return;
 					}
 
-					// Hand off to the Import Wizard (selection UI + import)
-					await ui_openSettingsImportWizard(data);
+					// Normalize (applies exclusions) then re-envelope
+					const before = { 
+						world: Object.values(data.world ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
+						client: Object.values(data.client ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
+						user: Object.values(data.user ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0)
+					};
+					const entries = hlp_normalizeToEntries(data);	// exclusions enforced here
+					const filtered = hlp_entriesToEnvelope(entries);
+					const after = { 
+						world: Object.values(filtered.world ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
+						client: Object.values(filtered.client ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
+						user: Object.values(filtered.user ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0)
+					};
+					DL("Import: counts before/after exclusions", { before, after, entryCount: entries.length });
+
+					// Hand off to Import Wizard with the filtered envelope
+					await ui_openSettingsImportWizard(filtered);
 					return;
 				}
 			} catch (err) {
-				// Log the real failure details (DL signature expects level first or a single string)
+				// Log the real failure details
 				DL(3, "openSettingsPresetManager(): action failed", {
-                    action,
-                    name: err?.name,
-                    message: err?.message,
-                    stack: err?.stack
-                });
+					action,
+					name: err?.name,
+					message: err?.message,
+					stack: err?.stack
+				});
 				ui.notifications.error("An error occurred; see console for details.");
 			}
 		});

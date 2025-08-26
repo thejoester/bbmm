@@ -1,7 +1,7 @@
 {
   "id": "bbmm",
   "title": "Big Bad Module Manager",
-  "version": "0.0.7",
+  "version": "0.1.0",
   "authors": [
     {
       "name": "TheJoester",
@@ -15,9 +15,11 @@
     "verified": "13"
   },
   "esmodules": [
-    "scripts/presets.js",
-    "scripts/settings.js",
-    "scripts/settings-presets.js"
+		"scripts/settings.js",
+		"scripts/helpers.js",
+		"scripts/module-presets.js",
+        "scripts/settings-presets.js",
+		"scripts/exclusions.js"
   ],
   "packs": [
     {
