@@ -1,4 +1,8 @@
-
+import { DL } from './settings.js';
+import { EXPORT_SKIP } from './settings.js';
+/* ---------------------------------------------------------------------- */
+/* General helpers										                  */
+/* ---------------------------------------------------------------------- */
 
 // Tiny safe HTML escaper for labels/values
 export function hlp_esc(s) {
@@ -71,3 +75,65 @@ export function hlp_pickLocalJSONFile() {
 export function hlp_normalizePresetName(s) {
 	return String(s).normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 }
+
+/* ---------------------------------------------------------------------- */
+/* Exclusion helpers (used by settings and module presets)                */
+/* ---------------------------------------------------------------------- */
+
+/* Cache the effective skip map until invalidated */
+let _skipMapCache = null;
+
+export function invalidateSkipMap() {
+	// Call this if you change bbmm.userExclusions or EXPORT_SKIP at runtime
+	_skipMapCache = null;
+}
+
+/*
+	Build effective skip map from EXPORT_SKIP + bbmm.userExclusions.
+	No DL() here; we log only when we actually skip something.
+*/
+export function getSkipMap() {
+	if (_skipMapCache) return _skipMapCache;
+
+	const out = new Map(EXPORT_SKIP ?? new Map());
+	let ex = {};
+	try { ex = game?.settings?.get?.("bbmm","userExclusions") ?? {}; } catch {}
+
+	// Entire modules → add "*"
+	for (const ns of ex.modules ?? []) {
+		if (!ns) continue;
+		const set = out.get(ns) ?? new Set();
+		set.add("*");
+		out.set(ns, set);
+	}
+
+	// Specific settings [{ namespace, key }]
+	for (const ent of ex.settings ?? []) {
+		if (!ent?.namespace || !ent?.key) continue;
+		const set = out.get(ent.namespace) ?? new Set();
+		set.add(ent.key);
+		out.set(ent.namespace, set);
+	}
+
+	_skipMapCache = out;
+	return _skipMapCache;
+}
+
+/* Fast predicate that uses a provided map (no rebuild/logging) */
+export function isExcludedWith(skipMap, namespace, key) {
+	const val = skipMap.get(namespace);
+	if (!val) return false;
+	if (val === "*" || (val instanceof Set && val.has("*"))) return true;
+	return !!(key && val instanceof Set && val.has(key));
+}
+
+/* Back-compat helper if some call sites still use isExcluded(ns,key) */
+export function isExcluded(namespace, key) {
+	return isExcludedWith(getSkipMap(), namespace, key);
+}
+
+Hooks.on("setSetting", (namespace, key, value) => {
+	if (namespace === "bbmm" && key === "userExclusions") {
+		invalidateSkipMap();
+	}
+});

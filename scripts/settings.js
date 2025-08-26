@@ -6,6 +6,11 @@ const MODULE_SETTING_PRESETS = "module-presets";
 const SETTING_SETTINGS_PRESETS = "settingsPresets"; 
 const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
+// Do not export these settings
+export const EXPORT_SKIP = new Map([
+	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", "migratedPresetsV1"])],
+	["core", new Set(["moduleConfiguration"])]	// <- prevents overwriting enabled/disabled modules
+]);
 
 //	Function for debugging - Prints out colored and tagged debug lines
 export function DL(intLogType, stringLogMsg, objObject = null) {
@@ -254,7 +259,7 @@ Hooks.once("init", () => {
 	});
 
 	// User scoped Settings presets
-	game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS_U, {
+	game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS_U, {
 		name: "Module Presets (User)",
 		hint: "User-scoped stored module enable/disable presets.",
 		scope: "user",
@@ -264,7 +269,7 @@ Hooks.once("init", () => {
 	});
 
 	// User scoped Module Presets
-	game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS_U, {
+	game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS_U, {
 		name: "Settings Presets (User)",
 		hint: "User-scoped stored settings presets.",
 		scope: "user",

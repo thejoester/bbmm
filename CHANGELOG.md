@@ -7,7 +7,10 @@ and this project adheres
 
 ## [0.1.0] - 2025-08-25
 ### Added
-- **Player Support:** - Settings Preset Manager accessible for users through Settings or View Active Modules screens. 
+- **Exclusions:** Added exclusions manager allowing to add exclusions to import/export. Supports adding by module or direct setting. 
+- **Player Support:** Settings Preset Manager accessible for users through Settings or View Active Modules screens. 
+- **Macro:** Added Settings Preset inspector macro that will show saved setting values in selected preset. 
+- **Presets (modules and settings):** Added update button that will overwrite the selected preset with current settings / module list. 
 ### Changed
 - Moved button on Manage Modules window to toolbar
 - Added button on Settings window toolbar

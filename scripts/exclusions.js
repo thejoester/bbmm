@@ -208,6 +208,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				try {
 					const ns  = String(s?.namespace ?? "");
 					const key = String(s?.key ?? "");
+					const scope = String(s?.scope ?? "client");	// "world" | "client" | "user"
 					if (!ns || !key) continue;
 
 					const pairKey = `${ns}::${key}`;
@@ -227,7 +228,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 						setTitle = key;
 					}
 
-					rows.push({ namespace: ns, key, modTitle, setTitle });
+					rows.push({ namespace: ns, key, modTitle, setTitle, scope });
 				} catch (e1) {
 					DL(2, "AddSetting._collectSettings() item failed", e1);
 				}
@@ -263,6 +264,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			<tr>
 				<td class="c-mod" title="${foundry.utils.escapeHTML(r.namespace)}">${foundry.utils.escapeHTML(r.modTitle)}</td>
 				<td class="c-setting" title="${foundry.utils.escapeHTML(`${r.namespace}.${r.key}`)}">${foundry.utils.escapeHTML(r.setTitle)}</td>
+				<td class="c-scope">${r.scope}</td>
 				<td class="c-act">
 					<button type="button" class="bbmm-exc-act" data-ns="${foundry.utils.escapeHTML(r.namespace)}" data-key="${foundry.utils.escapeHTML(r.key)}">Exclude</button>
 				</td>
@@ -284,6 +286,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				.bbmm-as-table .c-mod{width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 				.bbmm-as-table .c-setting{width:45%;overflow:hidden;text-overflow:ellipsis}
 				.bbmm-as-table .c-act{width:15%;text-align:right}
+				.bbmm-as-table .c-scope{ width:90px; text-transform:capitalize; opacity:.85; }
 			</style>
 
 			<section class="bbmm-as-root">
@@ -294,7 +297,9 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 				<div class="bbmm-as-scroller">
 					<table class="bbmm-as-table">
-						<thead><tr><th>Module</th><th>Setting</th><th></th></tr></thead>
+						<thead>
+							<tr><th>Module</th><th>Setting</th><th>Scope</th><th></th></tr>
+						</thead>
 						<tbody>${rows || `<tr><td colspan="3" class="c-empty" style="text-align:center;opacity:.8;padding:18px 0">No eligible settings found.</td></tr>`}</tbody>
 					</table>
 				</div>
@@ -377,7 +382,6 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 	BBMMExclusionsAppV2
 	- Lists current exclusions from game.settings.get("bbmm","userExclusions")
 	- Two buttons: Add Module / Add Setting (setting flow TBD)
-	- Scrolls properly (flex column + min-height:0 + overflow:auto)
    ========================================================================== 
 */
 class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
@@ -641,7 +645,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 		const cancelBtn = document.createElement("button");
 		cancelBtn.type = "button";
-		cancelBtn.innerText = "Cancel";
+		cancelBtn.innerText = "Close";
 		cancelBtn.addEventListener("click", () => {
 			DL("ExclusionsManager.cancel(): close");
 			try { this.close({ force: true }); } catch {}
