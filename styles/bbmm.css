@@ -1,0 +1,55 @@
+/* BBMM Exclusions dialog */
+.bbmm-exclusions-dialog .window-content {
+	/* make sure our content can lay out as intended */
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+/* Force the toolbar into a single row regardless of theme */
+.bbmm-exclusions-dialog .bbmm-x-toolbar {
+	display: grid !important;
+	grid-template-columns: max-content max-content 1fr max-content !important;
+	align-items: center !important;
+	column-gap: 8px !important;
+	row-gap: 0 !important;
+}
+
+/* Keep buttons compact and inline */
+.bbmm-exclusions-dialog .bbmm-x-toolbar .bbmm-btn {
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	width: auto !important;
+	max-width: none !important;
+	min-width: 0 !important;
+	white-space: nowrap !important;
+	flex: 0 0 auto !important;
+	margin: 0 !important;
+}
+
+/* (optional) if some theme forces buttons to block in all contexts */
+.bbmm-exclusions-dialog .bbmm-x-toolbar .bbmm-btn,
+.bbmm-exclusions-dialog .bbmm-x-toolbar .bbmm-x-cell > .bbmm-btn {
+	display: inline-flex !important;
+}
+
+/* BBMM Launcher dialog: stack footer buttons full-width */
+.bbmm-launcher-dialog footer.form-footer,
+.bbmm-launcher-dialog footer .dialog-buttons {
+	display: grid !important;
+	grid-template-columns: 1fr !important;
+	row-gap: 0.5rem !important;
+	align-items: stretch !important;
+	justify-items: stretch !important;
+}
+
+/* Make each footer button a full-width block */
+.bbmm-launcher-dialog footer.form-footer button,
+.bbmm-launcher-dialog footer .dialog-buttons > button {
+	display: block !important;
+	width: 100% !important;
+	max-width: none !important;
+	margin: 0 !important;
+	white-space: nowrap !important;
+}

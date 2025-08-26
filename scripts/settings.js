@@ -1,7 +1,7 @@
 import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 
-const MM_ID = "bbmm";
+const BBMM_ID = "bbmm";
 const MODULE_SETTING_PRESETS = "module-presets";  
 const SETTING_SETTINGS_PRESETS = "settingsPresets"; 
 const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
@@ -20,7 +20,7 @@ export function DL(intLogType, stringLogMsg, objObject = null) {
 		stringLogMsg = intLogType;
 		intLogType = 1; // Default log type to 'all'
 	}
-	const debugLevel = game.settings.get(MM_ID, "debugLevel");
+	const debugLevel = game.settings.get(BBMM_ID, "debugLevel");
 
 	// Map debugLevel setting to numeric value for comparison
 	const levelMap = {
@@ -156,35 +156,32 @@ function injectBBMMHeaderButton(root) {
 // Open a small chooser dialog, then launch the selected manager
 export async function openBBMMLauncher() {
 	DL("openBBMMLauncher()");
+	
+	function openExclusionsManager() {
+		DL('openExclusionsManager(): fired');
+		const fn = globalThis.bbmm?.openExclusionsManagerApp ?? globalThis.openExclusionsManagerApp;
+		if (typeof fn === "function") fn();
+		else DL(3, "openExclusionsManager(): launcher not found");
+	}
+
 
 	const choice = await new Promise((resolve) => {
 		const dlg = new foundry.applications.api.DialogV2({
 			window: { title: "Big Bad Module Manager" },
-			content: `
-				<div style="min-width:420px;display:flex;flex-direction:column;gap:.75rem;">
-					<p class="notes">Choose which manager to open:</p>
-				</div>
-			`,
+			classes: ["bbmm-launcher-dialog"],
+			content: ``,
 			buttons: [
-				{ action: "modules",	label: "Module Preset Manager",	default: true, callback: () => "modules" },
-				{ action: "settings",	label: "Settings Preset Manager", callback: () => "settings" },
-				{ action: "cancel",		label: "Cancel" , callback: () => "cancel" }
+				{ action: "modules",  label: "Module Preset Manager", default: true },
+				{ action: "settings", label: "Settings Preset Manager" },
+				{ action: "exclusions", label: "Exclusions Manager" },
+				{ action: "cancel",   label: "Cancel" }
 			],
-			submit: (res/*, _ev, _btn*/) => resolve(res ?? "cancel"),
+			submit: (res) => resolve(res ?? "cancel"),
 			rejectClose: false,
-			render: (app) => {
-				// make the standard footer vertical
-				const form = app.element?.querySelector("form");
-				const footer = form?.querySelector("footer");
-				if (footer) {
-					footer.style.display = "flex";
-					footer.style.flexDirection = "column";
-					footer.style.gap = ".5rem";
-					footer.style.alignItems = "stretch";
-				}
-			}
+			position: { width: 400, height: "auto" }
 		});
 		dlg.render(true);
+
 	});
 
 	DL(`openBBMMLauncher(): choice = ${choice}`);
@@ -193,7 +190,9 @@ export async function openBBMMLauncher() {
 		openPresetManager();
 	} else if (choice === "settings") {
 		openSettingsPresetManager();
-	} 
+	} else if (choice === "exclusions") {
+		openExclusionsManager();
+	}
 	// "cancel" → do nothing
 }
 
@@ -205,21 +204,21 @@ async function migrationV1Check() {
 	if (!game.user.isGM) return; // Only needed for GMs
 	
 	try {
-		const migrated = game.settings.get(MM_ID, "migratedPresetsV1");
+		const migrated = game.settings.get(BBMM_ID, "migratedPresetsV1");
 		if (!migrated) {
-			const oldModule = game.settings.get(MM_ID, MODULE_SETTING_PRESETS) ?? {};
-			const oldSetting = game.settings.get(MM_ID, SETTING_SETTINGS_PRESETS) ?? {};
+			const oldModule = game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS) ?? {};
+			const oldSetting = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) ?? {};
 
 			if (Object.keys(oldModule).length) {
-				await game.settings.set(MM_ID, MODULE_SETTING_PRESETS_U, oldModule);
+				await game.settings.set(BBMM_ID, MODULE_SETTING_PRESETS_U, oldModule);
 				DL("migrationV1Check(): migrated module presets to user scope");
 			}
 			if (Object.keys(oldSetting).length) {
-				await game.settings.set(MM_ID, SETTING_SETTINGS_PRESETS_U, oldSetting);
+				await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS_U, oldSetting);
 				DL("migrationV1Check(): migrated setting presets to user scope");
 			}
 
-			await game.settings.set(MM_ID, "migratedPresetsV1", true);
+			await game.settings.set(BBMM_ID, "migratedPresetsV1", true);
 			DL("migrationV1Check(): migration complete, flag set");
 		}
 	} catch (err) {
@@ -236,7 +235,7 @@ Hooks.once("init", () => {
 	
 // ===== FLAGS ======
 	//	World-scoped one-time migration flag
-	game.settings.register(MM_ID, "migratedPresetsV1", {
+	game.settings.register(BBMM_ID, "migratedPresetsV1", {
 		name: "BBMM Migration Flag",
 		scope: "world",
 		config: false,
@@ -244,8 +243,18 @@ Hooks.once("init", () => {
 		default: false
 	});
 // ====== HIDDEN VARIABLES ===== 
+	// User Exclusions 
+	game.settings.register(BBMM_ID, "userExclusions", {
+		name: "BBMM: User Exclusions",
+		hint: "Modules or Settings to be ignored when importing/exporting BBMM presets.",
+		scope: "world",	
+		config: false,	
+		type: Object,
+		default: { modules: [], settings: [] }
+	});
+
 	// User scoped Settings presets
-	game.settings.register(MM_ID, MODULE_SETTING_PRESETS_U, {
+	game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS_U, {
 		name: "Module Presets (User)",
 		hint: "User-scoped stored module enable/disable presets.",
 		scope: "user",
@@ -255,7 +264,7 @@ Hooks.once("init", () => {
 	});
 
 	// User scoped Module Presets
-	game.settings.register(MM_ID, SETTING_SETTINGS_PRESETS_U, {
+	game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS_U, {
 		name: "Settings Presets (User)",
 		hint: "User-scoped stored settings presets.",
 		scope: "user",
@@ -265,7 +274,7 @@ Hooks.once("init", () => {
 	});
 
 	// OLD Settings Presets 
-	game.settings.register(MM_ID, MODULE_SETTING_PRESETS, {
+	game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS, {
 		name: "Module Presets",
 		hint: "Stored module enable/disable presets.",
 		scope: "world",
@@ -275,7 +284,7 @@ Hooks.once("init", () => {
 	});
 	
 	// OLD world Presets 
-	game.settings.register(MM_ID, SETTING_SETTINGS_PRESETS, {
+	game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS, {
 		name: "Settings Presets",
 		hint: "Stored module enable/disable presets.",
 		scope: "world",
@@ -285,7 +294,7 @@ Hooks.once("init", () => {
 	});
 // ===== SETTINGS ITEMS =====
 	// Add a menu entry in Configure Settings to open the Preset Manager
-	game.settings.registerMenu(MM_ID, "modulePresetManager", {
+	game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
 		name: "Module Presets",
 		label: "Open Module Preset Manager",
 		icon: "fas fa-layer-group",
@@ -309,11 +318,11 @@ Hooks.once("init", () => {
 	});
 	
 	// Add a menu entry in Configure Settings to open the Preset Manager
-	game.settings.registerMenu(MM_ID, "settingsPresetManager", {
+	game.settings.registerMenu(BBMM_ID, "settingsPresetManager", {
 		name: "Settings Presets",
 		label: "Open Settings Preset Manager",
 		icon: "fas fa-layer-group",
-		restricted: true,
+		restricted: false,
 		type: class extends FormApplication {
 			constructor(...args){ super(...args); }
 			static get defaultOptions() {
@@ -332,8 +341,32 @@ Hooks.once("init", () => {
 		}
 	});
 	
+	// Add a  menu entry for Exclusions manager
+	game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
+		name: "Exclusions",
+		label: "Open Exclusions Manager",
+		icon: "fas fa-filter",
+		restricted: true,
+		type: class extends FormApplication {
+			constructor(...args){ super(...args); }
+			static get defaultOptions() {
+				return foundry.utils.mergeObject(super.defaultOptions, {
+					id: "bbmm-exclusions-manager",
+					title: "BBBM Exclusions Manager",
+					template: null, 
+					width: 600
+				});
+			}
+			async render(...args) {
+				await openExclusionsManager();
+				return this;
+			}
+			async _updateObject() {}
+		}
+	});
+	
 	// Debug level for THIS module
-	game.settings.register(MM_ID, "debugLevel", {
+	game.settings.register(BBMM_ID, "debugLevel", {
 		name: "Debug Level",
 		hint: "Logging: all, warn, error, none",
 		scope: "world",

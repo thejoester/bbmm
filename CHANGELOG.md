@@ -12,7 +12,8 @@ and this project adheres
 - Moved button on Manage Modules window to toolbar
 - Added button on Settings window toolbar
 ### Fixed
-- **Settings Preset Manager:** - export/import suppord for user scope settings. This is only for current user.
+- **Settings Preset Manager:** export/import suppord for user scope settings. This is only for current user.
+- **Settings Preset Manager:** fixed bug that overwrote module state when loading setting presets. 
 
 ## [0.0.7] - 2025-08-25
 ### Fixed 
