@@ -1,5 +1,5 @@
 import { DL } from './settings.js';
-const BBMM_ID = "bbmm";
+import { LT, BBMM_ID } from "./localization.js";
 
 /* ============================================================================
 	BBMMAddModuleExclusionAppV2
@@ -744,17 +744,23 @@ export function openExclusionsManagerApp() {
 	// DL('openExclusionsManagerApp(): fired');
 	new BBMMExclusionsAppV2().render(true);
 }
+
 export function openAddModuleExclusionApp() {
 	// DL('openAddModuleExclusionApp(): fired');
 	new BBMMAddModuleExclusionAppV2().render(true);
 }
-if (!globalThis.bbmm) globalThis.bbmm = {};
-globalThis.bbmm.openAddSettingExclusionApp = function () {
-	// DL("openAddSettingExclusionApp(): fired");
+
+export function openAddSettingExclusionApp() {
+	// DL('openAddSettingExclusionApp(): fired');
 	new BBMMAddSettingExclusionAppV2().render(true);
-};
-// Expose on global so settings.js can call without imports
-if (!globalThis.bbmm) globalThis.bbmm = {};
-globalThis.bbmm.openExclusionsManagerApp = openExclusionsManagerApp;
-globalThis.bbmm.openAddModuleExclusionApp = openAddModuleExclusionApp;
-globalThis.openAddSettingExclusionApp = globalThis.bbmm.openAddSettingExclusionApp;
+}
+
+//	Ensure namespace once
+globalThis.bbmm ??= {};
+
+//	Register on bbmm namespace
+Object.assign(globalThis.bbmm, {
+	openExclusionsManagerApp,
+	openAddModuleExclusionApp,
+	openAddSettingExclusionApp
+});

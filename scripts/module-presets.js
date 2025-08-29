@@ -1,6 +1,6 @@
 import { DL } from './settings.js';
 import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName } from './helpers.js';
-const BBMM_ID = "bbmm";
+import { LT, BBMM_ID } from "./localization.js";
 const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  enabled module ids
 
 /*	=====	HELPERS =====
@@ -93,17 +93,21 @@ async function hlp_savePreset(name, modules) {
 	
 	// Prompt how to handle duplicate name 
 	function askPresetConflict(existingKey) {
+		const boldName = "<b>" + hlp_esc(existingKey) + "</b>";
+		const contentHtml = "<p>"
+			+ LT.errors.presetExists({ name: boldName })
+			+ "</p><p>"
+			+ LT.errors.existsPrompt()
+			+ "</p>";
+		
 		return new Promise((resolve) => {
 			new foundry.applications.api.DialogV2({
-				window: { title: "Preset Exists", modal: true },
-				content: `
-					<p>A preset named <b>${hlp_esc(existingKey)}</b> already exists.</p>
-					<p>What would you like to do?</p>
-				`,
+				window: { title: LT.errors.conflictTitleExists(), modal: true },
+				content: contentHtml,
 				buttons: [
-					{ action: "overwrite", label: "Overwrite", default: true, callback: () => "overwrite" },
-					{ action: "rename", label: "Rename", callback: () => "rename" },
-					{ action: "cancel", label: "Cancel", callback: () => "cancel" }
+					{ action: "overwrite", label: LT.errors.overwrite(), default: true, callback: () => "overwrite" },
+					{ action: "rename", label: LT.errors.rename(), callback: () => "rename" },
+					{ action: "cancel", label: LT.buttons.cancel(), callback: () => "cancel" }
 				],
 				submit: (result) => resolve(result ?? "cancel"),
 				rejectClose: false
@@ -115,17 +119,17 @@ async function hlp_savePreset(name, modules) {
 	function promptRename(rawInput) {
 		return new Promise((resolve) => {
 			new foundry.applications.api.DialogV2({
-				window: { title: "Rename Preset", modal: true },
+				window: { title: LT.renamePreset(), modal: true },
 				content: `
 					<div style="display:flex;gap:.5rem;align-items:center;">
-						<label style="min-width:7rem;">New Name</label>
+						<label style="min-width:7rem;">${LT.newName()}</label>
 						<input name="newName" type="text" value="${hlp_esc(rawInput)}" autofocus style="flex:1;">
 					</div>
 				`,
 				buttons: [
-					{ action: "ok",     label: "Save",   default: true,
+					{ action: "ok", label: LT.buttons.save(), default: true,
 					  callback: (_ev, btn) => resolve(btn.form.elements.newName?.value?.trim() || "") },
-					{ action: "cancel", label: "Cancel", callback: () => resolve(null) }
+					{ action: "cancel", label: LT.buttons.cancel(), callback: () => resolve(null) }
 				],
 				submit: () => {},
 				rejectClose: false
@@ -200,15 +204,15 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 		// Wrap DialogV2 in a Promise so we can await a boolean
 		return new Promise((resolve) => {
 			new foundry.applications.api.DialogV2({
-				window: { title: "Import Check — Issues Detected" },
+				window: { title: LT.titleImportIssues },
 				content: `
 					<div style="display:flex;flex-direction:column;gap:.5rem;">
-						<p class="notes">The imported preset was saved, but the following issues were found:</p>
+						<p class="notes">${LT.descImportIssues()}:</p>
 						${lines.join("\n")}
 					</div>
 				`,
 				buttons: [
-					{ action: "ok", label: "OK", default: true }
+					{ action: "ok", label: LT.buttons.ok(), default: true }
 				],
 				submit: (_res, _ev, button) => button?.action === "ok"
 			}).render(true);
@@ -222,9 +226,9 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 	const lines = [];
 
 	if (unknown.length) {
-		lines.push(`<p><b>Modules not installed:</b></p>`);
+		lines.push(`<p><b>${LT.titleModulesNotInstalled()}:</b></p>`);
 		lines.push(`<ul style="margin-top:.25rem;">${
-			unknown.map(it => `<li><code>${hlp_esc(it.id)}</code> — Module not installed</li>`).join("")
+			unknown.map(it => `<li><code>${hlp_esc(it.id)}</code> — ${LT.descModulesNotInstalled()}</li>`).join("")
 		}</ul>`);
 	}
 
@@ -237,10 +241,10 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 			if (!byMod.has(modId)) byMod.set(modId, []);
 			if (depId != null) byMod.get(modId).push(depId);
 		}
-		lines.push(`<p><b>Dependencies missing:</b></p>`);
+		lines.push(`<p><b>${LT.dependencyMissing()}:</b></p>`);
 		lines.push(`<ul style="margin-top:.25rem;">${
 			[...byMod.entries()].map(([id, deps]) =>
-				`<li><code>${hlp_esc(id)}</code> → missing: ${deps.map(d => `<code>${hlp_esc(d)}</code>`).join(", ")}</li>`
+				`<li><code>${hlp_esc(id)}</code> → ${LT.errors.missing()}: ${deps.map(d => `<code>${hlp_esc(d)}</code>`).join(", ")}</li>`
 			).join("")
 		}</ul>`);
 	}
@@ -256,31 +260,32 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 // Open Dialog to export Module state json
 async function exportCurrentModuleStateDialog() {
 	new foundry.applications.api.DialogV2({
-		window: { title: "Export Current Module State" },
+		window: { title: LT.titleExportModuleState() },
 		content: `
 			<div style="display:flex;flex-direction:column;gap:.5rem;">
 				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:7rem;">Export Name</label>
+					<label style="min-width:7rem;">${LT.exportName()}</label>
 					<input name="exportName" type="text" placeholder="e.g. prod-setup" style="flex:1;">
 				</div>
-				<p class="notes">File will be named <code>module-state-{name}-{YYYYMMDD-HHMMSS}.json</code></p>
+				<p class="notes">${LT.noteExportFileName()} 
+				<code>${LT.filenameModuleState()}-{name}-{YYYYMMDD-HHMMSS}.json</code></p>
 			</div>
 		`,
 		buttons: [
 			{
 				action: "ok",
-				label: "Export",
+				label: LT.buttons.export(),
 				default: true,
 				callback: (ev, button) => button.form.elements.exportName?.value?.trim() || ""
 			},
-			{ action: "cancel", label: "Cancel" }
+			{ action: "cancel", label: LT.buttons.export() }
 		],
 		submit: (_result) => {
 			const baseName = _result;
-			if (!baseName) { ui.notifications.warn("Please enter an export name."); return; }
+			if (!baseName) { ui.notifications.warn(`${LT.exportNamePrompt()}.`); return; }
 
 			const stamp = hlp_timestampStr();
-			const fname = `module-state-${hlp_slugify(baseName)}-${stamp}.json`;
+			const fname = `${LT.filenameModuleState()}-${hlp_slugify(baseName)}-${stamp}.json`;
 
 			const enabled = hlp_getEnabledModuleIds();
 			const versions = {};
@@ -303,13 +308,13 @@ async function importModuleStateAsPreset(data) {
 	const validated = hlp_validateModulePresetJSON(data);
 	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
 		DL(3, "Not a BBMM export. Expected a file created by BBMM.");
-		await new foundry.applications.api.DialogV2({
-			window: { title: "Import Error" },
-			content: `<p>Error! Not a BBMM export. Expected a file created by BBMM.</p>`,
-			buttons: [{ action: "ok", label: "OK", default: true }],
-			submit: () => "ok"
-		}).render(true);
-		return;
+			await new foundry.applications.api.DialogV2({
+				window: { title: LT.errors.titleImportError() },
+				content: `<p>${LT.errors.notBBMMFile()}.</p>`,
+				buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
+				submit: () => "ok"
+			}).render(true);
+			return;
 	}
 	const modules = validated.modules;
 
@@ -318,27 +323,27 @@ async function importModuleStateAsPreset(data) {
 
 	// 3) ask for preset name and save
 	new foundry.applications.api.DialogV2({
-		window: { title: "Import as module preset" },
+		window: { title: LT.titleImportPreset() },
 		content: `
 			<div style="display:flex;flex-direction:column;gap:.5rem;">
 				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:7rem;">Preset Name</label>
+					<label style="min-width:7rem;">${LT.presetName()}</label>
 					<input name="presetName" type="text" placeholder="e.g. staging" style="flex:1;">
 				</div>
 			</div>
 		`,
 		buttons: [
-			{ action: "ok", label: "Import", default: true, callback: (ev, button) => button.form.elements.presetName?.value?.trim() || "" },
-			{ action: "cancel", label: "Cancel" }
+			{ action: "ok", label: LT.buttons.import(), default: true, callback: (ev, button) => button.form.elements.presetName?.value?.trim() || "" },
+			{ action: "cancel", label: LT.buttons.cancel() }
 		],
 		submit: async (_result) => {
 			const baseName = _result;
-			if (!baseName) { ui.notifications.warn("Please enter a preset name."); return; }
+			if (!baseName) { ui.notifications.warn(`${LT.importNamePrompt()}.`); return; }
 
 			const res = await hlp_savePreset(`${baseName} (${hlp_formatDateD_Mon_YYYY()})`, modules);
-			if (res.status !== "saved") return;
+			if (res.status !== "saved") return res;
 
-			ui.notifications.info(`Imported preset "${res.name}" (${modules.length} modules).`);
+			ui.notifications.info(`${LT.importedSummary({ name: res.name, count: modules.length })}.`);
 
 			// Show issues once (if any), do NOT reopen the manager here.
 			const report = hlp_validateModuleState(modules);
@@ -347,6 +352,7 @@ async function importModuleStateAsPreset(data) {
 			}
 
 			// Return to caller so it can decide whether to close/refresh the manager.
+			DL("importModuleStateAsPreset() returning ", res);
 			return res;
 		}
 	}).render(true);
@@ -406,37 +412,35 @@ export async function openPresetManager() {
 		<div style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
 
 			<div style="display:flex;gap:.5rem;align-items:center;">
-				<label style="min-width:10rem;">Saved Presets</label>
+				<label style="min-width:10rem;">${LT.savedPresets()}</label>
 				<select name="presetName" style="flex:1;">${options}</select>
-				<button type="button" data-action="load">Load</button>
-				<button type="button" data-action="update">Update</button>
-				<button type="button" data-action="delete">Delete</button>
+				<button type="button" data-action="load">${LT.buttons.load()}</button>
+				<button type="button" data-action="update">${LT.buttons.update()}</button>
+				<button type="button" data-action="delete">${LT.buttons.delete()}</button>
 			</div>
 
 			<hr>
 
 			<div style="display:flex;gap:.5rem;align-items:center;">
-				<input name="newName" type="text" placeholder="New preset name…" style="flex:1;">
-				<button type="button" data-action="save-current">Save Current</button>
+				<input name="newName" type="text" placeholder="${LT.newPresetName()}…" style="flex:1;">
+				<button type="button" data-action="save-current">${LT.buttons.saveCurrent()}</button>
 			</div>
 
 			<hr>
 
-			<h3 style="margin:0;">Export/Import Current Module State</h3>
+			<h3 style="margin:0;">${LT.titleImportExportModuleState()}</h3>
 			<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-				<button type="button" data-action="bbmm-export-state">Export to .json</button>
-				<button type="button" data-action="bbmm-import-state">Import from .json</button>
+				<button type="button" data-action="bbmm-export-state">${LT.buttons.exportToJSON()}</button>
+				<button type="button" data-action="bbmm-import-state">${LT.buttons.importFromJSON()}</button>
 			</div>
-
-			<p class="notes">After applying a preset, you may be prompted to reload.</p>
 		</div>
 	`;
 
 	// Create the DialogV2
 	const dlg = new foundry.applications.api.DialogV2({
-		window: { title: "BBMM Module Presets" },
+		window: { title: LT.modulePresets() },
 		content,
-		buttons: [{ action: "close", label: "Close", default: true }]
+		buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
 	});
 
 	/*
@@ -478,14 +482,14 @@ export async function openPresetManager() {
 					Save Current → create/overwrite preset with current enabled modules
 				*/
 				if (action === "save-current") {
-					if (!newName) { ui.notifications.warn("Enter a name for the new preset."); return; }
+					if (!newName) { ui.notifications.warn(`${LT.promptNewPresetName()}.`); return; }
 
 					const enabled = hlp_getEnabledModuleIds();
 					DL("save-current: collected enabled module ids", { count: enabled.length });
 
 					const res = await hlp_savePreset(newName, enabled);
 					if (res?.status !== "saved") return;
-					ui.notifications.info(`Saved preset "${res.name}" (${enabled.length} modules).`);
+					ui.notifications.info(`${LT.savedSummary({ name: res.name, count: enabled.length })}.`);
 
 					// Refresh UI list
 					app.close();
@@ -497,7 +501,7 @@ export async function openPresetManager() {
 					Update → overwrite the SELECTED preset with CURRENT enabled modules
 				*/
 				if (action === "update") {
-					if (!selected) { ui.notifications.warn("Select a preset to update."); return; }
+					if (!selected) { ui.notifications.warn(`${LT.warnUpdatePreset()}.`); return; }
 
 					const enabled = hlp_getEnabledModuleIds();
 					DL("update: collected enabled module ids", { count: enabled.length, target: selected });
@@ -505,7 +509,7 @@ export async function openPresetManager() {
 					const res = await hlp_savePreset(selected, enabled);
 					if (res?.status !== "saved") return;
 
-					ui.notifications.info(`Updated preset "${selected}" (${enabled.length} modules).`);
+					ui.notifications.info(`${LT.updatedSummary({name: selected, count: enabled.length})}.`);
 
 					// Refresh UI list (names unchanged, but keep flow consistent)
 					app.close();
@@ -523,10 +527,10 @@ export async function openPresetManager() {
 					DL("load: applying preset", { name: selected, count: enabled.length });
 
 					const proceed = await foundry.applications.api.DialogV2.confirm({
-						window: { title: "Apply Module Preset" },
-						content: `<p>Apply module preset <b>${hlp_esc(selected)}</b> to this world?</p>`,
+						window: { title: LT.titleApplyModulePreset() },
+						content: `<p>${LT.promptApplyModulePreset({ name: hlp_esc(selected) })}</p>`,
 						modal: true,
-						ok: { label: "Apply" }
+						ok: { label: LT.buttons.apply() }
 					});
 					if (!proceed) return;
 
@@ -534,9 +538,9 @@ export async function openPresetManager() {
 					DL("load: applied; prompting reload");
 
 					const reload = await foundry.applications.api.DialogV2.confirm({
-						window: { title: "Reload Foundry?" },
-						content: `<p>Preset applied. Reload now?</p>`,
-						ok: { label: "Reload" }
+						window: { title: LT.titleReloadFoundry() },
+						content: `<p>${LT.promptReloadNow()}</p>`,
+						ok: { label: LT.buttons.reload() }
 					});
 					if (reload) location.reload();
 					return;
@@ -546,12 +550,12 @@ export async function openPresetManager() {
 					Delete → remove preset
 				*/
 				if (action === "delete") {
-					if (!selected) return ui.notifications.warn("Select a preset to delete.");
+					if (!selected) return ui.notifications.warn(`${LT.warnSelectPresetDelete()}.`);
 
 					const ok = await foundry.applications.api.DialogV2.confirm({
-						window: { title: "Delete Module Preset" },
-						content: `<p>Delete module preset <b>${hlp_esc(selected)}</b>?</p>`,
-						ok: { label: "Delete" }
+						window: { title: LT.titleDeleteModulePreset() },
+						content: `<p>${LT.promptDeleteModulePreset()} <b>${hlp_esc(selected)}</b>?</p>`,
+						ok: { label: LT.buttons.delete() }
 					});
 					if (!ok) return;
 
@@ -559,7 +563,7 @@ export async function openPresetManager() {
 					delete p[selected];
 					await hlp_setPresets(p);
 
-					ui.notifications.info(`Deleted preset "${selected}".`);
+					ui.notifications.info(`${LT.deletedPreset()} "${selected}".`);
 					app.close();
 					openPresetManager();
 					return;
@@ -583,31 +587,34 @@ export async function openPresetManager() {
 
 					let data;
 					try { data = JSON.parse(await file.text()); }
-					catch { ui.notifications.error("Invalid JSON file."); return; }
+					catch { ui.notifications.error(`${LT.errors.invalidJSONFile()}.`); return; }
 
 					const res = await importModuleStateAsPreset(data);
-					DL("import-state: result", res);
+					DL("import-state: result:", res);
 
 					if (res?.status === "saved") {
 						app.close();
 						openPresetManager();
+						DL("bbmm-import-state: app.close() fired");
+					} else {
+						DL("bbmm-import-state: app.close() skipped");
 					}
+					
+					
 					return;
 				}
 			} catch (err) {
 				DL(3, "openPresetManager(): click handler error", {
 					name: err?.name, message: err?.message, stack: err?.stack
 				});
-				ui.notifications.error("An error occurred; see console for details.");
+				ui.notifications.error(`${LT.errors.errorOccured()}.`);
 			}
 		});
 	};
 	Hooks.on("renderDialogV2", onRender);
 
 	// Render
-	DL("rendering DialogV2…");
 	dlg.render(true);
-	DL("DialogV2.render returned");
 }
 
 Hooks.once("ready", () => {

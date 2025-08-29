@@ -1,9 +1,9 @@
 import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
+import { LT, BBMM_ID } from "./localization.js";
 
-const BBMM_ID = "bbmm";
-const MODULE_SETTING_PRESETS = "module-presets";  
-const SETTING_SETTINGS_PRESETS = "settingsPresets"; 
+const MODULE_SETTING_PRESETS = "module-presets";  // OLD will go away 
+const SETTING_SETTINGS_PRESETS = "settingsPresets"; // OLD will go away
 const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
 // Do not export these settings
@@ -25,7 +25,15 @@ export function DL(intLogType, stringLogMsg, objObject = null) {
 		stringLogMsg = intLogType;
 		intLogType = 1; // Default log type to 'all'
 	}
-	const debugLevel = game.settings.get(BBMM_ID, "debugLevel");
+	let debugLevel = "all"; // default until setting exists
+	try {
+		// Only read after it’s registered
+		if (game?.settings?.settings?.has?.(`${BBMM_ID}.debugLevel`)) {
+			debugLevel = game.settings.get(BBMM_ID, "debugLevel");
+		}
+	} catch (e) {
+		// Swallow: setting not registered yet
+	}
 
 	// Map debugLevel setting to numeric value for comparison
 	const levelMap = {
@@ -114,8 +122,8 @@ function injectBBMMHeaderButton(root) {
 	const btn = document.createElement("button");
 	btn.type = "button";
 	btn.className = "header-control bbmm-header-btn";
-	btn.setAttribute("data-tooltip", "Open Big Bad Module Manager");
-	btn.setAttribute("aria-label", "Open Big Bad Module Manager");
+	btn.setAttribute("data-tooltip", LT.buttons.bbmmBtnToolTip());
+	btn.setAttribute("aria-label", LT.buttons.bbmmBtnToolTip());
 	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i><span>BBMM</span>`;
 
 	btn.addEventListener("click", (ev) => {
@@ -158,28 +166,33 @@ function injectBBMMHeaderButton(root) {
 	DL("BBMM header button injected");
 }
 
+export function openExclusionsManager() {
+	// Wrapper that calls the actual app launcher if present
+	DL("openExclusionsManager(): fired");
+	try {
+		const fn = globalThis.bbmm?.openExclusionsManagerApp ?? globalThis.openExclusionsManagerApp;
+		if (typeof fn === "function") return fn();
+		DL(3, "openExclusionsManager(): launcher not found");
+	ui.notifications?.warn(LT?.exclusionsNotAvailable?.() ?? `${LT.errors.exclusionsMgrNotFound()}.`);
+	} catch (e) {
+		DL(3, "openExclusionsManager(): error", e);
+	}
+}
+
 // Open a small chooser dialog, then launch the selected manager
 export async function openBBMMLauncher() {
 	DL("openBBMMLauncher()");
-	
-	function openExclusionsManager() {
-		DL('openExclusionsManager(): fired');
-		const fn = globalThis.bbmm?.openExclusionsManagerApp ?? globalThis.openExclusionsManagerApp;
-		if (typeof fn === "function") fn();
-		else DL(3, "openExclusionsManager(): launcher not found");
-	}
-
 
 	const choice = await new Promise((resolve) => {
 		const dlg = new foundry.applications.api.DialogV2({
-			window: { title: "Big Bad Module Manager" },
+			window: { title: LT.moduleName() },
 			classes: ["bbmm-launcher-dialog"],
 			content: ``,
 			buttons: [
-				{ action: "modules",  label: "Module Preset Manager", default: true },
-				{ action: "settings", label: "Settings Preset Manager" },
-				{ action: "exclusions", label: "Exclusions Manager" },
-				{ action: "cancel",   label: "Cancel" }
+				{ action: "modules",  label: LT.modulePresetMgr(), default: true },
+				{ action: "settings", label: LT.settingsPresetMgr() },
+				{ action: "exclusions", label: LT.exclusionsMgr() },
+				{ action: "cancel",   label: LT.buttons.cancel() }
 			],
 			submit: (res) => resolve(res ?? "cancel"),
 			rejectClose: false,
@@ -198,7 +211,7 @@ export async function openBBMMLauncher() {
 	} else if (choice === "exclusions") {
 		openExclusionsManager();
 	}
-	// "cancel" → do nothing
+	// "cancel" -> do nothing
 }
 
 /*  Migrationv1 Checker
@@ -300,8 +313,8 @@ Hooks.once("init", () => {
 // ===== SETTINGS ITEMS =====
 	// Add a menu entry in Configure Settings to open the Preset Manager
 	game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
-		name: "Module Presets",
-		label: "Open Module Preset Manager",
+		name: LT.modulePresetsBtn(),
+		label: LT.lblOpenModulePresets(),
 		icon: "fas fa-layer-group",
 		restricted: true,
 		type: class extends FormApplication {
@@ -309,7 +322,7 @@ Hooks.once("init", () => {
 			static get defaultOptions() {
 				return foundry.utils.mergeObject(super.defaultOptions, {
 					id: "bbmm-module-preset-manager",
-					title: "BBBM Module Presets",
+					title: LT.titleModulePresets(),
 					template: null, // We’ll use DialogV2 instead
 					width: 600
 				});
@@ -324,8 +337,8 @@ Hooks.once("init", () => {
 	
 	// Add a menu entry in Configure Settings to open the Preset Manager
 	game.settings.registerMenu(BBMM_ID, "settingsPresetManager", {
-		name: "Settings Presets",
-		label: "Open Settings Preset Manager",
+		name: LT.settingsPresetsBtn(),
+		label: LT.lblOpenSettingsPresets(),
 		icon: "fas fa-layer-group",
 		restricted: false,
 		type: class extends FormApplication {
@@ -333,7 +346,7 @@ Hooks.once("init", () => {
 			static get defaultOptions() {
 				return foundry.utils.mergeObject(super.defaultOptions, {
 					id: "bbmm-settings-preset-manager",
-					title: "BBBM Settings Presets",
+					title: LT.titleSettingsPresets(),
 					template: null, // We’ll use DialogV2 instead
 					width: 600
 				});
@@ -348,8 +361,8 @@ Hooks.once("init", () => {
 	
 	// Add a  menu entry for Exclusions manager
 	game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
-		name: "Exclusions",
-		label: "Open Exclusions Manager",
+		name: LT.exclusionsMgrBtn(),
+		label: LT.lblExclusionsMgr(),
 		icon: "fas fa-filter",
 		restricted: true,
 		type: class extends FormApplication {
@@ -357,7 +370,7 @@ Hooks.once("init", () => {
 			static get defaultOptions() {
 				return foundry.utils.mergeObject(super.defaultOptions, {
 					id: "bbmm-exclusions-manager",
-					title: "BBBM Exclusions Manager",
+					title: LT.titleExclusionsMgr(),
 					template: null, 
 					width: 600
 				});
@@ -372,12 +385,17 @@ Hooks.once("init", () => {
 	
 	// Debug level for THIS module
 	game.settings.register(BBMM_ID, "debugLevel", {
-		name: "Debug Level",
-		hint: "Logging: all, warn, error, none",
+		name: LT.debugLevel(),
+		hint: LT.debugLevelHint(),
 		scope: "world",
 		config: true,
 		type: String,
-		choices: { all: "All", warn: "Warnings", error: "Errors", none: "None" },
+		choices: { 
+			all: LT.debugLevelAll(), 
+			warn: LT.debugLevelWarn(), 
+			error: LT.debugLevelErr(), 
+			none: LT.debugLevelNone() 
+		},
 		default: "all"
 	});
 });
