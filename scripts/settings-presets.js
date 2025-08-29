@@ -1,6 +1,6 @@
 import { DL, EXPORT_SKIP } from './settings.js';
 import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, getSkipMap, isExcludedWith } from './helpers.js';
-const BBMM_ID = "bbmm";
+import { LT, BBMM_ID } from "./localization.js";
 const SETTING_SETTINGS_PRESETS = "settingsPresetsUser";	// user-scoped store defined in settings.js
 const PRESET_MANAGER_ID = "bbmm-settings-preset-manager";	// stable window id
 
@@ -17,10 +17,8 @@ const BBMM_V2_WINDOWS = new Map();	// id -> app
 Hooks.on("renderDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.set(app.id, app);
-		// Comment
 		DL(`renderDialogV2: registered ${app?.id}`);
 	} catch (e) {
-		// Comment
 		DL(2, "renderDialogV2: registry failed", e);
 	}
 });
@@ -28,18 +26,13 @@ Hooks.on("renderDialogV2", (app) => {
 Hooks.on("closeDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.delete(app.id);
-		// Comment
 		DL(`closeDialogV2: unregistered ${app?.id}`);
 	} catch (e) {
-		// Comment
 		DL(2, "closeDialogV2: unregistry failed", e);
 	}
 });
 
-/*
-	Return an open app by id. Supports DialogV2/ApplicationV2 via registry,
-	and falls back to legacy ui.windows for classic apps.
-*/
+// Return an open app by id.
 function getWindowById(id) {
 	// Check v2 registry first
 	const v2 = BBMM_V2_WINDOWS.get(id);
@@ -50,16 +43,15 @@ function getWindowById(id) {
 	return all.find(w => w?.id === id) ?? null;
 }
 
-/*
+/* 
 	Convert a bbmm-settings export envelope:
 	{ world:{ns:{key:val}}, client:{...}, user:{...} }
-	-> flat entries: [{namespace,key,scope,value}, ...]
+	-> flat entries: [{namespace,key,scope,value}, ...] 
 */
 function hlp_normalizeToEntries(bbmmExport) {
 	// Build skip map once (EXPORT_SKIP + userExclusions)
 	const skip = getSkipMap();
 
-	// Debug
 	DL("hlp_normalizeToEntries(): start");
 
 	const entries = [];
@@ -91,7 +83,7 @@ function hlp_normalizeToEntries(bbmmExport) {
 						namespace,
 						key,
 						scope,
-						// Use your json-safe helper if present
+						// Use json-safe helper if present
 						value: (typeof hlp_toJsonSafe === "function") ? hlp_toJsonSafe(value) : value
 					});
 				}
@@ -114,7 +106,6 @@ function hlp_normalizeToEntries(bbmmExport) {
 }
 
 function hlp_entriesToEnvelope(entries) {
-	// Comment
 	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
 	for (const e of entries || []) {
 		const scope = (e.scope === "world") ? "world" : (e.scope === "user" ? "user" : "client");
@@ -124,14 +115,11 @@ function hlp_entriesToEnvelope(entries) {
 	return out;
 }
 
-/*
-	Comment block
-	Default preset name suggestion
-*/
+// Default preset name suggestion
 function hlp_defaultPresetName() {
 	const d = new Date();
 	const pad = (n) => `${n}`.padStart(2, "0");
-	return `Imported ${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	return `${LT.imported()} ${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function hlp_findExistingSettingsPresetKey(name) {
@@ -300,7 +288,8 @@ async function svc_setSettingsPresets(obj) {
 	}
 }
 
-/*	Collect all Settings - except excluded
+/*	
+	Collect all Settings - except excluded
 	Collect module settings by scope, optionally restricting to active modules.
 	- Skips config:false entries
 	- GM: world + client, Non‑GM: client only
@@ -372,7 +361,8 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 	return out;
 }
 
-/* 	Apply settings export (bbmm-settings).
+/* 	
+	Apply settings export (bbmm-settings).
 	- GM applies world + client; non‑GM applies client only
 	- Skips namespaces where module not installed (collects report)
 	- Always reloads after apply (per your requirement)
@@ -380,7 +370,7 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 async function svc_applySettingsExport(exportData) {
 	// Validate envelope
 	if (!exportData || exportData.type !== "bbmm-settings") {
-		ui.notifications.error("Not a BBMM settings export.");
+		ui.notifications.error(`${LT.errors.notBBMMFile()}.`);
 		return { applied: [], skipped: [], missingModules: new Set() };
 	}
 
@@ -467,9 +457,9 @@ async function svc_applySettingsExport(exportData) {
 
 	// Prompt reload
 	const doReload = await foundry.applications.api.DialogV2.confirm({
-		window: { title: "Reload Foundry?" },
-		content: `<p>Settings preset applied. Reload now to ensure everything initializes correctly?</p>`,
-		ok: { label: "Reload" },
+		window: { title: `${LT.titleReload()}?` },
+		content: `<p>${LT.promptReload()}?</p>`,
+		ok: { label: LT.buttons.reload() },
 		modal: true
 	});
 	if (doReload) location.reload();
@@ -481,15 +471,15 @@ async function svc_applySettingsExport(exportData) {
 function svc_askSettingsPresetConflict(existingKey) {
 	return new Promise((resolve) => {
 		new foundry.applications.api.DialogV2({
-			window: { title: "Preset Exists", modal: true },
+			window: { title: LT.titlePresetExists(), modal: true },
 			content: `
-				<p>A settings preset named <b>${hlp_esc(existingKey)}</b> already exists.</p>
-				<p>What would you like to do?</p>
+				<p>${LT.settingPresetExists({ name: hlp_esc(existingKey) })}.</p>
+				<p>${LT.errors.existsPrompt()}?</p>
 			`,
 			buttons: [
-				{ action: "overwrite", label: "Overwrite", default: true, callback: () => resolve("overwrite") },
-				{ action: "rename", label: "Rename", callback: () => resolve("rename") },
-				{ action: "cancel", label: "Cancel", callback: () => resolve("cancel") }
+				{ action: "overwrite", label: LT.errors.overwrite(), default: true, callback: () => resolve("overwrite") },
+				{ action: "rename", label: LT.errors.rename(), callback: () => resolve("rename") },
+				{ action: "cancel", label: LT.buttons.cancel(), callback: () => resolve("cancel") }
 			],
 			submit: () => {},
 			rejectClose: false
@@ -553,17 +543,17 @@ async function svc_saveSettingsPreset(name, payload) {
 function ui_promptRenamePreset(defaultName) {
 	return new Promise((resolve) => {
 		new foundry.applications.api.DialogV2({
-			window: { title: "Rename Settings Preset", modal: true },
+			window: { title: LT.renameSettingPreset(), modal: true },
 			content: `
 				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:7rem;">New Name</label>
+					<label style="min-width:7rem;">${LT.newName()}</label>
 					<input name="newName" type="text" value="${hlp_esc(defaultName)}" autofocus style="flex:1;">
 				</div>
 			`,
 			buttons: [
-				{ action: "ok",     label: "Save", default: true,
+				{ action: "ok",     label: LT.buttons.save(), default: true,
 				  callback: (_ev, btn) => resolve(btn.form.elements.newName?.value?.trim() || "") },
-				{ action: "cancel", label: "Cancel", callback: () => resolve(null) }
+				{ action: "cancel", label: LT.buttons.cancel(), callback: () => resolve(null) }
 			],
 			submit: () => {},
 			rejectClose: false
@@ -616,7 +606,7 @@ export async function ui_openSettingsImportWizard(data) {
 		const normalized = normalizeToEntriesCompat(json);
 
 		if (!normalized.entries.length) {
-			ui.notifications.warn("No settings found in JSON.");
+		ui.notifications.warn(`${LT.errors.noSettingsFound()}.`);
 			DL("ui_openSettingsImportWizard(): Import Wizard: 0 entries after normalization", { json });
 			return;
 		}
@@ -625,8 +615,7 @@ export async function ui_openSettingsImportWizard(data) {
 
 		// Guard: verify base class is available before we construct
 		if (!AppV2) {
-			ui.notifications.error("BBMM Import Wizard: ApplicationV2 is unavailable.");
-			DL("ui_openSettingsImportWizard(): ui_openSettingsImportWizard(): AppV2 base missing", { AppV2 });
+			DL(3,"ui_openSettingsImportWizard(): ui_openSettingsImportWizard(): AppV2 base missing", { AppV2 });
 			return;
 		}
 
@@ -637,7 +626,7 @@ export async function ui_openSettingsImportWizard(data) {
 			app.render(true);	
 		} catch (ctorErr) {
 			DL("ui_openSettingsImportWizard(): BBMM Import Wizard: constructor failed", ctorErr);
-			ui.notifications.error(`Import Wizard failed during construction: ${ctorErr?.message ?? ctorErr}`);
+			ui.notifications.error(`${LT.errors.importWizFailedCon()}.`);
 			return;
 		}
 
@@ -646,13 +635,13 @@ export async function ui_openSettingsImportWizard(data) {
 			await app.render(true);
 		} catch (renderErr) {
 			DL("ui_openSettingsImportWizard(): BBMM Import Wizard render failed", renderErr);
-			ui.notifications.error(`Import Wizard failed during render: ${renderErr?.message ?? renderErr}`);
+			ui.notifications.error(`${LT.errors.importWizFailRen()}.`);
 			return;
 		}
 	} catch (err) {
 		// If anything else goes wrong, log and notify
 		DL("ui_openSettingsImportWizard(): failed to open", err);
-		ui.notifications.error("Failed to open Import Wizard (see console).");
+		ui.notifications.error(`${LT.errors.importWizFailOpen()}.`);
 	}
 }
 
@@ -663,9 +652,9 @@ class BBMMImportWizard extends AppV2 {
 	constructor(state) {
 		super({
 			id: "bbmm-import-wizard",
-			title: "BBMM — Import Settings to Preset",
+			title: LT.titleImportSettingsPreset(),
 			width: 700,
-			height: "auto",          // don’t force tall window
+			height: "auto",
 			resizable: true
 		});
 		this.bbmmState = state;
@@ -676,7 +665,7 @@ class BBMMImportWizard extends AppV2 {
 			tag: "section",
 			class: ["bbmm-import-app"],
 			position: { width: 700, height: 600, top: 100, left: 100 },
-			window: { title: "BBMM — Import Settings to Preset" }
+			window: { title: LT.titleImportSettingsPreset() }
 		}, { inplace: false });
 	}
 
@@ -686,18 +675,18 @@ class BBMMImportWizard extends AppV2 {
 		return `
 			<form class="bbmm-import" style="display:flex;flex-direction:column;gap:.5rem;height:100%;">
 				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:12rem;">What would you like to import?</label>
+					<label style="min-width:12rem;">${LT.promptWhatImport()}?</label>
 					<select name="mode">
-						<option value="all" selected>All Settings</option>
-						<option value="modules">Select Modules</option>
-						<option value="settings">Select Settings</option>
+						<option value="all" selected>${LT.allSettings()}</option>
+						<option value="modules">${LT.selectModules()}</option>
+						<option value="settings">${LT.selectSettings()}</option>
 					</select>
 					
 				</div>
 
 				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:12rem;">Preset Name</label>
-					<input type="text" name="presetName" placeholder="My Preset" required>
+					<label style="min-width:12rem;">${LT.presetName()}</label>
+					<input type="text" name="presetName" placeholder="${LT.myPreset()}" required>
 				</div>
 
 				<div id="bbmm-list" style="
@@ -710,8 +699,8 @@ class BBMMImportWizard extends AppV2 {
 				</div>
 
 				<footer style="display:flex;justify-content:flex-end;gap:.5rem;">
-					<button type="button" data-action="cancel">Cancel</button>
-					<button type="button" data-action="import" class="default">Import to Preset</button>
+					<button type="button" data-action="cancel">${LT.buttons.cancel()}</button>
+					<button type="button" data-action="import" class="default">${LT.buttons.importToPreset()}</button>
 				</footer>
 			</form>
 		`;
@@ -735,18 +724,8 @@ class BBMMImportWizard extends AppV2 {
 
 			// Cache handles we'll use later
 			this._root = contentRegion;
-			this._form = /** @type {HTMLFormElement|null} */ (contentRegion.querySelector("form.bbmm-import"));
-			this._list = /** @type {HTMLElement|null} */ (contentRegion.querySelector("#bbmm-list"));
-
-			// Deep debug so we can see what exists right now
-			DL("_replaceHTML(): Import Wizard _replaceHTML(): after inject", {
-				hasWindowContent: !!win.querySelector(".window-content"),
-				rootTag: this._root?.tagName,
-				htmlLen: this._root?.innerHTML?.length ?? 0,
-				formExists: !!this._form,
-				listExists: !!this._list,
-				sampleInner: (this._root?.innerHTML ?? "").slice(0, 180)
-			});
+			this._form = (contentRegion.querySelector("form.bbmm-import"));
+			this._list = (contentRegion.querySelector("#bbmm-list"));
 
 			// Wire listeners on next tick
 			setTimeout(() => this.activateListeners(), 0);
@@ -767,8 +746,8 @@ class BBMMImportWizard extends AppV2 {
 
 		// Root + cached refs from _replaceHTML
 		const root = this._root || this.element;
-		const form = this._form || /** @type {HTMLFormElement|null} */ (root?.querySelector("form.bbmm-import"));
-		const list = this._list || /** @type {HTMLElement|null} */ (root?.querySelector("#bbmm-list"));
+		const form = this._form || (root?.querySelector("form.bbmm-import"));
+		const list = this._list || (root?.querySelector("#bbmm-list"));
 
 		DL("activateListeners(): activateListeners called", {
 			hasRoot: !!root,
@@ -785,18 +764,13 @@ class BBMMImportWizard extends AppV2 {
 		form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
 
 		// Field handles
-		/** @type {HTMLSelectElement} */
-		const modeSel = /** @type any */ (form.elements.namedItem("mode"));
-		/** @type {HTMLInputElement} */
-		const presetName = /** @type any */ (form.elements.namedItem("presetName"));
+		const modeSel = (form.elements.namedItem("mode"));
+		const presetName = (form.elements.namedItem("presetName"));
 
 		// Set a friendly default name if empty
 		if (!presetName.value) presetName.value = hlp_defaultPresetName();
 
-		/*
-			Paint the center panel based on mode and then recenter the window.
-			setPosition({ left:null, top:null }) tells Foundry to fully recenter.
-		*/
+		// Paint the center panel based on mode and then recenter the window.
 		const paint = () => {
 			const mode = modeSel.value;
 			if (mode === "all") this.#paintAll(list);
@@ -823,7 +797,7 @@ class BBMMImportWizard extends AppV2 {
 			this.close();
 		});
 
-		// Import button: overwrite check (DialogV2), save, refresh, close
+		// Import button: overwrite check, save, refresh, close
 		form.querySelector('[data-action="import"]')?.addEventListener("click", async (ev) => {
 			try {
 				ev.preventDefault();
@@ -832,7 +806,7 @@ class BBMMImportWizard extends AppV2 {
 
 				const name = presetName.value.trim();
 				if (!name) {
-					ui.notifications.warn("Please enter a Preset Name.");
+					ui.notifications.warn(`${LT.importNamePrompt()}.`);
 					this._inFlight = false;
 					return;
 				}
@@ -841,18 +815,18 @@ class BBMMImportWizard extends AppV2 {
 				const allPresets = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {};
 				if (allPresets[name]) {
 					const confirmed = await foundry.applications.api.DialogV2.confirm({
-						window: { title: "Preset Exists" },
-						content: `<p>A preset named <b>${name}</b> already exists. Overwrite it?</p>`,
+						window: { title: LT.errors.conflictTitleExists() },
+						content: `<p>${LT.settingPresetExists({ name: name })}. ${LT.errors.overwrite()}?</p>`,
 						defaultYes: false,
-						ok: { label: "Overwrite" },
-						cancel: { label: "Cancel" }
+						ok: { label: LT.errors.overwrite() },
+						cancel: { label: LT.buttons.cancel() }
 					});
 					if (!confirmed) { this._inFlight = false; return; }
 				}
 
 				const selected = this.#collectSelected(modeSel.value, list);
 				if (!selected.length) {
-					ui.notifications.warn("No entries selected.");
+					ui.notifications.warn(`${LT.errors.noEntrySelected()}.`);
 					this._inFlight = false;
 					return;
 				}
@@ -864,8 +838,7 @@ class BBMMImportWizard extends AppV2 {
 				cancelBtn?.setAttribute("disabled", "true");
 				form.setAttribute("aria-busy", "true");
 
-				// Lightweight feedback + close immediately so it feels responsive
-				ui.notifications.info(`Importing ${selected.length} setting(s) into preset "${name}"…`);
+				ui.notifications.info(`${LT.importingToPreset({ count: selected.length, name: name })}…`);
 				DL(`BBMMImportWizard: starting import of ${selected.length} entries to "${name}"`);
 
 				// Close the window first; the async save continues in the background
@@ -880,10 +853,10 @@ class BBMMImportWizard extends AppV2 {
 				Hooks.callAll("bbmm:importPreset", { name, items: preset.items });
 
 				// Final toast after completion
-				ui.notifications.info(`Imported ${selected.length} setting(s) into preset "${name}".`);
+				ui.notifications.info(`${LT.importComplete()}.`);
 			} catch (e) {
 				DL(3, "Import Wizard: failed to save preset", { message: e?.message, stack: e?.stack });
-				ui.notifications.error(`Failed to save preset: ${e?.message ?? "see console"}`);
+				ui.notifications.error(`${LT.errors.savePresetFail()}.`);
 			} finally {
 				this._inFlight = false;
 			}
@@ -898,7 +871,7 @@ class BBMMImportWizard extends AppV2 {
 		const total = this.bbmmState.normalized.entries.length;
 		list.innerHTML = `
 			<div style="padding:.25rem;">
-				<em>All ${total} settings in the file will be imported into the preset.</em>
+				<em>${LT.allSettingsMsg({ count: total })}.</em>
 			</div>
 		`;
 	}
@@ -912,11 +885,11 @@ class BBMMImportWizard extends AppV2 {
 		const rows = moduleList.map(ns => `
 			<label style="display:flex;align-items:center;gap:.5rem;padding:.25rem .5rem;border-radius:4px;">
 				<input type="checkbox" class="bbmm-ns" data-ns="${ns}" checked>
-				<span style="flex:1;"><b>${ns}</b> <span class="notes">(${counts.get(ns) || 0} settings)</span></span>
+				<span style="flex:1;"><b>${ns}</b> <span class="notes">(${counts.get(ns) || 0} ${LT.settings()})</span></span>
 			</label>
 		`).join("");
 
-		list.innerHTML = rows || `<em>No modules detected.</em>`;
+		list.innerHTML = rows || `<em>${LT.errors.noModulesDet()}.</em>`;
 	}
 
 	/** Settings mode: all keys grouped by namespace, with per-namespace master toggles */
@@ -953,7 +926,7 @@ class BBMMImportWizard extends AppV2 {
 		}
 		if (currentNs !== null) blocks.push(`</div></fieldset>`);
 
-		list.innerHTML = blocks.join("") || `<em>No settings detected.</em>`;
+		list.innerHTML = blocks.join("") || `<em>${LT.errors.noSettingsDet()}.</em>`;
 
 		// Master checkbox toggles all child settings for that namespace
 		list.querySelectorAll(".bbmm-ns-master").forEach(el => {
@@ -1030,33 +1003,31 @@ export async function openSettingsPresetManager() {
 	const content = `
 		<section class="bbmm-preset-manager-root" style="min-width:560px;display:flex;flex-direction:column;gap:.75rem;max-height:70vh;overflow:auto;">
 			<div style="display:flex;gap:.5rem;align-items:center;">
-				<label style="min-width:12rem;">Saved Settings Presets</label>
+				<label style="min-width:12rem;">${LT.savedSettingsPresets()}</label>
 				<select name="presetName" style="flex:1;">${options}</select>
-				<button type="button" data-action="load">Load</button>
-				<button type="button" data-action="update">Update</button>
-				<button type="button" data-action="delete">Delete</button>
+				<button type="button" data-action="load">${LT.buttons.load()}</button>
+				<button type="button" data-action="update">${LT.buttons.update()}</button>
+				<button type="button" data-action="delete">${LT.buttons.delete()}</button>
 			</div>
 
 			<hr>
 
 			<div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
-				<label><input type="checkbox" name="includeDisabled" checked> Include disabled modules</label>
+				<label><input type="checkbox" name="includeDisabled" checked> ${LT.incDisabledModules()}</label>
 			</div>
 
 			<div style="display:flex;gap:.5rem;align-items:center;">
-				<input name="newName" type="text" placeholder="New settings preset name…" style="flex:1;">
-				<button type="button" data-action="save-current">Save Current Settings</button>
+				<input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
+				<button type="button" data-action="save-current">${LT.buttons.saveCurrentSettings()}</button>
 			</div>
 
 			<hr>
 
-			<h3 style="margin:0;">Export/Import Current Settings</h3>
+			<h3 style="margin:0;">${LT.expImpCurrentSettings()}</h3>
 			<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-				<button type="button" data-action="export">Export to .json</button>
-				<button type="button" data-action="import">Import from .json</button>
+				<button type="button" data-action="export">${LT.buttons.exportToJSON()}</button>
+				<button type="button" data-action="import">${LT.buttons.importFromJSON()}</button>
 			</div>
-
-			<p class="notes">GM exports world+client+user settings; players export client+user. Applying a settings preset will prompt to reload.</p>
 		</section>
 	`;
 
@@ -1066,10 +1037,10 @@ export async function openSettingsPresetManager() {
 	*/
 	const dlg = new foundry.applications.api.DialogV2({
 		id: PRESET_MANAGER_ID,
-		window: { title: "BBMM — Settings Preset Manager", resizable: true },
+		window: { title: LT.titleSettingsPresetMgr(), resizable: true },
 		position: { width: 700, height: "auto" },
 		content,
-		buttons: [{ action: "close", label: "Close", default: true }]
+		buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
 	});
 
 	/*
@@ -1114,7 +1085,7 @@ export async function openSettingsPresetManager() {
 
 			// Guard: name required for save-current
 			if (action === "save-current" && !newName) {
-				ui.notifications.warn("Enter a name for the new settings preset.");
+				ui.notifications.warn(`${LT.promptNameSettingsPreset()}.`);
 				return;
 			}
 
@@ -1142,7 +1113,7 @@ export async function openSettingsPresetManager() {
 					DL("openSettingsPresetManager(): save-current — save result", res);
 					if (res?.status !== "saved") return;
 
-					ui.notifications.info(`Saved settings preset "${res.name}".`);
+					ui.notifications.info(`${LT.savedSettingsPreset({ name: res.name })}.`);
 
 					// Refresh list
 					app.close();
@@ -1154,7 +1125,7 @@ export async function openSettingsPresetManager() {
 					UPDATE -> overwrite the SELECTED preset with CURRENT settings
 				*/
 				if (action === "update") {
-					if (!selected) { ui.notifications.warn("Select a settings preset to update."); return; }
+					if (!selected) { ui.notifications.warn(`${LT.selectSettingsPreset()}.`); return; }
 
 					// Collect fresh current settings
 					const payload = svc_collectAllModuleSettings({ includeDisabled });
@@ -1176,7 +1147,7 @@ export async function openSettingsPresetManager() {
 					DL("openSettingsPresetManager(): update — save result", res);
 					if (res?.status !== "saved") return;
 
-					ui.notifications.info(`Updated settings preset "${selected}".`);
+					ui.notifications.info(`${LT.updatedSettingsPreset({ name: selected})}.`);
 
 					// Refresh list (no need to rebuild options, but keep consistent)
 					app.close();
@@ -1188,16 +1159,16 @@ export async function openSettingsPresetManager() {
 					LOAD -> apply preset
 				*/
 				if (action === "load") {
-					if (!selected) return ui.notifications.warn("Select a settings preset to load.");
+					if (!selected) return ui.notifications.warn(`${LT.selectSettingsPresetLoad()}.`);
 					const preset = svc_getSettingsPresets()[selected];
 					if (!preset) return;
 
 					const skippedMissing = [];
 
 					const ok = await foundry.applications.api.DialogV2.confirm({
-						window: { title: "Apply Settings Preset" },
-						content: `<p>Apply settings preset <b>${hlp_esc(selected)}</b>?</p>`,
-						ok: { label: "Apply" },
+						window: { title: LT.titleApplySettingsPreset() },
+						content: `<p>${LT.titleApplySettingsPreset()} <b>${hlp_esc(selected)}</b>?</p>`,
+						ok: { label: LT.buttons.apply() },
 						modal: true
 					});
 					if (!ok) return;
@@ -1250,8 +1221,7 @@ export async function openSettingsPresetManager() {
 					}
 
 					if (skippedMissing.length) {
-						const count = skippedMissing.length;
-						ui.notifications?.warn(`BBMM: Skipped ${count} setting${count !== 1 ? "s" : ""} for uninstalled or unregistered modules. Check console for details.`);
+						ui.notifications?.warn(`${LT.skippedSettingsApply({ count: skippedMissing.length })}.`);
 						DL(`openSettingsPresetManager(): Skipped for missing modules/settings:\n${skippedMissing.join("\n")}`);
 					}
 
@@ -1264,18 +1234,18 @@ export async function openSettingsPresetManager() {
 					DELETE -> remove a preset
 				*/
 				if (action === "delete") {
-					if (!selected) return ui.notifications.warn("Select a settings preset to delete.");
+					if (!selected) return ui.notifications.warn(`${LT.errors.selectSettingPresetDelete()}.`);
 					const ok = await foundry.applications.api.DialogV2.confirm({
-						window: { title: "Delete Settings Preset" },
-						content: `<p>Delete settings preset <b>${hlp_esc(selected)}</b>?</p>`,
-						ok: { label: "Delete" }
+						window: { title: LT.titleDelSettingsPreset() },
+						content: `<p>${LT.promptDelSettingsPreset({ name: hlp_esc(selected) })}?</p>`,
+						ok: { label: LT.buttons.delete() }
 					});
 					if (!ok) return;
 
 					const all = svc_getSettingsPresets();
 					delete all[selected];
 					await svc_setSettingsPresets(all);
-					ui.notifications.info(`Deleted settings preset "${selected}".`);
+					ui.notifications.info(`${LT.deletedSettingsPreset({ name: selected })}.`);
 
 					// Refresh list
 					app.close();
@@ -1298,11 +1268,11 @@ export async function openSettingsPresetManager() {
 						const fname = `bbmm-${base}-${hlp_timestampStr()}.json`;
 
 						await hlp_saveJSONFile(payload, fname);
-						ui.notifications.info("Exported current settings.");
+						ui.notifications.info(`${LT.exportedCurrentSettings()}.`);
 						DL("openSettingsPresetManager(): Export: done");
 					} catch (e) {
 						DL(3, `Export: FAILED — ${e?.name ?? "Error"}: ${e?.message ?? e}`);
-						ui.notifications.error(`Export failed: ${e?.message ?? e}`);
+						ui.notifications.error(`${LT.errors.settingsExportFailed()}.`);
 						throw e;
 					}
 					return;
@@ -1315,14 +1285,14 @@ export async function openSettingsPresetManager() {
 
 					let data;
 					try { data = JSON.parse(await file.text()); }
-					catch { ui.notifications.error("Invalid JSON file."); return; }
+					catch { ui.notifications.error(`${LT.invalidJSONFile()}.`); return; }
 
 					// Require BBMM settings export type
 					if (!data || data.type !== "bbmm-settings") {
 						await new foundry.applications.api.DialogV2({
-							window: { title: "Import Error" },
-							content: `<p>Not a BBMM settings export (type "bbmm-settings").</p>`,
-							buttons: [{ action: "ok", label: "OK", default: true }],
+							window: { title: LT.errors.titleImportError() },
+							content: `<p>${LT.errors.notBBMMSettingsFile()}.</p>`,
+							buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
 							submit: () => "ok"
 						}).render(true);
 						return;
@@ -1355,7 +1325,7 @@ export async function openSettingsPresetManager() {
 					message: err?.message,
 					stack: err?.stack
 				});
-				ui.notifications.error("An error occurred; see console for details.");
+				ui.notifications.error(`${LT.errors.errorOccured()}.`);
 			}
 		});
 	};

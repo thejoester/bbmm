@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres
 
+## [0.1.1] - 2025-08-25
+### Added
+- Added Localization support. 
+
 ## [0.1.0] - 2025-08-25
 ### Added
 - **Exclusions:** Added exclusions manager allowing to add exclusions for settings presets/import/export. Supports adding by entire module or direct setting. 

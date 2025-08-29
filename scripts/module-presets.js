@@ -98,7 +98,7 @@ async function hlp_savePreset(name, modules) {
 			+ LT.errors.presetExists({ name: boldName })
 			+ "</p><p>"
 			+ LT.errors.existsPrompt()
-			+ "</p>";
+			+ "?</p>";
 		
 		return new Promise((resolve) => {
 			new foundry.applications.api.DialogV2({
@@ -528,7 +528,7 @@ export async function openPresetManager() {
 
 					const proceed = await foundry.applications.api.DialogV2.confirm({
 						window: { title: LT.titleApplyModulePreset() },
-						content: `<p>${LT.promptApplyModulePreset({ name: hlp_esc(selected) })}</p>`,
+						content: `<p>${LT.promptApplyModulePreset({ name: hlp_esc(selected) })}?</p>`,
 						modal: true,
 						ok: { label: LT.buttons.apply() }
 					});
