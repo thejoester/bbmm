@@ -48,7 +48,7 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 ## Contribute
 
 If you would like to contribute to the localization, you can do so in one of these ways: 
-- Translate through [Gitlocalize](https://gitlocalize.com/repo/10406). 
+- Translate through [Gitlocalize](https://gitlocalize.com/repo/10409). 
 - [fork the repository](https://www.youtube.com/watch?v=f5grYMXbAV0) (copy main branch only). Then download the [en.json](https://github.com/thejoester/bbmm/blob/master/lang/en.json) file, rename it to the language code or language (for example es.json or spanish.json for Spanish language), then edit the file translating the text in quotes on the RIGHT SIDE of the colon. When done upload the new language file to your fork in the **lang** folder, then click the "Contribute" button and "Open Pull Request".
 - Open up an [Issue](https://github.com/thejoester/bbmm/issues) and upload the file there. 
 
