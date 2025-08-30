@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres
 
+## [0.1.3] - 2025-08-30
+### Fixed
+- **Localization:** Added French translation. Credit: @retculo
+
 ## [0.1.2] - 2025-08-29
 ### Fixed
 - **Localization:** fixed issue with en.json not being included in install. 
