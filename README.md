@@ -34,21 +34,32 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 - Categorize / arrange modules in module list
 
 ## Screenshots
-<img width="791" height="102" alt="image" src="https://github.com/user-attachments/assets/fe5a02f3-dce4-4b0b-8ed1-bd64311ddf72" />
+<img width="60%" height="60%" alt="image" src="https://github.com/user-attachments/assets/fe5a02f3-dce4-4b0b-8ed1-bd64311ddf72" />
 <br /><br />
-<img width="682" height="481" alt="image" src="https://github.com/user-attachments/assets/c16735dc-fa68-4d1b-ac8f-4ff7ce7415d0" />
+<img width=40% height=40% alt="image" src="https://github.com/user-attachments/assets/c16735dc-fa68-4d1b-ac8f-4ff7ce7415d0" />
 <br /><br />
-<img width="556" height="440" alt="image" src="https://github.com/user-attachments/assets/115ae28b-fcab-4ff8-8538-a2d49e0ce2b6" />
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/115ae28b-fcab-4ff8-8538-a2d49e0ce2b6" />
 <br /><br />
-<img width="444" height="265" alt="image" src="https://github.com/user-attachments/assets/9b3c2e6f-85a6-4b7c-9664-48b288a1868d" />
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/9b3c2e6f-85a6-4b7c-9664-48b288a1868d" />
 <br /><br />
-<img width="801" height="327" alt="image" src="https://github.com/user-attachments/assets/cb33e3e1-fe8b-42d7-9b7c-4a990c47d8e5" />
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/cb33e3e1-fe8b-42d7-9b7c-4a990c47d8e5" />
 
 
 ## Contribute
 
 If you would like to contribute to the localization, you can do so in one of these ways: 
-- Translate through [Gitlocalize](https://gitlocalize.com/repo/10409). 
-- [fork the repository](https://www.youtube.com/watch?v=f5grYMXbAV0) (copy main branch only). Then download the [en.json](https://github.com/thejoester/bbmm/blob/master/lang/en.json) file, rename it to the language code or language (for example es.json or spanish.json for Spanish language), then edit the file translating the text in quotes on the RIGHT SIDE of the colon. When done upload the new language file to your fork in the **lang** folder, then click the "Contribute" button and "Open Pull Request".
-- Open up an [Issue](https://github.com/thejoester/bbmm/issues) and upload the file there. 
+
+#### Translate through [Gitlocalize](https://gitlocalize.com/repo/10409). 
+
+#### Fork and Submit a Pull Request:
+1. [Fork the repository](https://www.youtube.com/watch?v=f5grYMXbAV0) (copy main branch only).
+2. Then download or copy the [en.json](https://github.com/thejoester/bbmm/blob/master/lang/en.json) file.
+3. Rename it to the proper [language code](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes) (for example es.json for Spanish language),
+4. Edit the file translating the text in quotes on the RIGHT SIDE of the colon.
+5. When done upload the new language file to your fork in the **lang/** folder,
+6. Click the "Contribute" button and "Open Pull Request".
+
+#### Upload file as Issue:
+1. Download the [en.json](https://github.com/thejoester/bbmm/blob/master/lang/en.json) file,
+2. Rename it to the Open up an [Issue](https://github.com/thejoester/bbmm/issues) and attach the file. 
 
