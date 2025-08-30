@@ -5,8 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres
 
-## [0.1.3] - 2025-08-30
+## [0.1.4] - 2025-08-30
 ### Fixed
+- **Module Preset Manager:** Fixed dual 'export to .json' buttons.
+
+## [0.1.3] - 2025-08-30
+### Added
 - **Localization:** Added French translation. Credit: @retculo
 
 ## [0.1.2] - 2025-08-29

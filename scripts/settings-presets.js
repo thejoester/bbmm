@@ -17,18 +17,18 @@ const BBMM_V2_WINDOWS = new Map();	// id -> app
 Hooks.on("renderDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.set(app.id, app);
-		DL(`renderDialogV2: registered ${app?.id}`);
+		//DL(`renderDialogV2: registered ${app?.id}`);
 	} catch (e) {
-		DL(2, "renderDialogV2: registry failed", e);
+		//DL(2, "renderDialogV2: registry failed", e);
 	}
 });
 
 Hooks.on("closeDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.delete(app.id);
-		DL(`closeDialogV2: unregistered ${app?.id}`);
+		//DL(`closeDialogV2: unregistered ${app?.id}`);
 	} catch (e) {
-		DL(2, "closeDialogV2: unregistry failed", e);
+		//DL(2, "closeDialogV2: unregistry failed", e);
 	}
 });
 

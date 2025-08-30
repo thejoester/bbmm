@@ -278,19 +278,36 @@ async function exportCurrentModuleStateDialog() {
 				default: true,
 				callback: (ev, button) => button.form.elements.exportName?.value?.trim() || ""
 			},
-			{ action: "cancel", label: LT.buttons.export() }
+			{
+				action: "cancel",
+				label: LT.buttons.cancel(),
+				// Return null so submit receives a falsy result
+				callback: () => null
+			}
 		],
 		submit: (_result) => {
-			const baseName = _result;
-			if (!baseName) { ui.notifications.warn(`${LT.exportNamePrompt()}.`); return; }
+			// Guard against cancel or empty input
+			if (!_result || _result === "cancel") {
+				DL("exportCurrentModuleStateDialog(): user cancelled export");
+				return;
+			}
+
+			const baseName = String(_result).trim();
+			if (!baseName) {
+                // Warn only if they clicked Export with empty name
+				ui.notifications.warn(`${LT.exportNamePrompt()}.`);
+				return;
+			}
 
 			const stamp = hlp_timestampStr();
 			const fname = `${LT.filenameModuleState()}-${hlp_slugify(baseName)}-${stamp}.json`;
 
+			// Collect enabled modules and versions
 			const enabled = hlp_getEnabledModuleIds();
 			const versions = {};
 			for (const id of enabled) versions[id] = game.modules.get(id)?.version ?? null;
 
+			// Save JSON file
 			hlp_saveJSONFile({
 				type: "bbmm-state",
 				name: baseName,
@@ -298,6 +315,8 @@ async function exportCurrentModuleStateDialog() {
 				modules: enabled,
 				versions
 			}, fname);
+
+			DL(`exportCurrentModuleStateDialog(): exported "${baseName}" as ${fname}`, { count: enabled.length });
 		}
 	}).render(true);
 }
