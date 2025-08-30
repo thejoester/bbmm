@@ -44,6 +44,11 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 <br /><br />
 <img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/cb33e3e1-fe8b-42d7-9b7c-4a990c47d8e5" />
 
+## Credits
+I would like to extend a thanks to the following people for helping contribute to this module!
+
+### Translations
+- French (fr): Retculo
 
 ## Contribute
 
