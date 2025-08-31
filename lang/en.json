@@ -116,6 +116,8 @@
 		"exportedv12Settings": "Exported v12 settings to .json",
 		"exportedv12Modules": "Exported v12 module states to .json",
 
+		"titlePresetPreview": "Preset changes preview",
+
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",
@@ -128,12 +130,14 @@
 			"export": "Export",
 			"import": "Import",
 			"load": "Load",
+			"preview": "Preview",
 			"update": "Update",
 			"delete": "Delete",
 			"exclude": "Exclude",
 			"addModule": "Add Module",
 			"addSetting": "Add Setting",
 			"saveCurrent": "Save Current",
+			"saveCurrentSettings": "Save Current Settings",
 			"exportToJSON": "Export to .json",
 			"importFromJSON": "Import from .json",
 			"bbmmBtnToolTip": "Open Big Bad Module Manager",

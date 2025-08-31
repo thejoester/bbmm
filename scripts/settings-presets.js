@@ -14,6 +14,56 @@ if (!AppV2) {
 
 const BBMM_V2_WINDOWS = new Map();	// id -> app
 
+function hlp_settingExists(ns, key) {
+	// Returns SettingConfig or null if not found
+	try {
+		const cfg = game?.settings?.settings?.get?.(`${ns}.${key}`) ?? null;
+		return cfg || null;
+	} catch (err) {
+		DL(2, `hlp_settingExists(): failed for ${ns}.${key}`, err);
+		return null;
+	}
+}
+
+function hlp_valuesEqual(a, b) {
+	// Deep equals with Foundry helper if available
+	try {
+		if (foundry?.utils?.isPropertyEqual) return foundry.utils.isPropertyEqual(a, b);
+		return JSON.stringify(a) === JSON.stringify(b);
+	} catch (err) {
+		DL(2, "hlp_valuesEqual(): compare failed", err);
+		return a === b;
+	}
+}
+
+function hlp_flattenEnvelope(env) {
+	/*
+		env: {
+			type: "bbmm-settings",
+			world: { ns: { key: val } },
+			client: { ns: { key: val } },
+			user: { ns: { key: val } }
+		}
+		→ [{scope, ns, key, value}]
+	*/
+	const out = [];
+	try {
+		for (const scope of ["world", "client", "user"]) {
+			const scopeObj = env?.[scope];
+			if (!scopeObj || typeof scopeObj !== "object") continue;
+			for (const [ns, nsObj] of Object.entries(scopeObj)) {
+				if (!nsObj || typeof nsObj !== "object") continue;
+				for (const [key, value] of Object.entries(nsObj)) {
+					out.push({ scope, ns, key, value });
+				}
+			}
+		}
+	} catch (err) {
+		DL(2, "hlp_flattenEnvelope(): error", err);
+	}
+	return out;
+}
+
 Hooks.on("renderDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.set(app.id, app);
@@ -266,6 +316,77 @@ function hlp_isRegisteredSetting(namespace, key) {
 }
 
 // ===== SERVICES =====
+
+/*
+	Returns { savedCount, totalCount, log }
+	Each log item: { action: "Saved from Preset" | "Setting Not Found" | "Skipped: Match" | "Error: Save Failed", setting, value }
+*/
+async function svc_applySettingsEnvelopeWithReport(env) {
+	const log = [];
+	let savedCount = 0;
+	let totalCount = 0;
+
+	try {
+		DL("svc_applySettingsEnvelopeWithReport(): start");
+
+		if (!env || typeof env !== "object" || env.type !== "bbmm-settings") {
+			DL(2, "svc_applySettingsEnvelopeWithReport(): invalid envelope");
+			return { savedCount: 0, totalCount: 0, log: [{ action: "Error: Invalid Envelope", setting: "-", value: null }] };
+		}
+
+		// Flatten env → entries
+		const scopes = ["world", "client", "user"];
+		const entries = [];
+		for (const scope of scopes) {
+			const S = env?.[scope];
+			if (!S || typeof S !== "object") continue;
+			for (const [ns, nsObj] of Object.entries(S)) {
+				if (!nsObj || typeof nsObj !== "object") continue;
+				for (const [key, value] of Object.entries(nsObj)) {
+					entries.push({ ns, key, value });
+				}
+			}
+		}
+		totalCount = entries.length;
+		DL(`svc_applySettingsEnvelopeWithReport(): entries=${entries.length}`);
+
+		for (const { ns, key, value } of entries) {
+			const setting = `${ns}.${key}`;
+
+			// 1) existence
+			const cfg = game?.settings?.settings?.get?.(setting);
+			if (!cfg) {
+				log.push({ action: "Setting Not Found", setting, value });
+				continue;
+			}
+
+			// 2) compare
+			let current;
+			try { current = game.settings.get(ns, key); } catch {}
+			if (hlp_valuesEqual(current, value)) {
+				log.push({ action: "Skipped: Match", setting, value });
+				continue;
+			}
+
+			// 3) save
+			try {
+				await game.settings.set(ns, key, value);
+				savedCount++;
+				log.push({ action: "Saved from Preset", setting, value });
+			} catch (errSet) {
+				DL(2, `svc_applySettingsEnvelopeWithReport(): set failed for ${setting}`, errSet);
+				log.push({ action: "Error: Save Failed", setting, value });
+			}
+		}
+
+		DL(`svc_applySettingsEnvelopeWithReport(): done saved=${savedCount}/${totalCount}`);
+		return { savedCount, totalCount, log };
+	} catch (err) {
+		DL(3, "svc_applySettingsEnvelopeWithReport(): error", err);
+		return { savedCount, totalCount, log: [{ action: "Error", setting: "-", value: String(err) }] };
+	}
+}
+
 
 function svc_getSettingsPresets() {
 	return foundry.utils.duplicate(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
@@ -537,6 +658,50 @@ async function svc_saveSettingsPreset(name, payload) {
 	return { status: "saved", name: finalName };
 }
 
+async function svc_planSettingsChanges(env) {
+	const rows = [];
+	try {
+		DL("svc_planSettingsChanges(): start");
+
+		if (!env || typeof env !== "object" || env.type !== "bbmm-settings") {
+			DL(2, "svc_planSettingsChanges(): invalid envelope");
+			return rows;
+		}
+
+		for (const scope of ["world", "client", "user"]) {
+			const S = env?.[scope];
+			if (!S || typeof S !== "object") continue;
+
+			for (const [ns, nsObj] of Object.entries(S)) {
+				if (!nsObj || typeof nsObj !== "object") continue;
+
+				for (const [key, next] of Object.entries(nsObj)) {
+					// must exist
+					if (!hlp_isRegisteredSetting(ns, key)) continue;
+					const full = `${ns}.${key}`;
+					const cfg = game?.settings?.settings?.get?.(full);
+					if (!cfg) continue;
+
+					// compare
+					let current;
+					try { current = game.settings.get(ns, key); } catch {}
+
+					if (!hlp_valuesEqual(current, next)) {
+						const name = (cfg?.name && String(cfg.name).trim()) ? String(cfg.name) : key;
+						rows.push({ ns, key, name, current, next });
+					}
+				}
+			}
+		}
+
+		DL(`svc_planSettingsChanges(): rows=${rows.length}`);
+		return rows;
+	} catch (err) {
+		DL(3, "svc_planSettingsChanges(): error", err);
+		return rows;
+	}
+}
+
 // ===== UI =====
 
 //	Rename Prompt
@@ -562,86 +727,129 @@ function ui_promptRenamePreset(defaultName) {
 }
 
 // Open the import wizard. `data` is the parsed JSON object from file.
-export async function ui_openSettingsImportWizard(data) {
+function ui_openPresetImportReport(log) {
 	try {
-		// If no data was passed in, prompt the user to pick a JSON file
-		const json = data || await pickJsonFile();
-		if (!json) {
-			DL("ui_openSettingsImportWizard(): no JSON provided/selected");
-			return;
-		}
+		DL("ui_openPresetImportReport(): open");
 
-		// Normalize (your existing compat function is fine to keep, or inline it here)
-		const normalizeToEntriesCompat = (jsonIn) => {
-			/** @type {{namespace:string,key:string,value:any,scope:'world'|'client'|'user',config:boolean}[]} */
-			const entries = [];
+		const rows = (log ?? []).map(r => `
+			<tr>
+				<td style="white-space:nowrap;padding:.25rem .5rem;">${hlp_esc(String(r.action))}</td>
+				<td style="white-space:nowrap;padding:.25rem .5rem;">${hlp_esc(String(r.setting))}</td>
+				<td style="padding:.25rem .5rem;"><pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_esc(hlp_toPrettyJson(r.value))}</pre></td>
+			</tr>
+		`).join("");
 
-			// Push all settings in a bucket into the flat entries array
-			const pushBucket = (bucket, scope) => {
-				if (!bucket || typeof bucket !== "object") return;
-				for (const [ns, settings] of Object.entries(bucket)) {
-					if (!settings || typeof settings !== "object") continue;
-					for (const [key, val] of Object.entries(settings)) {
-						const isObj = val && typeof val === "object";
-						const value = (isObj && "value" in val) ? val.value : val;
-						const cfg = (isObj && "config" in val) ? !!val.config : true;
-						const scp = (isObj && (val.scope === "world" || val.scope === "client" || val.scope === "user")) ? val.scope : scope;
-						entries.push({ namespace: ns, key, value, scope: scp, config: cfg });
-					}
-				}
-			};
+		const content = `
+			<section style="min-width:760px;max-height:70vh;display:flex;flex-direction:column;gap:.5rem;">
+				<div style="overflow:auto;border:1px solid var(--color-border);border-radius:6px;">
+					<table style="width:100%;border-collapse:collapse;font-size:12px;">
+						<thead style="position:sticky;top:0;background:var(--app-background);">
+							<tr>
+								<th style="text-align:left;padding:.5rem;">Action</th>
+								<th style="text-align:left;padding:.5rem;">Setting</th>
+								<th style="text-align:left;padding:.5rem;">Value</th>
+							</tr>
+						</thead>
+						<tbody>${rows}</tbody>
+					</table>
+				</div>
+			</section>
+		`;
 
-			if (jsonIn?.world || jsonIn?.client || jsonIn?.user) {
-				pushBucket(jsonIn.world, "world");
-				pushBucket(jsonIn.client, "client");
-				pushBucket(jsonIn.user, "user");
-			} else if (jsonIn?.settings && typeof jsonIn.settings === "object") {
-				pushBucket(jsonIn.settings, "client");
-			}
+		new foundry.applications.api.DialogV2({
+			window: { title: "BBMM: Preset Import Report" },
+			content,
+			buttons: [{ action: "close", label: "Close", default: true }],
+			submit: () => "close"
+		}).render(true);
+	} catch (err) {
+		DL(3, "ui_openPresetImportReport(): error", err);
+		ui.notifications.error("Failed to open import report.");
+	}
+}
 
-			const moduleList = [...new Set(entries.map(e => e.namespace))].sort();
-			return { entries, moduleList };
+/* minimal esc + pretty json */
+function _esc(str) {
+	try {
+		return String(str).replace(/[&<>"']/g, s => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[s]));
+	} catch { return String(str ?? ""); }
+}
+function _bbmmSafeJson(v) {
+	try { return typeof v === "string" ? v : JSON.stringify(v, null, 2); }
+	catch { return String(v); }
+}
+
+/* ---------------------------------------------------------------------- */
+/* ui_openPresetPreview(): scrollable diff table                          */
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
+/* ui_openPresetPreview(): clamped single-scroller w/ sticky header       */
+/* ---------------------------------------------------------------------- */
+function ui_openPresetPreview(rows, presetName = "") {
+	try {
+		DL(`ui_openPresetPreview(): open rows=${rows?.length ?? 0}`);
+
+		// Use your helpers if present
+		const esc = (s) => (typeof hlp_esc === "function")
+			? hlp_esc(s)
+			: String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+		const asText = (v) => {
+			if (typeof hlp_toPrettyJson === "function") return hlp_toPrettyJson(v);
+			try { return typeof v === "string" ? v : JSON.stringify(v, null, 2); } catch { return String(v); }
 		};
 
-		const normalized = normalizeToEntriesCompat(json);
+		const body = (rows ?? []).map(r => `
+			<tr>
+				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${esc(r.ns)}</td>
+				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${esc(r.name || r.key)}</td>
+				<td style="padding:.25rem .5rem;vertical-align:top;">
+					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${esc(asText(r.current))}</pre>
+				</td>
+				<td style="padding:.25rem .5rem;vertical-align:top;">
+					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${esc(asText(r.next))}</pre>
+				</td>
+			</tr>
+		`).join("");
 
-		if (!normalized.entries.length) {
-		ui.notifications.warn(`${LT.errors.noSettingsFound()}.`);
-			DL("ui_openSettingsImportWizard(): Import Wizard: 0 entries after normalization", { json });
-			return;
-		}
+		// KEY: a single, outer scroller that clamps to 70vh
+		const content = `
+			<div style="max-width:1200px;margin:0 auto;">
+				<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+					<h3 style="margin:.25rem 0;">${esc(LT.titlePresetPreview?.() ?? "Preset changes preview")}</h3>
+					<div style="opacity:.8;">${esc(presetName)} — ${rows.length} change${rows.length===1?"":"s"}</div>
+				</div>
 
-		DL(`ui_openSettingsImportWizard(): Import Wizard: normalized ${normalized.entries.length} entries from ${normalized.moduleList.length} namespaces`);
+				<!-- SINGLE SCROLL CONTAINER -->
+				<div style="max-height:70vh;overflow:auto;border:1px solid var(--color-border);border-radius:6px;">
+					<table style="width:100%;border-collapse:collapse;font-size:12px;">
+						<thead style="position:sticky;top:0;background:var(--app-background);z-index:1;">
+							<tr>
+								<th style="text-align:left;padding:.5rem;min-width:140px;">Namespace</th>
+								<th style="text-align:left;padding:.5rem;min-width:220px;">Setting</th>
+								<th style="text-align:left;padding:.5rem;min-width:280px;">Current</th>
+								<th style="text-align:left;padding:.5rem;min-width:280px;">New</th>
+							</tr>
+						</thead>
+						<tbody>${body}</tbody>
+					</table>
+				</div>
 
-		// Guard: verify base class is available before we construct
-		if (!AppV2) {
-			DL(3,"ui_openSettingsImportWizard(): ui_openSettingsImportWizard(): AppV2 base missing", { AppV2 });
-			return;
-		}
+				${rows.length === 0 ? `<p style="opacity:.75;margin:.5rem 0 0 0;">${esc(LT.noChangesDetected?.() ?? "No changes detected.")}</p>` : ""}
+			</div>
+		`;
 
-		// Construct with a try/catch to isolate ctor failures
-		let app;
-		try {
-			app = new BBMMImportWizard({ json, normalized });
-			app.render(true);	
-		} catch (ctorErr) {
-			DL("ui_openSettingsImportWizard(): BBMM Import Wizard: constructor failed", ctorErr);
-			ui.notifications.error(`${LT.errors.importWizFailedCon()}.`);
-			return;
-		}
+		// Keep it simple: width only, no height, no resizable
+		new foundry.applications.api.DialogV2({
+			window: { title: LT.titlePresetPreview?.() ?? "Preset changes preview" },
+			position: { width: Math.min(1200, window.innerWidth - 100) },
+			content,
+			buttons: [{ action: "close", label: LT.buttons.close?.() ?? "Close", default: true }],
+			submit: () => "close"
+		}).render(true);
 
-		// Render with a try/catch to isolate render failures
-		try {
-			await app.render(true);
-		} catch (renderErr) {
-			DL("ui_openSettingsImportWizard(): BBMM Import Wizard render failed", renderErr);
-			ui.notifications.error(`${LT.errors.importWizFailRen()}.`);
-			return;
-		}
 	} catch (err) {
-		// If anything else goes wrong, log and notify
-		DL("ui_openSettingsImportWizard(): failed to open", err);
-		ui.notifications.error(`${LT.errors.importWizFailOpen()}.`);
+		DL(3, "ui_openPresetPreview(): error", err);
+		ui.notifications.error(LT.errors.failedOpenPreview?.() ?? "Failed to open preview.");
 	}
 }
 
@@ -1006,6 +1214,7 @@ export async function openSettingsPresetManager() {
 				<label style="min-width:12rem;">${LT.savedSettingsPresets()}</label>
 				<select name="presetName" style="flex:1;">${options}</select>
 				<button type="button" data-action="load">${LT.buttons.load()}</button>
+				<button type="button" data-action="preview">${LT.buttons.preview()}</button>
 				<button type="button" data-action="update">${LT.buttons.update()}</button>
 				<button type="button" data-action="delete">${LT.buttons.delete()}</button>
 			</div>
@@ -1066,7 +1275,7 @@ export async function openSettingsPresetManager() {
 			const btn = ev.target;
 			if (!(btn instanceof HTMLButtonElement)) return;
 			const action = btn.dataset.action || "";
-			if (!["save-current","load","update","delete","export","import"].includes(action)) return;
+			if (!["save-current","load","update","delete","export","import","preview"].includes(action)) return;
 
 			ev.preventDefault();
 			ev.stopPropagation();
@@ -1200,7 +1409,7 @@ export async function openSettingsPresetManager() {
 						payload = out;
 						DL(`openSettingsPresetManager(): Load converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
 					}
-
+					
 					// Safety: ignore accidental nested world wrappers
 					if (payload?.type === "bbmm-settings") {
 						const stripWorldNameNest = (bucket) => {
@@ -1230,6 +1439,49 @@ export async function openSettingsPresetManager() {
 					return;
 				}
 
+				if (action === "preview") {
+					DL(`Preview button clicked`);
+					// Same selected check as load
+					if (!selected) return ui.notifications.warn(`${LT.selectSettingsPresetLoad()}.`);
+					const preset = svc_getSettingsPresets()[selected];
+					if (!preset) return;
+
+					try {
+						DL(`openSettingsPresetManager(): preview preset "${selected}"`);
+
+						// Build the same payload (bbmm-settings envelope) you build for load
+						let payload = preset;
+						const flat = Array.isArray(preset?.items) ? preset.items
+							: (Array.isArray(preset?.entries) ? preset.entries : null);
+
+						if (!preset?.type && flat) {
+							const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
+							for (const e of flat) {
+								if (!e || typeof e.namespace !== "string" || typeof e.key !== "string") continue;
+
+								// Skip unregistered (matches your load path)
+								if (!hlp_isRegisteredSetting(e.namespace, e.key)) continue;
+
+								const scope = (e.scope === "world") ? "world" : (e.scope === "user" ? "user" : "client");
+								out[scope][e.namespace] ??= {};
+								out[scope][e.namespace][e.key] = e.value;
+							}
+							payload = out;
+							DL(`openSettingsPresetManager(): Preview hydrated preset "${selected}" with ${flat.length} entries`, payload);
+						}
+
+						// Compute differences only (no writes)
+						const rows = await svc_planSettingsChanges(payload);
+						DL(`openSettingsPresetManager(): preview rows=${rows.length}`);
+
+						// Open report window
+						ui_openPresetPreview(rows, selected);
+					} catch (err) {
+						DL(3, "preview failed", err);
+						ui.notifications.error(LT.errors.failedOpenPreview?.() ?? "Failed to open preview.");
+					}
+					return;
+				}
 				/*
 					DELETE -> remove a preset
 				*/
