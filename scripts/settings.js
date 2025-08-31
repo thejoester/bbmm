@@ -14,15 +14,25 @@ export const EXPORT_SKIP = new Map([
 ]);
 
 export function isFoundryV12() {
-	// Foundry v12 has release.generation === 12; fallback to major from game.version
 	try {
-		const gen = Number(game?.release?.generation ?? String(game?.version ?? "0").split(".")[0]);
-		return gen === 12;
+		// if we've already computed it post-init, trust the cache
+		if (__bbmm_isV12 !== null) return __bbmm_isV12;
+
+		// fallback computation (in case someone calls before init again)
+		const gen = Number(game?.release?.generation);
+		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
+		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
+		const is12 = major === 12;
+		DL(`isFoundryV12(): gen=${gen} version="${ver}" → ${is12}`);
+		return is12;
 	} catch (err) {
-		DL(2, "isFoundryV12(): failed to detect version", err);
+		DL(2, "isFoundryV12(): detection failed", err);
 		return false;
 	}
 }
+
+
+let __bbmm_isV12 = null;	// cache after init
 
 //	Function for debugging - Prints out colored and tagged debug lines
 export function DL(intLogType, stringLogMsg, objObject = null) {
@@ -257,11 +267,24 @@ async function migrationV1Check() {
 	
 }
 
-// Hook into settings and manage modules window to add app button in header 
-Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
-Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
-
 Hooks.once("init", () => {
+
+	// detect foundry version
+	try {
+		const gen = Number(game?.release?.generation);
+		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
+		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
+		__bbmm_isV12 = (major === 12);
+		DL(`BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
+
+		// now safely gate your injections
+		if (!__bbmm_isV12) {
+			Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
+			Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
+		}
+	} catch (err) {
+		DL(2, "BBMM init version gate failed", err);
+	}
 
 	try {
 		DL("init(): start");
@@ -272,41 +295,23 @@ Hooks.once("init", () => {
 
 			// Add a  menu entry to launch legacy export dialog
 			game.settings.registerMenu(BBMM_ID, "v12ExportSettings", {
-				name: LT.buttons.exportToJSON(),
-				label: LT.buttons.exportToJSON(),
-				icon: "fas fa-filter",
+				name:  game.i18n.localize("bbmm.titlev12Legacy"),
+				label: game.i18n.localize("bbmm.titlev12Legacy"),
+				icon: "fas fa-box-archive",
 				restricted: true,
 				type: class extends FormApplication {
-					constructor(...args) { 
-						super(...args); 
-					}
-					/* -------------------------------------------------------------- */
-					/* Options                                                        */
-					/* -------------------------------------------------------------- */
 					static get defaultOptions() {
 						return foundry.utils.mergeObject(super.defaultOptions, {
 							id: "bbmm-legacy-export",
-							title: LT.exportToJSON(), 
-							template: null, 
+							title: game.i18n.localize("bbmm.titlev12Legacy"),
+							template: null,
 							width: 600
 						});
 					}
-					/* -------------------------------------------------------------- */
-					/* Render → immediately open the legacy export dialog             */
-					/* -------------------------------------------------------------- */
 					async render(...args) {
-						try {
-							DL("LegacyExportMenu.render(): opening legacy export dialog");
-							await openLegacyExportDialog();
-						} catch (err) {
-							DL(3, "LegacyExportMenu.render(): error", err);
-							ui.notifications.error("Failed to open legacy export dialog. See console.");
-						}
-						return this; // no window to keep; just return
+						await openLegacyExportDialog();
+						return this;
 					}
-					/* -------------------------------------------------------------- */
-					/* No form submit                                                 */
-					/* -------------------------------------------------------------- */
 					async _updateObject() {}
 				}
 			});
@@ -472,9 +477,12 @@ Hooks.on("setup", () => DL("settings.js | setup fired"));
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
-
-	// mivgrationV1
-	if (!isFoundryV12()) await migrationV1Check();
+	if (!isFoundryV12()){
+		// Hook into settings and manage modules window to add app button in header 
+		Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
+		Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
+		await migrationV1Check(); // mivgrationV1
+	}
 });
 
 // For use in macro for easy testing

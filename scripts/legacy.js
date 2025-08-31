@@ -5,72 +5,82 @@
 	- Uses DL() for all logging
 */
 
-import { DL, EXPORT_SKIP } from './settings.js';
-import { LT, BBMM_ID } from "./localization.js";
+// legacy.js
+import { DL } from "./settings.js";
 
-/* ---------------------------------------------------------------------- */
-/* Main dialog                                                             */
-/* ---------------------------------------------------------------------- */
+/* minimal esc for v12 */
+function _esc(str) {
+	try {
+		return String(str).replace(/[&<>"']/g, s => ({
+			"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+		}[s]));
+	} catch { return String(str ?? ""); }
+}
+
 export async function openLegacyExportDialog() {
+    DL("i18n tree 'bbmm' present=" + !!game.i18n.translations?.bbmm, game.i18n.translations?.bbmm && Object.keys(game.i18n.translations.bbmm).slice(0,5));
 	try {
 		DL("openLegacyExportDialog(): open");
 
+		// i18n (uses YOUR existing keys)
+		const title    = game.i18n.localize("bbmm.titlev12Legacy");
+		const msg      = game.i18n.localize("bbmm.v12Note");
+		const lblA     = game.i18n.localize("bbmm.buttons.expSettingsJSON");
+		const lblB     = game.i18n.localize("bbmm.buttons.expModuleStateJSON");
+		const lblClose = game.i18n.localize("bbmm.buttons.close");
+
+		// Debug what i18n actually returned (keys vs strings)
+		const hasTree = !!game.i18n?.translations?.bbmm;
+		DL(`i18n tree 'bbmm' present=${hasTree} | title="${title}"`);
+
 		const content = `
 			<section style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
-					${LT.v12Note()}
-				</p>
-				<div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-					<button type="button" data-action="export-settings">${LT.buttons.expSettingsJSON()}</button>
-					<button type="button" data-action="export-mods">${LT.buttons.expModuleStateJSON()}</button>
-				</div>
+				<p>${msg}</p>
 			</section>
 		`;
 
-		const dlg = await new foundry.applications.api.DialogV2({
-			window: { title: LT.titlev12Legacy, modal: true },
+		await new foundry.applications.api.DialogV2({
+			window: { title, modal: true },
 			content,
 			buttons: [
-				{ action: "close", label: LT.buttons.close(), default: true }
+				{
+					action: "export-settings",
+					label: lblA,
+					callback: async () => {
+						try { DL("Legacy: export-settings"); await exportSettingsJSON_v12(); }
+						catch (err) { DL(3, "export-settings error", err); ui.notifications.error(game.i18n.localize("bbmm.errors.settingsExportFailed")); }
+					}
+				},
+				{
+					action: "export-mods",
+					label: lblB,
+					callback: async () => {
+						try { DL("Legacy: export-mods"); await exportModuleStatesJSON_v12(); }
+						catch (err) { DL(3, "export-mods error", err); ui.notifications.error(game.i18n.localize("bbmm.errors.failedModulestateExp")); }
+					}
+				},
+				{ action: "close", label: lblClose, default: true }
 			],
-			render: (html) => {
-				// wire buttons
-				const el = html[0];
-				el.querySelector('[data-action="export-settings"]')?.addEventListener("click", () => {
-					DL("Legacy: export-settings clicked");
-					exportSettingsJSON_v12();
-				});
-				el.querySelector('[data-action="export-mods"]')?.addEventListener("click", () => {
-					DL("Legacy: export-mods clicked");
-					exportModuleStatesJSON_v12();
-				});
-			},
 			submit: () => "close"
 		}).render(true);
-
-		return dlg;
 	} catch (err) {
 		DL(3, "openLegacyExportDialog(): error", err);
-		ui.notifications.error(LT.errors.failedOpenLegacyExport());
+		ui.notifications.error(game.i18n.localize("bbmm.errors.failedOpenLegacyExport"));
 	}
 }
 
+
 /* ---------------------------------------------------------------------- */
-/* Export: SETTINGS (v12)                                                  */
+/* Export: SETTINGS (v12)                                                 */
 /* ---------------------------------------------------------------------- */
-/*
-	Collects current values from the settings registry (world/client/user).
-	We export a bbmm-settings envelope with only changed values per scope.
-	We do NOT assume your other files are present; this is standalone.
-*/
 export async function exportSettingsJSON_v12() {
 	try {
 		DL("exportSettingsJSON_v12(): start");
 
 		// Gather all registered settings
-		// game.settings.settings is a Map<"namespace.key", SettingConfig>
 		const reg = game?.settings?.settings;
 		if (!reg || typeof reg.forEach !== "function") {
-			ui.notifications.warn(LT.errors.settingsRegUnavail());
+			ui.notifications.warn(game.i18n.localize("bbmm.errors.settingsRegUnavail"));
 			return;
 		}
 
@@ -91,15 +101,16 @@ export async function exportSettingsJSON_v12() {
 		reg.forEach((cfg, fullKey) => {
 			// cfg = { key, namespace, scope, config, default, type, ... }
 			try {
+                // Always tabs
 				const ns = cfg.namespace;
 				const key = cfg.key;
 				const scope = cfg.scope; // "world" | "client" | "user"
 				if (!ns || !key || !scope) return;
 
-				// skip core.moduleConfiguration (that’s exported by module-state exporter below)
+				// skip core.moduleConfiguration (exported by module-state exporter)
 				if (ns === "core" && key === "moduleConfiguration") return;
 
-				// get current value
+				// current value
 				const val = game.settings.get(ns, key);
 
 				// include if different from default or if no default available
@@ -119,20 +130,16 @@ export async function exportSettingsJSON_v12() {
 		const blob = JSON.stringify(out, null, 2);
 		DL(`exportSettingsJSON_v12(): writing ${filename}`);
 		saveDataToFile(blob, "application/json", filename);
-		ui.notifications.info("Exported v12 settings to .json");
+		ui.notifications.info(game.i18n.localize("bbmm.exportedv12Settings"));
 	} catch (err) {
 		DL(3, "exportSettingsJSON_v12(): error", err);
-		ui.notifications.error(LT.errors.settingsExportFailed());
+		ui.notifications.error(game.i18n.localize("bbmm.errors.settingsExportFailed"));
 	}
 }
 
 /* ---------------------------------------------------------------------- */
 /* Export: MODULE STATES (v12)                                            */
 /* ---------------------------------------------------------------------- */
-/*
-	Exports the enable/disable state map from core.moduleConfiguration.
-	This is exactly where Foundry stores module on/off in v12.
-*/
 export async function exportModuleStatesJSON_v12() {
 	try {
 		DL("exportModuleStatesJSON_v12(): start");
@@ -154,9 +161,9 @@ export async function exportModuleStatesJSON_v12() {
 		const blob = JSON.stringify(out, null, 2);
 		DL(`exportModuleStatesJSON_v12(): writing ${filename}`);
 		saveDataToFile(blob, "application/json", filename);
-		ui.notifications.info(LT.exportedv12Modules());
+		ui.notifications.info(game.i18n.localize("bbmm.exportedv12Modules"));
 	} catch (err) {
 		DL(3, "exportModuleStatesJSON_v12(): error", err);
-		ui.notifications.error(LT.errors.failedModulestateExp());
+		ui.notifications.error(game.i18n.localize("bbmm.errors.failedModulestateExp"));
 	}
 }
