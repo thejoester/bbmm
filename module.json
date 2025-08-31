@@ -21,7 +21,8 @@
 		"scripts/module-presets.js",
     "scripts/settings-presets.js",
 		"scripts/exclusions.js",
-    "scripts/legacy.js"
+    "scripts/legacy.js",
+    "scripts/changelog.js"
   ],
   "packs": [
     {

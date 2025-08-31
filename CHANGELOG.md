@@ -7,6 +7,8 @@ and this project adheres
 
 ## [0.1.5] - 2025-08-31
 ### Added
+- **Changelog:** Added changelog display will show the changelogs of recently updated modules if they have the changelog document in the module folder.
+  - can be disabled in settings. 
 - **Settings Preset Manager:** Added preview option for preset that will show changes from the current settings, with highlighted differences. 
 - **v12 Support:** Added minimal v12 support to export settings and module state to .json to backup prior to updating to v13.
   - - NOTE! Cannot guarantee all settings will import in v13 if setting names have changed. 
