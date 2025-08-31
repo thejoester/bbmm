@@ -32,6 +32,8 @@ Hooks.once("ready", async () => {
 		// Preload all texts so paging is instant
 		for (const e of entries) {
             e.text = await _bbmmFetchChangelogText(e.url); // local-only
+			
+			e.html = await _bbmmToHTML(e.text); // Convert text into safe enriched HTML
         }
         const nonEmpty = entries.filter(e => (e.text && e.text.trim().length));
         if (!nonEmpty.length) return;
@@ -190,8 +192,11 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
                         </div>
                     </div>
 
-                    <pre class="bbmm-changelog-pre" style="flex:1;min-height:0;overflow:auto;padding:.75rem;border:1px solid #555;border-radius:.5rem;background:#111;white-space:pre-wrap;">${esc(current.text || "")}</pre>
-
+                   <div class="bbmm-changelog-body"
+						style="flex:1;min-height:0;overflow:auto;padding:.75rem;border:1px solid #555;
+								border-radius:.5rem;background:#111;">
+						${current.html || ""}
+					</div>
                     <label style="display:flex;align-items:center;gap:.5rem;">
                         <input type="checkbox" name="dontShowAgain" />
                         <span>${LT.changelog.dont_show_again()}</span>
@@ -250,6 +255,34 @@ _onRender(html) {
 		if (!root) {
 			DL(2, "_onRender: missing root element");
 			return;
+		}
+
+		const styleId = "bbmm-changelog-style";
+		if (!document.getElementById(styleId)) {
+			const s = document.createElement("style");
+			s.id = styleId;
+			s.textContent = `
+				.bbmm-changelog-body h1,
+				.bbmm-changelog-body h2,
+				.bbmm-changelog-body h3 { margin: 0.5em 0 0.25em; }
+				.bbmm-changelog-body p,
+				.bbmm-changelog-body ul,
+				.bbmm-changelog-body ol { margin: 0.4em 0; }
+				.bbmm-changelog-body code,
+				.bbmm-changelog-body pre {
+					background: #0c0c0c;
+					border: 1px solid #444;
+					border-radius: 6px;
+				}
+				.bbmm-changelog-body pre {
+					padding: 0.5em;
+					overflow: auto;
+				}
+				.bbmm-changelog-body a {
+					color: var(--color-text-hyperlink, #4ea4ff);
+				}
+			`;
+			document.head.appendChild(s);
 		}
 
 		const frame = (root.closest?.(".app, .window-app")) || root.parentElement;
@@ -374,6 +407,80 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	}
 
 	return results;
+}
+
+/*
+	Convert changelog markdown/plaintext into enriched HTML.
+*/
+async function _bbmmToHTML(text) {
+	try {
+		if (!text) return "";
+
+		let htmlSrc = text;
+
+		// 1) Foundry v12/v13 helper (async)
+		if (TextEditor?.convertMarkdown) {
+			try {
+				htmlSrc = await TextEditor.convertMarkdown(text);
+			} catch (_e) { /* continue */ }
+		}
+
+		// 2) Foundry’s markdown wrapper (sync)
+		if (htmlSrc === text && TextEditor?.markdown?.render) {
+			try {
+				htmlSrc = TextEditor.markdown.render(text);
+			} catch (_e) { /* continue */ }
+		}
+
+		// 3) Global marked (bundled by many FVTT versions)
+		if (htmlSrc === text && window.marked?.parse) {
+			try {
+				htmlSrc = window.marked.parse(text);
+			} catch (_e) { /* continue */ }
+		}
+
+		// 4) Minimal fallback (headings + lists + paragraphs)
+		if (htmlSrc === text) {
+			const esc = (s) => String(s)
+				.replaceAll("&", "&amp;")
+				.replaceAll("<", "&lt;")
+				.replaceAll(">", "&gt;");
+			let t = esc(text);
+
+			// headings
+			t = t.replace(/^\s*######\s+(.+)$/gm, "<h6>$1</h6>")
+			     .replace(/^\s*#####\s+(.+)$/gm, "<h5>$1</h5>")
+			     .replace(/^\s*####\s+(.+)$/gm, "<h4>$1</h4>")
+			     .replace(/^\s*###\s+(.+)$/gm, "<h3>$1</h3>")
+			     .replace(/^\s*##\s+(.+)$/gm, "<h2>$1</h2>")
+			     .replace(/^\s*#\s+(.+)$/gm, "<h1>$1</h1>");
+
+			// unordered lists (simple)
+			t = t.replace(/^(?:\s*[-*]\s+.+\n?)+/gmi, (block) => {
+				const items = block.trim().split(/\n+/).map(l => l.replace(/^\s*[-*]\s+/, "").trim());
+				return `<ul>${items.map(i => `<li>${i}</li>`).join("")}</ul>`;
+			});
+
+			// paragraphs
+			t = t
+				.replace(/\r\n/g, "\n")
+				.split(/\n{2,}/)
+				.map(p => (/^<h\d|^<ul/.test(p.trim()) ? p : `<p>${p.replace(/\n/g, "<br>")}</p>`))
+				.join("");
+
+			htmlSrc = t;
+		}
+
+		// Enrich/sanitize in Foundry
+		const enriched = await TextEditor.enrichHTML(htmlSrc, {
+			async: true,
+			secrets: false
+		});
+		return String(enriched || "");
+	} catch (err) {
+		DL(2, "_bbmmToHTML(): error", err);
+		return "";
+	}
 }
 
 // ===== Fetch Changelogs =====
