@@ -19,10 +19,10 @@
 		"scripts/settings.js",
 		"scripts/helpers.js",
 		"scripts/module-presets.js",
-    "scripts/settings-presets.js",
+    	"scripts/settings-presets.js",
 		"scripts/exclusions.js",
-    "scripts/legacy.js",
-    "scripts/changelog.js"
+    	"scripts/legacy.js",
+    	"scripts/changelog.js"
   ],
   "packs": [
     {
