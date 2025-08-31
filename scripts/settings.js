@@ -269,7 +269,8 @@ async function migrationV1Check() {
 
 Hooks.once("init", () => {
 
-	// detect foundry version
+	/*	Detect Foundry version 
+	*/
 	try {
 		const gen = Number(game?.release?.generation);
 		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
@@ -286,6 +287,7 @@ Hooks.once("init", () => {
 		DL(2, "BBMM init version gate failed", err);
 	}
 
+	
 	try {
 		DL("init(): start");
 
@@ -317,6 +319,7 @@ Hooks.once("init", () => {
 			});
 
 			return;
+		// Else show default settings. 
 		} else {
 
 			// ===== FLAGS ======
@@ -379,6 +382,7 @@ Hooks.once("init", () => {
 					default: {}
 				});
 			// ===== SETTINGS ITEMS =====
+
 				// Add a menu entry in Configure Settings to open the Preset Manager
 				game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
 					name: LT.modulePresetsBtn(),
@@ -451,6 +455,26 @@ Hooks.once("init", () => {
 					}
 				});
 				
+				// World toggle to Show changelog on GM login
+				game.settings.register(BBMM_ID, "showChangelogsOnLogin", {
+					name: "Show Module Changelogs on GM Login",
+					hint: "If enabled, the GM will be prompted with changelogs for any modules updated since they were last marked seen.",
+					scope: "world",
+					config: true,
+					type: Boolean,
+					default: true
+				});
+
+				// World map of { [moduleId]: "x.y.z" } that we've marked as seen
+				game.settings.register(BBMM_ID, "seenChangelogs", {
+					name: "Seen Changelogs",
+					hint: "Internal map of module versions marked as 'seen'.",
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}
+				});
+
 				// Debug level for THIS module
 				game.settings.register(BBMM_ID, "debugLevel", {
 					name: LT.debugLevel(),

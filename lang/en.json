@@ -144,7 +144,6 @@
 			"importToPreset": "Import to Preset",
 			"expSettingsJSON": "export settings to .json",
 			"expModuleStateJSON": "export module state to .json"
-				
 		},
 		
 		"errors": {
@@ -177,6 +176,19 @@
 			"settingsRegUnavail": "Settings registry unavailable",
 			"failedOpenLegacyExport": "Failed to open legacy export dialog (See console)",
 			"failedModulestateExp": "Module state export failed (See console)"
+		},
+
+		"changelog": {
+			"window_title": "Module Changelogs",
+			"source": "Source",
+			"dont_show_again": "Don’t show again for this version (when closing)",
+			"open_file": "Open File",
+			"remind_later": "Remind Me Later",
+			"mark_current": "Mark Current Seen",
+			"mark_all": "Mark All Seen",
+			"marked_seen_single": "Marked {title} v{version} as seen.",
+			"marked_seen_all": "Marked {count} changelog(s) as seen.",
+			"remote_placeholder": "Remote changelog cannot be loaded in-app. Use the Open File button to view it."
 		}
 	}
 }
