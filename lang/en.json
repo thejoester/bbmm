@@ -111,7 +111,11 @@
 		"debugLevelErr": "Errors",
 		"debugLevelNone": "None",
 		
-		
+		"v12Note": "This module offers minimal support for FoundryVTT v12, allowing you to export settings and module states as prep for updating to v13.<br>NOTE: Some settings may not transfer if the v13 module setting has changed.",
+		"titlev12Legacy": "BBMM: Legacy (v12) Export",
+		"exportedv12Settings": "Exported v12 settings to .json",
+		"exportedv12Modules": "Exported v12 module states to .json",
+
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",
@@ -134,7 +138,9 @@
 			"importFromJSON": "Import from .json",
 			"bbmmBtnToolTip": "Open Big Bad Module Manager",
 			"importToPreset": "Import to Preset",
-			"saveCurrentSettings": "Save Current Settings"			
+			"expSettingsJSON": "export settings to .json",
+			"expModuleStateJSON": "export module state to .json"
+				
 		},
 		
 		"errors": {
@@ -163,7 +169,10 @@
 			"noModulesDet": "No modules detected",
 			"noSettingsDet": "No settings detected",
 			"selectSettingPresetDelete": "Select a settings preset to delete",
-			"settingsExportFailed": "Settings Export failed (see console)"
+			"settingsExportFailed": "Settings Export failed (see console)",
+			"settingsRegUnavail": "Settings registry unavailable",
+			"failedOpenLegacyExport": "Failed to open legacy export dialog (See console)",
+			"failedModulestateExp": "Module state export failed (See console)"
 		}
 	}
 }
