@@ -800,13 +800,13 @@ function ui_openPresetPreview(rows, presetName = "") {
 
 		const body = (rows ?? []).map(r => `
 			<tr>
-				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${esc(r.ns)}</td>
-				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${esc(r.name || r.key)}</td>
+				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${hlp_esc(r.ns)}</td>
+				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${hlp_esc(r.name || r.key)}</td>
 				<td style="padding:.25rem .5rem;vertical-align:top;">
-					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${esc(asText(r.current))}</pre>
+					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_esc(asText(r.current))}</pre>
 				</td>
 				<td style="padding:.25rem .5rem;vertical-align:top;">
-					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${esc(asText(r.next))}</pre>
+					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_diffHighlight(r.current, r.next)}</pre>
 				</td>
 			</tr>
 		`).join("");
@@ -815,8 +815,8 @@ function ui_openPresetPreview(rows, presetName = "") {
 		const content = `
 			<div style="max-width:1200px;margin:0 auto;">
 				<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.5rem;">
-					<h3 style="margin:.25rem 0;">${esc(LT.titlePresetPreview?.() ?? "Preset changes preview")}</h3>
-					<div style="opacity:.8;">${esc(presetName)} — ${rows.length} change${rows.length===1?"":"s"}</div>
+					<h3 style="margin:.25rem 0;">${hlp_esc(LT.titlePresetPreview?.() ?? "Preset changes preview")}</h3>
+					<div style="opacity:.8;">${hlp_esc(presetName)} — ${rows.length} change${rows.length===1?"":"s"}</div>
 				</div>
 
 				<!-- SINGLE SCROLL CONTAINER -->
@@ -834,7 +834,7 @@ function ui_openPresetPreview(rows, presetName = "") {
 					</table>
 				</div>
 
-				${rows.length === 0 ? `<p style="opacity:.75;margin:.5rem 0 0 0;">${esc(LT.noChangesDetected?.() ?? "No changes detected.")}</p>` : ""}
+				${rows.length === 0 ? `<p style="opacity:.75;margin:.5rem 0 0 0;">${hlp_esc(LT.noChangesDetected?.() ?? "No changes detected.")}</p>` : ""}
 			</div>
 		`;
 
@@ -852,6 +852,30 @@ function ui_openPresetPreview(rows, presetName = "") {
 		ui.notifications.error(LT.errors.failedOpenPreview?.() ?? "Failed to open preview.");
 	}
 }
+
+// helper: simple inline diff highlighting
+function hlp_diffHighlight(oldVal, newVal) {
+	try {
+		const oldStr = (typeof oldVal === "string") ? oldVal : JSON.stringify(oldVal, null, 2);
+		const newStr = (typeof newVal === "string") ? newVal : JSON.stringify(newVal, null, 2);
+
+		// naive char-by-char diff
+		let out = "";
+		for (let i = 0; i < newStr.length; i++) {
+			const ch = newStr[i];
+			if (i >= oldStr.length || oldStr[i] !== ch) {
+				out += `<span style="color:#f55;background:rgba(255, 0, 0, 0)">${hlp_esc(ch)}</span>`;
+			} else {
+				out += hlp_esc(ch);
+			}
+		}
+		return out;
+	} catch (err) {
+		DL(2, "hlp_diffHighlight(): error", err);
+		return esc(String(newVal));
+	}
+}
+
 
 /*
 	ApplicationV2: BBMMImportWizard
