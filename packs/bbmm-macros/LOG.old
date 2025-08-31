@@ -1,15 +1,13 @@
-2025/08/26-02:22:56.930612 7c083e7bd640 Recovering log #35
-2025/08/26-02:22:56.934028 7c083e7bd640 Delete type=0 #35
-2025/08/26-02:22:56.934092 7c083e7bd640 Delete type=3 #34
-2025/08/26-07:21:39.683788 7c0316bff640 Level-0 table #39: started
-2025/08/26-07:21:39.685331 7c0316bff640 Level-0 table #39: 8145 bytes OK
-2025/08/26-07:21:39.714773 7c0316bff640 Delete type=0 #37
-2025/08/26-07:21:39.722199 7c0316bff640 Manual compaction at level-0 from '!macros!sc6d0g6syYz3nEbB' @ 72057594037927935 : 1 .. '!macros!sc6d0g6syYz3nEbB' @ 0 : 0; will stop at (end)
-2025/08/26-07:21:39.754009 7c0316bff640 Manual compaction at level-1 from '!macros!sc6d0g6syYz3nEbB' @ 72057594037927935 : 1 .. '!macros!sc6d0g6syYz3nEbB' @ 0 : 0; will stop at '!macros!sc6d0g6syYz3nEbB' @ 5 : 1
-2025/08/26-07:21:39.754023 7c0316bff640 Compacting 1@1 + 1@2 files
-2025/08/26-07:21:39.755747 7c0316bff640 Generated table #40@1: 1 keys, 8145 bytes
-2025/08/26-07:21:39.755771 7c0316bff640 Compacted 1@1 + 1@2 files => 8145 bytes
-2025/08/26-07:21:39.756962 7c0316bff640 compacted to: files[ 0 0 1 0 0 0 0 ]
-2025/08/26-07:21:39.757068 7c0316bff640 Delete type=2 #39
-2025/08/26-07:21:39.757182 7c0316bff640 Delete type=2 #29
-2025/08/26-07:21:39.757673 7c0316bff640 Manual compaction at level-1 from '!macros!sc6d0g6syYz3nEbB' @ 5 : 1 .. '!macros!sc6d0g6syYz3nEbB' @ 0 : 0; will stop at (end)
+2025/08/31-00:19:37.087306 72b24bfff640 Delete type=3 #2
+2025/08/31-00:19:37.087391 72b24bfff640 Delete type=3 #18
+2025/08/31-00:19:37.087426 72b24bfff640 Delete type=2 #5
+2025/08/31-00:19:37.087462 72b24bfff640 Delete type=2 #22
+2025/08/31-00:19:37.087496 72b24bfff640 Delete type=3 #25
+2025/08/31-00:19:37.087526 72b24bfff640 Delete type=2 #29
+2025/08/31-00:19:37.087557 72b24bfff640 Delete type=3 #36
+2025/08/31-00:19:37.087587 72b24bfff640 Delete type=3 #10
+2025/08/31-00:51:01.763601 72ad237ff640 Level-0 table #44: started
+2025/08/31-00:51:01.763629 72ad237ff640 Level-0 table #44: 0 bytes OK
+2025/08/31-00:51:01.765256 72ad237ff640 Delete type=0 #42
+2025/08/31-00:51:01.768231 72ad237ff640 Manual compaction at level-0 from '!macros!sc6d0g6syYz3nEbB' @ 72057594037927935 : 1 .. '!macros!sc6d0g6syYz3nEbB' @ 0 : 0; will stop at (end)
+2025/08/31-00:51:01.770224 72ad237ff640 Manual compaction at level-1 from '!macros!sc6d0g6syYz3nEbB' @ 72057594037927935 : 1 .. '!macros!sc6d0g6syYz3nEbB' @ 0 : 0; will stop at (end)
