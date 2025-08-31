@@ -1,6 +1,7 @@
 import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
+import { openLegacyExportDialog } from "./legacy.js";
 
 const MODULE_SETTING_PRESETS = "module-presets";  // OLD will go away 
 const SETTING_SETTINGS_PRESETS = "settingsPresets"; // OLD will go away
@@ -11,6 +12,27 @@ export const EXPORT_SKIP = new Map([
 	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", "migratedPresetsV1"])],
 	["core", new Set(["moduleConfiguration"])]	// <- prevents overwriting enabled/disabled modules
 ]);
+
+export function isFoundryV12() {
+	try {
+		// if we've already computed it post-init, trust the cache
+		if (__bbmm_isV12 !== null) return __bbmm_isV12;
+
+		// fallback computation (in case someone calls before init again)
+		const gen = Number(game?.release?.generation);
+		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
+		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
+		const is12 = major === 12;
+		DL(`isFoundryV12(): gen=${gen} version="${ver}" → ${is12}`);
+		return is12;
+	} catch (err) {
+		DL(2, "isFoundryV12(): detection failed", err);
+		return false;
+	}
+}
+
+
+let __bbmm_isV12 = null;	// cache after init
 
 //	Function for debugging - Prints out colored and tagged debug lines
 export function DL(intLogType, stringLogMsg, objObject = null) {
@@ -245,168 +267,222 @@ async function migrationV1Check() {
 	
 }
 
-// Hook into settings and manage modules window to add app button in header 
-Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
-Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
-
 Hooks.once("init", () => {
-	
-// ===== FLAGS ======
-	//	World-scoped one-time migration flag
-	game.settings.register(BBMM_ID, "migratedPresetsV1", {
-		name: "BBMM Migration Flag",
-		scope: "world",
-		config: false,
-		type: Boolean,
-		default: false
-	});
-// ====== HIDDEN VARIABLES ===== 
-	// User Exclusions 
-	game.settings.register(BBMM_ID, "userExclusions", {
-		name: "BBMM: User Exclusions",
-		hint: "Modules or Settings to be ignored when importing/exporting BBMM presets.",
-		scope: "world",	
-		config: false,	
-		type: Object,
-		default: { modules: [], settings: [] }
-	});
 
-	// User scoped Settings presets
-	game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS_U, {
-		name: "Module Presets (User)",
-		hint: "User-scoped stored module enable/disable presets.",
-		scope: "user",
-		config: false,
-		type: Object,
-		default: {}
-	});
+	// detect foundry version
+	try {
+		const gen = Number(game?.release?.generation);
+		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
+		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
+		__bbmm_isV12 = (major === 12);
+		DL(`BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
 
-	// User scoped Module Presets
-	game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS_U, {
-		name: "Settings Presets (User)",
-		hint: "User-scoped stored settings presets.",
-		scope: "user",
-		config: false,
-		type: Object,
-		default: {}
-	});
+		// now safely gate your injections
+		if (!__bbmm_isV12) {
+			Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
+			Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
+		}
+	} catch (err) {
+		DL(2, "BBMM init version gate failed", err);
+	}
 
-	// OLD Settings Presets 
-	game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS, {
-		name: "Module Presets",
-		hint: "Stored module enable/disable presets.",
-		scope: "world",
-		config: false,
-		type: Object,
-		default: {}
-	});
-	
-	// OLD world Presets 
-	game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS, {
-		name: "Settings Presets",
-		hint: "Stored module enable/disable presets.",
-		scope: "world",
-		config: false,
-		type: Object,
-		default: {}
-	});
-// ===== SETTINGS ITEMS =====
-	// Add a menu entry in Configure Settings to open the Preset Manager
-	game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
-		name: LT.modulePresetsBtn(),
-		label: LT.lblOpenModulePresets(),
-		icon: "fas fa-layer-group",
-		restricted: true,
-		type: class extends FormApplication {
-			constructor(...args){ super(...args); }
-			static get defaultOptions() {
-				return foundry.utils.mergeObject(super.defaultOptions, {
-					id: "bbmm-module-preset-manager",
-					title: LT.titleModulePresets(),
-					template: null, // We’ll use DialogV2 instead
-					width: 600
+	try {
+		DL("init(): start");
+
+		// v12-only legacy export menu
+		if (isFoundryV12()) {
+			DL("init(): Foundry v12 detected — registering Legacy Export menu");
+
+			// Add a  menu entry to launch legacy export dialog
+			game.settings.registerMenu(BBMM_ID, "v12ExportSettings", {
+				name:  game.i18n.localize("bbmm.titlev12Legacy"),
+				label: game.i18n.localize("bbmm.titlev12Legacy"),
+				icon: "fas fa-box-archive",
+				restricted: true,
+				type: class extends FormApplication {
+					static get defaultOptions() {
+						return foundry.utils.mergeObject(super.defaultOptions, {
+							id: "bbmm-legacy-export",
+							title: game.i18n.localize("bbmm.titlev12Legacy"),
+							template: null,
+							width: 600
+						});
+					}
+					async render(...args) {
+						await openLegacyExportDialog();
+						return this;
+					}
+					async _updateObject() {}
+				}
+			});
+
+			return;
+		} else {
+
+			// ===== FLAGS ======
+				//	World-scoped one-time migration flag
+				game.settings.register(BBMM_ID, "migratedPresetsV1", {
+					name: "BBMM Migration Flag",
+					scope: "world",
+					config: false,
+					type: Boolean,
+					default: false
 				});
-			}
-			async render(...args) {
-				await openPresetManager();
-				return this;
-			}
-			async _updateObject() {}
-		}
-	});
-	
-	// Add a menu entry in Configure Settings to open the Preset Manager
-	game.settings.registerMenu(BBMM_ID, "settingsPresetManager", {
-		name: LT.settingsPresetsBtn(),
-		label: LT.lblOpenSettingsPresets(),
-		icon: "fas fa-layer-group",
-		restricted: false,
-		type: class extends FormApplication {
-			constructor(...args){ super(...args); }
-			static get defaultOptions() {
-				return foundry.utils.mergeObject(super.defaultOptions, {
-					id: "bbmm-settings-preset-manager",
-					title: LT.titleSettingsPresets(),
-					template: null, // We’ll use DialogV2 instead
-					width: 600
+			// ====== HIDDEN VARIABLES ===== 
+				// User Exclusions 
+				game.settings.register(BBMM_ID, "userExclusions", {
+					name: "BBMM: User Exclusions",
+					hint: "Modules or Settings to be ignored when importing/exporting BBMM presets.",
+					scope: "world",	
+					config: false,	
+					type: Object,
+					default: { modules: [], settings: [] }
 				});
-			}
-			async render(...args) {
-				await openSettingsPresetManager();
-				return this;
-			}
-			async _updateObject() {}
-		}
-	});
-	
-	// Add a  menu entry for Exclusions manager
-	game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
-		name: LT.exclusionsMgrBtn(),
-		label: LT.lblExclusionsMgr(),
-		icon: "fas fa-filter",
-		restricted: true,
-		type: class extends FormApplication {
-			constructor(...args){ super(...args); }
-			static get defaultOptions() {
-				return foundry.utils.mergeObject(super.defaultOptions, {
-					id: "bbmm-exclusions-manager",
-					title: LT.titleExclusionsMgr(),
-					template: null, 
-					width: 600
+
+				// User scoped Settings presets
+				game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS_U, {
+					name: "Module Presets (User)",
+					hint: "User-scoped stored module enable/disable presets.",
+					scope: "user",
+					config: false,
+					type: Object,
+					default: {}
 				});
-			}
-			async render(...args) {
-				await openExclusionsManager();
-				return this;
-			}
-			async _updateObject() {}
+
+				// User scoped Module Presets
+				game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS_U, {
+					name: "Settings Presets (User)",
+					hint: "User-scoped stored settings presets.",
+					scope: "user",
+					config: false,
+					type: Object,
+					default: {}
+				});
+
+				// OLD Settings Presets 
+				game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS, {
+					name: "Module Presets",
+					hint: "Stored module enable/disable presets.",
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}
+				});
+				
+				// OLD world Presets 
+				game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS, {
+					name: "Settings Presets",
+					hint: "Stored module enable/disable presets.",
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}
+				});
+			// ===== SETTINGS ITEMS =====
+				// Add a menu entry in Configure Settings to open the Preset Manager
+				game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
+					name: LT.modulePresetsBtn(),
+					label: LT.lblOpenModulePresets(),
+					icon: "fas fa-layer-group",
+					restricted: true,
+					type: class extends FormApplication {
+						constructor(...args){ super(...args); }
+						static get defaultOptions() {
+							return foundry.utils.mergeObject(super.defaultOptions, {
+								id: "bbmm-module-preset-manager",
+								title: LT.titleModulePresets(),
+								template: null, // We’ll use DialogV2 instead
+								width: 600
+							});
+						}
+						async render(...args) {
+							await openPresetManager();
+							return this;
+						}
+						async _updateObject() {}
+					}
+				});
+				
+				// Add a menu entry in Configure Settings to open the Preset Manager
+				game.settings.registerMenu(BBMM_ID, "settingsPresetManager", {
+					name: LT.settingsPresetsBtn(),
+					label: LT.lblOpenSettingsPresets(),
+					icon: "fas fa-layer-group",
+					restricted: false,
+					type: class extends FormApplication {
+						constructor(...args){ super(...args); }
+						static get defaultOptions() {
+							return foundry.utils.mergeObject(super.defaultOptions, {
+								id: "bbmm-settings-preset-manager",
+								title: LT.titleSettingsPresets(),
+								template: null, // We’ll use DialogV2 instead
+								width: 600
+							});
+						}
+						async render(...args) {
+							await openSettingsPresetManager();
+							return this;
+						}
+						async _updateObject() {}
+					}
+				});
+				
+				// Add a  menu entry for Exclusions manager
+				game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
+					name: LT.exclusionsMgrBtn(),
+					label: LT.lblExclusionsMgr(),
+					icon: "fas fa-filter",
+					restricted: true,
+					type: class extends FormApplication {
+						constructor(...args){ super(...args); }
+						static get defaultOptions() {
+							return foundry.utils.mergeObject(super.defaultOptions, {
+								id: "bbmm-exclusions-manager",
+								title: LT.titleExclusionsMgr(),
+								template: null, 
+								width: 600
+							});
+						}
+						async render(...args) {
+							await openExclusionsManager();
+							return this;
+						}
+						async _updateObject() {}
+					}
+				});
+				
+				// Debug level for THIS module
+				game.settings.register(BBMM_ID, "debugLevel", {
+					name: LT.debugLevel(),
+					hint: LT.debugLevelHint(),
+					scope: "world",
+					config: true,
+					type: String,
+					choices: { 
+						all: LT.debugLevelAll(), 
+						warn: LT.debugLevelWarn(), 
+						error: LT.debugLevelErr(), 
+						none: LT.debugLevelNone() 
+					},
+					default: "all"
+				});
+
 		}
-	});
-	
-	// Debug level for THIS module
-	game.settings.register(BBMM_ID, "debugLevel", {
-		name: LT.debugLevel(),
-		hint: LT.debugLevelHint(),
-		scope: "world",
-		config: true,
-		type: String,
-		choices: { 
-			all: LT.debugLevelAll(), 
-			warn: LT.debugLevelWarn(), 
-			error: LT.debugLevelErr(), 
-			none: LT.debugLevelNone() 
-		},
-		default: "all"
-	});
+	} catch (err) {
+		DL(3, "init(): error", err);
+	}
 });
 
 Hooks.on("setup", () => DL("settings.js | setup fired"));
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
-
-	// mivgrationV1
-	await migrationV1Check();
+	if (!isFoundryV12()){
+		// Hook into settings and manage modules window to add app button in header 
+		Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
+		Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
+		await migrationV1Check(); // mivgrationV1
+	}
 });
 
 // For use in macro for easy testing

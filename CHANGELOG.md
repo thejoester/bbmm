@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres
 
+## [0.1.5] - 2025-08-31
+### Added
+- **Settings Preset Manager:** Added preview option for preset that will show changes from the current settings, with highlighted differences. 
+- **v12 Support:** Added minimal v12 support to export settings and module state to .json to backup prior to updating to v13.
+  - - NOTE! Cannot guarantee all settings will import in v13 if setting names have changed. 
+
 ## [0.1.4] - 2025-08-30
 ### Fixed
 - **Module Preset Manager:** Fixed dual 'export to .json' buttons.

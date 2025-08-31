@@ -327,21 +327,21 @@ async function importModuleStateAsPreset(data) {
 	const validated = hlp_validateModulePresetJSON(data);
 	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
 		DL(3, "Not a BBMM export. Expected a file created by BBMM.");
-			await new foundry.applications.api.DialogV2({
-				window: { title: LT.errors.titleImportError() },
-				content: `<p>${LT.errors.notBBMMFile()}.</p>`,
-				buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
-				submit: () => "ok"
-			}).render(true);
-			return;
+		await new foundry.applications.api.DialogV2({
+			window: { title: LT.errors.titleImportError() },
+			content: `<p>${LT.errors.notBBMMFile()}.</p>`,
+			buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
+			submit: () => "ok"
+		}).render(true);
+		return;
 	}
 	const modules = validated.modules;
 
-	// 2) compute report now
+	// 2) compute report now (so we can show it after save)
 	const report = hlp_validateModuleState(modules);
 
 	// 3) ask for preset name and save
-	new foundry.applications.api.DialogV2({
+	const dlgName = new foundry.applications.api.DialogV2({
 		window: { title: LT.titleImportPreset() },
 		content: `
 			<div style="display:flex;flex-direction:column;gap:.5rem;">
@@ -352,7 +352,8 @@ async function importModuleStateAsPreset(data) {
 			</div>
 		`,
 		buttons: [
-			{ action: "ok", label: LT.buttons.import(), default: true, callback: (ev, button) => button.form.elements.presetName?.value?.trim() || "" },
+			{ action: "ok", label: LT.buttons.import(), default: true,
+			  callback: (ev, button) => button.form.elements.presetName?.value?.trim() || "" },
 			{ action: "cancel", label: LT.buttons.cancel() }
 		],
 		submit: async (_result) => {
@@ -364,17 +365,20 @@ async function importModuleStateAsPreset(data) {
 
 			ui.notifications.info(`${LT.importedSummary({ name: res.name, count: modules.length })}.`);
 
-			// Show issues once (if any), do NOT reopen the manager here.
-			const report = hlp_validateModuleState(modules);
+			// CLOSE the naming dialog *before* showing issues
+			try { await dlgName.close(); } catch {}
+
+			// Show issues once (if any)
 			if (report.unknown.length || report.depIssues.length) {
-				await showImportIssuesDialog(report);
+				await showImportIssuesDialog(report); // this already returns a Promise in your file
 			}
 
-			// Return to caller so it can decide whether to close/refresh the manager.
 			DL("importModuleStateAsPreset() returning ", res);
 			return res;
-		}
-	}).render(true);
+		},
+		rejectClose: false
+	});
+	dlgName.render(true);
 }
 
 // Apply a set of enabled ids -> update core.moduleConfiguration 

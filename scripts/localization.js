@@ -14,7 +14,7 @@ export const BBMM_ID = "bbmm";
 */
 export function L(key) {
 	// Debug
-	DL("L(): start");
+	//DL("L(): start");
 	try {
 		const s = game.i18n.localize(key);
 		if (s === key) DL(2, "L(): missing key", { key });
@@ -30,7 +30,7 @@ export function L(key) {
 */
 export function LF(key, data = {}) {
 	// Debug
-	DL("LF(): start");
+	//DL("LF(): start");
 	try {
 		const out = game.i18n.format(key, data);
 		if (out === key) DL(2, "LF(): missing key", { key, data });
@@ -51,7 +51,7 @@ function makeNode(key) {
 	// Callable function: LT.something(...) -> localize/format
 	const fn = (data) => {
         // Debug
-        DL("LT(): lookup", { key, hasData: !!data });
+        //DL("LT(): lookup", { key, hasData: !!data });
 		return data && typeof data === "object" ? LF(key, data) : L(key);
 	};
 
