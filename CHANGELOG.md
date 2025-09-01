@@ -12,6 +12,8 @@ and this project adheres
   - Can mark/unmark as read
   - enabled by default, can disable in settings
   - default only shows enabled modules, can change in settings to show all modules
+- **Settings Preset Manager:** Added "Preview" button to preview changes loading a preset will make, will highlight changes in red. 
+  - This may hang for a minute if lots of changes or large data included. 
 - **v12:** added minimal v12 support. In v12 just added tools to export settings and module states to .json to prep for migration to v13.
     - NOTE! Cannot guarantee all settings will import in v13 if setting names have changed. 
 ### Fixed
