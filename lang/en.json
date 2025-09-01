@@ -87,7 +87,10 @@
 		"promptDelSettingsPreset": "Delete settings preset <b>{name}</b>",
 		"deletedSettingsPreset": "Deleted settings preset '{name}'",
 		"exportedCurrentSettings": "Exported current settings",
-
+		"name_showChangelogsOnLogin": "Show Module Changelogs on GM Login",
+		"hint_showChangelogsOnLogin": "If enabled, the GM will be prompted with changelogs for any modules updated since they were last marked seen.",
+		"name_checkDisabledModules": "Check Disabled Modules",
+		"hint_checkDisabledModules": "When enabled, BBMM will also look for changelogs in installed but disabled modules.",
 		"exclusionsMgr": "Exclusions Manager",
 		"exclusionsMgrBtn": "Exclusions Manager button",
 		"lblExclusionsMgr": "Open Exclusions Manager",
@@ -103,20 +106,20 @@
 		"noExclusionsYet": "No exclusions yet",
 		"confirmRemoveModuleExclusion": "Remove module '{title}' from exclusions",
 		"confirmRemoveSettingExclusion": "Remove setting '{ns}.{key}' from exclusions?",
-
 		"debugLevel": "Debug Level",
 		"debugLevelHint": "Logging: all, warnings, errors, none",
 		"debugLevelAll": "All",
 		"debugLevelWarn": "Warnings",
 		"debugLevelErr": "Errors",
 		"debugLevelNone": "None",
-		
+
 		"v12Note": "This module offers minimal support for FoundryVTT v12, allowing you to export settings and module states as prep for updating to v13.<br><strong>NOTE:</strong> Some settings may not transfer if the v13 module setting has changed.",
 		"titlev12Legacy": "BBMM: Legacy (v12) Export",
 		"exportedv12Settings": "Exported v12 settings to .json",
 		"exportedv12Modules": "Exported v12 module states to .json",
-
 		"titlePresetPreview": "Preset changes preview",
+		"noteSaveBeforeLoad": "Tip: Save your current settings before loading a different preset to avoid losing changes",
+
 
 		"buttons": {
 			"yes": "Yes",
@@ -181,14 +184,17 @@
 		"changelog": {
 			"window_title": "Module Changelogs",
 			"source": "Source",
-			"dont_show_again": "Don’t show again for this version (when closing)",
+			"dont_show_again": "Auto-mark this page as read on close",
 			"open_file": "Open File",
 			"remind_later": "Remind Me Later",
 			"mark_current": "Mark Current Seen",
 			"mark_all": "Mark All Seen",
 			"marked_seen_single": "Marked {title} v{version} as seen.",
 			"marked_seen_all": "Marked {count} changelog(s) as seen.",
-			"remote_placeholder": "Remote changelog cannot be loaded in-app. Use the Open File button to view it."
+			"remote_placeholder": "Remote changelog cannot be loaded in-app. Use the Open File button to view it.",
+			"mark_current_unseen": "Mark Current Unseen",
+			"mark_all_unseen": "Mark All Unseen"
+
 		}
 	}
 }

@@ -668,6 +668,9 @@ async function svc_planSettingsChanges(env) {
 			return rows;
 		}
 
+		// Build unified skip map (EXPORT_SKIP + userExclusions)
+		const skipMap = getSkipMap();
+
 		for (const scope of ["world", "client", "user"]) {
 			const S = env?.[scope];
 			if (!S || typeof S !== "object") continue;
@@ -681,6 +684,12 @@ async function svc_planSettingsChanges(env) {
 					const full = `${ns}.${key}`;
 					const cfg = game?.settings?.settings?.get?.(full);
 					if (!cfg) continue;
+					
+					// Skip specific setting if excluded
+					if (isExcludedWith(skipMap, ns, key)) {
+						DL(`svc_planSettingsChanges(): excluded setting "${ns}.${key}" (scope=${scope})`);
+						continue;
+					}
 
 					// compare
 					let current;
@@ -801,7 +810,13 @@ function ui_openPresetPreview(rows, presetName = "") {
 		const body = (rows ?? []).map(r => `
 			<tr>
 				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${hlp_esc(r.ns)}</td>
-				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${hlp_esc(r.name || r.key)}</td>
+				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">
+					<span
+						data-tooltip="${hlp_esc(`${r.ns}.${r.key}`)}"
+						title="${hlp_esc(`${r.ns}.${r.key}`)}"
+						style="cursor: help;"
+					>${hlp_esc(r.name || r.key)}</span>
+				</td>
 				<td style="padding:.25rem .5rem;vertical-align:top;">
 					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_esc(asText(r.current))}</pre>
 				</td>
@@ -1242,9 +1257,11 @@ export async function openSettingsPresetManager() {
 				<button type="button" data-action="update">${LT.buttons.update()}</button>
 				<button type="button" data-action="delete">${LT.buttons.delete()}</button>
 			</div>
-
-			<hr>
-
+			<div>
+				${LT.noteSaveBeforeLoad()}.
+				<hr>
+			</div>
+			
 			<div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
 				<label><input type="checkbox" name="includeDisabled" checked> ${LT.incDisabledModules()}</label>
 			</div>

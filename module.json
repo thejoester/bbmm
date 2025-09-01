@@ -15,14 +15,13 @@
     "verified": "13"
   },
   "esmodules": [
-		"scripts/localization.js",
-		"scripts/settings.js",
-		"scripts/helpers.js",
-		"scripts/module-presets.js",
-    	"scripts/settings-presets.js",
-		"scripts/exclusions.js",
-    	"scripts/legacy.js",
-    	"scripts/changelog.js"
+		 "scripts/localization.js",
+		 "scripts/settings.js",
+		 "scripts/helpers.js",
+		 "scripts/module-presets.js",
+     "scripts/settings-presets.js",
+		 "scripts/exclusions.js",
+     "scripts/changelogs.js"
   ],
   "packs": [
     {

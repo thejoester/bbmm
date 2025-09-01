@@ -5,15 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres
 
-## [0.1.5] - 2025-08-31
+## [0.2.0] - 2025-08-31
 ### Added
-- **Changelog:** Added changelog display will show the changelogs of recently updated modules if they have the changelog document in the module folder.
-  - can be disabled in settings. 
-- **Settings Preset Manager:** Added preview option for preset that will show changes from the current settings, with highlighted differences. 
-- **v12 Support:** Added minimal v12 support to export settings and module state to .json to backup prior to updating to v13.
-  - - NOTE! Cannot guarantee all settings will import in v13 if setting names have changed. 
-
-## [0.1.4] - 2025-08-30
+- **Changelog report** Upon GM login will show report of changelogs. 
+  - Will only show if module includes changelog file in the root or 'docs/' directory
+  - Can mark/unmark as read
+  - enabled by default, can disable in settings
+  - default only shows enabled modules, can change in settings to show all modules
+- **Settings Preset Manager:** Added "Preview" button to preview changes loading a preset will make, will highlight changes in red. 
+  - This may hang for a minute if lots of changes or large data included. 
+- **v12:** added minimal v12 support. In v12 just added tools to export settings and module states to .json to prep for migration to v13.
+    - NOTE! Cannot guarantee all settings will import in v13 if setting names have changed. 
 ### Fixed
 - **Module Preset Manager:** Fixed dual 'export to .json' buttons.
 
