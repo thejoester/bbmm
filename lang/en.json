@@ -112,12 +112,14 @@
 		"debugLevelWarn": "Warnings",
 		"debugLevelErr": "Errors",
 		"debugLevelNone": "None",
+
 		"v12Note": "This module offers minimal support for FoundryVTT v12, allowing you to export settings and module states as prep for updating to v13.<br><strong>NOTE:</strong> Some settings may not transfer if the v13 module setting has changed.",
 		"titlev12Legacy": "BBMM: Legacy (v12) Export",
 		"exportedv12Settings": "Exported v12 settings to .json",
 		"exportedv12Modules": "Exported v12 module states to .json",
 		"titlePresetPreview": "Preset changes preview",
 		"noteSaveBeforeLoad": "Tip: Save your current settings before loading a different preset to avoid losing changes",
+
 
 		"buttons": {
 			"yes": "Yes",
@@ -192,6 +194,7 @@
 			"remote_placeholder": "Remote changelog cannot be loaded in-app. Use the Open File button to view it.",
 			"mark_current_unseen": "Mark Current Unseen",
 			"mark_all_unseen": "Mark All Unseen"
+
 		}
 	}
 }
