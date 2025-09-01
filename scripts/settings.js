@@ -10,7 +10,8 @@ const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser";
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
 	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", "migratedPresetsV1"])],
-	["core", new Set(["moduleConfiguration"])]	// <- prevents overwriting enabled/disabled modules
+	["core", new Set(["moduleConfiguration", "compendiumConfiguration", "time"])],	
+	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
 
 export function isFoundryV12() {

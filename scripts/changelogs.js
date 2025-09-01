@@ -198,9 +198,17 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 					</label>
 
                     <div style="display:flex;gap:.5rem;justify-content:flex-end;">
-                        <button type="button" data-action="mark-current">${LT.changelog.mark_current()}</button>
-                        <button type="button" data-action="mark-all">${LT.changelog.mark_all()}</button>
-                    </div>
+						<button type="button" data-action="mark-current">
+							${this._markedSeen.has(current.id) 
+								? LT.changelog.mark_current_unseen()   // new string
+								: LT.changelog.mark_current()}
+						</button>
+						<button type="button" data-action="mark-all">
+							${this.entries.length && this.entries.every(e => this._markedSeen.has(e.id))
+								? LT.changelog.mark_all_unseen()       // new string
+								: LT.changelog.mark_all()}
+						</button>
+					</div>
                 </main>
             </section>
         `;
@@ -328,7 +336,7 @@ _onRender(html) {
 
 		
 
-		// click handler
+		// onClick handler
 		if (this._boundRoot && this._boundRoot !== root) {
 			this._boundRoot.removeEventListener("click", this._onClick);
 			this._boundRoot.removeEventListener("change", this._onChange);
@@ -359,21 +367,45 @@ _onRender(html) {
 					if (action === "mark-current") {
 						const entry = this.entries[this.index];
 						if (!entry) return;
-						await _bbmmMarkChangelogSeen(entry.id, entry.version);
-						this._markedSeen.add(entry.id);
-						this._pendingOnClose.delete(entry.id);
-						ui.notifications?.info(LT.changelog.marked_seen_single({ title: entry.title || entry.id, version: entry.version }));
+
+						if (this._markedSeen.has(entry.id)) {
+							// currently marked → unmark
+							await _bbmmUnmarkChangelogSeen(entry.id);
+							this._markedSeen.delete(entry.id);
+							ui.notifications?.info(`Unmarked ${entry.title || entry.id} v${entry.version}`);
+						} else {
+							// not marked → mark
+							await _bbmmMarkChangelogSeen(entry.id, entry.version);
+							this._markedSeen.add(entry.id);
+							this._pendingOnClose.delete(entry.id);
+							ui.notifications?.info(LT.changelog.marked_seen_single({ title: entry.title || entry.id, version: entry.version }));
+						}
 						this.render();
 						return;
 					}
 
 					if (action === "mark-all") {
+						let allMarked = true;
 						for (const e of this.entries) {
-							await _bbmmMarkChangelogSeen(e.id, e.version);
-							this._markedSeen.add(e.id);
-							this._pendingOnClose.delete(e.id);
+							if (!this._markedSeen.has(e.id)) { allMarked = false; break; }
 						}
-						ui.notifications?.info(LT.changelog.marked_seen_all({ count: this.entries.length }));
+
+						if (allMarked) {
+							// every entry is already marked → unmark all
+							for (const e of this.entries) {
+								await _bbmmUnmarkChangelogSeen(e.id);
+								this._markedSeen.delete(e.id);
+							}
+							ui.notifications?.info(`Unmarked ${this.entries.length} changelog(s).`);
+						} else {
+							// mark all
+							for (const e of this.entries) {
+								await _bbmmMarkChangelogSeen(e.id, e.version);
+								this._markedSeen.add(e.id);
+								this._pendingOnClose.delete(e.id);
+							}
+							ui.notifications?.info(LT.changelog.marked_seen_all({ count: this.entries.length }));
+						}
 						this.render();
 						return;
 					}
@@ -702,6 +734,19 @@ async function _bbmmMarkChangelogSeen(moduleId, version) {
 		await game.settings.set(BBMM_ID, "seenChangelogs", seen);
 	} catch (err) {
 		DL(3, `Failed to update seenChangelogs for ${moduleId}: ${err?.message || err}`, err);
+		throw err;
+	}
+}
+
+async function _bbmmUnmarkChangelogSeen(moduleId) {
+	try {
+		const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {};
+		if (seen[moduleId]) {
+			delete seen[moduleId];
+			await game.settings.set(BBMM_ID, "seenChangelogs", seen);
+		}
+	} catch (err) {
+		DL(3, `Failed to unset seenChangelogs for ${moduleId}: ${err?.message || err}`, err);
 		throw err;
 	}
 }
