@@ -736,6 +736,90 @@ function ui_promptRenamePreset(defaultName) {
 }
 
 // Open the import wizard. `data` is the parsed JSON object from file.
+export async function ui_openSettingsImportWizard(data) {
+	try {
+		// If no data was passed in, prompt the user to pick a JSON file
+		const json = data || await pickJsonFile();
+		if (!json) {
+			DL("ui_openSettingsImportWizard(): no JSON provided/selected");
+			return;
+		}
+
+		// Normalize (your existing compat function is fine to keep, or inline it here)
+		const normalizeToEntriesCompat = (jsonIn) => {
+			/** @type {{namespace:string,key:string,value:any,scope:'world'|'client'|'user',config:boolean}[]} */
+			const entries = [];
+
+			// Push all settings in a bucket into the flat entries array
+			const pushBucket = (bucket, scope) => {
+				if (!bucket || typeof bucket !== "object") return;
+				for (const [ns, settings] of Object.entries(bucket)) {
+					if (!settings || typeof settings !== "object") continue;
+					for (const [key, val] of Object.entries(settings)) {
+						const isObj = val && typeof val === "object";
+						const value = (isObj && "value" in val) ? val.value : val;
+						const cfg = (isObj && "config" in val) ? !!val.config : true;
+						const scp = (isObj && (val.scope === "world" || val.scope === "client" || val.scope === "user")) ? val.scope : scope;
+						entries.push({ namespace: ns, key, value, scope: scp, config: cfg });
+					}
+				}
+			};
+
+			if (jsonIn?.world || jsonIn?.client || jsonIn?.user) {
+				pushBucket(jsonIn.world, "world");
+				pushBucket(jsonIn.client, "client");
+				pushBucket(jsonIn.user, "user");
+			} else if (jsonIn?.settings && typeof jsonIn.settings === "object") {
+				pushBucket(jsonIn.settings, "client");
+			}
+
+			const moduleList = [...new Set(entries.map(e => e.namespace))].sort();
+			return { entries, moduleList };
+		};
+
+		const normalized = normalizeToEntriesCompat(json);
+
+		if (!normalized.entries.length) {
+		ui.notifications.warn(`${LT.errors.noSettingsFound()}.`);
+			DL("ui_openSettingsImportWizard(): Import Wizard: 0 entries after normalization", { json });
+			return;
+		}
+
+		DL(`ui_openSettingsImportWizard(): Import Wizard: normalized ${normalized.entries.length} entries from ${normalized.moduleList.length} namespaces`);
+
+		// Guard: verify base class is available before we construct
+		if (!AppV2) {
+			DL(3,"ui_openSettingsImportWizard(): ui_openSettingsImportWizard(): AppV2 base missing", { AppV2 });
+			return;
+		}
+
+		// Construct with a try/catch to isolate ctor failures
+		let app;
+		try {
+			app = new BBMMImportWizard({ json, normalized });
+			app.render(true);	
+		} catch (ctorErr) {
+			DL("ui_openSettingsImportWizard(): BBMM Import Wizard: constructor failed", ctorErr);
+			ui.notifications.error(`${LT.errors.importWizFailedCon()}.`);
+			return;
+		}
+
+		// Render with a try/catch to isolate render failures
+		try {
+			await app.render(true);
+		} catch (renderErr) {
+			DL("ui_openSettingsImportWizard(): BBMM Import Wizard render failed", renderErr);
+			ui.notifications.error(`${LT.errors.importWizFailRen()}.`);
+			return;
+		}
+	} catch (err) {
+		// If anything else goes wrong, log and notify
+		DL("ui_openSettingsImportWizard(): failed to open", err);
+		ui.notifications.error(`${LT.errors.importWizFailOpen()}.`);
+	}
+}
+
+// Open the import wizard. `data` is the parsed JSON object from file.
 function ui_openPresetImportReport(log) {
 	try {
 		DL("ui_openPresetImportReport(): open");
