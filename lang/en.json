@@ -185,7 +185,7 @@
 		"changelog": {
 			"window_title": "Module Changelogs",
 			"source": "Source",
-			"dont_show_again": "Don’t show again for this version (when closing)",
+			"dont_show_again": "Auto-mark this page as read on close",
 			"open_file": "Open File",
 			"remind_later": "Remind Me Later",
 			"mark_current": "Mark Current Seen",

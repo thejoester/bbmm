@@ -131,37 +131,16 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		});
 		this.entries = Array.isArray(entries) ? entries : [];
 		this.index = 0;
+
+		// track per-session states
+		this._markedSeen = new Set();      // ids we actually wrote to settings this session
+		this._pendingOnClose = new Set();  // ids user ticked checkbox for (auto-mark on close)
+
+		this._sizedOnce = false;
+		this._centeredOnce = false;
 	}
 
-    async _replaceHTML(html, element) {
-	try {
-		// v13 passes (html, element). Use element as the container.
-		const root = element || this.element;
-		if (!root) {
-			DL(2, "_replaceHTML: no root element available");
-			return;
-		}
-
-		// Accept either a string or a Node/Fragment
-		if (typeof html === "string") {
-			root.innerHTML = html;
-		} else if (html instanceof HTMLElement || html instanceof DocumentFragment) {
-			// Safer replacement when we get nodes
-			root.replaceChildren(html);
-		} else {
-			DL(2, "_replaceHTML: unexpected html payload type");
-			return;
-		}
-
-		// Re-bind listeners on the fresh DOM
-		this._onRender(root);
-	} catch (err) {
-		DL(2, `_replaceHTML error: ${err?.message || err}`, err);
-	}
-}
-
-	/* AppV2: build HTML string */
-	async _renderHTML() {
+   	async _renderHTML() {
         const esc = (s) => String(s ?? "")
             .replaceAll("&", "&amp;")
             .replaceAll("<", "&lt;")
@@ -169,16 +148,24 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 
         const current = this.entries[this.index] || {};
         const list = this.entries.map((e, i) => {
-            const active = i === this.index ? "style='background:#222;'" : "";
-            const vv = esc(e.version || "0.0.0");
-            const tt = esc(e.title || e.id || "Unknown");
-            return `
-                <button class="bbmm-nav-item" data-index="${i}" ${active}>
-                    <div style="font-weight:600;">${tt}</div>
-                    <div style="opacity:.75;font-size:.85em;">v${vv}</div>
-                </button>
-            `;
-        }).join("");
+			const active = i === this.index ? "style='background:#222;'" : "";
+			const vv = esc(e.version || "0.0.0");
+			const tt = esc(e.title || e.id || "Unknown");
+
+			// add a tiny check icon if marked seen this session
+			const seenNow = this._markedSeen.has(e.id)
+				? "<span class='bbmm-seen-badge' title='Marked seen'>✓</span>"
+				: "";
+
+			return `
+				<button class="bbmm-nav-item" data-index="${i}" ${active} style="position:relative;">
+					<div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+						${tt} ${seenNow}
+					</div>
+					<div style="opacity:.75;font-size:.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">v${vv}</div>
+				</button>
+			`;
+		}).join("");
 
         const content = `
             <section class="bbmm-shell" style="display:flex;gap:.75rem;min-height:0;height:100%;">
@@ -206,9 +193,9 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 						${current.html || ""}
 					</div>
                     <label style="display:flex;align-items:center;gap:.5rem;">
-                        <input type="checkbox" name="dontShowAgain" />
-                        <span>${LT.changelog.dont_show_again()}</span>
-                    </label>
+						<input type="checkbox" name="dontShowAgain" ${this._pendingOnClose.has((current.id || "")) || this._markedSeen.has((current.id || "")) ? "checked" : ""} ${this._markedSeen.has((current.id || "")) ? "disabled" : ""} />
+						<span>${LT.changelog.dont_show_again()}</span>
+					</label>
 
                     <div style="display:flex;gap:.5rem;justify-content:flex-end;">
                         <button type="button" data-action="mark-current">${LT.changelog.mark_current()}</button>
@@ -307,12 +294,24 @@ _onRender(html) {
 					text-overflow: ellipsis;
 					white-space: nowrap;
 				}
+				.bbmm-seen-badge { margin-left: .35rem; font-weight: 800; }
 			`;
 			document.head.appendChild(s);
 		}
 
 		const frame = (root.closest?.(".app, .window-app")) || root.parentElement;
 		if (!frame) return;
+
+		// checkbox: toggle per-page pending state
+		const cb = root.querySelector('input[name="dontShowAgain"]');
+		if (cb) {
+			cb.addEventListener("change", () => {
+				const entry = this.entries[this.index];
+				if (!entry) return;
+				if (cb.checked) this._pendingOnClose.add(entry.id);
+				else this._pendingOnClose.delete(entry.id);
+			});
+		}
 
 		// Size once, then center once, using rAF to let Foundry finish layout
 		if (!this._sizedOnce) {
@@ -327,6 +326,80 @@ _onRender(html) {
 			requestAnimationFrame(() => _bbmmCenterFrame(frame, this));
 		}
 
+		
+
+		// click handler
+		if (this._boundRoot && this._boundRoot !== root) {
+			this._boundRoot.removeEventListener("click", this._onClick);
+			this._boundRoot.removeEventListener("change", this._onChange);
+		}
+		if (this._onClick) root.removeEventListener("click", this._onClick);
+		if (this._onChange) root.removeEventListener("change", this._onChange);
+
+		this._boundRoot = root; // remember where we wired
+		this._onClick = async (ev) => {
+			try {
+				// Sidebar nav item
+				const nav = ev.target.closest(".bbmm-nav-item");
+				if (nav && root.contains(nav)) {
+					const idx = Number(nav.dataset.index ?? 0);
+					if (!Number.isNaN(idx) && idx >= 0 && idx < this.entries.length) {
+						this.index = idx;
+						this.render(); // re-render page area
+						DL(`Changelog: switched to index ${idx} (${this.entries[idx]?.id})`);
+					}
+					return; // handled
+				}
+
+				// Footer buttons with data-action
+				const btn = ev.target.closest("[data-action]");
+				if (btn && root.contains(btn)) {
+					const action = btn.dataset.action;
+
+					if (action === "mark-current") {
+						const entry = this.entries[this.index];
+						if (!entry) return;
+						await _bbmmMarkChangelogSeen(entry.id, entry.version);
+						this._markedSeen.add(entry.id);
+						this._pendingOnClose.delete(entry.id);
+						ui.notifications?.info(LT.changelog.marked_seen_single({ title: entry.title || entry.id, version: entry.version }));
+						this.render();
+						return;
+					}
+
+					if (action === "mark-all") {
+						for (const e of this.entries) {
+							await _bbmmMarkChangelogSeen(e.id, e.version);
+							this._markedSeen.add(e.id);
+							this._pendingOnClose.delete(e.id);
+						}
+						ui.notifications?.info(LT.changelog.marked_seen_all({ count: this.entries.length }));
+						this.render();
+						return;
+					}
+				}
+			} catch (err) {
+				DL(2, `_onClick delegated handler error: ${err?.message || err}`, err);
+			}
+		};
+		root.addEventListener("click", this._onClick);
+
+		// change handler for the per-page checkbox
+		this._onChange = (ev) => {
+			try {
+				if (ev.target?.name === "dontShowAgain") {
+					const entry = this.entries[this.index];
+					if (!entry) return;
+					if (ev.target.checked) this._pendingOnClose.add(entry.id);
+					else this._pendingOnClose.delete(entry.id);
+				}
+			} catch (err) {
+				DL(2, `_onChange delegated handler error: ${err?.message || err}`, err);
+			}
+		};
+		root.addEventListener("change", this._onChange);
+	/*	
+
 		// Sidebar navigation
 		root.querySelectorAll(".bbmm-nav-item").forEach(btn => {
 			btn.addEventListener("click", ev => {
@@ -338,23 +411,30 @@ _onRender(html) {
 				}
 			});
 		});
-
-		// Footer actions
+		
+		// Mark Current Seen
 		root.querySelector('[data-action="mark-current"]')?.addEventListener("click", async () => {
 			const entry = this.entries[this.index];
 			if (!entry) return;
 			await _bbmmMarkChangelogSeen(entry.id, entry.version);
-			ui.notifications?.info(LT.changelog.markedSeenSingle(entry.title || entry.id, entry.version));
-			DL(`Changelog marked seen for ${entry.id} -> ${entry.version}`);
+			this._markedSeen.add(entry.id);
+			this._pendingOnClose.delete(entry.id);
+			ui.notifications?.info(LT.changelog.marked_seen_single({ title: entry.title || entry.id, version: entry.version }));
+			this.render(); // refresh badge + checkbox state
 		});
 
+		// Mark All Seen
 		root.querySelector('[data-action="mark-all"]')?.addEventListener("click", async () => {
 			for (const e of this.entries) {
 				await _bbmmMarkChangelogSeen(e.id, e.version);
+				this._markedSeen.add(e.id);
+				this._pendingOnClose.delete(e.id);
 			}
-			ui.notifications?.info(LT.changelog.markedSeenAll(this.entries.length));
-			DL(`Changelog marked all seen (${this.entries.length}).`);
+			ui.notifications?.info(LT.changelog.marked_seen_all({ count: this.entries.length }));
+			this.render();
 		});
+	*/
+
 	} catch (err) {
 		DL(2, `_onRender (BBMMChangelogJournal) error: ${err?.message || err}`, err);
 	}
@@ -363,15 +443,14 @@ _onRender(html) {
 	/* When closing, honor "don’t show again" for the CURRENT page (optional UX). */
 	async close(options) {
 		try {
-			const root = this.element;
-			const dont = root?.querySelector('input[name="dontShowAgain"]')?.checked;
-			if (dont) {
-				const e = this.entries[this.index];
-				if (e) {
-					await _bbmmMarkChangelogSeen(e.id, e.version);
-					DL(`Changelog: auto-marked seen on close for ${e.id} -> ${e.version}`);
-				}
+			// apply all pending-on-close marks
+			for (const id of this._pendingOnClose) {
+				const e = this.entries.find(x => x.id === id);
+				if (!e) continue;
+				await _bbmmMarkChangelogSeen(e.id, e.version);
+				this._markedSeen.add(e.id);
 			}
+			this._pendingOnClose.clear();
 		} catch (err) {
 			DL(2, `close() auto-mark error: ${err?.message || err}`, err);
 		}
