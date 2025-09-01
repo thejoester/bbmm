@@ -87,6 +87,10 @@
 		"promptDelSettingsPreset": "Delete settings preset <b>{name}</b>",
 		"deletedSettingsPreset": "Deleted settings preset '{name}'",
 		"exportedCurrentSettings": "Exported current settings",
+		"name_showChangelogsOnLogin": "Show Module Changelogs on GM Login",
+		"hint_showChangelogsOnLogin": "If enabled, the GM will be prompted with changelogs for any modules updated since they were last marked seen.",
+		"name_checkDisabledModules": "Check Disabled Modules",
+		"hint_checkDisabledModules": "When enabled, BBMM will also look for changelogs in installed but disabled modules.",
 
 		"exclusionsMgr": "Exclusions Manager",
 		"exclusionsMgrBtn": "Exclusions Manager button",

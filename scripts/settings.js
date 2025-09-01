@@ -332,6 +332,7 @@ Hooks.once("init", () => {
 					default: false
 				});
 			// ====== HIDDEN VARIABLES ===== 
+			// These do not need to be localized
 				// User Exclusions 
 				game.settings.register(BBMM_ID, "userExclusions", {
 					name: "BBMM: User Exclusions",
@@ -362,6 +363,16 @@ Hooks.once("init", () => {
 					default: {}
 				});
 
+				// HIDDEN World map of { [moduleId]: "x.y.z" } that we've marked as seen
+				game.settings.register(BBMM_ID, "seenChangelogs", {
+					name: "Seen Changelogs",
+					hint: "Internal map of module versions marked as 'seen'.",
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}
+				});
+
 				// OLD Settings Presets 
 				game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS, {
 					name: "Module Presets",
@@ -382,6 +393,7 @@ Hooks.once("init", () => {
 					default: {}
 				});
 			// ===== SETTINGS ITEMS =====
+			// These DO need to be localized
 
 				// Add a menu entry in Configure Settings to open the Preset Manager
 				game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
@@ -457,22 +469,21 @@ Hooks.once("init", () => {
 				
 				// World toggle to Show changelog on GM login
 				game.settings.register(BBMM_ID, "showChangelogsOnLogin", {
-					name: "Show Module Changelogs on GM Login",
-					hint: "If enabled, the GM will be prompted with changelogs for any modules updated since they were last marked seen.",
+					name: LT.name_showChangelogsOnLogin(),
+					hint: LT.hint_showChangelogsOnLogin(),
 					scope: "world",
 					config: true,
 					type: Boolean,
 					default: true
 				});
 
-				// World map of { [moduleId]: "x.y.z" } that we've marked as seen
-				game.settings.register(BBMM_ID, "seenChangelogs", {
-					name: "Seen Changelogs",
-					hint: "Internal map of module versions marked as 'seen'.",
+				game.settings.register("bbmm", "checkDisabledModules", {
 					scope: "world",
-					config: false,
-					type: Object,
-					default: {}
+					config: true,
+					type: Boolean,
+					default: false,
+					name: LT.name_checkDisabledModules(),
+					hint: LT.hint_checkDisabledModules()
 				});
 
 				// Debug level for THIS module

@@ -22,6 +22,9 @@ const CHANGELOG_CANDIDATES = [
 // ===== Entry Points =====
 Hooks.once("ready", async () => {
 	try {
+		const start = performance.now();
+		DL("changelog ready: starting");
+
 		if (!game.user.isGM) return;
 		const showOnLogin = game.settings.get(BBMM_ID, "showChangelogsOnLogin");
 		if (!showOnLogin) return;
@@ -39,6 +42,11 @@ Hooks.once("ready", async () => {
         if (!nonEmpty.length) return;
         DL(`Changelog: opening journal with ${nonEmpty.length} module(s).`);
         new BBMMChangelogJournal(nonEmpty).render(true);
+
+		const end = performance.now();
+		const ms = (end - start).toFixed(1);
+		DL(`changelog ready: finished in ${ms}ms`);
+
 	} catch (err) {
 		DL(3, `Changelog ready hook error: ${err?.message || err}`, err);
 	}
@@ -175,7 +183,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
         const content = `
             <section class="bbmm-shell" style="display:flex;gap:.75rem;min-height:0;height:100%;">
                 <!-- Sidebar -->
-                <aside style="width:260px;min-width:220px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;padding:.5rem;border-right:1px solid #444;">
+                <aside style="width:300px;min-width:220px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;padding:.5rem;border-right:1px solid #444;">
                     <div class="bbmm-nav-scroll" style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:.5rem;">
                         ${list}
                     </div>
@@ -281,6 +289,24 @@ _onRender(html) {
 				.bbmm-changelog-body a {
 					color: var(--color-text-hyperlink, #4ea4ff);
 				}
+				.bbmm-nav-item {
+					display: block;
+					width: 100%;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					text-align: left;
+
+					/* extra vertical room */
+					padding: 0.4rem 0.5rem;   /* was ~0.25rem */
+					line-height: 1.3;         /* give both divs breathing space */
+					min-height: 2.8rem;       /* enforce enough height for two lines */
+				}
+				.bbmm-nav-item div {
+					overflow: hidden;
+					text-overflow: ellipsis;
+					white-space: nowrap;
+				}
 			`;
 			document.head.appendChild(s);
 		}
@@ -379,13 +405,18 @@ function _bbmmCenterFrame(frame, app) {
 }
 
 async function _bbmmCollectUpdatedModulesWithChangelogs() {
-	const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {};
+	const start = performance.now();
+	DL("changelog collector: starting scan");
+
+	const seen = game.settings.get("bbmm", "seenChangelogs") || {};
+	const includeDisabled = game.settings.get("bbmm", "checkDisabledModules");
 	const results = [];
 
 	try {
 		for (const mod of game.modules) {
 			try {
-				if (!mod?.active) continue;
+				if (!includeDisabled && !mod?.active) continue;
+
 				const id = mod?.id ?? null;
 				if (!id) continue;
 
@@ -394,7 +425,7 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 				const prevSeen = seen?.[id] || null;
 				if (prevSeen && !foundry.utils.isNewerVersion(version, prevSeen)) continue;
 
-				const url = await _bbmmFindChangelogURL(mod); // local-only
+				const url = await _bbmmFindChangelogURL(mod);
 				if (!url) continue;
 
 				results.push({ id, title, version, url, mod });
@@ -405,6 +436,10 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	} catch (err) {
 		DL(2, `Changelog collect: top-level error: ${err?.message || err}`, err);
 	}
+
+	const end = performance.now();
+	const ms = (end - start).toFixed(1);
+	DL(`changelog collector: finished scan in ${ms}ms (found ${results.length} modules)`);
 
 	return results;
 }
