@@ -151,8 +151,9 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			id: "bbmm-changelog-journal",
 			window: { title: LT.changelog.window_title(), modal: true },
 			width: 900,
+			minWidth: 900,
 			height: 640,
-			resizable: true,
+			resizable: false,
 			classes: ["bbmm-changelog-journal"]
 		});
 		this.entries = Array.isArray(entries) ? entries : [];
@@ -294,7 +295,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 
 		// compose the full view
 		const content = `
-			<section class="bbmm-shell bbmm-changelog bbmm-changelog-journal" style="display:flex;gap:.75rem;min-height:0;height:100%;">
+			<section class="bbmm-shell bbmm-changelog bbmm-changelog-journal" style="display:flex;gap:.75rem;min-height:0;height:100%; width: 1200px; min-width:1200px;">
 				<!-- Sidebar -->
 				<aside class="bbmm-theme-reset" style="width:300px;min-width:220px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;padding:.5rem;border-right:1px solid var(--color-border-light, #888);">
 					<div class="bbmm-nav-scroll" style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:.5rem;">
@@ -303,13 +304,16 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 				</aside>
 
 				<!-- Page -->
-				<main style="flex:1;display:flex;flex-direction:column;gap:.5rem;min-width:0;min-height:0;">
+				<main style="flex:1;display:flex;flex-direction:column;gap:.5rem;min-height:0;">
 					<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">
-						<div style="font-weight:700;">
-							${esc(current.title || current.id || "")} — v${esc(current.version || "0.0.0")}
-						</div>
-						<div style="opacity:.8;">
-							${LT.changelog.source()}: <a href="${current.url || "#"}" target="_blank" rel="noopener">${esc(current.url || "")}</a>
+						<div class="bbmm-heading-block">
+							<h2 class="bbmm-heading">
+								${esc(current.title || current.id || "")}
+								<span class="bbmm-version">(v${esc(current.version || "0.0.0")})</span>
+							</h2>
+							<div class="bbmm-source">
+								${LT.changelog.source()}: <a href="${current.url || "#"}" target="_blank" rel="noopener">${esc(current.url || "")}</a>
+							</div>
 						</div>
 					</div>
 
@@ -391,8 +395,16 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			}
 
 			const frame = (root.closest?.(".app, .window-app")) || root.parentElement;
-			if (!frame) return;
+			if (frame) {
+				// lock a minimum width
+				frame.style.minWidth = "900px";
 
+				// optional: also enforce a fixed width
+				// frame.style.width = "900px";
+				// frame.style.maxWidth = "900px";
+			} else {
+				if (!frame) return;
+			}
 			// checkbox: toggle per-page pending state
 			const cb = root.querySelector('input[name="dontShowAgain"]');
 			if (cb) {

@@ -75,7 +75,30 @@
 	border-color: currentColor;
 }
 
+/* Fix the changelog window width exactly */
+.app#bbmm-changelog-journal,
+.window-app#bbmm-changelog-journal {
+	width: 900px !important;
+	min-width: 900px !important;
+	max-width: 900px !important;
+}
+.bbmm-changelog-journal .right {
+	min-width: 560px;
+}
+
 /* HEADINGS / TEXT rhythm */
+.bbmm-heading {
+	display: inline-flex;    
+	align-items: baseline;    
+	gap: 0.4rem;              
+	margin: 0;                
+}
+
+.bbmm-heading .bbmm-version {
+	font-size: 0.9rem;
+	opacity: 0.8;
+}
+
 .bbmm-changelog-body h1,
 .bbmm-changelog-body h2,
 .bbmm-changelog-body h3 {
