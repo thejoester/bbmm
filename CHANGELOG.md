@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres
 
+## [0.2.2] - 2025-09-02
+### Changed
+- **Changelog report** 
+  - Locked changelog window to fixed width
+  - Improved url detection, links now show properly
+### Fixed
+- **Changelog report** 
+  - Fixed style of changelog on light interface settings.
+
 ## [0.2.1] - 2025-09-01
 ### Fixed
 - **Settings Preset Manager:** fixed bug preventing import of settings .json file
