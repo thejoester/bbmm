@@ -53,3 +53,105 @@
 	margin: 0 !important;
 	white-space: nowrap !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Changelog — theme reset + scoped styles
+   ───────────────────────────────────────────────────────────── */
+
+/* Use Foundry/theme defaults inside the right pane */
+.bbmm-changelog-journal .bbmm-theme-reset {
+	/* wipe inherited/overridden presentation without nuking layout */
+	all: revert;
+	font: inherit;
+	color: inherit;
+	background: transparent;
+}
+
+.bbmm-changelog-journal .bbmm-theme-reset .log,
+.bbmm-changelog-journal .bbmm-theme-reset .card,
+.bbmm-changelog-journal .bbmm-theme-reset .panel {
+	background: transparent;
+	color: inherit;
+	border-color: currentColor;
+}
+
+/* HEADINGS / TEXT rhythm */
+.bbmm-changelog-body h1,
+.bbmm-changelog-body h2,
+.bbmm-changelog-body h3 {
+	margin: 0.5em 0 0.25em;
+}
+
+.bbmm-changelog-body p,
+.bbmm-changelog-body ul,
+.bbmm-changelog-body ol {
+	margin: 0.4em 0;
+}
+
+/* Code blocks — keeping your current look (dark), adjust if you want theme-aware later */
+.bbmm-changelog-body code,
+.bbmm-changelog-body pre {
+	background: #0c0c0c;
+	border: 1px solid #444;
+	border-radius: 6px;
+}
+
+.bbmm-changelog-body pre {
+	padding: 0.5em;
+	overflow: auto;
+}
+
+/* BBMM Changelog links — force Foundry-style orange */
+.bbmm-changelog-journal .bbmm-changelog-body a {
+	color: var(--color-text-hyperlink, #ff6400) !important;
+	text-decoration: underline;
+}
+
+/* Sidebar nav items — consolidated & theme-aware (no global .bbmm-nav-item leakage) */
+.bbmm-changelog-journal .bbmm-nav-item {
+	display: block;
+	width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-align: left;
+
+	background: transparent;
+	color: inherit;
+	border: 1px solid var(--color-border-light, #888);
+	border-radius: 8px;
+
+	/* comfortable tap target */
+	padding: 0.4rem 0.5rem;
+	line-height: 1.3;
+	min-height: 2.8rem; /* room for two lines */
+}
+
+.bbmm-changelog-journal .bbmm-nav-item div {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Active item: slightly stronger border + subtle fill for both light/dark */
+.bbmm-changelog-journal .bbmm-nav-item[data-active="1"] {
+	border-color: var(--color-border, #666);
+	box-shadow: inset 0 0 0 9999px color-mix(in srgb, currentColor 6%, transparent);
+}
+
+/* Hover / focus */
+.bbmm-changelog-journal .bbmm-nav-item:hover,
+.bbmm-changelog-journal .bbmm-nav-item:focus {
+	border-color: var(--color-border, #666);
+}
+
+/* Tiny badge after title */
+.bbmm-seen-badge {
+	margin-left: .35rem;
+	font-weight: 800;
+}
+
+/* De-emphasis utility used in body text */
+.bbmm-changelog-journal .bbmm-theme-reset .muted {
+	opacity: .75;
+}
