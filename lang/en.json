@@ -120,7 +120,6 @@
 		"titlePresetPreview": "Preset changes preview",
 		"noteSaveBeforeLoad": "Tip: Save your current settings before loading a different preset to avoid losing changes",
 
-
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",
@@ -195,6 +194,19 @@
 			"mark_current_unseen": "Mark Current Unseen",
 			"mark_all_unseen": "Mark All Unseen"
 
+		},
+
+		"sync": {
+			"BadgeUser": "User-scoped setting",
+			"BadgeClient": "Client-scoped setting",
+			"ToggleHint": "Toggle sync to players",
+			"ToggleError": "Failed to toggle sync.",
+			"ReloadTitle": "Settings Synced",
+			"ReloadMsg": "You have new GM-enforced settings. A reload is required.",
+			"ReloadNow": "Reload",
+			"ReloadLater": "Later",
+			"ReloadWarn": "Settings updated by GM. Please reload.",
+			"Updated": "Settings updated by GM."
 		}
 	}
 }

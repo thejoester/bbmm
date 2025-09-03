@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres
 
+## [0.3.0] - 2025-09-03
+### Added
+- **Settings Sync**
+  - Added Sync icon next to user/client settings. 
+  - When clicked it toggles on and turns orange. 
+  - Will push setting to connected clients, but also when clients log in they sync to enabled GM settings.
+### Fixed
+- **Changelog report** 
+  - Fixed issues for lower resolution displays:
+    - Moved 'Mark Seen' buttons to top
+    - Window will resize to smaller size if resolution is smaller
+
 ## [0.2.2] - 2025-09-02
 ### Changed
 - **Changelog report** 

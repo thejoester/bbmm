@@ -374,6 +374,15 @@ Hooks.once("init", () => {
 					default: {}
 				});
 
+				game.settings.register(BBMM_ID, "userSettingSync", {
+					name: "User Setting Sync",
+					hint: "GM: settings marked for sync are enforced on players when they load.",
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}
+				});
+
 				// OLD Settings Presets 
 				game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS, {
 					name: "Module Presets",

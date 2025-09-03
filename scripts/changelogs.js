@@ -113,55 +113,76 @@ async function _bbmmListModuleFilesCached(modId) {
 	return found;
 }
 
-function _bbmmSizeFrameOnce(frame) {
+function _bbmmSizeFrameOnce(frame, app) {
 	try {
-		// Target = 50% wider, 30% shorter than your original 900x640
-		const targetW = 1350; // 900 * 1.5
-		const targetH = 448;  // 640 * 0.7
+		// Viewport
+		const vw = window?.innerWidth ?? 1280;
+		const vh = window?.innerHeight ?? 900;
 
-		// Keep it inside the viewport and reasonable bounds
-		const maxW = Math.min(window.innerWidth - 40, 1500);
-		const maxH = Math.min(window.innerHeight - 60, 900);
-		const minW = 720;
-		const minH = 900;
+		// Margins  
+		const marginW = 40;
+		const marginH = 60;
 
-		const w = Math.max(minW, Math.min(targetW, maxW));
-		const h = Math.max(minH, Math.min(targetH, maxH));
+		// Hard ceiling for very tall displays 
+		const HARD_MAX_H = 900;
 
-		// Apply pixel sizes only; avoid vw/vh to prevent body scrollbars
+		// Respect constructor base size
+		const baseW = Math.max(720, Number(app?._baseW ?? 900));
+		const baseH = Math.max(400, Number(app?._baseH ?? 640));
+
+		// Width: base -> capped to viewport
+		const maxW = Math.max(600, Math.min(vw - marginW, 1600));
+		const w = Math.min(Math.max(baseW, 720), maxW);
+
+		// Height: start at base, clamp to viewport 
+		const h = Math.min(Math.max(baseH, 400), vh - marginH);
+
+		// Apply initial size 
 		frame.style.width = `${w}px`;
 		frame.style.height = `${h}px`;
+		frame.style.minWidth = "720px";
+		frame.style.maxWidth = `${maxW}px`;
+		frame.style.maxHeight = `min(${HARD_MAX_H}px, calc(100vh - ${marginH}px))`;
 
-		// Optional mins for resize handles
-		frame.style.minWidth = `${minW}px`;
-		frame.style.minHeight = `${minH}px`;
-		frame.style.maxWidth = `${Math.max(w, minW)}px`;
-		frame.style.maxHeight = `${Math.max(h, minH)}px`;
+		// Keep content scrolling inside, not the window
+		frame.style.overflow = "hidden";
+
+		DL(`_bbmmSizeFrameOnce(): viewport=${vw}x${vh}, base=${baseW}x${baseH}, final=${w}x${h}`);
 	} catch (err) {
 		DL(2, `_bbmmSizeFrameOnce error: ${err?.message || err}`, err);
 	}
 }
 
 
+
 // ===== Main Workflow =====
 
 class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 	constructor(entries) {
+		// Detect viewport height and pick a safe base height
+		const _vh = (window?.visualViewport?.height ?? window?.innerHeight ?? 900);
+		const _height = _vh < 800 ? 500 : 640;
+
 		super({
 			id: "bbmm-changelog-journal",
 			window: { title: LT.changelog.window_title(), modal: true },
 			width: 900,
 			minWidth: 900,
-			height: 640,
+			height: _height,
 			resizable: false,
 			classes: ["bbmm-changelog-journal"]
 		});
+
+		// Remember base size so the sizer doesn't undershoot it
+		this._baseW = 900;
+		this._baseH = _height;
+
 		this.entries = Array.isArray(entries) ? entries : [];
 		this.index = 0;
 
 		// track per-session states
-		this._markedSeen = new Set();      // ids we actually wrote to settings this session
-		this._pendingOnClose = new Set();  // ids user ticked checkbox for (auto-mark on close)
+		this._markedSeen = new Set();
+		this._pendingOnClose = new Set();
 
 		this._sizedOnce = false;
 		this._centeredOnce = false;
@@ -243,9 +264,21 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			.replaceAll("<", "&lt;")
 			.replaceAll(">", "&gt;");
 
+
+		
 		// pick current entry
 		const current = this.entries[this.index] || {};
+		// toolbar/footer labels
+		const currentMarked = this._markedSeen.has(current.id);
+		const allMarked = (this.entries.length && this.entries.every(e => this._markedSeen.has(e.id)));
 
+		const btnCurrentLabel = currentMarked
+			? LT.changelog.mark_current_unseen()
+			: LT.changelog.mark_current();
+
+		const btnAllLabel = allMarked
+			? LT.changelog.mark_all_unseen()
+			: LT.changelog.mark_all();
 		// build left-side nav list 
 		const list = this.entries.map((e, i) => {
 			const activeAttr = i === this.index ? `data-active="1"` : "";
@@ -315,6 +348,19 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 								${LT.changelog.source()}: <a href="${current.url || "#"}" target="_blank" rel="noopener">${esc(current.url || "")}</a>
 							</div>
 						</div>
+						<!-- Toolbar: duplicates footer actions for convenience -->
+						<div class="bbmm-toolbar" style="display:flex;gap:.5rem;align-items:center;flex:0 0 auto;">
+							<button type="button" data-action="mark-current">
+								${this._markedSeen.has(current.id)
+									? LT.changelog.mark_current_unseen()
+									: LT.changelog.mark_current()}
+							</button>
+							<button type="button" data-action="mark-all">
+								${this.entries.length && this.entries.every(e => this._markedSeen.has(e.id))
+									? LT.changelog.mark_all_unseen()
+									: LT.changelog.mark_all()}
+							</button>
+						</div>
 					</div>
 
 					<!-- Theme-reset wrapper so text/bg follow Foundry's light/dark theme -->
@@ -332,16 +378,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 					</label>
 
 					<div style="display:flex;gap:.5rem;justify-content:flex-end;">
-						<button type="button" data-action="mark-current">
-							${this._markedSeen.has(current.id)
-								? LT.changelog.mark_current_unseen()
-								: LT.changelog.mark_current()}
-						</button>
-						<button type="button" data-action="mark-all">
-							${this.entries.length && this.entries.every(e => this._markedSeen.has(e.id))
-								? LT.changelog.mark_all_unseen()
-								: LT.changelog.mark_all()}
-						</button>
+						
 					</div>
 				</main>
 			</section>
@@ -420,7 +457,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			if (!this._sizedOnce) {
 				this._sizedOnce = true;
 				requestAnimationFrame(() => {
-					_bbmmSizeFrameOnce(frame);
+					_bbmmSizeFrameOnce(frame, this);
 					// Center on the next frame after sizing so we have final width/height
 					requestAnimationFrame(() => _bbmmCenterFrame(frame, this));
 				});

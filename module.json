@@ -1,61 +1,65 @@
 {
-  "id": "bbmm",
-  "title": "Big Bad Module Manager",
-  "version": "0.2.2",
-  "authors": [
-    {
-      "name": "TheJoester",
-      "discord": "thejoester",
-      "url": "https://github.com/thejoester",
-      "flags": {}
-    }
-  ],
-  "compatibility": {
-    "minimum": "12",
-    "verified": "13"
-  },
-  "esmodules": [
-		 "scripts/localization.js",
-		 "scripts/settings.js",
-		 "scripts/helpers.js",
-		 "scripts/module-presets.js",
-     "scripts/settings-presets.js",
-		 "scripts/exclusions.js",
-     "scripts/changelogs.js"
-  ],
-  "packs": [
-    {
-      "name": "bbmm-macros",
-      "label": "BBMM Macros",
-      "path": "packs/bbmm-macros",
-      "type": "Macro",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    }
-  ],
-  "styles": ["styles/bbmm.css"],
-  "languages": [
-		{
-			"lang": "en",
-			"name": "English",
-			"path": "lang/en.json"
-		}, 
-	    {
-			"lang": "fr",
-			"name": "French",
-			"path": "lang/fr.json"
-		}
-	],
-  "flags": {
-    "canUpload": true
-  },
-  "description": "Utility to manage modules and settings.",
-  "url": "https://github.com/thejoester/bbmm/",
-  "manifest": "https://github.com/thejoester/bbmm/releases/latest/download/module.json",
-  "download": "https://github.com/thejoester/bbmm/releases/latest/download/bbmm.zip",
-  "readme": "https://github.com/thejoester/bbmm/blob/main/CHANGELOG.md",
-  "bugs": "https://github.com/thejoester/bbmm/issues",
-  "changelog": "https://github.com/thejoester/bbmm/blob/main/README.md"
+    "id": "bbmm",
+    "title": "Big Bad Module Manager",
+    "version": "0.3.0",
+    "authors": [
+        {
+            "name": "TheJoester",
+            "discord": "thejoester",
+            "url": "https://github.com/thejoester",
+            "flags": {}
+        }
+    ],
+    "compatibility": {
+        "minimum": "13",
+        "verified": "13"
+    },
+    "esmodules": [
+        "scripts/localization.js",
+        "scripts/settings.js",
+        "scripts/helpers.js",
+        "scripts/module-presets.js",
+        "scripts/settings-presets.js",
+        "scripts/exclusions.js",
+        "scripts/setting-sync.js",
+        "scripts/changelogs.js"
+    ],
+    "socket": true,
+    "packs": [
+        {
+            "name": "bbmm-macros",
+            "label": "BBMM Macros",
+            "path": "packs/bbmm-macros",
+            "type": "Macro",
+            "ownership": {
+                "PLAYER": "OBSERVER",
+                "ASSISTANT": "OWNER"
+            }
+        }
+    ],
+    "styles": [
+        "styles/bbmm.css"
+    ],
+    "languages": [
+        {
+            "lang": "en",
+            "name": "English",
+            "path": "lang/en.json"
+        },
+        {
+            "lang": "fr",
+            "name": "French",
+            "path": "lang/fr.json"
+        }
+    ],
+    "flags": {
+        "canUpload": true
+    },
+    "description": "Utility to manage modules and settings.",
+    "url": "https://github.com/thejoester/bbmm/",
+    "manifest": "https://github.com/thejoester/bbmm/releases/latest/download/module.json",
+    "download": "https://github.com/thejoester/bbmm/releases/download/0.2.1/bbmm.zip",
+    "readme": "https://github.com/thejoester/bbmm/blob/main/CHANGELOG.md",
+    "bugs": "https://github.com/thejoester/bbmm/issues",
+    "changelog": "https://github.com/thejoester/bbmm/blob/main/README.md"
 }
