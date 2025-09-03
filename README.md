@@ -49,6 +49,12 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 <img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/9b3c2e6f-85a6-4b7c-9664-48b288a1868d" />
 <br /><br />
 <img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/cb33e3e1-fe8b-42d7-9b7c-4a990c47d8e5" />
+<br /><br />
+<img width="528" height="133" alt="image" src="https://github.com/user-attachments/assets/53658f16-e579-4e1f-bcc3-fe73c09b7362" />
+<br /><br />
+<img width="70%" height="70%" alt="image" src="https://github.com/user-attachments/assets/047a4c3b-103d-4211-a3a5-bfcdffbcb52d" />
+
+
 
 ## Credits
 I would like to extend a thanks to the following people for helping contribute to this module!
