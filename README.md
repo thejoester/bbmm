@@ -23,14 +23,20 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 - Export settings state to .json
 - import .json to preset
   - Choose which modules or specific settings to import
- 
+
+### Settings Sync
+- Will display a sync icon next to client settings, when clicked will toggle to sync Player settings to GM
+- If client is connected, will push new setting to client. 
+- When clients connect, they will auto sync to enabled GM settings.
+
 ### Exclude modules & settings
 - Add modules to ignore on presets/imports/exports
 - Add specific setting to ignore on presets/imports/exports
 
+### Changelog report
+- Opens report on login for GM with latest change logs for modules that contain a changelog file
+
 ## Planned features
-- Changelog report: open new changelogs if the CHANGELOG.md is included in module
-- Sync client settings
 - Categorize / arrange modules in module list
 
 ## Screenshots
