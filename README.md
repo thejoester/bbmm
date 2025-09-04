@@ -14,15 +14,15 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 ### Module Presets
 - Save module state (enabled/disabled) as a preset.
 - Load / update / delete preset.
-- Export module state to .json
-- import .json to preset
+- Export module state to .json.
+- import .json to preset.
 
 ### Settings Presets
 - Save settings state as a preset.
 - Load / update / delete preset.
 - Export settings state to .json
-- import .json to preset
-  - Choose which modules or specific settings to import
+- import .json to preset:
+  - Choose which modules or specific settings to import.
 
 ### Settings Sync
 - For user/client scope settings will have a Lock and a sync icon, 
@@ -30,14 +30,15 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
   - Sync: Will push GM setting to currently connected player(s). 
 
 ### Exclude modules & settings
-- Add modules to ignore on presets/imports/exports
-- Add specific setting to ignore on presets/imports/exports
+- Add modules to ignore on presets/imports/exports.
+- Add specific setting to ignore on presets/imports/exports.
 
 ### Changelog report
-- Opens report on login for GM with latest change logs for modules that contain a changelog file
+- Opens report on login for GM with latest change logs for modules that contain a changelog file.
 
-## Planned features
-- Categorize / arrange modules in module list
+## Planned future features
+- Categorize / arrange modules in module list.
+- Add support for Controls (Key bindings).
 
 ## Screenshots
 <img width="60%" height="60%" alt="image" src="https://github.com/user-attachments/assets/fe5a02f3-dce4-4b0b-8ed1-bd64311ddf72" />
