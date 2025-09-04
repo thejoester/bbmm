@@ -50,7 +50,7 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 <br /><br />
 <img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/cb33e3e1-fe8b-42d7-9b7c-4a990c47d8e5" />
 <br /><br />
-<img width="528" height="133" alt="image" src="https://github.com/user-attachments/assets/53658f16-e579-4e1f-bcc3-fe73c09b7362" />
+<img width="520" height="169" alt="image" src="https://github.com/user-attachments/assets/28a1c8a5-12df-440c-b125-bdc940e65ca1" />
 <br /><br />
 <img width="70%" height="70%" alt="image" src="https://github.com/user-attachments/assets/047a4c3b-103d-4211-a3a5-bfcdffbcb52d" />
 
