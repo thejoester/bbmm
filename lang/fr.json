@@ -190,12 +190,17 @@
     "sync": {
       "BadgeUser": "Option utilisateur",
       "BadgeClient": "Option client",
+      "ToggleHint": "Verrouiller les paramètres du jouer",
+      "ToggleError": "Impossible de basculer le verrouillage.",
       "ReloadTitle": "Paramètres synchronisés",
       "ReloadMsg": "Vous avez de nouveaux paramètres imposés par le MJ. Le rechargement de la page est requis.",
       "ReloadNow": "Recharger",
       "ReloadLater": "Plus tard",
       "ReloadWarn": "Paramètres mis à jour par le MJ. Rechargez s'il vous plait.",
-      "Updated": "Paramètres mis à jour par le MJ."
+      "Updated": "Paramètres mis à jour par le MJ.",
+      "LockedByGM": "Verrouillé par le MJ",
+      "EnableName": "Activer la synchronisation des paramètres utilisateur/client",
+      "EnableHint": "MJ : lorsqu'il est désactivé, BGGM n'ajoutera ni contrôles de verrouillage/synchronisation, n'imposera pas de valeurs et n'appliquera ni ne masquera les paramètres utilisateur/client."
     }
   }
 }
