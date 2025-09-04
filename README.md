@@ -25,9 +25,9 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
   - Choose which modules or specific settings to import
 
 ### Settings Sync
-- Will display a sync icon next to client settings, when clicked will toggle to sync Player settings to GM
-- If client is connected, will push new setting to client. 
-- When clients connect, they will auto sync to enabled GM settings.
+- For user/client scope settings will have a Lock and a sync icon, 
+  - Lock (toggle): will force player setting to match GM, and hide from player settings. 
+  - Sync: Will push GM setting to currently connected player(s). 
 
 ### Exclude modules & settings
 - Add modules to ignore on presets/imports/exports

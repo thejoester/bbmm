@@ -2,8 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.3.1] - 2025-09-03
+### Changed
+- **Settings Sync**
+  - Added settings lock toggle, this will lock setting value for players and hide setting from them. 
+  - Sync icon is no longer toggle, pushing it will push current GM setting to connected players but will not lock the setting. 
 
 ## [0.3.0] - 2025-09-03
 ### Added
