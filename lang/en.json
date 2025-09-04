@@ -199,14 +199,17 @@
 		"sync": {
 			"BadgeUser": "User-scoped setting",
 			"BadgeClient": "Client-scoped setting",
-			"ToggleHint": "Toggle sync to players",
-			"ToggleError": "Failed to toggle sync.",
+			"ToggleHint": "Lock Player settings",
+			"ToggleError": "Failed to toggle lock.",
 			"ReloadTitle": "Settings Synced",
 			"ReloadMsg": "You have new GM-enforced settings. A reload is required.",
 			"ReloadNow": "Reload",
 			"ReloadLater": "Later",
 			"ReloadWarn": "Settings updated by GM. Please reload.",
-			"Updated": "Settings updated by GM."
+			"Updated": "Settings updated by GM.",
+			"LockedByGM": "Locked by GM",
+			"EnableName": "Enable user/client setting sync",
+			"EnableHint": "GM: When disabled, BBMM will not add lock/sync controls, push values, or enforce/hide user/client settings."
 		}
 	}
 }

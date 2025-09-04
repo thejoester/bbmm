@@ -28,7 +28,7 @@
 	margin: 0 !important;
 }
 
-/* (optional) if some theme forces buttons to block in all contexts */
+/* if some theme forces buttons to block in all contexts */
 .bbmm-exclusions-dialog .bbmm-x-toolbar .bbmm-btn,
 .bbmm-exclusions-dialog .bbmm-x-toolbar .bbmm-x-cell > .bbmm-btn {
 	display: inline-flex !important;
@@ -60,7 +60,6 @@
 
 /* Use Foundry/theme defaults inside the right pane */
 .bbmm-changelog-journal .bbmm-theme-reset {
-	/* wipe inherited/overridden presentation without nuking layout */
 	all: revert;
 	font: inherit;
 	color: inherit;
@@ -111,7 +110,7 @@
 	margin: 0.4em 0;
 }
 
-/* Code blocks — keeping your current look (dark), adjust if you want theme-aware later */
+/* Code blocks */
 .bbmm-changelog-body code,
 .bbmm-changelog-body pre {
 	background: #0c0c0c;
@@ -130,7 +129,7 @@
 	text-decoration: underline;
 }
 
-/* Sidebar nav items — consolidated & theme-aware (no global .bbmm-nav-item leakage) */
+/* Sidebar nav items */
 .bbmm-changelog-journal .bbmm-nav-item {
 	display: block;
 	width: 100%;
@@ -147,7 +146,7 @@
 	/* comfortable tap target */
 	padding: 0.4rem 0.5rem;
 	line-height: 1.3;
-	min-height: 2.8rem; /* room for two lines */
+	min-height: 2.8rem; 
 }
 
 .bbmm-changelog-journal .bbmm-nav-item div {
@@ -156,16 +155,25 @@
 	white-space: nowrap;
 }
 
-/* Active item: slightly stronger border + subtle fill for both light/dark */
-.bbmm-changelog-journal .bbmm-nav-item[data-active="1"] {
+/* Active item */
+.bbmm-changelog-journal {
 	border-color: var(--color-border, #666);
 	box-shadow: inset 0 0 0 9999px color-mix(in srgb, currentColor 6%, transparent);
 }
-
+.bbmm-nav-item[data-active="1"] {
+	outline: 2px solid orange;
+	outline-offset: -2px; 
+	border-radius: 8px;  
+}
 /* Hover / focus */
 .bbmm-changelog-journal .bbmm-nav-item:hover,
 .bbmm-changelog-journal .bbmm-nav-item:focus {
-	border-color: var(--color-border, #666);
+	border-color: var(--color-border, #ffffff);
+	box-shadow: inset 0 0 0 2px orange;
+	background-color: rgba(119, 78, 0, 0.432);
+	color: white;             
+	border-radius: 8px;        
+	cursor: pointer;
 }
 
 /* Tiny badge after title */

@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Settings Sync**
   - Added settings lock toggle, this will lock setting value for players and hide setting from them. 
   - Sync icon is no longer toggle, pushing it will push current GM setting to connected players but will not lock the setting. 
+  - Added setting option to enable/disable settings sync feature. 
+- **Changelog report**
+  - Updated styling and interaction settings of changelog window.
 
 ## [0.3.0] - 2025-09-03
 ### Added

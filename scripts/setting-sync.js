@@ -23,7 +23,13 @@ const BBMM_SYNC_CH = `module.${BBMM_ID}`;	// Socket channel for this module
 const objectsEqual = foundry?.utils?.objectsEqual ?? ((a, b) => {
 	try { return JSON.stringify(a) === JSON.stringify(b); } catch { return a === b; }
 });
+const ENABLE_KEY = "enableUserSettingSync";
 
+// Helper: is feature enabled?
+function bbmmIsSyncEnabled() {
+	try { return !!game.settings.get(BBMM_ID, ENABLE_KEY); }
+	catch { return true; } // safe default if setting not found
+}
 
 /*
 	=======================================================
@@ -33,6 +39,7 @@ const objectsEqual = foundry?.utils?.objectsEqual ?? ((a, b) => {
 let _bbmmTriggerTimer = null;
 function bbmmBroadcastTrigger() {
 	try {
+		if (!bbmmIsSyncEnabled()) return; // feature disabled?
 		if (!game.user?.isGM) return;
 		if (!game.socket) return;
 		clearTimeout(_bbmmTriggerTimer);
@@ -111,6 +118,7 @@ async function bbmmResnapUserSync() {
 */
 function bbmmPushSetting(ns, key) {
 	try {
+		if (!bbmmIsSyncEnabled()) return; // feature disabled?
 		if (!game.user?.isGM) return;
 		if (!game.socket) return;
 
@@ -140,6 +148,7 @@ function bbmmPushSetting(ns, key) {
 */
 Hooks.once("init", () => {
 	try {
+		
 		const orig = game.settings.register.bind(game.settings);
 		game.settings.register = function bbmm_register(namespace, key, data) {
 			try {
@@ -181,6 +190,9 @@ Hooks.once("init", () => {
 */
 Hooks.on("closeSettingsConfig", async (app) => {
 	try {
+
+		if (!bbmmIsSyncEnabled()) return; // feature disabled?
+
 		if (!game.user?.isGM) return;
 
 		const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
@@ -229,6 +241,9 @@ Hooks.on("closeSettingsConfig", async (app) => {
 */
 Hooks.on("setSetting", async (namespace, key, value) => {
 	try {
+
+		if (!bbmmIsSyncEnabled()) return; // feature disabled?
+
 		if (game.user?.isGM) return;
 
 		const id = `${namespace}.${key}`;
@@ -264,7 +279,9 @@ Hooks.on("setSetting", async (namespace, key, value) => {
 */
 Hooks.on("renderSettingsConfig", (app, html) => {
 	try {
-		// Common
+
+		if (!bbmmIsSyncEnabled()) return; // feature disabled?
+
 		const form = app?.form || html?.[0] || app?.element?.[0] || document;
 
 		// Player branch: HIDE locked controls completely
@@ -472,6 +489,13 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 */
 Hooks.once("ready", async () => {
 	try {
+
+		// Check if feature enabled 
+		if (!bbmmIsSyncEnabled()) {
+			DL("bbmm-setting-lock: disabled, skipping ready features");
+			return;								
+		}
+
 		if (game.user?.isGM) { // GM: inject CSS for the icons
 			bbmmResnapUserSync();
 

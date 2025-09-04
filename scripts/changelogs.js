@@ -188,6 +188,10 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		this._centeredOnce = false;
 	}
 
+	/*
+		===== Helpers =====
+	*/
+
 	_cleanHref(html) {
 		try {
 			const wrap = document.createElement("div");
@@ -257,6 +261,30 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 	}
 	}
 
+	/* Preserve left-nav scroll across re-renders */
+	_captureNavScroll(root) {
+		try {
+			const sc = root?.querySelector?.(".bbmm-nav-scroll");
+			this._navScrollTop = sc ? sc.scrollTop : 0;
+			DL(`Changelog: captured nav scrollTop=${this._navScrollTop}`);
+		} catch (err) {
+			DL(2, `_captureNavScroll(): ${err?.message || err}`, err);
+		}
+	}
+	_restoreNavScroll(root) {
+		try {
+			if (typeof this._navScrollTop !== "number") return;
+			const sc = root?.querySelector?.(".bbmm-nav-scroll");
+			if (!sc) return;
+
+			// restore immediately, then once more on next frame to survive late layout
+			sc.scrollTop = this._navScrollTop;
+			requestAnimationFrame(() => { sc.scrollTop = this._navScrollTop; });
+			DL(`Changelog: restored nav scrollTop=${this._navScrollTop}`);
+		} catch (err) {
+			DL(2, `_restoreNavScroll(): ${err?.message || err}`, err);
+		}
+	}
 	async _renderHTML() {
 		// escape helper for titles/urls etc.
 		const esc = (s) => String(s ?? "")
@@ -442,6 +470,10 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			} else {
 				if (!frame) return;
 			}
+
+			// Restore left-pane scroll position after re-render
+			this._restoreNavScroll(root);
+
 			// checkbox: toggle per-page pending state
 			const cb = root.querySelector('input[name="dontShowAgain"]');
 			if (cb) {
@@ -482,6 +514,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 					if (nav && root.contains(nav)) {
 						const idx = Number(nav.dataset.index ?? 0);
 						if (!Number.isNaN(idx) && idx >= 0 && idx < this.entries.length) {
+							this._captureNavScroll(root); // preserve scroll
 							this.index = idx;
 							this.render(); // re-render page area
 							DL(`Changelog: switched to index ${idx} (${this.entries[idx]?.id})`);
@@ -510,6 +543,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 								this._pendingOnClose.delete(entry.id);
 								ui.notifications?.info(LT.changelog.marked_seen_single({ title: entry.title || entry.id, version: entry.version }));
 							}
+							this._captureNavScroll(root);
 							this.render();
 							return;
 						}
@@ -536,6 +570,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 								}
 								ui.notifications?.info(LT.changelog.marked_seen_all({ count: this.entries.length }));
 							}
+							this._captureNavScroll(root);
 							this.render();
 							return;
 						}

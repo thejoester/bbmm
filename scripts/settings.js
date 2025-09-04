@@ -496,6 +496,26 @@ Hooks.once("init", () => {
 					hint: LT.hint_checkDisabledModules()
 				});
 
+				// Enable/disable BBMM user/client setting sync
+				game.settings.register(BBMM_ID, "enableUserSettingSync", {
+					name: LT.sync.EnableName(),
+					hint: LT.sync.EnableHint(),
+					scope: "world",
+					config: true,
+					type: Boolean,
+					default: true,
+					requiresReload: true,
+					onChange: (v) => {
+						try {
+							DL(`bbmm-setting-lock: enableUserSettingSync -> ${v}`);
+							// Optional: let connected clients know state changed (no-op if they aren't listening)
+							game.socket?.emit?.(`module.${BBMM_ID}`, { t: "bbmm-sync-toggle", enabled: !!v });
+						} catch (err) {
+							DL(2, "bbmm-setting-lock: onChange(enableUserSettingSync) error", err);
+						}
+					}
+				});
+
 				// Debug level for THIS module
 				game.settings.register(BBMM_ID, "debugLevel", {
 					name: LT.debugLevel(),
