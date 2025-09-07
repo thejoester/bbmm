@@ -53,7 +53,8 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 <br /><br />
 <img width="520" height="169" alt="image" src="https://github.com/user-attachments/assets/28a1c8a5-12df-440c-b125-bdc940e65ca1" />
 <br /><br />
-<img width="70%" height="70%" alt="image" src="https://github.com/user-attachments/assets/047a4c3b-103d-4211-a3a5-bfcdffbcb52d" />
+<img width="70%" height="70%" alt="image" src="https://github.com/user-attachments/assets/4ff3761e-aa80-42c2-9729-f6d4479d5747" />
+
 
 
 

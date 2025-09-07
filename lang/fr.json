@@ -84,6 +84,10 @@
     "promptDelSettingsPreset": "Supprime le préréglage de paramètres <b>{name}</b>",
     "deletedSettingsPreset": "Préréglage de paramètres '{name}' supprimé",
     "exportedCurrentSettings": "Paramètres actuels exportés",
+    "name_showChangelogsOnLogin": "Afficher le journal des changements des modules lors de la connection du MJ",
+    "hint_showChangelogsOnLogin": "Si cette option est activée, le journal des changements sera affiché au MJ à chaque mise à jour des modules depuis la dernière fois qu'ils ont étaient marqué comme lu.",
+    "name_checkDisabledModules": "Vérification des modules désactivés",
+    "hint_checkDisabledModules": "Lorsque que l'option est activée, BGGM cherchera aussi le journal des changements des modules installés mais désactivés.",
     "exclusionsMgr": "Gestionnaire des exclusions",
     "exclusionsMgrBtn": "Bouton de gestionnaire des exclusions",
     "lblExclusionsMgr": "Ouvrir le gestionnaire des exclusions",
@@ -105,6 +109,12 @@
     "debugLevelWarn": "Avertissements",
     "debugLevelErr": "Erreurs",
     "debugLevelNone": "Aucun",
+    "v12Note": "Ce module offre une compatibilité minimal avec FoundryVTT v12, vous permettant d'exporter les paramètres et les états des modules afin de préparer la mise à jour vers v13.<br><strong>NOTE :</strong> certains paramètres peuvent ne pas être transférés si le paramétrage du module v13 a changé.",
+    "titlev12Legacy": "BGGM : Export Legacy (v12) ",
+    "exportedv12Settings": "Paramètres v12 exportés au format .json",
+    "exportedv12Modules": "État du module v12 exporté au format .json",
+    "titlePresetPreview": "Aperçu des changements de préréglage",
+    "noteSaveBeforeLoad": "Astuce : sauvegardez vos paramètres actuels avant de charger un préréglage different pour éviter de perdre vos changements",
     "buttons": {
       "yes": "Oui",
       "no": "Non",
@@ -117,17 +127,20 @@
       "export": "Exporter",
       "import": "Importer",
       "load": "Charger",
+      "preview": "Prévisualiser",
       "update": "Mettre à jour",
       "delete": "Supprimer",
       "exclude": "Exclure",
       "addModule": "Ajouter un module",
       "addSetting": "Ajouter un paramètre",
       "saveCurrent": "Enregistrer l'actuel",
+      "saveCurrentSettings": "Enregistrer les paramètres actuels",
       "exportToJSON": "Exporter au format .json",
       "importFromJSON": "Importer au format .json",
       "bbmmBtnToolTip": "Ouvrir le Bon Gros Gestionnaire de Module",
       "importToPreset": "Importer vers le préréglage",
-      "saveCurrentSettings": "Enregistrer les paramètres actuels"
+      "expSettingsJSON": "Export des paramètres au format .json",
+      "expModuleStateJSON": "Export de l'état du module au format .json"
     },
     "errors": {
       "conflictTitleExists": "Le préréglage existe",
@@ -155,7 +168,39 @@
       "noModulesDet": "Aucun module détecté",
       "noSettingsDet": "Aucun paramètre détecté",
       "selectSettingPresetDelete": "Sélectionnez un préréglage de paramètres à supprimer",
-      "settingsExportFailed": "L'exportation des paramètres a échoué (voir console)"
+      "settingsExportFailed": "L'exportation des paramètres a échoué (voir console)",
+      "settingsRegUnavail": "Registre des paramètres indisponible",
+      "failedOpenLegacyExport": "Échec de l'ouverture de l'exportation du dialogue legacy (Voir console)",
+      "failedModulestateExp": "Exportation de l'état du module a échoué (Voir console)"
+    },
+    "changelog": {
+      "window_title": "Journaux des changement des modules",
+      "source": "Source",
+      "dont_show_again": "Marqué automatiquement cette page comme lu lors de sa fermeture",
+      "open_file": "Ouvrir un fichier",
+      "remind_later": "Me rappeler plus tard",
+      "mark_current": "Marquer le journal des changements actuel comme lu",
+      "mark_all": "Marquer tout comme lu",
+      "marked_seen_single": "Marquer {title} v{version} comme lu.",
+      "marked_seen_all": "Marquer le(s) {count} jounal(aux) des changements comme lu.",
+      "remote_placeholder": "Le journal des changements distant ne peut être chargé dans l'application. Utilisez le bouton \"Ouvrir un fichier\" pour le voir.",
+      "mark_current_unseen": "Marquer le journal des changements actuel comme non lu",
+      "mark_all_unseen": "Marquer tout comme non lu"
+    },
+    "sync": {
+      "BadgeUser": "Option utilisateur",
+      "BadgeClient": "Option client",
+      "ToggleHint": "Verrouiller les paramètres du jouer",
+      "ToggleError": "Impossible de basculer le verrouillage.",
+      "ReloadTitle": "Paramètres synchronisés",
+      "ReloadMsg": "Vous avez de nouveaux paramètres imposés par le MJ. Le rechargement de la page est requis.",
+      "ReloadNow": "Recharger",
+      "ReloadLater": "Plus tard",
+      "ReloadWarn": "Paramètres mis à jour par le MJ. Rechargez s'il vous plait.",
+      "Updated": "Paramètres mis à jour par le MJ.",
+      "LockedByGM": "Verrouillé par le MJ",
+      "EnableName": "Activer la synchronisation des paramètres utilisateur/client",
+      "EnableHint": "MJ : lorsqu'il est désactivé, BGGM n'ajoutera ni contrôles de verrouillage/synchronisation, n'imposera pas de valeurs et n'appliquera ni ne masquera les paramètres utilisateur/client."
     }
   }
 }
