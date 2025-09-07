@@ -50,6 +50,11 @@
             "lang": "fr",
             "name": "French",
             "path": "lang/fr.json"
+        },
+        {
+            "lang": "it",
+            "name": "Italiano",
+            "path": "lang/it.json"
         }
     ],
     "flags": {
