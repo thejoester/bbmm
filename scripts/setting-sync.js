@@ -397,12 +397,12 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 
 				// lock toggle: lock setting and hide from players
 				const isLocked = !!syncMap[id];
-				const lockTitle = (LT.syncToggleHint());
+				const lockTitle = (LT.sync.ToggleHint());
 				const lockIcon = makeIcon(lockTitle, "fa-solid fa-lock", true);
 				if (isLocked) lockIcon.classList.add("bbmm-active");
 
 				// sync/push icon: force this one setting now to players
-				const pushTitle = (LT.syncPushHint());
+				const pushTitle = (LT.sync.PushHint());
 				const pushIcon = makeIcon(pushTitle, "fa-solid fa-arrows-rotate", true);
 				pushIcon.addEventListener("click", (ev) => {
 					try {
