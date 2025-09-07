@@ -39,6 +39,7 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 ## Planned future features
 - Categorize / arrange modules in module list.
 - Add support for Controls (Key bindings).
+- Let GM lock/push setting to specific player.
 
 ## Screenshots
 <img width="60%" height="60%" alt="image" src="https://github.com/user-attachments/assets/fe5a02f3-dce4-4b0b-8ed1-bd64311ddf72" />
