@@ -200,6 +200,7 @@
 			"BadgeUser": "User-scoped setting",
 			"BadgeClient": "Client-scoped setting",
 			"ToggleHint": "Lock Player settings",
+			"PushHint": "Sync setting to connected users",
 			"ToggleError": "Failed to toggle lock.",
 			"ReloadTitle": "Settings Synced",
 			"ReloadMsg": "You have new GM-enforced settings. A reload is required.",
