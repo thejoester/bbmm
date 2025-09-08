@@ -191,6 +191,7 @@
       "BadgeUser": "Option utilisateur",
       "BadgeClient": "Option client",
       "ToggleHint": "Verrouiller les paramètres du jouer",
+      "PushHint": "Paramètrage de synchronisation avec les utilisateurs connectés",
       "ToggleError": "Impossible de basculer le verrouillage.",
       "ReloadTitle": "Paramètres synchronisés",
       "ReloadMsg": "Vous avez de nouveaux paramètres imposés par le MJ. Le rechargement de la page est requis.",
