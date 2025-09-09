@@ -29,6 +29,7 @@ Hooks.once("ready", async () => {
 	*/
 	try {
 
+		/*
 		// --- MIGRATE seenChangelogs if an old Array slipped into storage ---
 		const rawSeen = game.settings.get(BBMM_ID, "seenChangelogs");
 		if (Array.isArray(rawSeen)) {
@@ -40,6 +41,7 @@ Hooks.once("ready", async () => {
 			await game.settings.set(BBMM_ID, "seenChangelogs", migrated);
 			DL("migrated seenChangelogs Array → Object", migrated);
 		}
+		*/
 
 		// Optional: sanity check the registered schema
 		const meta = game.settings.settings.get(`${BBMM_ID}.seenChangelogs`);
@@ -277,7 +279,13 @@ function _bbmmMarkdownToHtml(md) {
 			const lm = line.match(/^(\s*)[-*+]\s+(.*)$/);
 			if (lm) {
 				const indentSpaces = lm[1].replace(/\t/g, "    ").length;
-				const level = Math.floor(indentSpaces / 4) + 1;
+				// Support common styles:
+				// - 0 spaces  → level 1
+				// - 2–5 spaces → level 2
+				// - 6–9 spaces → level 3
+				// …then every +4 spaces
+				let level = 1;
+				if (indentSpaces >= 2) level = 2 + Math.floor((indentSpaces - 2) / 4);
 
 				while (listStack.length < level) openList();
 				while (listStack.length > level) closeList();
