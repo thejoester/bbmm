@@ -367,7 +367,7 @@ Hooks.once("init", () => {
 				// HIDDEN World map of { [moduleId]: "x.y.z" } that we've marked as seen
 				game.settings.register(BBMM_ID, "seenChangelogs", {
 					name: "Seen Changelogs",
-					hint: "Internal map of module versions marked as 'seen'.",
+					hint: "Private setting: Internal map of module versions marked as 'seen'.",
 					scope: "world",
 					config: false,
 					type: Object,
@@ -529,7 +529,7 @@ Hooks.once("init", () => {
 						error: LT.debugLevelErr(), 
 						none: LT.debugLevelNone() 
 					},
-					default: "all"
+					default: "none"
 				});
 
 		}

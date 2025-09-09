@@ -28,6 +28,24 @@ Hooks.once("ready", async () => {
 		only show for V13 
 	*/
 	try {
+
+		// --- MIGRATE seenChangelogs if an old Array slipped into storage ---
+		const rawSeen = game.settings.get(BBMM_ID, "seenChangelogs");
+		if (Array.isArray(rawSeen)) {
+			const migrated = {};
+			// copy only non-index keys from the array's own props
+			for (const k in rawSeen) {
+				if (!/^\d+$/.test(k)) migrated[k] = rawSeen[k];
+			}
+			await game.settings.set(BBMM_ID, "seenChangelogs", migrated);
+			DL("migrated seenChangelogs Array → Object", migrated);
+		}
+
+		// Optional: sanity check the registered schema
+		const meta = game.settings.settings.get(`${BBMM_ID}.seenChangelogs`);
+		DL(`seenChangelogs schema: type=${meta?.type?.name}, default=${JSON.stringify(meta?.default)}`);
+
+
 		const gen = Number(game?.release?.generation);
 		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
 		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
@@ -54,10 +72,10 @@ Hooks.once("ready", async () => {
 
 				// Preload all texts so paging is instant
 				for (const e of entries) {
-					e.text = await _bbmmFetchChangelogText(e.url); // local-only
-					
-					e.html = await _bbmmToHTML(e.text); // Convert text into safe enriched HTML
+					e.text = await _bbmmFetchChangelogText(e.url);	// raw markdown
+					e.html = await _bbmmRenderMarkdownOnly(e.text);	// Markdown → HTML (no enrich)
 				}
+
 				const nonEmpty = entries.filter(e => (e.text && e.text.trim().length));
 				if (!nonEmpty.length) return;
 				DL(`Changelog: opening journal with ${nonEmpty.length} module(s).`);
@@ -153,7 +171,150 @@ function _bbmmSizeFrameOnce(frame, app) {
 	}
 }
 
+/*
+	Simple, safe Markdown → HTML converter for BBMM changelogs.
+	Supports:
+	- #..###### headers
+	- unordered lists (-, *, +) with nesting by 4-space indentation
+	- [text](https://url) links and <https://url> autolinks
+	- inline code: `code`
+	- paragraphs for non-empty lines
+*/
+function _bbmmMarkdownToHtml(md) {
+	try {
+		const escHTML = (s) => {
+			if (foundry?.utils?.escapeHTML) return foundry.utils.escapeHTML(String(s ?? ""));
+			return String(s ?? "")
+				.replaceAll("&", "&amp;")
+				.replaceAll("<", "&lt;")
+				.replaceAll(">", "&gt;")
+				.replaceAll('"', "&quot;")
+				.replaceAll("'", "&#39;");
+		};
+		const escAttr = (s) => escHTML(s);
 
+		function inlineToHtml(text) {
+			/*
+				Order matters:
+				1) Protect code spans
+				2) Apply emphasis (** / *)
+				3) Convert markdown links & autolinks
+				4) Escape remaining non-tag text
+			*/
+			const escHTML = (s) => {
+				if (foundry?.utils?.escapeHTML) return foundry.utils.escapeHTML(String(s ?? ""));
+				return String(s ?? "")
+					.replaceAll("&", "&amp;")
+					.replaceAll("<", "&lt;")
+					.replaceAll(">", "&gt;")
+					.replaceAll('"', "&quot;")
+					.replaceAll("'", "&#39;");
+			};
+			const escAttr = (s) => escHTML(s);
+
+			// 1) Split by backticks → protect code segments
+			const parts = String(text ?? "").split(/`/);
+
+			for (let i = 0; i < parts.length; i++) {
+				// odd indexes are code; even are normal text
+				if (i % 2 === 1) {
+					parts[i] = `<code>${escHTML(parts[i])}</code>`;
+					continue;
+				}
+
+				let seg = parts[i];
+
+				// 2) Emphasis — do bold first, then italics (avoid overlapping)
+				seg = seg.replace(/\*\*([^*]+?)\*\*/g, (_m, t) => `<strong>${escHTML(t)}</strong>`);
+				seg = seg.replace(/\*([^*]+?)\*/g,       (_m, t) => `<em>${escHTML(t)}</em>`);
+				seg = seg.replace(/__([^_]+?)__/g,       (_m, t) => `<strong>${escHTML(t)}</strong>`);
+				seg = seg.replace(/_([^_]+?)_/g,         (_m, t) => `<em>${escHTML(t)}</em>`);
+
+				// 3) Markdown links: [label](https://url) — format label with emphasis already applied
+				seg = seg.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_m, label, url) => {
+					// label may already contain <strong>/<em>; do NOT escape tags, only attributes
+					return `<a href="${escAttr(url)}">${label}</a>`;
+				});
+
+				// Autolink: <https://url>
+				seg = seg.replace(/<\s*(https?:\/\/[^>\s]+)\s*>/g, (_m, url) => {
+					return `<a href="${escAttr(url)}">${escHTML(url)}</a>`;
+				});
+
+				// 4) Escape any remaining text that isn't a tag
+				const chunks = seg.split(/(<\/?[^>]+>)/g);
+				for (let j = 0; j < chunks.length; j++) {
+					if (!chunks[j]) continue;
+					if (chunks[j].startsWith("<")) continue; // keep tags we just added
+					chunks[j] = escHTML(chunks[j]);
+				}
+				parts[i] = chunks.join("");
+			}
+
+			return parts.join("");
+		}
+
+
+		const lines = String(md ?? "").split(/\r?\n/);
+		let html = "";
+		let listStack = [];	
+		const openList  = () => { html += "<ul>\n"; listStack.push(true); };
+		const closeList = () => { html += "</ul>\n"; listStack.pop(); };
+
+		for (let raw of lines) {
+			const line = String(raw ?? "");
+
+			// Headers
+			const hm = line.match(/^(#{1,6})\s+(.*)$/);
+			if (hm) {
+				while (listStack.length) closeList();
+				const lvl = Math.min(6, hm[1].length);
+				html += `<h${lvl}>${inlineToHtml(hm[2])}</h${lvl}>\n`;
+				continue;
+			}
+
+			// Bullet list item with indent (4 spaces per level)
+			const lm = line.match(/^(\s*)[-*+]\s+(.*)$/);
+			if (lm) {
+				const indentSpaces = lm[1].replace(/\t/g, "    ").length;
+				const level = Math.floor(indentSpaces / 4) + 1;
+
+				while (listStack.length < level) openList();
+				while (listStack.length > level) closeList();
+
+				html += `\t<li>${inlineToHtml(lm[2])}</li>\n`;
+				continue;
+			}
+
+			// Blank line = separator (don’t close lists here; let structure be explicit)
+			if (!line.trim().length) continue;
+
+			// Paragraph line
+			while (listStack.length) closeList();
+			html += `<p>${inlineToHtml(line)}</p>\n`;
+		}
+
+		while (listStack.length) closeList();
+		return html;
+	} catch (err) {
+		DL(2, `_bbmmMarkdownToHtml(): ${err?.message || err}`, err);
+		return foundry?.utils?.escapeHTML ? foundry.utils.escapeHTML(String(md ?? "")) : String(md ?? "");
+	}
+}
+
+/*
+	Render Markdown only (no enrich), preferring Foundry’s renderer if present.
+*/
+async function _bbmmRenderMarkdownOnly(md) {
+	try {
+		if (TextEditor?.renderMarkdown) {
+			return await TextEditor.renderMarkdown(String(md ?? ""), { sanitize: true });
+		}
+	} catch (err) {
+		DL(2, `renderMarkdown failed: ${err?.message || err}`, err);
+	}
+	return _bbmmMarkdownToHtml(md);
+}
 
 // ===== Main Workflow =====
 
@@ -260,7 +421,6 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		return String(html ?? "");
 	}
 	}
-
 	/* Preserve left-nav scroll across re-renders */
 	_captureNavScroll(root) {
 		try {
@@ -291,8 +451,6 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			.replaceAll("&", "&amp;")
 			.replaceAll("<", "&lt;")
 			.replaceAll(">", "&gt;");
-
-
 		
 		// pick current entry
 		const current = this.entries[this.index] || {};
@@ -331,27 +489,17 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		// Prefer HTML if provided; else fall back to text/markdown
 		const bodyText = current.html ?? current.text ?? current.body ?? current.markdown ?? "";
 
+		// Prefer the prebuilt HTML (from ready hook); else fall back to raw text
 		let enrichedBody = "";
 		try {
-			// keep your current path (html vs text) + optional enrichHTML
-			const bodyText = current.html ?? current.text ?? current.body ?? current.markdown ?? "";
-			let out = bodyText;
-
-			// if you enrich, remember to await in v13
-			out = await TextEditor.enrichHTML(String(out), {
-				secrets: false,
-				relativeTo: null,
-				links: true,
-				rolls: false
-			});
-
-			// link sanitation pass 1: remove trailing '),', ')),' etc. from href
-			enrichedBody = this._cleanHref(out);
-			// link sanitation pass 2
-			enrichedBody = this._fixMdWrappedEmptyAnchors(enrichedBody);	
+			let out = current.html ?? (current.text ?? current.body ?? current.markdown ?? "");
+			// Final link tidy
+			out = this._cleanHref(out);
+			out = this._fixMdWrappedEmptyAnchors(out);
+			enrichedBody = out;
 		} catch (err) {
-			DL(2, `_renderHTML(): enrich failed: ${err?.message || err}`, err);
-			enrichedBody = current.html ?? current.text ?? current.body ?? current.markdown ?? "";
+			DL(2, `_renderHTML(): build body failed: ${err?.message || err}`, err);
+			enrichedBody = current.html ?? current.text ?? "";
 		}
 
 		// compose the full view
@@ -648,8 +796,8 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	const start = performance.now();
 	DL("changelog collector: starting scan");
 
-	const seen = game.settings.get("bbmm", "seenChangelogs") || {};
-	const includeDisabled = game.settings.get("bbmm", "checkDisabledModules");
+	const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {}; 
+	const includeDisabled = game.settings.get(BBMM_ID, "checkDisabledModules");
 	const results = [];
 
 	try {
@@ -682,80 +830,6 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	DL(`changelog collector: finished scan in ${ms}ms (found ${results.length} modules)`);
 
 	return results;
-}
-
-/*
-	Convert changelog markdown/plaintext into enriched HTML.
-*/
-async function _bbmmToHTML(text) {
-	try {
-		if (!text) return "";
-
-		let htmlSrc = text;
-
-		// 1) Foundry v12/v13 helper (async)
-		if (TextEditor?.convertMarkdown) {
-			try {
-				htmlSrc = await TextEditor.convertMarkdown(text);
-			} catch (_e) { /* continue */ }
-		}
-
-		// 2) Foundry’s markdown wrapper (sync)
-		if (htmlSrc === text && TextEditor?.markdown?.render) {
-			try {
-				htmlSrc = TextEditor.markdown.render(text);
-			} catch (_e) { /* continue */ }
-		}
-
-		// 3) Global marked (bundled by many FVTT versions)
-		if (htmlSrc === text && window.marked?.parse) {
-			try {
-				htmlSrc = window.marked.parse(text);
-			} catch (_e) { /* continue */ }
-		}
-
-		// 4) Minimal fallback (headings + lists + paragraphs)
-		if (htmlSrc === text) {
-			const esc = (s) => String(s)
-				.replaceAll("&", "&amp;")
-				.replaceAll("<", "&lt;")
-				.replaceAll(">", "&gt;");
-			let t = esc(text);
-
-			// headings
-			t = t.replace(/^\s*######\s+(.+)$/gm, "<h6>$1</h6>")
-			     .replace(/^\s*#####\s+(.+)$/gm, "<h5>$1</h5>")
-			     .replace(/^\s*####\s+(.+)$/gm, "<h4>$1</h4>")
-			     .replace(/^\s*###\s+(.+)$/gm, "<h3>$1</h3>")
-			     .replace(/^\s*##\s+(.+)$/gm, "<h2>$1</h2>")
-			     .replace(/^\s*#\s+(.+)$/gm, "<h1>$1</h1>");
-
-			// unordered lists (simple)
-			t = t.replace(/^(?:\s*[-*]\s+.+\n?)+/gmi, (block) => {
-				const items = block.trim().split(/\n+/).map(l => l.replace(/^\s*[-*]\s+/, "").trim());
-				return `<ul>${items.map(i => `<li>${i}</li>`).join("")}</ul>`;
-			});
-
-			// paragraphs
-			t = t
-				.replace(/\r\n/g, "\n")
-				.split(/\n{2,}/)
-				.map(p => (/^<h\d|^<ul/.test(p.trim()) ? p : `<p>${p.replace(/\n/g, "<br>")}</p>`))
-				.join("");
-
-			htmlSrc = t;
-		}
-
-		// Enrich/sanitize in Foundry
-		const enriched = await TextEditor.enrichHTML(htmlSrc, {
-			async: true,
-			secrets: false
-		});
-		return String(enriched || "");
-	} catch (err) {
-		DL(2, "_bbmmToHTML(): error", err);
-		return "";
-	}
 }
 
 // ===== Fetch Changelogs =====
@@ -861,6 +935,8 @@ async function _bbmmMarkChangelogSeen(moduleId, version) {
 		const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {};
 		seen[moduleId] = version;
 		await game.settings.set(BBMM_ID, "seenChangelogs", seen);
+		const verify = game.settings.get(BBMM_ID, "seenChangelogs") || {};
+		DL(`seenChangelogs updated: ${moduleId} -> ${version}`, verify);
 	} catch (err) {
 		DL(3, `Failed to update seenChangelogs for ${moduleId}: ${err?.message || err}`, err);
 		throw err;
@@ -870,13 +946,16 @@ async function _bbmmMarkChangelogSeen(moduleId, version) {
 async function _bbmmUnmarkChangelogSeen(moduleId) {
 	try {
 		const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {};
-		if (seen[moduleId]) {
+		if (Object.prototype.hasOwnProperty.call(seen, moduleId)) {
 			delete seen[moduleId];
 			await game.settings.set(BBMM_ID, "seenChangelogs", seen);
 		}
+		const verify = game.settings.get(BBMM_ID, "seenChangelogs") || {};
+		DL(`seenChangelogs updated (removed): ${moduleId}`, verify);
+		return true;
 	} catch (err) {
 		DL(3, `Failed to unset seenChangelogs for ${moduleId}: ${err?.message || err}`, err);
-		throw err;
+		return false;
 	}
 }
 
