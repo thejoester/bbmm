@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0-test.1] - 2025-09-10
+### Changed
+- **Settings Sync:**
+  - Added ability to lock/sync setting for specific players.
+    - When clicking lock with show setting and value that is being locked, and list of players to lock. 
+    - When clicking sync, shows connected users allowing to select which users to push sync to.
+    - Locks/Sync apply when GM clicks Save Changes on settings screen.
+    - Oramge lock = all users locked to setting.
+    - Blue user with lock = settings locked for selected players. 
+
 ## [0.3.3] - 2025-09-09
 ### Added
 - **Localization:** Added Italian (it) localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+author%3AGregoryWarn)
