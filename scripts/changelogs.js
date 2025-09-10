@@ -45,14 +45,14 @@ Hooks.once("ready", async () => {
 
 		// Optional: sanity check the registered schema
 		const meta = game.settings.settings.get(`${BBMM_ID}.seenChangelogs`);
-		DL(`seenChangelogs schema: type=${meta?.type?.name}, default=${JSON.stringify(meta?.default)}`);
+		DL(`changelog.js |  seenChangelogs schema: type=${meta?.type?.name}, default=${JSON.stringify(meta?.default)}`);
 
 
 		const gen = Number(game?.release?.generation);
 		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
 		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
 		__bbmm_isV12 = (major === 12);
-		DL(`BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
+		DL(`changelog.js |  BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
 
 		// now safely gate your injections
 		if (__bbmm_isV12) {
@@ -63,7 +63,7 @@ Hooks.once("ready", async () => {
 					on v13+ show changelog
 				*/
 				const start = performance.now();
-				DL("changelog ready: starting");
+				DL("changelog.js |  changelog ready: starting");
 
 				if (!game.user.isGM) return;
 				const showOnLogin = game.settings.get(BBMM_ID, "showChangelogsOnLogin");
@@ -796,13 +796,13 @@ function _bbmmCenterFrame(frame, app) {
 			frame.style.top  = `${top}px`;
 		}
 	} catch (err) {
-		DL(2, `_bbmmCenterFrame error: ${err?.message || err}`, err);
+		DL(2, `changelog.js |  _bbmmCenterFrame error: ${err?.message || err}`, err);
 	}
 }
 
 async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	const start = performance.now();
-	DL("changelog collector: starting scan");
+	DL("changelog.js |  changelog collector: starting scan");
 
 	const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {}; 
 	const includeDisabled = game.settings.get(BBMM_ID, "checkDisabledModules");
@@ -826,16 +826,16 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 
 				results.push({ id, title, version, url, mod });
 			} catch (errInner) {
-				DL(2, `Changelog collect: skipping a module due to error: ${errInner?.message || errInner}`, errInner);
+				DL(2, `changelog.js |  Changelog collect: skipping a module due to error: ${errInner?.message || errInner}`, errInner);
 			}
 		}
 	} catch (err) {
-		DL(2, `Changelog collect: top-level error: ${err?.message || err}`, err);
+		DL(2, `changelog.js |  Changelog collect: top-level error: ${err?.message || err}`, err);
 	}
 
 	const end = performance.now();
 	const ms = (end - start).toFixed(1);
-	DL(`changelog collector: finished scan in ${ms}ms (found ${results.length} modules)`);
+	DL(`changelog.js |  changelog collector: finished scan in ${ms}ms (found ${results.length} modules)`);
 
 	return results;
 }
@@ -852,7 +852,7 @@ async function _bbmmFindChangelogURL(mod) {
 			}
 		}
 	} catch (err) {
-		DL(2, `_bbmmFindChangelogURL (local-only) failed for ${mod.id}: ${err?.message || err}`);
+		DL(2, `changelog.js |  _bbmmFindChangelogURL (local-only) failed for ${mod.id}: ${err?.message || err}`);
 	}
 	return null; // never fall back to remote
 }

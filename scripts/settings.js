@@ -24,10 +24,10 @@ export function isFoundryV12() {
 		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
 		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
 		const is12 = major === 12;
-		DL(`isFoundryV12(): gen=${gen} version="${ver}" → ${is12}`);
+		DL(`settings.js | isFoundryV12(): gen=${gen} version="${ver}" → ${is12}`);
 		return is12;
 	} catch (err) {
-		DL(2, "isFoundryV12(): detection failed", err);
+		DL(2, "settings.js | isFoundryV12(): detection failed", err);
 		return false;
 	}
 }
@@ -126,14 +126,14 @@ function injectBBMMHeaderButton(root) {
 	// Resolve the root element (jQuery or HTMLElement)
 	root = root instanceof HTMLElement ? root : (root?.[0] ?? null);
 	if (!root) {
-		DL(2, "BBMM header injection: no root element found");
+		DL(2, "settings.js | BBMM header injection: no root element found");
 		return;
 	}
 
 	// Find header and its controls bucket
 	const header = root.querySelector("header.window-header");
 	if (!header) {
-		DL(2, "BBMM header injection: no header found");
+		DL(2, "settings.js | BBMM header injection: no header found");
 		return;
 	}
 	const controls = header.querySelector(".window-controls") || header;
@@ -154,10 +154,10 @@ function injectBBMMHeaderButton(root) {
 		ev.stopPropagation();
 
 		if (game.user.isGM) {
-			DL("Opening BBMM Launcher from header button");
+			DL("settings.js | Opening BBMM Launcher from header button");
 			openBBMMLauncher();
 		} else {
-			DL("Opening BBMM Settings Preset Manager from header button");
+			DL("settings.js | Opening BBMM Settings Preset Manager from header button");
 			openSettingsPresetManager();
 		}
 	});
@@ -186,25 +186,25 @@ function injectBBMMHeaderButton(root) {
 		document.head.appendChild(style);
 	}
 
-	DL("BBMM header button injected");
+	DL("settings.js | BBMM header button injected");
 }
 
 export function openExclusionsManager() {
 	// Wrapper that calls the actual app launcher if present
-	DL("openExclusionsManager(): fired");
+	DL("settings.js | openExclusionsManager(): fired");
 	try {
 		const fn = globalThis.bbmm?.openExclusionsManagerApp ?? globalThis.openExclusionsManagerApp;
 		if (typeof fn === "function") return fn();
-		DL(3, "openExclusionsManager(): launcher not found");
+		DL(3, "settings.js | openExclusionsManager(): launcher not found");
 	ui.notifications?.warn(LT?.exclusionsNotAvailable?.() ?? `${LT.errors.exclusionsMgrNotFound()}.`);
 	} catch (e) {
-		DL(3, "openExclusionsManager(): error", e);
+		DL(3, "settings.js | openExclusionsManager(): error", e);
 	}
 }
 
 // Open a small chooser dialog, then launch the selected manager
 export async function openBBMMLauncher() {
-	DL("openBBMMLauncher()");
+	DL("settings.js | openBBMMLauncher()");
 
 	const choice = await new Promise((resolve) => {
 		const dlg = new foundry.applications.api.DialogV2({
@@ -225,7 +225,7 @@ export async function openBBMMLauncher() {
 
 	});
 
-	DL(`openBBMMLauncher(): choice = ${choice}`);
+	DL(`settings.js | openBBMMLauncher(): choice = ${choice}`);
 
 	if (choice === "modules") {
 		openPresetManager();
@@ -252,18 +252,18 @@ async function migrationV1Check() {
 
 			if (Object.keys(oldModule).length) {
 				await game.settings.set(BBMM_ID, MODULE_SETTING_PRESETS_U, oldModule);
-				DL("migrationV1Check(): migrated module presets to user scope");
+				DL("settings.js | migrationV1Check(): migrated module presets to user scope");
 			}
 			if (Object.keys(oldSetting).length) {
 				await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS_U, oldSetting);
-				DL("migrationV1Check(): migrated setting presets to user scope");
+				DL("settings.js | migrationV1Check(): migrated setting presets to user scope");
 			}
 
 			await game.settings.set(BBMM_ID, "migratedPresetsV1", true);
-			DL("migrationV1Check(): migration complete, flag set");
+			DL("settings.js | migrationV1Check(): migration complete, flag set");
 		}
 	} catch (err) {
-		DL(3, "migrationV1Check(): migration error", err);
+		DL(3, "settings.js | migrationV1Check(): migration error", err);
 	}
 	
 }
@@ -277,7 +277,7 @@ Hooks.once("init", () => {
 		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
 		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
 		__bbmm_isV12 = (major === 12);
-		DL(`BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
+		DL(`settings.js |  BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
 
 		// now safely gate your injections
 		if (!__bbmm_isV12) {
@@ -285,16 +285,16 @@ Hooks.once("init", () => {
 			Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
 		}
 	} catch (err) {
-		DL(2, "BBMM init version gate failed", err);
+		DL(2, "settings.js | BBMM init version gate failed", err);
 	}
 
 	
 	try {
-		DL("init(): start");
+		DL("settings.js | init(): start");
 
 		// v12-only legacy export menu
 		if (isFoundryV12()) {
-			DL("init(): Foundry v12 detected — registering Legacy Export menu");
+			DL("settings.js | init(): Foundry v12 detected — registering Legacy Export menu");
 
 			// Add a  menu entry to launch legacy export dialog
 			game.settings.registerMenu(BBMM_ID, "v12ExportSettings", {
@@ -507,13 +507,24 @@ Hooks.once("init", () => {
 					requiresReload: true,
 					onChange: (v) => {
 						try {
-							DL(`bbmm-setting-lock: enableUserSettingSync -> ${v}`);
+							DL(`settings.js | bbmm-setting-lock: enableUserSettingSync -> ${v}`);
 							// Optional: let connected clients know state changed (no-op if they aren't listening)
 							game.socket?.emit?.(`module.${BBMM_ID}`, { t: "bbmm-sync-toggle", enabled: !!v });
 						} catch (err) {
-							DL(2, "bbmm-setting-lock: onChange(enableUserSettingSync) error", err);
+							DL(2, "settings.js | bbmm-setting-lock: onChange(enableUserSettingSync) error", err);
 						}
 					}
+				});
+
+				// Enable/disable selecting users on push/lock.
+				// - When disabled will just push/lock for all users. 
+				game.settings.register(BBMM_ID, "selectUsersOnPushLock", {
+					name: LT.selectUsersPushLock(),
+					hint: LT.hintSelectUsersPushLock(),
+					scope: "world",
+					config: true,
+					type: Boolean,
+					default: false
 				});
 
 				// Debug level for THIS module
@@ -534,7 +545,7 @@ Hooks.once("init", () => {
 
 		}
 	} catch (err) {
-		DL(3, "init(): error", err);
+		DL(3, "settings.js | init() error", err);
 	}
 });
 

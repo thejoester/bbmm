@@ -7,7 +7,7 @@ const PRESET_MANAGER_ID = "bbmm-settings-preset-manager";	// stable window id
 const AppV2 = foundry?.applications?.api?.ApplicationV2;
 if (!AppV2) {
 	// Comment
-	DL(1, "ApplicationV2 base class not found.");
+	DL(1, "settings-presets.js | ApplicationV2 base class not found.");
 }
 
 // ===== Helpers =====
@@ -20,7 +20,7 @@ function hlp_settingExists(ns, key) {
 		const cfg = game?.settings?.settings?.get?.(`${ns}.${key}`) ?? null;
 		return cfg || null;
 	} catch (err) {
-		DL(2, `hlp_settingExists(): failed for ${ns}.${key}`, err);
+		DL(2, `settings-presets.js | hlp_settingExists(): failed for ${ns}.${key}`, err);
 		return null;
 	}
 }
@@ -31,7 +31,7 @@ function hlp_valuesEqual(a, b) {
 		if (foundry?.utils?.isPropertyEqual) return foundry.utils.isPropertyEqual(a, b);
 		return JSON.stringify(a) === JSON.stringify(b);
 	} catch (err) {
-		DL(2, "hlp_valuesEqual(): compare failed", err);
+		DL(2, "settings-presets.js | hlp_valuesEqual(): compare failed", err);
 		return a === b;
 	}
 }
@@ -59,7 +59,7 @@ function hlp_flattenEnvelope(env) {
 			}
 		}
 	} catch (err) {
-		DL(2, "hlp_flattenEnvelope(): error", err);
+		DL(2, "settings-presets.js | hlp_flattenEnvelope(): error", err);
 	}
 	return out;
 }
@@ -67,18 +67,18 @@ function hlp_flattenEnvelope(env) {
 Hooks.on("renderDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.set(app.id, app);
-		//DL(`renderDialogV2: registered ${app?.id}`);
+		//DL(`settings-presets.js | renderDialogV2: registered ${app?.id}`);
 	} catch (e) {
-		//DL(2, "renderDialogV2: registry failed", e);
+		//DL(2, "settings-presets.js | renderDialogV2: registry failed", e);
 	}
 });
 
 Hooks.on("closeDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.delete(app.id);
-		//DL(`closeDialogV2: unregistered ${app?.id}`);
+		//DL(`settings-presets.js | closeDialogV2: unregistered ${app?.id}`);
 	} catch (e) {
-		//DL(2, "closeDialogV2: unregistry failed", e);
+		//DL(2, "settings-presets.js | closeDialogV2: unregistry failed", e);
 	}
 });
 
@@ -102,7 +102,7 @@ function hlp_normalizeToEntries(bbmmExport) {
 	// Build skip map once (EXPORT_SKIP + userExclusions)
 	const skip = getSkipMap();
 
-	DL("hlp_normalizeToEntries(): start");
+	DL("settings-presets.js | hlp_normalizeToEntries(): start");
 
 	const entries = [];
 	try {
@@ -114,7 +114,7 @@ function hlp_normalizeToEntries(bbmmExport) {
 			for (const namespace of Object.keys(bucket)) {
 				// Skip whole module if excluded
 				if (isExcludedWith(skip, namespace)) {
-					DL(`hlp_normalizeToEntries(): excluded module "${namespace}" (scope=${scope})`);
+					DL(`settings-presets.js | hlp_normalizeToEntries(): excluded module "${namespace}" (scope=${scope})`);
 					continue;
 				}
 
@@ -124,7 +124,7 @@ function hlp_normalizeToEntries(bbmmExport) {
 				for (const key of Object.keys(settings)) {
 					// Skip specific setting if excluded
 					if (isExcludedWith(skip, namespace, key)) {
-						DL(`hlp_normalizeToEntries(): excluded setting "${namespace}.${key}" (scope=${scope})`);
+						DL(`settings-presets.js | hlp_normalizeToEntries(): excluded setting "${namespace}.${key}" (scope=${scope})`);
 						continue;
 					}
 
@@ -140,7 +140,7 @@ function hlp_normalizeToEntries(bbmmExport) {
 			}
 		}
 	} catch (e) {
-		DL(3, "hlp_normalizeToEntries(): failed", { message: e?.message, stack: e?.stack });
+		DL(3, "settings-presets.js | hlp_normalizeToEntries(): failed", { message: e?.message, stack: e?.stack });
 		throw e;
 	}
 
@@ -151,7 +151,7 @@ function hlp_normalizeToEntries(bbmmExport) {
 		String(a.key ?? "").localeCompare(String(b.key ?? ""))
 	);
 
-	DL("hlp_normalizeToEntries(): produced entries", { count: entries.length });
+	DL("settings-presets.js | hlp_normalizeToEntries(): produced entries", { count: entries.length });
 	return entries;
 }
 
@@ -185,21 +185,21 @@ function hlp_findExistingSettingsPresetKey(name) {
 function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 	const here = path || "<root>";
 	const ROOT = depth === 0;
-	//if (ROOT) DL(`toJsonSafe IN ${here}`, value);
+	//if (ROOT) DL(`settings-presets.js | toJsonSafe IN ${here}`, value);
 
 	let out;
 
 	// primitives / null
 	if (value == null || (typeof value !== "object" && typeof value !== "function")) {
 		out = value;
-		//if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 
 	// cycle guard
 	if (seen.has(value)) {
 		out = "[[Circular]]";
-		//if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 	seen.add(value);
@@ -207,12 +207,12 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 	// Sets / Maps
 	if (value instanceof Set) {
 		out = { __type: "Set", value: [...value] };
-		//if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 	if (value instanceof Map) {
 		out = { __type: "Map", value: Object.fromEntries(value) };
-		//if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 
@@ -222,7 +222,7 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 			const obj = Object.fromEntries(value.entries());
 			out = {};
 			for (const [k, v] of Object.entries(obj)) out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
-			//if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+			//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 			return out;
 		}
 	} catch {}
@@ -230,7 +230,7 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 	// Arrays
 	if (Array.isArray(value)) {
 		out = value.map((v, i) => hlp_toJsonSafe(v, seen, `${here}[${i}]`, depth + 1));
-		//if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 
@@ -244,7 +244,7 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 					out = {};
 					for (const [k, v] of Object.entries(dup)) out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
 				}
-				//if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+				//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 				return out;
 			}
 		}
@@ -258,7 +258,7 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 		out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
 	}
 
-	//if (ROOT) DL(`toJsonSafe OUT ${here}`, out);
+	//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 	return out;
 }
 
@@ -327,10 +327,10 @@ async function svc_applySettingsEnvelopeWithReport(env) {
 	let totalCount = 0;
 
 	try {
-		DL("svc_applySettingsEnvelopeWithReport(): start");
+		DL("settings-presets.js | svc_applySettingsEnvelopeWithReport(): start");
 
 		if (!env || typeof env !== "object" || env.type !== "bbmm-settings") {
-			DL(2, "svc_applySettingsEnvelopeWithReport(): invalid envelope");
+			DL(2, "settings-presets.js | svc_applySettingsEnvelopeWithReport(): invalid envelope");
 			return { savedCount: 0, totalCount: 0, log: [{ action: "Error: Invalid Envelope", setting: "-", value: null }] };
 		}
 
@@ -348,7 +348,7 @@ async function svc_applySettingsEnvelopeWithReport(env) {
 			}
 		}
 		totalCount = entries.length;
-		DL(`svc_applySettingsEnvelopeWithReport(): entries=${entries.length}`);
+		DL(`settings-presets.js | svc_applySettingsEnvelopeWithReport(): entries=${entries.length}`);
 
 		for (const { ns, key, value } of entries) {
 			const setting = `${ns}.${key}`;
@@ -374,15 +374,15 @@ async function svc_applySettingsEnvelopeWithReport(env) {
 				savedCount++;
 				log.push({ action: "Saved from Preset", setting, value });
 			} catch (errSet) {
-				DL(2, `svc_applySettingsEnvelopeWithReport(): set failed for ${setting}`, errSet);
+				DL(2, `settings-presets.js | svc_applySettingsEnvelopeWithReport(): set failed for ${setting}`, errSet);
 				log.push({ action: "Error: Save Failed", setting, value });
 			}
 		}
 
-		DL(`svc_applySettingsEnvelopeWithReport(): done saved=${savedCount}/${totalCount}`);
+		DL(`settings-presets.js | svc_applySettingsEnvelopeWithReport(): done saved=${savedCount}/${totalCount}`);
 		return { savedCount, totalCount, log };
 	} catch (err) {
-		DL(3, "svc_applySettingsEnvelopeWithReport(): error", err);
+		DL(3, "settings-presets.js | svc_applySettingsEnvelopeWithReport(): error", err);
 		return { savedCount, totalCount, log: [{ action: "Error", setting: "-", value: String(err) }] };
 	}
 }
@@ -395,11 +395,11 @@ function svc_getSettingsPresets() {
 async function svc_setSettingsPresets(obj) {
 	// Write to user-scoped store "settingsPresetsUser"
 	try {
-		DL("svc_setSettingsPresets(): writing bbmm.settingsPresetsUser");
+		DL("settings-presets.js | svc_setSettingsPresets(): writing bbmm.settingsPresetsUser");
 		await game.settings.set("bbmm", "settingsPresetsUser", obj);
-		DL("svc_setSettingsPresets(): OK");
+		DL("settings-presets.js | svc_setSettingsPresets(): OK");
 	} catch (e) {
-		DL(3, "svc_setSettingsPresets(): FAILED", {
+		DL(3, "settings-presets.js | svc_setSettingsPresets(): FAILED", {
 			name: e?.name,
 			message: e?.message,
 			stack: e?.stack,
@@ -442,7 +442,7 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 
 			// Single source of truth for exclusions 
 			if (isExcludedWith(skipMap, namespace) || isExcludedWith(skipMap, namespace, key)) {
-				DL(`svc_collectAllModuleSettings(): excluded ${namespace}.${key}`);
+				DL(`settings-presets.js | svc_collectAllModuleSettings(): excluded ${namespace}.${key}`);
 				continue;
 			}
 
@@ -450,7 +450,7 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 			let value;
 			try { value = game.settings.get(namespace, key); }
 			catch (e) {
-				DL(2, `svc_collectAllModuleSettings(): get failed ${namespace}.${key}`, { message: e?.message });
+				DL(2, `settings-presets.js | svc_collectAllModuleSettings(): get failed ${namespace}.${key}`, { message: e?.message });
 				continue;
 			}
 
@@ -460,14 +460,14 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 			try {
 				bucket[namespace][key] = (typeof hlp_toJsonSafe === "function") ? hlp_toJsonSafe(value) : value;
 			} catch (e) {
-				DL(2, `svc_collectAllModuleSettings(): toJsonSafe failed ${namespace}.${key}`, { message: e?.message });
+				DL(2, `settings-presets.js | svc_collectAllModuleSettings(): toJsonSafe failed ${namespace}.${key}`, { message: e?.message });
 				bucket[namespace][key] = value;
 			}
 		}
 
 		// Summary
 		const countNs = (obj) => Object.values(obj).reduce((n, ns) => n + Object.keys(ns).length, 0);
-		DL("svc_collectAllModuleSettings(): collected", {
+		DL("settings-presets.js | svc_collectAllModuleSettings(): collected", {
 			counts: {
 				world: countNs(out.world),
 				client: countNs(out.client),
@@ -475,7 +475,7 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 			}
 		});
 	} catch (e) {
-		DL(3, "svc_collectAllModuleSettings(): FAILED", { message: e?.message, stack: e?.stack });
+		DL(3, "settings-presets.js | svc_collectAllModuleSettings(): FAILED", { message: e?.message, stack: e?.stack });
 		throw e;
 	}
 
@@ -511,7 +511,7 @@ async function svc_applySettingsExport(exportData) {
 		for (const [namespace, entries] of Object.entries(tree)) {
 			// Exclude entire namespace first
 			if (isExcludedWith(skip, namespace)) {
-				DL(`svc_applySettingsExport(): excluded module "${namespace}" — skipping all keys in scope=${scope}`);
+				DL(`settings-presets.js | svc_applySettingsExport(): excluded module "${namespace}" — skipping all keys in scope=${scope}`);
 				continue;
 			}
 
@@ -524,7 +524,7 @@ async function svc_applySettingsExport(exportData) {
 			for (const [key, value] of Object.entries(entries)) {
 				// Exclude specific setting if needed
 				if (isExcludedWith(skip, namespace, key)) {
-					DL(`svc_applySettingsExport(): excluded setting "${namespace}.${key}" (scope=${scope})`);
+					DL(`settings-presets.js | svc_applySettingsExport(): excluded setting "${namespace}.${key}" (scope=${scope})`);
 					continue;
 				}
 
@@ -569,7 +569,7 @@ async function svc_applySettingsExport(exportData) {
 					await game.settings.set(namespace, key, hydrated);
 					applied.push(`${namespace}.${key}`);
 				} catch (e) {
-					DL(2, "svc_applySettingsExport(): set failed", { ns: namespace, key, message: e?.message });
+					DL(2, "settings-presets.js | svc_applySettingsExport(): set failed", { ns: namespace, key, message: e?.message });
 					skipped.push(`${namespace}.${key}`);
 				}
 			}
@@ -626,10 +626,10 @@ async function svc_savePresetToSettings(presetName, selectedEntries) {
 
 		await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, current);
 
-		DL(`svc_savePresetToSettings(): saved preset "${presetName}" with ${selectedEntries.length} entries`);
+		DL(`settings-presets.js | svc_savePresetToSettings(): saved preset "${presetName}" with ${selectedEntries.length} entries`);
 		return current[presetName];
 	} catch (e) {
-		DL(3, "svc_savePresetToSettings(): failed", { message: e?.message, stack: e?.stack });
+		DL(3, "settings-presets.js | svc_savePresetToSettings(): failed", { message: e?.message, stack: e?.stack });
 		throw e;
 	}
 }
@@ -661,10 +661,10 @@ async function svc_saveSettingsPreset(name, payload) {
 async function svc_planSettingsChanges(env) {
 	const rows = [];
 	try {
-		DL("svc_planSettingsChanges(): start");
+		DL("settings-presets.js | svc_planSettingsChanges(): start");
 
 		if (!env || typeof env !== "object" || env.type !== "bbmm-settings") {
-			DL(2, "svc_planSettingsChanges(): invalid envelope");
+			DL(2, "settings-presets.js | svc_planSettingsChanges(): invalid envelope");
 			return rows;
 		}
 
@@ -687,7 +687,7 @@ async function svc_planSettingsChanges(env) {
 					
 					// Skip specific setting if excluded
 					if (isExcludedWith(skipMap, ns, key)) {
-						DL(`svc_planSettingsChanges(): excluded setting "${ns}.${key}" (scope=${scope})`);
+						DL(`settings-presets.js | svc_planSettingsChanges(): excluded setting "${ns}.${key}" (scope=${scope})`);
 						continue;
 					}
 
@@ -703,10 +703,10 @@ async function svc_planSettingsChanges(env) {
 			}
 		}
 
-		DL(`svc_planSettingsChanges(): rows=${rows.length}`);
+		DL(`settings-presets.js | svc_planSettingsChanges(): rows=${rows.length}`);
 		return rows;
 	} catch (err) {
-		DL(3, "svc_planSettingsChanges(): error", err);
+		DL(3, "settings-presets.js | svc_planSettingsChanges(): error", err);
 		return rows;
 	}
 }
@@ -741,7 +741,7 @@ export async function ui_openSettingsImportWizard(data) {
 		// If no data was passed in, prompt the user to pick a JSON file
 		const json = data || await pickJsonFile();
 		if (!json) {
-			DL("ui_openSettingsImportWizard(): no JSON provided/selected");
+			DL("settings-presets.js | ui_openSettingsImportWizard(): no JSON provided/selected");
 			return;
 		}
 
@@ -781,15 +781,15 @@ export async function ui_openSettingsImportWizard(data) {
 
 		if (!normalized.entries.length) {
 		ui.notifications.warn(`${LT.errors.noSettingsFound()}.`);
-			DL("ui_openSettingsImportWizard(): Import Wizard: 0 entries after normalization", { json });
+			DL("settings-presets.js | ui_openSettingsImportWizard(): Import Wizard: 0 entries after normalization", { json });
 			return;
 		}
 
-		DL(`ui_openSettingsImportWizard(): Import Wizard: normalized ${normalized.entries.length} entries from ${normalized.moduleList.length} namespaces`);
+		DL(`settings-presets.js | ui_openSettingsImportWizard(): Import Wizard: normalized ${normalized.entries.length} entries from ${normalized.moduleList.length} namespaces`);
 
 		// Guard: verify base class is available before we construct
 		if (!AppV2) {
-			DL(3,"ui_openSettingsImportWizard(): ui_openSettingsImportWizard(): AppV2 base missing", { AppV2 });
+			DL(3,"settings-presets.js | ui_openSettingsImportWizard(): ui_openSettingsImportWizard(): AppV2 base missing", { AppV2 });
 			return;
 		}
 
@@ -799,7 +799,7 @@ export async function ui_openSettingsImportWizard(data) {
 			app = new BBMMImportWizard({ json, normalized });
 			app.render(true);	
 		} catch (ctorErr) {
-			DL("ui_openSettingsImportWizard(): BBMM Import Wizard: constructor failed", ctorErr);
+			DL("settings-presets.js | ui_openSettingsImportWizard(): BBMM Import Wizard: constructor failed", ctorErr);
 			ui.notifications.error(`${LT.errors.importWizFailedCon()}.`);
 			return;
 		}
@@ -808,13 +808,13 @@ export async function ui_openSettingsImportWizard(data) {
 		try {
 			await app.render(true);
 		} catch (renderErr) {
-			DL("ui_openSettingsImportWizard(): BBMM Import Wizard render failed", renderErr);
+			DL("settings-presets.js | settings-presets.js | ui_openSettingsImportWizard(): BBMM Import Wizard render failed", renderErr);
 			ui.notifications.error(`${LT.errors.importWizFailRen()}.`);
 			return;
 		}
 	} catch (err) {
 		// If anything else goes wrong, log and notify
-		DL("ui_openSettingsImportWizard(): failed to open", err);
+		DL("settings-presets.js | ui_openSettingsImportWizard(): failed to open", err);
 		ui.notifications.error(`${LT.errors.importWizFailOpen()}.`);
 	}
 }
@@ -822,7 +822,7 @@ export async function ui_openSettingsImportWizard(data) {
 // Open the import wizard. `data` is the parsed JSON object from file.
 function ui_openPresetImportReport(log) {
 	try {
-		DL("ui_openPresetImportReport(): open");
+		DL("settings-presets.js | ui_openPresetImportReport(): open");
 
 		const rows = (log ?? []).map(r => `
 			<tr>
@@ -856,7 +856,7 @@ function ui_openPresetImportReport(log) {
 			submit: () => "close"
 		}).render(true);
 	} catch (err) {
-		DL(3, "ui_openPresetImportReport(): error", err);
+		DL(3, "settings-presets.js | ui_openPresetImportReport(): error", err);
 		ui.notifications.error("Failed to open import report.");
 	}
 }
@@ -880,7 +880,7 @@ function _bbmmSafeJson(v) {
 /* ---------------------------------------------------------------------- */
 function ui_openPresetPreview(rows, presetName = "") {
 	try {
-		DL(`ui_openPresetPreview(): open rows=${rows?.length ?? 0}`);
+		DL(`settings-presets.js | ui_openPresetPreview(): open rows=${rows?.length ?? 0}`);
 
 		// Use your helpers if present
 		const esc = (s) => (typeof hlp_esc === "function")
@@ -947,7 +947,7 @@ function ui_openPresetPreview(rows, presetName = "") {
 		}).render(true);
 
 	} catch (err) {
-		DL(3, "ui_openPresetPreview(): error", err);
+		DL(3, "settings-presets.js | ui_openPresetPreview(): error", err);
 		ui.notifications.error(LT.errors.failedOpenPreview?.() ?? "Failed to open preview.");
 	}
 }
@@ -970,7 +970,7 @@ function hlp_diffHighlight(oldVal, newVal) {
 		}
 		return out;
 	} catch (err) {
-		DL(2, "hlp_diffHighlight(): error", err);
+		DL(2, "settings-presets.js | hlp_diffHighlight(): error", err);
 		return esc(String(newVal));
 	}
 }
@@ -1061,7 +1061,7 @@ class BBMMImportWizard extends AppV2 {
 			// Wire listeners on next tick
 			setTimeout(() => this.activateListeners(), 0);
 		} catch (e) {
-			DL("BBMMImportWizard: _replaceHTML failed", e);
+			DL("settings-presets.js | BBMMImportWizard: _replaceHTML failed", e);
 			throw e;
 		}
 	}
@@ -1070,7 +1070,7 @@ class BBMMImportWizard extends AppV2 {
 	activateListeners() {
 		// Prevent double‑wiring if AppV2 rerenders or we get called twice
 		if (this._wired) {
-			DL("activateListeners(): activateListeners skipped (already wired)");
+			DL("settings-presets.js | activateListeners(): activateListeners skipped (already wired)");
 			return;
 		}
 		this._wired = true;
@@ -1080,14 +1080,14 @@ class BBMMImportWizard extends AppV2 {
 		const form = this._form || (root?.querySelector("form.bbmm-import"));
 		const list = this._list || (root?.querySelector("#bbmm-list"));
 
-		DL("activateListeners(): activateListeners called", {
+		DL("settings-presets.js | activateListeners(): activateListeners called", {
 			hasRoot: !!root,
 			hasForm: !!form,
 			hasList: !!list
 		});
 
 		if (!root || !form || !list) {
-			DL("activateListeners(): BBMM Import Wizard: form or #bbmm-list not found (post-activate)");
+			DL("settings-presets.js | activateListeners(): BBMM Import Wizard: form or #bbmm-list not found (post-activate)");
 			return;
 		}
 
@@ -1110,13 +1110,13 @@ class BBMMImportWizard extends AppV2 {
 
 			// Recalculate height and recenter so window never grows off-screen
 			this.setPosition({ height: "auto", left: null, top: null });
-			DL("paint() done and window re-centered", { mode });
+			DL("settings-presets.js | paint() done and window re-centered", { mode });
 		};
 
 		// Prevent default form submission (which could cause double events)
 		form.addEventListener("submit", (ev) => {
 			ev.preventDefault();
-			DL("BBMMImportWizard(): blocked default form submit");
+			DL("settings-presets.js | BBMMImportWizard(): blocked default form submit");
 		});
 
 		// Mode changes repaint and recenter
@@ -1124,7 +1124,7 @@ class BBMMImportWizard extends AppV2 {
 
 		// Cancel button closes the wizard
 		form.querySelector('[data-action="cancel"]')?.addEventListener("click", () => {
-			DL("BBMMImportWizard: cancel clicked — closing");
+			DL("settings-presets.js | BBMMImportWizard: cancel clicked — closing");
 			this.close();
 		});
 
@@ -1170,23 +1170,23 @@ class BBMMImportWizard extends AppV2 {
 				form.setAttribute("aria-busy", "true");
 
 				ui.notifications.info(`${LT.importingToPreset({ count: selected.length, name: name })}…`);
-				DL(`BBMMImportWizard: starting import of ${selected.length} entries to "${name}"`);
+				DL(`settings-presets.js | BBMMImportWizard: starting import of ${selected.length} entries to "${name}"`);
 
 				// Close the window first; the async save continues in the background
 				this.close();
 
 				// Perform the save
 				const preset = await svc_savePresetToSettings(name, selected);
-				DL("BBMMImportWizard: savePresetToSettings OK", { name, count: selected.length });
+				DL("settings-presets.js | BBMMImportWizard: savePresetToSettings OK", { name, count: selected.length });
 				
-				DL("BBMMImportWizard: Reopening Settings Preset Manager after import");
+				DL("settings-presets.js | BBMMImportWizard: Reopening Settings Preset Manager after import");
 				openSettingsPresetManager();
 				Hooks.callAll("bbmm:importPreset", { name, items: preset.items });
 
 				// Final toast after completion
 				ui.notifications.info(`${LT.importComplete()}.`);
 			} catch (e) {
-				DL(3, "Import Wizard: failed to save preset", { message: e?.message, stack: e?.stack });
+				DL(3, "settings-presets.js | Import Wizard: failed to save preset", { message: e?.message, stack: e?.stack });
 				ui.notifications.error(`${LT.errors.savePresetFail()}.`);
 			} finally {
 				this._inFlight = false;
@@ -1311,7 +1311,7 @@ export async function openSettingsPresetManager() {
 			}
 		} catch (e) {
 			// If anything goes wrong reading the registry, ignore and fall back
-			DL(2, "openSettingsPresetManager(): v2 registry lookup failed", e);
+			DL(2, "settings-presets.js | openSettingsPresetManager(): v2 registry lookup failed", e);
 		}
 		// Fallback
 		return Object.values(ui.windows ?? {}).find(w => w?.id === id) ?? null;
@@ -1320,9 +1320,9 @@ export async function openSettingsPresetManager() {
 	// Close any existing instance so we reopen a fresh one
 	const existing = getWindowById(PRESET_MANAGER_ID);
 	if (existing) {
-		DL("openSettingsPresetManager(): Settings Preset Manager: closing existing instance before reopen");
+		DL("settings-presets.js | openSettingsPresetManager(): Settings Preset Manager: closing existing instance before reopen");
 		try { await existing.close({ force: true }); }
-		catch (e) { DL(2, "openSettingsPresetManager(): failed to close existing instance", e); }
+		catch (e) { DL(2, "settings-presets.js | openSettingsPresetManager(): failed to close existing instance", e); }
 	}
 
 	// Build list of current presets
@@ -1415,7 +1415,7 @@ export async function openSettingsPresetManager() {
 			const newName = txt ? String(txt.value ?? "").trim() : "";
 			const includeDisabled = !!(chk && chk.checked);
 
-			DL(`openSettingsPresetManager(): \naction = ${action} \nselected = ${selected} \nnewName = ${newName} \nincludeDisabled = ${includeDisabled}`);
+			DL(`settings-presets.js | openSettingsPresetManager(): \naction = ${action} \nselected = ${selected} \nnewName = ${newName} \nincludeDisabled = ${includeDisabled}`);
 
 			// Guard: name required for save-current
 			if (action === "save-current" && !newName) {
@@ -1429,7 +1429,7 @@ export async function openSettingsPresetManager() {
 				*/
 				if (action === "save-current") {
 					const payload = svc_collectAllModuleSettings({ includeDisabled });
-					DL("openSettingsPresetManager(): save-current — collected payload", {
+					DL("settings-presets.js | openSettingsPresetManager(): save-current — collected payload", {
 						counts: {
 							world: Object.keys(payload.world ?? {}).length,
 							client: Object.keys(payload.client ?? {}).length,
@@ -1439,12 +1439,12 @@ export async function openSettingsPresetManager() {
 
 					// Normalize schema types
 					hlp_schemaCorrectNonPlainTypes(payload);
-					DL("openSettingsPresetManager(): save-current — schema corrected");
+					DL("settings-presets.js | openSettingsPresetManager(): save-current — schema corrected");
 
 					// Save preset (overwrites if same name already exists)
-					DL("openSettingsPresetManager(): save-current — calling svc_saveSettingsPreset", { name: newName });
+					DL("settings-presets.js | openSettingsPresetManager(): save-current — calling svc_saveSettingsPreset", { name: newName });
 					const res = await svc_saveSettingsPreset(`${newName}`, payload);
-					DL("openSettingsPresetManager(): save-current — save result", res);
+					DL("settings-presets.js | openSettingsPresetManager(): save-current — save result", res);
 					if (res?.status !== "saved") return;
 
 					ui.notifications.info(`${LT.savedSettingsPreset({ name: res.name })}.`);
@@ -1463,7 +1463,7 @@ export async function openSettingsPresetManager() {
 
 					// Collect fresh current settings
 					const payload = svc_collectAllModuleSettings({ includeDisabled });
-					DL("openSettingsPresetManager(): update — collected payload", {
+					DL("settings-presets.js | openSettingsPresetManager(): update — collected payload", {
 						counts: {
 							world: Object.keys(payload.world ?? {}).length,
 							client: Object.keys(payload.client ?? {}).length,
@@ -1473,12 +1473,12 @@ export async function openSettingsPresetManager() {
 
 					// Normalize schema types
 					hlp_schemaCorrectNonPlainTypes(payload);
-					DL("openSettingsPresetManager(): update — schema corrected");
+					DL("settings-presets.js | openSettingsPresetManager(): update — schema corrected");
 
 					// Save over the selected name
-					DL("openSettingsPresetManager(): update — calling svc_saveSettingsPreset", { name: selected });
+					DL("settings-presets.js | openSettingsPresetManager(): update — calling svc_saveSettingsPreset", { name: selected });
 					const res = await svc_saveSettingsPreset(`${selected}`, payload);
-					DL("openSettingsPresetManager(): update — save result", res);
+					DL("settings-presets.js | openSettingsPresetManager(): update — save result", res);
 					if (res?.status !== "saved") return;
 
 					ui.notifications.info(`${LT.updatedSettingsPreset({ name: selected})}.`);
@@ -1532,7 +1532,7 @@ export async function openSettingsPresetManager() {
 						}
 
 						payload = out;
-						DL(`openSettingsPresetManager(): Load converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
+						DL(`settings-presets.js | openSettingsPresetManager(): Load converted preset "${selected}" with ${flat.length} entries to bbmm-settings envelope`, payload);
 					}
 					
 					// Safety: ignore accidental nested world wrappers
@@ -1556,7 +1556,7 @@ export async function openSettingsPresetManager() {
 
 					if (skippedMissing.length) {
 						ui.notifications?.warn(`${LT.skippedSettingsApply({ count: skippedMissing.length })}.`);
-						DL(`openSettingsPresetManager(): Skipped for missing modules/settings:\n${skippedMissing.join("\n")}`);
+						DL(`settings-presets.js | openSettingsPresetManager(): Skipped for missing modules/settings:\n${skippedMissing.join("\n")}`);
 					}
 
 					// Apply
@@ -1565,14 +1565,14 @@ export async function openSettingsPresetManager() {
 				}
 
 				if (action === "preview") {
-					DL(`Preview button clicked`);
+					DL(`settings-presets.js | Preview button clicked`);
 					// Same selected check as load
 					if (!selected) return ui.notifications.warn(`${LT.selectSettingsPresetLoad()}.`);
 					const preset = svc_getSettingsPresets()[selected];
 					if (!preset) return;
 
 					try {
-						DL(`openSettingsPresetManager(): preview preset "${selected}"`);
+						DL(`settings-presets.js | openSettingsPresetManager(): preview preset "${selected}"`);
 
 						// Build the same payload (bbmm-settings envelope) you build for load
 						let payload = preset;
@@ -1592,17 +1592,17 @@ export async function openSettingsPresetManager() {
 								out[scope][e.namespace][e.key] = e.value;
 							}
 							payload = out;
-							DL(`openSettingsPresetManager(): Preview hydrated preset "${selected}" with ${flat.length} entries`, payload);
+							DL(`settings-presets.js | openSettingsPresetManager(): Preview hydrated preset "${selected}" with ${flat.length} entries`, payload);
 						}
 
 						// Compute differences only (no writes)
 						const rows = await svc_planSettingsChanges(payload);
-						DL(`openSettingsPresetManager(): preview rows=${rows.length}`);
+						DL(`settings-presets.js | openSettingsPresetManager(): preview rows=${rows.length}`);
 
 						// Open report window
 						ui_openPresetPreview(rows, selected);
 					} catch (err) {
-						DL(3, "preview failed", err);
+						DL(3, "settings-presets.js | preview failed", err);
 						ui.notifications.error(LT.errors.failedOpenPreview?.() ?? "Failed to open preview.");
 					}
 					return;
@@ -1635,7 +1635,7 @@ export async function openSettingsPresetManager() {
 				*/
 				if (action === "export") {
 					try {
-						DL("openSettingsPresetManager(): Export: start");
+						DL("settings-presets.js | openSettingsPresetManager(): Export: start");
 						const payload = svc_collectAllModuleSettings({ includeDisabled });
 
 						// Normalize schema types
@@ -1646,9 +1646,9 @@ export async function openSettingsPresetManager() {
 
 						await hlp_saveJSONFile(payload, fname);
 						ui.notifications.info(`${LT.exportedCurrentSettings()}.`);
-						DL("openSettingsPresetManager(): Export: done");
+						DL("settings-presets.js | openSettingsPresetManager(): Export: done");
 					} catch (e) {
-						DL(3, `Export: FAILED — ${e?.name ?? "Error"}: ${e?.message ?? e}`);
+						DL(3, `settings-presets.js | Export: FAILED — ${e?.name ?? "Error"}: ${e?.message ?? e}`);
 						ui.notifications.error(`${LT.errors.settingsExportFailed()}.`);
 						throw e;
 					}
@@ -1688,7 +1688,7 @@ export async function openSettingsPresetManager() {
 						client: Object.values(filtered.client ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
 						user: Object.values(filtered.user ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0)
 					};
-					DL("Import: counts before/after exclusions", { before, after, entryCount: entries.length });
+					DL("settings-presets.js | Import: counts before/after exclusions", { before, after, entryCount: entries.length });
 
 					// Hand off to Import Wizard with the filtered envelope
 					await ui_openSettingsImportWizard(filtered);
@@ -1696,7 +1696,7 @@ export async function openSettingsPresetManager() {
 				}
 			} catch (err) {
 				// Log the real failure details
-				DL(3, "openSettingsPresetManager(): action failed", {
+				DL(3, "settings-presets.js | openSettingsPresetManager(): action failed", {
 					action,
 					name: err?.name,
 					message: err?.message,

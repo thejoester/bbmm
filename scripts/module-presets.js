@@ -41,9 +41,9 @@ function hlp_validateModuleState(modIds) {
 
 	// Optional debug
 	if (!unknown.length && !depIssues.length) {
-		DL("hlp_validateModuleState(): No missing modules or dependencies");
+		DL("module-presets.js | hlp_validateModuleState(): No missing modules or dependencies");
 	} else {
-		DL("hlp_validateModuleState(): Missing modules or dependencies found!");
+		DL("module-presets.js | hlp_validateModuleState(): Missing modules or dependencies found!");
 	}
 
 	return { unknown, depIssues };
@@ -139,11 +139,11 @@ async function hlp_savePreset(name, modules) {
 	
 	// keep what the user typed for the rename dialog
 	const rawInput = String(name).trim();
-	DL(`hlp_savePreset(): rawInput: '${rawInput}'`);
+	DL(`module-presets.js | hlp_savePreset(): rawInput: '${rawInput}'`);
 
 	// use normalized copy only for matching
 	const normalizedWanted = hlp_normalizePresetName(rawInput);
-	DL(`hlp_savePreset(): normalizedWanted: '${normalizedWanted}'`);
+	DL(`module-presets.js | hlp_savePreset(): normalizedWanted: '${normalizedWanted}'`);
 	const presets = hlp_getPresets();
 
 	let existingKey = null;
@@ -154,22 +154,22 @@ async function hlp_savePreset(name, modules) {
 	// default final name is the raw input (preserve casing/spaces the user typed)
 	let finalName = rawInput;
 
-	DL(`hlp_savePreset(): existingKey: ${existingKey}`);
+	DL(`module-presets.js | hlp_savePreset(): existingKey: ${existingKey}`);
 	
 	if (existingKey) {
-		DL(`hlp_savePreset(): existingKey condition fired!`);
+		DL(`module-presets.js | hlp_savePreset(): existingKey condition fired!`);
 		const choice = await askPresetConflict(existingKey);
-		DL(`hlp_savePreset(): choice: ${choice}`);
+		DL(`module-presets.js | hlp_savePreset(): choice: ${choice}`);
 		if (choice === "cancel") return { status: "cancel" };
 		else if (choice === "overwrite") {
-			DL(`hlp_savePreset(): Chose overwrite`);
+			DL(`module-presets.js | hlp_savePreset(): Chose overwrite`);
 			// proceed with overwrite
 			finalName = existingKey;
 		}
 		else if (choice === "rename") {
-			DL(`hlp_savePreset(): Chose rename`);
+			DL(`module-presets.js | hlp_savePreset(): Chose rename`);
 			const newName = await promptRename(rawInput);
-			DL(`hlp_savePreset(): newName = '${newName}'`);
+			DL(`module-presets.js | hlp_savePreset(): newName = '${newName}'`);
 			if (!newName) return { status: "cancel" };
 			finalName = newName.trim();
 		}
@@ -178,7 +178,7 @@ async function hlp_savePreset(name, modules) {
 	const p = hlp_getPresets();
 	p[finalName] = modules;
 	await hlp_setPresets(p);
-	DL(`hlp_savePreset(): saved presets: `, p);
+	DL(`module-presets.js | hlp_savePreset(): saved presets: `, p);
 	return { status: "saved", name: finalName };
 }
 
@@ -220,8 +220,8 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 	}
 	
 	
-	DL(`showImportIssuesDialog(): unknown: `, unknown);
-	DL(`showImportIssuesDialog(): depIssues: `, depIssues);
+	DL(`module-presets.js | showImportIssuesDialog(): unknown: `, unknown);
+	DL(`module-presets.js | showImportIssuesDialog(): depIssues: `, depIssues);
 
 	const lines = [];
 
@@ -251,7 +251,7 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 
 	if (!lines.length) return;
 	
-	DL(`showImportIssuesDialog(): Issues with import found`);
+	DL(`module-presets.js | showImportIssuesDialog(): Issues with import found`);
 	const issues = await displayIssues(lines);
 	return;
 		
@@ -288,7 +288,7 @@ async function exportCurrentModuleStateDialog() {
 		submit: (_result) => {
 			// Guard against cancel or empty input
 			if (!_result || _result === "cancel") {
-				DL("exportCurrentModuleStateDialog(): user cancelled export");
+				DL("module-presets.js | exportCurrentModuleStateDialog(): user cancelled export");
 				return;
 			}
 
@@ -316,7 +316,7 @@ async function exportCurrentModuleStateDialog() {
 				versions
 			}, fname);
 
-			DL(`exportCurrentModuleStateDialog(): exported "${baseName}" as ${fname}`, { count: enabled.length });
+			DL(`module-presets.js | exportCurrentModuleStateDialog(): exported "${baseName}" as ${fname}`, { count: enabled.length });
 		}
 	}).render(true);
 }
@@ -326,7 +326,7 @@ async function importModuleStateAsPreset(data) {
 	// 1) validate shape
 	const validated = hlp_validateModulePresetJSON(data);
 	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
-		DL(3, "Not a BBMM export. Expected a file created by BBMM.");
+		DL(3, "module-presets.js | Not a BBMM export. Expected a file created by BBMM.");
 		await new foundry.applications.api.DialogV2({
 			window: { title: LT.errors.titleImportError() },
 			content: `<p>${LT.errors.notBBMMFile()}.</p>`,
@@ -373,7 +373,7 @@ async function importModuleStateAsPreset(data) {
 				await showImportIssuesDialog(report); // this already returns a Promise in your file
 			}
 
-			DL("importModuleStateAsPreset() returning ", res);
+			DL("module-presets.js | importModuleStateAsPreset() returning ", res);
 			return res;
 		},
 		rejectClose: false
@@ -421,11 +421,11 @@ async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 //	Open Dialog to manage presets 
 export async function openPresetManager() {
 	// Start
-	DL("openPresetManager: start");
+	DL("module-presets.js | openPresetManager: start");
 
 	// Load existing presets and build the select options
 	const presets = hlp_getPresets();
-	DL("openPresetManager: presets loaded", presets);
+	DL("module-presets.js | openPresetManager: presets loaded", presets);
 
 	const names = Object.keys(presets).sort((a, b) => a.localeCompare(b));
 	const options = names.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`).join("");
@@ -472,10 +472,10 @@ export async function openPresetManager() {
 	const onRender = (app) => {
 		if (app !== dlg) return;
 		Hooks.off("renderDialogV2", onRender);
-		DL("renderDialogV2 fired for Preset Manager", { appId: app.appId });
+		DL("module-presets.js | renderDialogV2 fired for Preset Manager", { appId: app.appId });
 
 		const form = app.element?.querySelector("form");
-		if (!form) { DL(2, "openPresetManager(): form not found"); return; }
+		if (!form) { DL(2, "module-presets.js | openPresetManager(): form not found"); return; }
 
 		// Defensive: ensure buttons don’t submit the form
 		form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
@@ -492,7 +492,7 @@ export async function openPresetManager() {
 			ev.stopPropagation();
 			ev.stopImmediatePropagation();
 
-			DL(`openPresetManager(): click ${action}`);
+			DL(`module-presets.js | openPresetManager(): click ${action}`);
 
 			const sel = form.elements.namedItem("presetName");
 			const txt = form.elements.namedItem("newName");
@@ -508,7 +508,7 @@ export async function openPresetManager() {
 					if (!newName) { ui.notifications.warn(`${LT.promptNewPresetName()}.`); return; }
 
 					const enabled = hlp_getEnabledModuleIds();
-					DL("save-current: collected enabled module ids", { count: enabled.length });
+					DL("module-presets.js | save-current: collected enabled module ids", { count: enabled.length });
 
 					const res = await hlp_savePreset(newName, enabled);
 					if (res?.status !== "saved") return;
@@ -527,7 +527,7 @@ export async function openPresetManager() {
 					if (!selected) { ui.notifications.warn(`${LT.warnUpdatePreset()}.`); return; }
 
 					const enabled = hlp_getEnabledModuleIds();
-					DL("update: collected enabled module ids", { count: enabled.length, target: selected });
+					DL("module-presets.js | update: collected enabled module ids", { count: enabled.length, target: selected });
 
 					const res = await hlp_savePreset(selected, enabled);
 					if (res?.status !== "saved") return;
@@ -547,7 +547,7 @@ export async function openPresetManager() {
 					if (!selected) return ui.notifications.warn("Select a preset to load.");
 
 					const enabled = (hlp_getPresets()[selected] || []);
-					DL("load: applying preset", { name: selected, count: enabled.length });
+					DL("module-presets.js | load: applying preset", { name: selected, count: enabled.length });
 
 					const proceed = await foundry.applications.api.DialogV2.confirm({
 						window: { title: LT.titleApplyModulePreset() },
@@ -558,7 +558,7 @@ export async function openPresetManager() {
 					if (!proceed) return;
 
 					await applyEnabledIds(enabled, { autoEnableDeps: true });
-					DL("load: applied; prompting reload");
+					DL("module-presets.js | load: applied; prompting reload");
 
 					const reload = await foundry.applications.api.DialogV2.confirm({
 						window: { title: LT.titleReloadFoundry() },
@@ -596,13 +596,13 @@ export async function openPresetManager() {
 					Export current module state to file
 				*/
 				if (action === "bbmm-export-state") {
-					DL("export-current: starting");
+					DL("module-presets.js | export-current: starting");
 					exportCurrentModuleStateDialog();
 					return;
 				}
 
 				/*
-					Import module state from a file and save as preset
+					Import module state from a file and save as preset 
 				*/
 				if (action === "bbmm-import-state") {
 					const file = await hlp_pickLocalJSONFile();
@@ -613,21 +613,21 @@ export async function openPresetManager() {
 					catch { ui.notifications.error(`${LT.errors.invalidJSONFile()}.`); return; }
 
 					const res = await importModuleStateAsPreset(data);
-					DL("import-state: result:", res);
+					DL("module-presets.js | import-state: result:", res);
 
 					if (res?.status === "saved") {
 						app.close();
 						openPresetManager();
-						DL("bbmm-import-state: app.close() fired");
+						DL("module-presets.js | bbmm-import-state: app.close() fired");
 					} else {
-						DL("bbmm-import-state: app.close() skipped");
+						DL("module-presets.js | bbmm-import-state: app.close() skipped");
 					}
 					
 					
 					return;
 				}
 			} catch (err) {
-				DL(3, "openPresetManager(): click handler error", {
+				DL(3, "module-presets.js | openPresetManager(): click handler error", {
 					name: err?.name, message: err?.message, stack: err?.stack
 				});
 				ui.notifications.error(`${LT.errors.errorOccured()}.`);
@@ -646,9 +646,9 @@ Hooks.once("ready", () => {
 	if (!mod) return;
 	mod.api ??= {};
 	mod.api.openPresetManager = openPresetManager;
-	DL("API exposed: mod.api.openPresetManager ready");
+	DL("module-presets.js | API exposed: mod.api.openPresetManager ready");
 });
 
-Hooks.on("setup", () => DL("presets.js | setup fired"));
-Hooks.once("ready", () => DL("ready fired"));
+Hooks.on("setup", () => DL("module-presets.js | setup fired"));
+Hooks.once("ready", () => DL("module-presets.js | ready fired"));
 

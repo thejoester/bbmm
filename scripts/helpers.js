@@ -78,7 +78,7 @@ export function hlp_normalizePresetName(s) {
 
 /* ---------------------------------------------------------------------- */
 /* Exclusion helpers (used by settings and module presets)                */
-/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */ 
 
 /* Cache the effective skip map until invalidated */
 let _skipMapCache = null;

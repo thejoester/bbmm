@@ -842,7 +842,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 // PUBLIC LAUNCHERS
 export function openExclusionsManagerApp() {
-	// DL('openExclusionsManagerApp(): fired');
+	// DL('openExclusionsManagerApp(): fired'); 
 	new BBMMExclusionsAppV2().render(true);
 }
 

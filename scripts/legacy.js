@@ -8,7 +8,7 @@
 // legacy.js
 import { DL } from "./settings.js";
 
-/* minimal esc for v12 */
+/* minimal esc for v12 */  
 function _esc(str) {
 	try {
 		return String(str).replace(/[&<>"']/g, s => ({
