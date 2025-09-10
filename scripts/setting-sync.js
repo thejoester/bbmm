@@ -1,28 +1,30 @@
-/*
-	=======================================================
-		BBMM Setting Lock
-		- GM: adds Person icon + Lock icon to every *user/client* setting
-		- GM clicking Lock icon: toggle in bbmm.userSettingSync (store/remove GM value)
-		- Player: on ready, apply diffs; show reload dialog if needed
-		- GM updates: broadcast a lightweight trigger; clients pull & apply
-	=======================================================
-*/
+/*  BBMM Setting Lock===========================================================
+	- GM: adds Person icon + Lock icon to every *user/client* setting
+	- GM clicking Lock icon: toggle in bbmm.userSettingSync (store/remove GM value)
+	- Player: on ready, apply diffs; show reload dialog if needed
+	- GM updates: broadcast a lightweight trigger; clients pull & apply
+	============================================================================ */
 
 import { DL } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 
-/*
-	=======================================================
-        Globals
-	=======================================================
-*/
-const BBMM_REG = { byId: new Map() };	// Live registry of settings
+
+/*  ============================================================================
+        {GLOBALS}
+	============================================================================ */
+
+	const BBMM_REG = { byId: new Map() };	// Live registry of settings
 const BBMM_SYNC_CH = `module.${BBMM_ID}`;	// Socket channel for this module
 const ENABLE_KEY = "enableUserSettingSync";
 const SELECT_USERS_KEY = "selectUsersOnPushLock"; 
 const _bbmmPendingOps = [];	 // Pending operations queue (applied on Save Changes)
 
-function _bbmmQueueOp(entry) {
+
+/*  ============================================================================
+        {HELPERS}
+	============================================================================ */
+
+	function _bbmmQueueOp(entry) {
 	try {
 		// Last selection wins (replace, don't union)
 		const idx = _bbmmPendingOps.findIndex(e => e.op === entry.op && e.id === entry.id);
@@ -181,11 +183,7 @@ function bbmmGetLockState(id, map) {
 	}
 }
 
-/*
-	=======================================================
-    GM: trigger clients to refresh their local lock map 
-	=======================================================
-*/
+//  GM: trigger clients to refresh their local lock map 
 let _bbmmTriggerTimer = null;
 function bbmmBroadcastTrigger() {
 	try {
@@ -202,14 +200,12 @@ function bbmmBroadcastTrigger() {
 	}
 }
 
-/*
-	=======================================================
+/* 	BBMM Lock: resnap userSettingSync ==========================================
 		BBMM Lock: resnap userSettingSync
 		- GM only
 		- Compare live values vs stored map
 		- Update map if different
-	=======================================================
-*/
+	============================================================================ */
 async function bbmmResnapUserSync() {
 	try {
 		if (!game.user?.isGM) return;
@@ -268,11 +264,10 @@ async function bbmmResnapUserSync() {
 	}
 }
 
-/*
-	Push current GM value over socket:
+/* 	Push current GM value over socket ==========================================
 	- Only for user/client scoped settings
 	- Players apply value; prompt reload if needed
-*/
+	============================================================================ */
 function bbmmPushSetting(ns, key) {
 	try {
 		if (!bbmmIsSyncEnabled()) return; // feature disabled?
@@ -298,22 +293,25 @@ function bbmmPushSetting(ns, key) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Class: BBMMUserPicker
-// - Shows a per-user selection dialog for Lock/Sync
-// - NEW: preChecked can be an array of user IDs OR the string "*" to pre-check all non-GM users
-// ---------------------------------------------------------------------------
+/* 	Class: BBMMUserPicker ======================================================
+	- Shows a per-user selection dialog for Lock/Sync
+	- preChecked: array of user IDs OR the string 
+	  "*" to pre-check all non-GM users
+	- onlyOnline: when true, only show users currently 
+	  online/connected (for Sync)
+ 	============================================================================*/
 class BBMMUserPicker {
-	constructor({ title, settingId, valuePreview, confirmLabel, preChecked, onConfirm }) {
+	constructor({ title, settingId, valuePreview, confirmLabel, preChecked, onlyOnline = false, onConfirm }) {
 		this.title = title;
 		this.settingId = settingId;
 		this.valuePreview = valuePreview;
 		this.onConfirm = typeof onConfirm === "function" ? onConfirm : () => {};
 		this.confirmLabel = confirmLabel || "Queue";
 		this.preChecked = Array.isArray(preChecked) || preChecked === "*" ? preChecked : [];
+		this.onlyOnline = !!onlyOnline;
 	}
 
-	/* Render a safe preview for the value block */
+	// Render a safe preview for the value block
 	_renderValuePreview(v) {
 		try {
 			if (v === null || v === undefined) return String(v);
@@ -322,6 +320,20 @@ class BBMMUserPicker {
 		} catch {
 			try { return String(v); } catch { return "(unprintable)"; }
 		}
+	}
+
+	// determine if a user is currently online/connected
+	_isUserOnline(u) {
+		try {
+			// Foundry commonly exposes .active for "currently connected".
+			// Fallbacks cover alternate props in some versions/modules.
+			if (typeof u.active === "boolean") return u.active;
+			if (typeof u.isActive === "boolean") return u.isActive;
+			// Some builds use a numeric/enum presence. Be liberal in detection.
+			if (typeof u.status === "string") return u.status.toUpperCase?.() === "ACTIVE" || u.status.toUpperCase?.() === "ONLINE";
+			if (typeof u.status === "number") return u.status > 0; // treat >0 as online-ish
+		} catch {}
+		return false;
 	}
 
 	async show() {
@@ -348,15 +360,44 @@ class BBMMUserPicker {
 				}
 			})();
 
-			// Exclude GMs from selection list
-			const users = (game.users?.contents || []).filter(u => !u.isGM);
+			// Base population: exclude GMs
+			let users = (game.users?.contents || []).filter(u => !u.isGM);
 
-			// -------------------------------------------------------------------
-			// Build pre-check set
-			// - If preChecked === "*"  => pre-check all non-GM users
-			// - If preChecked is array => pre-check those IDs
-			// - Else                   => pre-check none
-			// -------------------------------------------------------------------
+			// Sync-only mode: restrict to currently-online users
+			if (this.onlyOnline) {
+				users = users.filter(u => this._isUserOnline(u));
+			}
+
+			// If no one connected
+			if (!users.length) {
+				const emptyDlg = new foundry.applications.api.DialogV2({
+					window: { title: this.title, modal: true, width: 520 },
+					content: `
+						<section style="display:flex;flex-direction:column;gap:.75rem;min-width:520px;">
+							<div>
+								<div style="font-weight:600;">${LT.dialogSetting()}</div>
+								<div>${this.settingId}</div>
+								<div style="opacity:.8">${settingPretty} • ${ns} (${sourcePretty})</div>
+							</div>
+							<div>
+								<div style="font-weight:600;">${LT.dialogValue()}</div>
+								<pre style="margin:0;padding:.5rem;background:#00000014;border-radius:.25rem;white-space:pre-wrap;word-break:break-word;max-height:12rem;overflow:auto;">${this._renderValuePreview(this.valuePreview)}</pre>
+							</div>
+							<hr/>
+							<p style="margin:.25rem 0 .5rem 0;">${LT.dialogNoUsersConnected()}</p>
+						</section>
+					`,
+					buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
+				});
+				await emptyDlg.render(true);
+				return;
+			}
+
+			/* 	Build pre-check set ======================================================
+				- If preChecked === "*"  => pre-check all current (filtered) non-GM users
+				- If preChecked is array => pre-check those IDs
+				- Else                   => pre-check none
+			  ============================================================================ */
 			let pre;
 			if (this.preChecked === "*") {
 				pre = new Set(users.map(u => u.id));
@@ -369,7 +410,6 @@ class BBMMUserPicker {
 			// Role label helper (Trusted vs Player)
 			const roleLabel = (u) => {
 				try {
-					// v13: u.role is numeric; >=2 is usually Trusted
 					if (u.isGM) return LT.roleGM();
 					return (typeof u.role === "number" && u.role >= 2) ? LT.roleTrusted() : LT.rolePlayer();
 				} catch {
@@ -391,7 +431,7 @@ class BBMMUserPicker {
 			}).join("");
 
 			const content = `
-				<section style="display:flex;flex-direction:column;gap:.75rem;min-width:820px;">
+				<section style="display:flex;flex-direction:column;gap:.75rem;min-width:520px;">
 					<div>
 						<div style="font-weight:600;">${LT.dialogSetting()}</div>
 						<div>${this.settingId}</div>
@@ -417,7 +457,7 @@ class BBMMUserPicker {
 									<th style="text-align:left;width:2rem;"></th>
 									<th style="text-align:left;">${LT.dialogUser()}</th>
 									<th style="text-align:left;">${LT.dialogRole()}</th>
-								</tr>
+                                </tr>
 							</thead>
 							<tbody>${rows}</tbody>
 						</table>
@@ -433,12 +473,13 @@ class BBMMUserPicker {
 						action: "confirm",
 						label: this.confirmLabel || LT.dialogQueue(),
 						default: true,
+						// Allow zero selection to mean "unlock"/"no targets"
 						callback: async (event, button, dialog) => {
-							// Allow zero selection to mean "unlock"
 							const root = dialog.element ?? dialog;
 							const picks = Array.from(root.querySelectorAll('input[name="u"]'))
 								.filter(el => el.checked)
 								.map(el => el.value);
+
 							DL(`BBMMUserPicker: confirm picks=${picks.length}`, picks);
 							await this.onConfirm(picks);
 							return true;
@@ -454,7 +495,7 @@ class BBMMUserPicker {
 			try {
 				const root = dlg.element?.[0] ?? dlg.element ?? document;
 
-				// Select all / Clear
+				// Select all / Clear event listener
 				root.querySelector('[data-action="all"]')?.addEventListener("click", () => {
 					root.querySelectorAll('input[name="u"]').forEach(cb => cb.checked = true);
 					DL("BBMMUserPicker: select all");
@@ -480,6 +521,7 @@ class BBMMUserPicker {
 		}
 	}
 }
+
 
 /*
 	=======================================================
@@ -794,14 +836,10 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 							settingId: id,
 							valuePreview: val,
 							confirmLabel: LT.dialogQueueSync(),
+							onlyOnline: true, // show only currently connected users
 							onConfirm: async (userIds) => {
-								_bbmmQueueOp({ op: "lock", id, namespace: ns, key, value: curVal, userIds });
-
-								if (userIds.length === 0) {
-									ui.notifications.info(LT.infoQueuedUnlock({ module: id }));	// e.g. "Queued unlock for {module}. Will apply on Save."
-								} else {
-									ui.notifications.info(LT.infoQueuedLock({ module: id, count: userIds.length }));
-								}
+								_bbmmQueueOp({ op: "push", id, namespace: ns, key, value: val, userIds });
+								ui.notifications.info(LT.infoQueuedSync({ module: id, count: userIds.length }));
 							}
 						});
 						picker.show();
