@@ -1,0 +1,14 @@
+{
+	"name": "bbmm",
+	"private": true,
+	"type": "module",
+	"engines": { "node": ">=18" },
+	"scripts": {
+		"extract": "node _build/extract-all-packs.mjs",
+		"compile": "node _build/compile-all-packs.mjs",
+		"verify": "node _build/verify-extracted-packs.mjs"
+	},
+	"devDependencies": {
+		"@foundryvtt/foundryvtt-cli": "^3.0.0"
+	}
+}

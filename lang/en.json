@@ -139,6 +139,20 @@
 		"titleLockForUsers": "Lock Setting for Users",
 		"titleSyncForUsers": "Sync Setting to Users",
 		"infoQueuedUnlock": "Queued unlock for {module}. Will apply on Save.",
+		"infoClearedLocks": "Cleared locks for this setting.",
+		
+		"click": "Click",
+		"shiftClick": "Shift+Click",
+		"rightClick": "Right-Click",
+		"shiftRightClick": "Shift+Right-Click",
+		"name_LockAll": "Lock All",
+		"name_LockSelected": "Lock Selected",
+		"name_SoftLock": "Soft Lock",
+		"name_ClearLocks": "Clear Locks",
+		"name_SetActionClick": "Set Action for Click:",
+		"name_SetActionShiftClick": "Set Action for Shift+Click:", 
+		"name_SetActionRightClick": "Set Action for Right-Click:", 
+		"name_SetActionShiftRightClick": "Set Action for Shift+Right-Click:", 
 
 		"v12Note": "This module offers minimal support for FoundryVTT v12, allowing you to export settings and module states as prep for updating to v13.<br><strong>NOTE:</strong> Some settings may not transfer if the v13 module setting has changed.",
 		"titlev12Legacy": "BBMM: Legacy (v12) Export",
@@ -219,7 +233,8 @@
 			"marked_seen_all": "Marked {count} changelog(s) as seen.",
 			"remote_placeholder": "Remote changelog cannot be loaded in-app. Use the Open File button to view it.",
 			"mark_current_unseen": "Mark Current Unseen",
-			"mark_all_unseen": "Mark All Unseen"
+			"mark_all_unseen": "Mark All Unseen",
+			"dontShowAgain": "Don’t show again for this version"
 
 		},
 

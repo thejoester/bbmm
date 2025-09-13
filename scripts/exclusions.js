@@ -1,13 +1,14 @@
-import { DL } from './settings.js';
-import { LT, BBMM_ID } from "./localization.js";
 
-/* ============================================================================
-	BBMMAddModuleExclusionAppV2
+/* BBMM Exclusions ============================================================
 	- Lists all modules not already excluded
 	- Shows Enabled/Disabled state
 	- "Exclude" updates setting, closes, then re-opens manager
-   ========================================================================== 
-*/
+============================================================================ */
+
+import { DL } from './settings.js';
+import { LT, BBMM_ID } from "./localization.js";
+
+
 class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({
@@ -24,10 +25,6 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		this._maxH = 720;
 	}
 
-	/* ---------------------------------------------------------------------- */
-	/* Data                                                                   */
-	/* ---------------------------------------------------------------------- */
-
 	_getExcludedIds() {
 		const ex = game.settings.get("bbmm", "userExclusions") || {};
 		return new Set(Array.isArray(ex.modules) ? ex.modules : []);
@@ -37,8 +34,8 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		const excluded = this._getExcludedIds();
 		const out = [];
 		for (const m of game.modules.values()) {
-			if (m.id === "bbmm") continue;			// optional self-skip
-			if (excluded.has(m.id)) continue;		// skip already excluded
+			if (m.id === "bbmm") continue; //  self-skip
+			if (excluded.has(m.id)) continue; // skip already excluded
 			out.push({ id: m.id, title: String(m.title ?? m.id), active: !!m.active });
 		}
 		out.sort((a,b)=>a.title.localeCompare(b.title, game.i18n.lang || undefined, {sensitivity:"base"}));
@@ -183,13 +180,11 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 
 }
 
-/* ============================================================================
-	BBMMAddSettingExclusionAppV2
+/* BBMMAddSettingExclusionAppV2 ===============================================
 	- Lists all CONFIG settings not already excluded
 	- Columns: Module (title or namespace), Setting (friendly name or key), Action
 	- Exclude adds {namespace,key} to userExclusions.settings, then reopens manager
-   ========================================================================== 
-*/
+   ========================================================================== */
 class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({
@@ -208,10 +203,9 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		this._rows = [];
 	}
 
-	/* ---------------------------------------------------------------------- */
-	/* Data helpers                                                           */
-	/* ---------------------------------------------------------------------- */
-
+	/* ============================================================================
+		{DATA HELPERS}
+	============================================================================ */
 	_getExcludedPairsSet() {
 		const ex = game.settings.get("bbmm", "userExclusions") || {};
 		const arr = Array.isArray(ex.settings) ? ex.settings : [];
@@ -224,8 +218,6 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		try {
 			// Already-excluded pairs as a Set of "ns::key"
 			const excluded = this._getExcludedPairsSet();
-
-			// @type {{namespace:string,key:string,modTitle:string,setTitle:string}[]}
 			const rows = [];
 
 			for (const s of game.settings.settings.values()) {
@@ -236,7 +228,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 					if (!ns || !key) continue;
 
 					const pairKey = `${ns}::${key}`;
-					if (excluded.has(pairKey)) continue;	// skip already excluded
+					if (excluded.has(pairKey)) continue; // skip already excluded
 
 					// Module title (fallback to namespace)
 					const mod = game.modules.get(ns);
@@ -383,7 +375,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			winEl.style.minHeight = this._minH + "px";
 			winEl.style.maxHeight = this._maxH + "px";
 			winEl.style.overflow = "hidden";
-		} catch (e) { DL(2, "AddSetting: size clamp failed", e); }
+		} catch (e) { DL(2, "exclusions.js | AddSetting: size clamp failed", e); }
 
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
@@ -399,12 +391,12 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		cancelBtn.type = "button";
 		cancelBtn.innerText = LT.buttons.cancel();
 		cancelBtn.addEventListener("click", () => {
-			DL("AddSetting.cancel(): reopen manager");
+			DL("exclusions.js | AddSetting.cancel(): reopen manager");
 			try { this.close({ force: true }); } catch {}
 			setTimeout(() => {
 				try {
 					(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-				} catch (e) { DL(3, "AddSetting.cancel(): reopen failed", e); }
+				} catch (e) { DL(3, "exclusions.js | AddSetting.cancel(): reopen failed", e); }
 			}, 0);
 		});
 
@@ -433,23 +425,21 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				setTimeout(() => {
 					try {
 						(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-					} catch (e) { DL(3, "AddSetting.reopen manager failed", e); }
+					} catch (e) { DL(3, "exclusions.js | AddSetting.reopen manager failed", e); }
 				}, 0);
 			} catch (e) {
 				btn.disabled = false;
-				DL(3, "AddSetting.exclude failed", e);
-				ui.notifications?.error("Failed to add setting exclusion.");
+				DL(3, "exclusions.js | AddSetting.exclude failed", e);
+				ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
 			}
 		});
 	}
 }
 
-/* ============================================================================
-	BBMMExclusionsAppV2
-	- Lists current exclusions from game.settings.get("bbmm","userExclusions")
+/* BBMMExclusionsAppV2 ========================================================
+    - Lists current exclusions from game.settings.get("bbmm","userExclusions")
 	- Two buttons: Add Module / Add Setting (setting flow TBD)
-   ========================================================================== 
-*/
+   ========================================================================= */
 class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 	
 	constructor() {
@@ -467,10 +457,10 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		this._maxH = 700;
 	}
 	
-	/* ---------------------------------------------------------------------- */
-	/* Label helpers                                                          */
-	/* ---------------------------------------------------------------------- */
-
+	/* ============================================================================
+		{LABEL HELPERS}
+	============================================================================ */
+	
 	//	Resolve a module title from a namespace; fallback to the namespace itself.
 	_getModuleTitle(ns) {
 		// most modules use their id as namespace; fall back gracefully
@@ -486,12 +476,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		const label = raw ? game.i18n.localize(String(raw)) : "";
 		return label || String(key);
 	}
-	
-	
-	/* ---------------------------------------------------------------------- */
-	/* Data helpers                                                           */
-	/* ---------------------------------------------------------------------- */
-	
+
 	// Remove a module from userExclusions.settings 
 	async _removeExcludedModule(moduleId) {
 		try {
@@ -500,9 +485,9 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			const next = list.filter(id => id !== moduleId);
 			data.modules = next;
 			await game.settings.set("bbmm", "userExclusions", data);
-			DL(`_removeExcludedModule(): removed ${moduleId}`);
+			DL(`exclusions.js | _removeExcludedModule(): removed ${moduleId}`);
 		} catch (e) {
-			DL(3, "_removeExcludedModule(): failed", e);
+			DL(3, "exclusions.js | _removeExcludedModule(): failed", e);
 			throw e;
 		}
 	}
@@ -515,9 +500,9 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			const next = list.filter(s => !(s?.namespace === namespace && s?.key === key));
 			data.settings = next;
 			await game.settings.set("bbmm", "userExclusions", data);
-			DL(`_removeExcludedSetting(): removed ${namespace}.${key}`);
+			DL(`exclusions.js | _removeExcludedSetting(): removed ${namespace}.${key}`);
 		} catch (e) {
-			DL(3, "_removeExcludedSetting(): failed", e);
+			DL(3, "exclusions.js | _removeExcludedSetting(): failed", e);
 			throw e;
 		}
 	}
@@ -561,7 +546,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				Hooks.on("renderDialogV2", onRender);
 				dlg.render(true);
 			} catch (e) {
-				DL(3, "_confirmDelete(): failed", e);
+				DL(3, "exclusions.js | _confirmDelete(): failed", e);
 				resolve(false);
 			}
 		});
@@ -730,7 +715,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			winEl.style.minHeight = this._minH + "px";
 			winEl.style.maxHeight = this._maxH + "px";
 			winEl.style.overflow  = "hidden";
-		} catch (e) { DL(2, "BBMMExclusionsAppV2: size clamp failed", e); }
+		} catch (e) { DL(2, "exclusions.js | BBMMExclusionsAppV2: size clamp failed", e); }
 
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
@@ -749,7 +734,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		cancelBtn.type = "button";
 		cancelBtn.innerText = LT.buttons.close();
 		cancelBtn.addEventListener("click", () => {
-			DL("ExclusionsManager.cancel(): close");
+			DL("exclusions.js | ExclusionsManager.cancel(): close");
 			try { this.close({ force: true }); } catch {}
 		});
 
@@ -764,13 +749,13 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			ev.stopPropagation();
 
 			const action = btn.dataset.action || "";
-			DL(`BBMMExclusionsAppV2.click(): ${action}`);
+			DL(`exclusions.js | BBMMExclusionsAppV2.click(): ${action}`);
 
 			if (action === "add-module") {
 				try { this.close({ force: true }); } catch {}
 				setTimeout(() => {
 					try { openAddModuleExclusionApp(); }
-					catch (e) { DL(3, "openAddModuleExclusionApp(): failed", e); }
+					catch (e) { DL(3, "exclusions.js | openAddModuleExclusionApp(): failed", e); }
 				}, 0);
 				return;
 			}
@@ -779,7 +764,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				try { this.close({ force: true }); } catch {}
 				setTimeout(() => {
 					try { (globalThis.bbmm?.openAddSettingExclusionApp || globalThis.openAddSettingExclusionApp)?.(); }
-					catch (e) { DL(3, "openAddSettingExclusionApp(): failed", e); }
+					catch (e) { DL(3, "exclusions.js | openAddSettingExclusionApp(): failed", e); }
 				}, 0);
 				return;
 			}
@@ -817,18 +802,18 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					const key = btn.dataset.key || "";
 					if (!ns || !key) return;
 
-					DL("delete(setting): opening confirm", { ns, key });
+					DL("exclusions.js | delete(setting): opening confirm", { ns, key });
 					const ok = await this._confirmDelete(`${LT.confirmRemoveSettingExclusion({ ns: ns, key: key })}?`);
 					if (!ok) return;
 
 					try {
 						btn.disabled = true;
-						DL(`delete confirmed - firing _removeExcludedSetting(): ${ns}.${key}`);
+						DL(`exclusions.js | delete confirmed - firing _removeExcludedSetting(): ${ns}.${key}`);
 						await this._removeExcludedSetting(ns, key);
 						await this.render(true); // refresh the list
 					} catch (e) {
 						btn.disabled = false;
-						DL(3, "_removeExcludedSetting() failed", e);
+						DL(3, "exclusions.js | _removeExcludedSetting() failed", e);
 						ui.notifications?.error(LT.failRemoveSettingExclusion());
 					}
 					return;

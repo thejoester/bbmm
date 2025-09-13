@@ -32,7 +32,17 @@
             "path": "packs/bbmm-macros",
             "type": "Macro",
             "ownership": {
-                "PLAYER": "OBSERVER",
+                "PLAYER": "NONE",
+                "ASSISTANT": "OWNER"
+            }
+        },
+		{
+            "name": "bbmm-journal",
+            "label": "BBMM Journal",
+            "path": "packs/bbmm-journal",
+            "type": "JournalEntry",
+            "ownership": {
+                "PLAYER": "NONE",
                 "ASSISTANT": "OWNER"
             }
         }

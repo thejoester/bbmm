@@ -1,18 +1,16 @@
-/*
-***************************************************************************
-	BBMM — Changelog on Login (Foundry v13)
-	Shows module changelogs to the GM on login for any modules that have
-	been updated and have a changelog file or URL.
-***************************************************************************
-*/
+/* BBMM — Changelog on Login ==================================================
+	- Shows module changelogs to the GM on login for any modules that have
+	- been updated and have a changelog file or URL.
+============================================================================ */
+
 import { DL } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 
+/* ============================================================================
+        {GLOBALS}
+============================================================================ */
 let __bbmm_isV12 = null;	// cache after init
-
-// Cache directory listings so we only hit the server once per module.
-const _BBMM_DIR_CACHE = new Map();
-
+const _BBMM_DIR_CACHE = new Map(); // Cache directory listings 
 const CHANGELOG_CANDIDATES = [
 	"CHANGELOG.md","CHANGELOG.txt","CHANGELOG",
 	"Changelog.md","Changelog.txt","Changelog",
@@ -20,48 +18,32 @@ const CHANGELOG_CANDIDATES = [
 	"docs/CHANGELOG.md","docs/Changelog.md","docs/changelog.md","docs/CHANGELOG.txt"
 ];
 
-// ===== Entry Points =====
+/* ============================================================================
+		{ HOOK: ready } 
+============================================================================ */
 Hooks.once("ready", async () => {
 
-	/*	
-		Detect Foundry version 
-		only show for V13 
-	*/
+	// Detect Foundry version 
 	try {
 
-		/*
-		// --- MIGRATE seenChangelogs if an old Array slipped into storage ---
-		const rawSeen = game.settings.get(BBMM_ID, "seenChangelogs");
-		if (Array.isArray(rawSeen)) {
-			const migrated = {};
-			// copy only non-index keys from the array's own props
-			for (const k in rawSeen) {
-				if (!/^\d+$/.test(k)) migrated[k] = rawSeen[k];
-			}
-			await game.settings.set(BBMM_ID, "seenChangelogs", migrated);
-			DL("migrated seenChangelogs Array → Object", migrated);
-		}
-		*/
-
-		// Optional: sanity check the registered schema
+		// sanity check the registered schema
 		const meta = game.settings.settings.get(`${BBMM_ID}.seenChangelogs`);
-		DL(`changelog.js |  seenChangelogs schema: type=${meta?.type?.name}, default=${JSON.stringify(meta?.default)}`);
+		DL(`changelog.js | seenChangelogs schema: type=${meta?.type?.name}, default=${JSON.stringify(meta?.default)}`);
 
 
 		const gen = Number(game?.release?.generation);
 		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
 		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
 		__bbmm_isV12 = (major === 12);
-		DL(`changelog.js |  BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
+		DL(`changelog.js |  BBMM init: major=${major} (gen=${gen}, ver="${ver}") -> isV12=${__bbmm_isV12}`);
 
 		// now safely gate your injections
 		if (__bbmm_isV12) {
-			DL(`BBMM skipping changelog report for v12`); 
+			DL(`changelog.js | BBMM skipping changelog report for v12`); 
 		} else {
 			try {
-				/*
-					on v13+ show changelog
-				*/
+
+				// on v13+ show changelog
 				const start = performance.now();
 				DL("changelog.js |  changelog ready: starting");
 
@@ -75,32 +57,31 @@ Hooks.once("ready", async () => {
 				// Preload all texts so paging is instant
 				for (const e of entries) {
 					e.text = await _bbmmFetchChangelogText(e.url);	// raw markdown
-					e.html = await _bbmmRenderMarkdownOnly(e.text);	// Markdown → HTML (no enrich)
+					e.html = await _bbmmRenderMarkdownOnly(e.text);	// Markdown -> HTML (no enrich)
 				}
 
 				const nonEmpty = entries.filter(e => (e.text && e.text.trim().length));
 				if (!nonEmpty.length) return;
-				DL(`Changelog: opening journal with ${nonEmpty.length} module(s).`);
+				DL(`changelog.js | Changelog: opening journal with ${nonEmpty.length} module(s).`);
 				new BBMMChangelogJournal(nonEmpty).render(true);
 
 				const end = performance.now();
 				const ms = (end - start).toFixed(1);
-				DL(`changelog ready: finished in ${ms}ms`);
+				DL(`changelog.js | changelog ready: finished in ${ms}ms`);
 
 			} catch (err) {
-				DL(3, `Changelog ready hook error: ${err?.message || err}`, err);
+				DL(3, `changelog.js | Changelog ready hook error: ${err?.message || err}`, err);
 			}
 		}
 	} catch (err) {
-		DL(2, "BBMM init version gate failed", err);
+		DL(2, "changelog.js | BBMM init version gate failed", err);
 	}
 	
 });
 
-/*
+/* ============================================================================
 	List files in /modules/<id>/ and optionally /modules/<id>/docs/ 
-	Returns a Set of filenames present at the root and docs/ (e.g., "CHANGELOG.md", "docs/CHANGELOG.md").
-*/
+============================================================================ */
 async function _bbmmListModuleFilesCached(modId) {
 	// Use cached if present
 	if (_BBMM_DIR_CACHE.has(modId)) return _BBMM_DIR_CACHE.get(modId);
@@ -125,7 +106,6 @@ async function _bbmmListModuleFilesCached(modId) {
 			}
 		}
 	} catch (err) {
-		// Ignore; some storage backends might block browse, we'll fall back to manifest URL
 		DL(2, `_bbmmListModuleFilesCached: browse failed for ${modId}: ${err?.message || err}`);
 	}
 
@@ -133,6 +113,9 @@ async function _bbmmListModuleFilesCached(modId) {
 	return found;
 }
 
+/* ============================================================================
+	Resize changelog based on canvas resolution 
+============================================================================ */
 function _bbmmSizeFrameOnce(frame, app) {
 	try {
 		// Viewport
@@ -173,15 +156,15 @@ function _bbmmSizeFrameOnce(frame, app) {
 	}
 }
 
-/*
-	Simple, safe Markdown → HTML converter for BBMM changelogs.
+	/* ==========================================================================
+	Markdown -> HTML converter for BBMM changelogs.
 	Supports:
 	- #..###### headers
 	- unordered lists (-, *, +) with nesting by 4-space indentation
 	- [text](https://url) links and <https://url> autolinks
 	- inline code: `code`
 	- paragraphs for non-empty lines
-*/
+ 	============================================================================ */
 function _bbmmMarkdownToHtml(md) {
 	try {
 		const escHTML = (s) => {
@@ -196,13 +179,13 @@ function _bbmmMarkdownToHtml(md) {
 		const escAttr = (s) => escHTML(s);
 
 		function inlineToHtml(text) {
-			/*
+				/* ==========================================================================
 				Order matters:
 				1) Protect code spans
 				2) Apply emphasis (** / *)
 				3) Convert markdown links & autolinks
 				4) Escape remaining non-tag text
-			*/
+ 				============================================================================*/
 			const escHTML = (s) => {
 				if (foundry?.utils?.escapeHTML) return foundry.utils.escapeHTML(String(s ?? ""));
 				return String(s ?? "")
@@ -214,7 +197,7 @@ function _bbmmMarkdownToHtml(md) {
 			};
 			const escAttr = (s) => escHTML(s);
 
-			// 1) Split by backticks → protect code segments
+			// 1) Split by backticks -> protect code segments
 			const parts = String(text ?? "").split(/`/);
 
 			for (let i = 0; i < parts.length; i++) {
@@ -256,7 +239,6 @@ function _bbmmMarkdownToHtml(md) {
 			return parts.join("");
 		}
 
-
 		const lines = String(md ?? "").split(/\r?\n/);
 		let html = "";
 		let listStack = [];	
@@ -280,9 +262,9 @@ function _bbmmMarkdownToHtml(md) {
 			if (lm) {
 				const indentSpaces = lm[1].replace(/\t/g, "    ").length;
 				// Support common styles:
-				// - 0 spaces  → level 1
-				// - 2–5 spaces → level 2
-				// - 6–9 spaces → level 3
+				// - 0 spaces  -> level 1
+				// - 2–5 spaces -> level 2
+				// - 6–9 spaces -> level 3
 				// …then every +4 spaces
 				let level = 1;
 				if (indentSpaces >= 2) level = 2 + Math.floor((indentSpaces - 2) / 4);
@@ -294,7 +276,7 @@ function _bbmmMarkdownToHtml(md) {
 				continue;
 			}
 
-			// Blank line = separator (don’t close lists here; let structure be explicit)
+			// Blank line = separator
 			if (!line.trim().length) continue;
 
 			// Paragraph line
@@ -310,9 +292,7 @@ function _bbmmMarkdownToHtml(md) {
 	}
 }
 
-/*
-	Render Markdown only (no enrich), preferring Foundry’s renderer if present.
-*/
+// Helper: Render Markdown
 async function _bbmmRenderMarkdownOnly(md) {
 	try {
 		if (TextEditor?.renderMarkdown) {
@@ -324,8 +304,7 @@ async function _bbmmRenderMarkdownOnly(md) {
 	return _bbmmMarkdownToHtml(md);
 }
 
-// ===== Main Workflow =====
-
+/* Main Workflow ============================================================ */
 class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 	constructor(entries) {
 		// Detect viewport height and pick a safe base height
@@ -357,10 +336,9 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		this._centeredOnce = false;
 	}
 
-	/*
-		===== Helpers =====
-	*/
-
+	/* ============================================================================
+			{HELPERS}
+	============================================================================ */
 	_cleanHref(html) {
 		try {
 			const wrap = document.createElement("div");
@@ -369,11 +347,11 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			for (const a of wrap.querySelectorAll("a[href]")) {
 				let href = a.getAttribute("href") || "";
 
-				// 1) trim whitespace & stray quotes at the end
+				// trim whitespace & stray quotes at the end
 				href = href.replace(/[\s"'”’]+$/g, "");
 
-				// 2) drop trailing punctuation that should not be in a URL
-				//    (commas/closing parens/periods/semicolons/colons)
+				// drop trailing punctuation that should not be in a URL
+				// (commas/closing parens/periods/semicolons/colons)
 				href = href.replace(/[),.;:]+$/g, "");
 
 				// write back + ensure safe link attrs
@@ -388,9 +366,10 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		}
 	}
 
-	/*
-		Replaces the leading "[label](" with "(" and injects {label} between > and </a>
-	*/
+	/* ============================================================================
+		Replaces the leading "[label](" 
+		with "(" and injects {label} between > and </a>
+	============================================================================ */
 	_fixMdWrappedEmptyAnchors(html) {
 		try {
 		let s = String(html ?? "");
@@ -419,7 +398,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			(_m, label, aOpen) => `${aOpen}${label}</a>`
 		);
 
-		// Optional tidy: "(<a ...>Label</a> )" → "(<a ...>Label</a>)"
+		// "(<a ...>Label</a> )" -> "(<a ...>Label</a>)"
 		s = s.replace(/\(<a\b([^>]*)>([\s\S]*?)<\/a>\s+\)/gi, "(<a $1>$2</a>)");
 
 		DL(`_fixMdWrappedEmptyAnchors(): applied`);
@@ -429,7 +408,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		return String(html ?? "");
 	}
 	}
-	/* Preserve left-nav scroll across re-renders */
+	// Preserve left-nav scroll across re-renders
 	_captureNavScroll(root) {
 		try {
 			const sc = root?.querySelector?.(".bbmm-nav-scroll");
@@ -620,7 +599,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 				// lock a minimum width
 				frame.style.minWidth = "900px";
 
-				// optional: also enforce a fixed width
+				// also enforce a fixed width
 				// frame.style.width = "900px";
 				// frame.style.maxWidth = "900px";
 			} else {
@@ -662,7 +641,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			if (this._onClick) root.removeEventListener("click", this._onClick);
 			if (this._onChange) root.removeEventListener("change", this._onChange);
 
-			this._boundRoot = root; // remember where we wired
+			this._boundRoot = root; 
 			this._onClick = async (ev) => {
 				try {
 					// Sidebar nav item
@@ -688,12 +667,12 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 							if (!entry) return;
 
 							if (this._markedSeen.has(entry.id)) {
-								// currently marked → unmark
+								// currently marked -> unmark
 								await _bbmmUnmarkChangelogSeen(entry.id);
 								this._markedSeen.delete(entry.id);
 								ui.notifications?.info(`Unmarked ${entry.title || entry.id} v${entry.version}`);
 							} else {
-								// not marked → mark
+								// not marked -> mark
 								await _bbmmMarkChangelogSeen(entry.id, entry.version);
 								this._markedSeen.add(entry.id);
 								this._pendingOnClose.delete(entry.id);
@@ -711,7 +690,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 							}
 
 							if (allMarked) {
-								// every entry is already marked → unmark all
+								// every entry is already marked -> unmark all
 								for (const e of this.entries) {
 									await _bbmmUnmarkChangelogSeen(e.id);
 									this._markedSeen.delete(e.id);
@@ -757,7 +736,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		}
 	}
 
-	/* When closing, honor "don’t show again" for the CURRENT page (optional UX). */
+	// When closing, honor "don’t show again" for the CURRENT page
 	async close(options) {
 		try {
 			// apply all pending-on-close marks
@@ -775,9 +754,10 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 	}
 }
 
-/*
+/* ============================================================================
+	{HELPER}
 	Center the app window without changing its size.
-*/
+============================================================================ */
 function _bbmmCenterFrame(frame, app) {
 	try {
 		const rect = frame.getBoundingClientRect();
@@ -800,6 +780,10 @@ function _bbmmCenterFrame(frame, app) {
 	}
 }
 
+/* ============================================================================
+	{HELPER}
+	Scan all modules for new/updated changelogs since last seen
+============================================================================ */
 async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	const start = performance.now();
 	DL("changelog.js |  changelog collector: starting scan");
@@ -840,7 +824,10 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	return results;
 }
 
-// ===== Fetch Changelogs =====
+/* ============================================================================
+	{HELPER}
+	Fetch Changelogs URL
+============================================================================ */
 async function _bbmmFindChangelogURL(mod) {
 	try {
 		const files = await _bbmmListModuleFilesCached(mod.id);
@@ -857,6 +844,10 @@ async function _bbmmFindChangelogURL(mod) {
 	return null; // never fall back to remote
 }
 
+/* ============================================================================
+	{HELPER}
+	Fetch Changelogs Text
+============================================================================ */
 async function _bbmmFetchChangelogText(url) {
 	try {
 		if (!url) return "";
@@ -870,7 +861,10 @@ async function _bbmmFetchChangelogText(url) {
 }
 
 // ===== UI =====
-
+/* ============================================================================
+	{UI}
+	Dialog 
+============================================================================ */
 async function _bbmmShowSingleChangelogDialog(entry) {
 	const { id, title, version, url } = entry;
 
@@ -890,7 +884,7 @@ async function _bbmmShowSingleChangelogDialog(entry) {
 			<pre style="flex:1;overflow:auto;padding:.5rem;border:1px solid #555;border-radius:.5rem;background:#111;white-space:pre-wrap;">${esc(raw)}</pre>
 			<label style="display:flex;align-items:center;gap:.5rem;">
 				<input type="checkbox" name="dontShowAgain" />
-				<span>Don’t show again for this version</span>
+				<span>${LT.changelog.dontShowAgain()}</span>
 			</label>
 		</div>
 	`;
@@ -936,8 +930,10 @@ async function _bbmmShowSingleChangelogDialog(entry) {
 	});
 }
 
-// ===== Persistence =====
-
+/* ============================================================================
+	{HELPER}
+	Mark Changelog seen
+============================================================================ */	
 async function _bbmmMarkChangelogSeen(moduleId, version) {
 	try {
 		const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {};
@@ -951,6 +947,10 @@ async function _bbmmMarkChangelogSeen(moduleId, version) {
 	}
 }
 
+/* ============================================================================
+	{HELPER}
+	Unmark Changelog seen
+============================================================================ */
 async function _bbmmUnmarkChangelogSeen(moduleId) {
 	try {
 		const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {};
@@ -967,7 +967,10 @@ async function _bbmmUnmarkChangelogSeen(moduleId) {
 	}
 }
 
-// helper to manually open a specific module's changelog
+/* ============================================================================
+	{HELPER}
+	manually open a specific module's changelog
+============================================================================ */
 export async function BBMM_openChangelogFor(moduleId) {
 	try {
 		const mod = game.modules.get(moduleId);

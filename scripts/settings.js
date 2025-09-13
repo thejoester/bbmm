@@ -7,6 +7,7 @@ const MODULE_SETTING_PRESETS = "module-presets";  // OLD will go away
 const SETTING_SETTINGS_PRESETS = "settingsPresets"; // OLD will go away
 const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
+
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
 	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", "migratedPresetsV1", "userSettingSync"])],
@@ -383,6 +384,24 @@ Hooks.once("init", () => {
 					default: {}
 				});
 
+				// User-scoped ledger: remembers which soft-lock value was last auto-applied per setting id
+				game.settings.register(BBMM_ID, "softLockLedger", {
+					name: "softLockLedger",
+					scope: "user",
+					config: false,
+					type: Object,
+					default: {}	// { "<namespace>.<key>": <serializedValue> }
+				});
+
+				// persistant soft-lock rev map
+				game.settings.register(BBMM_ID, "softLockRevMap", {
+					name: "softLockRevMap",
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}
+				});
+
 				// OLD Settings Presets 
 				game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS, {
 					name: "Module Presets",
@@ -486,7 +505,8 @@ Hooks.once("init", () => {
 					type: Boolean,
 					default: true
 				});
-
+				
+				// toggle to check disabled modules
 				game.settings.register("bbmm", "checkDisabledModules", {
 					scope: "world",
 					config: true,
@@ -516,17 +536,65 @@ Hooks.once("init", () => {
 					}
 				});
 
-				// Enable/disable selecting users on push/lock.
-				// - When disabled will just push/lock for all users. 
-				game.settings.register(BBMM_ID, "selectUsersOnPushLock", {
-					name: LT.selectUsersPushLock(),
-					hint: LT.hintSelectUsersPushLock(),
+
+				// Choices for lock-gestures 
+				const GESTURE_ACTION_CHOICES = {
+					"lockSelected": LT.name_LockSelected(),
+					"softLock": LT.name_SoftLock(),
+					"lockAll": LT.name_LockAll(),
+					"clearLocks": LT.name_ClearLocks()
+				};
+
+				// Set action for "Click" (default: lock selected)
+				game.settings.register(BBMM_ID, "gestureAction_click", {
+					name: LT.name_SetActionClick(),
 					scope: "world",
+					restricted: true,
 					config: true,
-					type: Boolean,
-					default: false
+					type: String,
+					choices: GESTURE_ACTION_CHOICES,
+					default: "lockSelected",
+					onChange: v => DL(`settings.js | gestureAction_click -> ${v}`)
 				});
 
+				// Set action for "Right-Click" (default: lock all)
+				game.settings.register(BBMM_ID, "gestureAction_right", {
+					name: LT.name_SetActionRightClick(),
+					scope: "world",
+					restricted: true,
+					config: true,
+					type: String,
+					choices: GESTURE_ACTION_CHOICES,
+					default: "lockAll",
+					onChange: v => DL(`settings.js | gestureAction_right -> ${v}`)
+				});
+
+				// Set action for "Shift+Click" (default: soft lock)
+				game.settings.register(BBMM_ID, "gestureAction_shift", {
+					name: LT.name_SetActionShiftClick(),
+					scope: "world",
+					restricted: true,
+					config: true,
+					type: String,
+					choices: GESTURE_ACTION_CHOICES,
+					default: "softLock",
+					onChange: v => DL(`settings.js | gestureAction_shift -> ${v}`)
+				});
+
+				
+
+				// Set action for Shift+Right-Click (default: clearLocks)
+				game.settings.register(BBMM_ID, "gestureAction_shiftRight", {
+					name: LT.name_SetActionShiftRightClick(),
+					scope: "world",
+					restricted: true,
+					config: true,
+					type: String,
+					choices: GESTURE_ACTION_CHOICES,
+					default: "clearLocks",
+					onChange: v => DL(`settings.js | gestureAction_shiftRight -> ${v}`)
+				});
+				
 				// Debug level for THIS module
 				game.settings.register(BBMM_ID, "debugLevel", {
 					name: LT.debugLevel(),
