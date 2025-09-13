@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0-test.2] - 2025-09-10
+### Changed
+- **Settings Sync:**
+  - Added click gesture detection on the lock icon:
+    - Click = Lock Selected (will promtp to select users).
+    - Right-Click = Lock All.
+    - Shift+Click = Soft Lock.
+    - Shift+Right-Click = Clear Locks. 
+  - Soft Lock option, will sync user setting once, but allow them to change it unless GM changes setting while soft lock enabled. 
+  - Icon changes immediately, but changes still only save when clicking "Save Changes" 
+  - Settings will allow to change click gesture behavior. 
+
 ## [0.4.0-test.1] - 2025-09-10
 ### Changed
 - **Settings Sync:**
