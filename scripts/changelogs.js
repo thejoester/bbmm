@@ -19,6 +19,75 @@ const CHANGELOG_CANDIDATES = [
 ];
 
 /* ============================================================================
+		{ HOOK: init } 
+============================================================================ */
+Hooks.once("init", () => {
+	try {
+
+		// Make the window class available to macros (and other modules)
+		globalThis.BBMMChangelogJournal = BBMMChangelogJournal;
+
+		const mod = game.modules.get(BBMM_ID);
+		if (!mod) return;
+		mod.api ??= {};
+
+		mod.api.openChangelogReport = async function openChangelogReport() {
+			try {
+				DL("changelog.js | api.openChangelogReport(): start");
+
+				// Version gate (match your ready hook behavior)
+				const gen = Number(game?.release?.generation);
+				const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
+				const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
+				if (major === 12) {
+					DL("changelog.js | api.openChangelogReport(): v12 detected, skipping");
+					ui.notifications?.info(LT?.changelog?.v12_skip?.() ?? "Changelog Report runs on Foundry v13+.");
+					return;
+				}
+
+				if (!game.user.isGM) {
+					ui.notifications?.warn(LT?.changelog?.gm_only?.() ?? "GM only.");
+					return;
+				}
+
+				const entries = await _bbmmCollectUpdatedModulesWithChangelogs();
+				if (!entries.length) {
+					ui.notifications?.info(LT?.changelog?.none_found?.() ?? "No updated module changelogs detected.");
+					return;
+				}
+
+				// Preload text + HTML (same as ready)
+				for (const e of entries) {
+					e.text = await _bbmmFetchChangelogText(e.url);
+					e.html = await _bbmmRenderMarkdownOnly(e.text);
+				}
+				const nonEmpty = entries.filter(e => (e.text && e.text.trim().length));
+				if (!nonEmpty.length) {
+					ui.notifications?.info(LT?.changelog?.none_found_nonempty?.() ?? "No non-empty changelog files found.");
+					return;
+				}
+
+				DL(`changelog.js | api.openChangelogReport(): opening with ${nonEmpty.length} module(s)`);
+				new BBMMChangelogJournal(nonEmpty).render(true);
+			} catch (err) {
+				DL(3, `changelog.js | api.openChangelogReport(): ${err?.message || err}`, err);
+				ui.notifications?.error("Failed to open BBMM Changelog Report. See console for details.");
+			}
+		};
+
+		// Optional: support a hook-based opener for generic macros
+		Hooks.on("bbmm:openChangelogReport", () => {
+			try { mod.api?.openChangelogReport?.(); }
+			catch (err) { DL(3, `bbmm:openChangelogReport hook error: ${err?.message || err}`, err); }
+		});
+
+		DL("changelog.js | API exposed: api.openChangelogReport()");
+	} catch (err) {
+		DL(2, `changelog.js | expose API failed: ${err?.message || err}`, err);
+	}
+});
+
+/* ============================================================================
 		{ HOOK: ready } 
 ============================================================================ */
 Hooks.once("ready", async () => {
@@ -156,15 +225,15 @@ function _bbmmSizeFrameOnce(frame, app) {
 	}
 }
 
-	/* ==========================================================================
-	Markdown -> HTML converter for BBMM changelogs.
-	Supports:
-	- #..###### headers
-	- unordered lists (-, *, +) with nesting by 4-space indentation
-	- [text](https://url) links and <https://url> autolinks
-	- inline code: `code`
-	- paragraphs for non-empty lines
- 	============================================================================ */
+/* ==========================================================================
+Markdown -> HTML converter for BBMM changelogs.
+Supports:
+- #..###### headers
+- unordered lists (-, *, +) with nesting by 4-space indentation
+- [text](https://url) links and <https://url> autolinks
+- inline code: `code`
+- paragraphs for non-empty lines
+============================================================================ */
 function _bbmmMarkdownToHtml(md) {
 	try {
 		const escHTML = (s) => {

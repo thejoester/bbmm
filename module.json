@@ -21,6 +21,7 @@
         "scripts/module-presets.js",
         "scripts/settings-presets.js",
         "scripts/exclusions.js",
+        "scripts/inclusions.js",
         "scripts/setting-sync.js",
         "scripts/changelogs.js"
     ],

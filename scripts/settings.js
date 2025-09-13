@@ -8,6 +8,9 @@ const MODULE_SETTING_PRESETS = "module-presets";  // OLD will go away
 const SETTING_SETTINGS_PRESETS = "settingsPresets"; // OLD will go away
 const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
+const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
+
+let __bbmm_isV12 = null; // cache after init
 
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
@@ -17,6 +20,64 @@ export const EXPORT_SKIP = new Map([
 	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
 
+// Check folder migration 
+async function checkFolderMigration(){
+	if (!game.user.isGM) return; // GM only
+
+	const BBMM_PACK_NAMES = [
+		"bbmm-macros",
+		"bbmm-journal"
+	];
+
+	// Get the full migrations object (always returns an object).
+	function getMigrations() {
+		const obj = game.settings.get(BBMM_ID, "bbmmFlags");
+		return obj && typeof obj === "object" ? { ...obj } : {};
+	}
+
+	// Set/merge a single flag without clobbering others.
+	async function setMigrationFlag(key, value) {
+		const current = getMigrations();
+		current[key] = value;
+		await game.settings.set(BBMM_ID, "bbmmFlags", current);
+	}
+
+	/** Check a flag; falsy if missing. */
+	function hasMigrationFlag(key) {
+		const current = getMigrations();
+		return Boolean(current[key]);
+	}
+
+	if (hasMigrationFlag("folderMigration")) return; // we already migrated
+
+	try {
+		let folder = game.folders.find((f) => f.type === "Compendium" && f.name === BBMM_COMP_FOLDER_NAME);
+		// If folder doesn't exist create it
+		if (!folder) { 
+			folder = await Folder.create({ name: BBMM_COMP_FOLDER_NAME, type: "Compendium", sorting: "a" });
+			DL("settings.js | Created compendium folder:", BBMM_COMP_FOLDER_NAME, folder?.id);
+		}
+
+		// move packs into folder
+		for (const name of BBMM_PACK_NAMES) {
+			const cid = `${BBMM_ID}.${name}`;
+			const pack = game.packs.get(cid);
+			if (!pack) { DL("settings.js | Pack not found, skipping:", cid); continue; }
+			await pack.configure({ folder: folder.id });
+			DL("settings.js | Moved pack into folder:", cid, "→", BBMM_COMP_FOLDER_NAME);
+		}
+
+		// update flag
+		await setMigrationFlag("folderMigration", true);
+		ui.compendium.render(true);
+		DL("settings.js | Compendium folder migration complete.");
+	} catch (err) {
+		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
+	}
+}
+
+
+/* V12 Check =============================================================== */
 export function isFoundryV12() {
 	try {
 		// if we've already computed it post-init, trust the cache
@@ -36,7 +97,6 @@ export function isFoundryV12() {
 }
 
 
-let __bbmm_isV12 = null;	// cache after init
 
 //	Function for debugging - Prints out colored and tagged debug lines
 export function DL(intLogType, stringLogMsg, objObject = null) {
@@ -340,6 +400,14 @@ Hooks.once("init", () => {
 					type: Boolean,
 					default: false
 				});
+
+				// Setting to hold module flags
+				game.settings.register(BBMM_ID, "bbmmFlags", {
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}	
+				});
 			// ====== HIDDEN VARIABLES ===== 
 			// These do not need to be localized
 				// User Exclusions 
@@ -616,6 +684,10 @@ Hooks.on("setup", () => DL("settings.js | setup fired"));
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
+
+	//check folder migration
+	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
+
 	if (!isFoundryV12()){
 		// Hook into settings and manage modules window to add app button in header 
 		Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
