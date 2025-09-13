@@ -1,0 +1,377 @@
+{
+  "name": "Big Bad Module Manager",
+  "_id": "u3uUIp6Jfg8411Pn",
+  "pages": [
+    {
+      "sort": 100000,
+      "name": "About",
+      "type": "text",
+      "_id": "LqdPKzBQbWas56RQ",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p></p><div class=\"markdown-heading\" dir=\"auto\"><h3><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h3></div><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / delete preset.</li><li>Export module state to .json.</li><li>import .json to preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / delete preset.</li><li>Export settings state to .json</li><li><p>import .json to preset:</p><ul dir=\"auto\"><li>Choose which modules or specific settings to import.</li></ul></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>Add modules to ignore on presets/imports/exports.</li><li>Add specific setting to ignore on presets/imports/exports.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Include hidden Settings}</h3><ul><li><p>Add hidden settings to always include in presets/imports/exports.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757732832081,
+        "modifiedTime": 1757801047269,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.LqdPKzBQbWas56RQ"
+    },
+    {
+      "sort": 200000,
+      "name": "Module Presets",
+      "type": "text",
+      "_id": "ALKM5KUILeJAZi62",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>Module Presets allow you to <strong data-start=\"306\" data-end=\"348\">save and load groups of active modules</strong>.<br data-start=\"349\" data-end=\"352\" /></p><p>This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><p></p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current module states into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current module state </strong>to the preset.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li><li><p><strong>Import/Export: </strong>Presets are specific to the game world, to use a preset in another game world you can export/import.</p></li></ul><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Import / Export</span></strong></span></h3><ul><li><p><strong>Export:</strong> exports <strong><span style=\"text-decoration:underline\">current module state</span></strong> to a .json file. To export a specific preset you must load it first, then export to .json.</p></li><li><p><strong>Import:</strong> Imports .json file into a preset.</p></li><li><p><strong>Note:</strong> Once you import the preset, you must choose it and load it for it to be activated.</p></li></ul><h3>Also see: </h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusion Manager}</p><p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757733057278,
+        "modifiedTime": 1757742304573,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.ALKM5KUILeJAZi62"
+    },
+    {
+      "sort": 300000,
+      "name": "Settings Presets",
+      "type": "text",
+      "_id": "mB68DCCQ83f9d3EQ",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>Setting Presets allow you to save your current settings state into a preset.</p><p><br data-start=\"349\" data-end=\"352\" />This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><p></p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current settings state into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current settings</strong> to the preset.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li><li><p><strong>Import/Export: </strong>Presets are specific to the game world, to use a preset in another game world you can export/import.</p></li></ul><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Import / Export</span></strong></span></h3><ul><li><p><strong>Export:</strong> exports <span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">current settings state</span></strong></span> to a .json file. To export a specific preset you must load it first, then export to .json.</p></li><li><p><strong>Import:</strong> Imports .json file into a preset. When importing it will let you choose what to import:</p><ul><li><p>\"All Settings\": imports everything from the .json</p></li><li><p>\"Select Modules\": Select which module settings to import.</p></li><li><p>\"Select Settings\": Select specific settings to import.</p></li><li><p><strong>Note:</strong> Anything in the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusions} will not be imported.</p></li></ul></li><li><p><strong>Note:</strong> Once you import the preset, you must choose it and load it for it to be activated.</p></li></ul><h3>Also See</h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}</p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757733847774,
+        "modifiedTime": 1757753172987,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.mB68DCCQ83f9d3EQ"
+    },
+    {
+      "sort": 400000,
+      "name": "Exclusion Manager",
+      "type": "text",
+      "_id": "1mPrapuBoNRZTWXo",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>The Exclusion Manager allows you to add modules or specific settings that will be excluded by this module when Saving Presets or Exporting / Importing from .json. </p><h3></h3>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757740071855,
+        "modifiedTime": 1757742505060,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.1mPrapuBoNRZTWXo"
+    },
+    {
+      "sort": 500000,
+      "name": "Inclusion Manager",
+      "type": "text",
+      "_id": "Q3JVPh8ykzMc3kLS",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>The Inclusion Manager will let you add @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} to ensure they are saved in @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets} and exports. </p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757740379508,
+        "modifiedTime": 1757744541257,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Q3JVPh8ykzMc3kLS"
+    },
+    {
+      "sort": 350000,
+      "name": "Hidden settings",
+      "type": "text",
+      "_id": "XsS4wjBTXbMDeHpr",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>By default the settings preset manager will only save / import / export the un-hidden settings. </p><h3>But Why? </h3><p>Foundry and modules store lots of data in hidden settings. This can be small things like the current world date/time, combat states, or it could be other larger data, for example BBMM stores all the preset data this way. </p><p>If you save this data into a preset then load that preset later it will overwrite many background data that can have cause data loss or unexpected issues. </p><h3>What side effects does this cause?</h3><p>How foundry handles settings, limits how they can be organized. Some module authors prefer to use sub-menus to organize settings by having a button  that opens a new window with those option configurations. These options are stored as \"hidden\" settings, so by default they may be missed by the normal method of saving / exporting presets.</p><h3>How can I save these settings? </h3><p>You can add hidden settings in the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Inclusion Manager}, these settings will also be saved in presets and exports. </p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757740476956,
+        "modifiedTime": 1757741587284,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.XsS4wjBTXbMDeHpr"
+    },
+    {
+      "sort": 312500,
+      "name": "Settings Sync",
+      "type": "text",
+      "_id": "MLQHRwurTFNqkFBn",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757799482479,
+        "modifiedTime": 1757799502928,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.MLQHRwurTFNqkFBn"
+    },
+    {
+      "sort": 150000,
+      "name": "Changelog Report",
+      "type": "text",
+      "_id": "9zaIHbxOwTBL5iwR",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>The <strong data-start=\"145\" data-end=\"165\">Changelog Report</strong> automatically appears when you log into your world if any of your installed modules have updated changelog files. This makes it easy to see what has changed since your last session without digging through GitHub pages or module.json files.</p><p></p><h3>How to Use</h3><ol><li data-start=\"807\" data-end=\"871\"><p data-start=\"810\" data-end=\"871\">On login, review the changelog window if updates are found.</p></li><li data-start=\"872\" data-end=\"928\"><p data-start=\"875\" data-end=\"928\">Use the navigation buttons to move through entries.</p></li><li data-start=\"929\" data-end=\"1005\"><p data-start=\"932\" data-end=\"1005\">Mark entries as <strong data-start=\"948\" data-end=\"963\">seen/unseen</strong> to track which updates you’ve reviewed.</p></li><li data-start=\"1006\" data-end=\"1081\"><p data-start=\"1009\" data-end=\"1081\">Open the source link to view the original changelog details if needed.</p></li></ol><p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757799614210,
+        "modifiedTime": 1757800226619,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.9zaIHbxOwTBL5iwR"
+    },
+    {
+      "sort": 600000,
+      "name": "Macros",
+      "type": "text",
+      "_id": "Tw7LX79cvGnJ3F67",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>Big Bad Module Manager macros found in the compendium:</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe]{View Changelog Report} - Launch the changelog report manually. </p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.sc6d0g6syYz3nEbB]{BBMM: Setting Preset Inspector} - allows you to inspect a preset, see the saved settings and values contained inside for troubleshooting purposes. </p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757800788174,
+        "modifiedTime": 1757800896419,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Tw7LX79cvGnJ3F67"
+    }
+  ],
+  "folder": null,
+  "categories": [],
+  "sort": 0,
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "flags": {},
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.348",
+    "systemId": "pf2e",
+    "systemVersion": "7.4.3",
+    "createdTime": 1757732810962,
+    "modifiedTime": 1757732810962,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_key": "!journal!u3uUIp6Jfg8411Pn"
+}
