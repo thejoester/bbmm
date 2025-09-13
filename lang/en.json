@@ -58,12 +58,12 @@
 		"promptApplyModulePreset": "Apply module preset <b>{name}</b> to this world",
 		"titleDeleteModulePreset": "Delete Module Preset",
 		"promptDeleteModulePreset": "Delete module preset", 
-		"modulePresetsBtn": "Module Presets button",
+		"modulePresetsBtn": "Module Presets",
 		"lblOpenModulePresets": "Open Module Preset Manager",
 		"titleModulePresets": "BBBM Module Presets",
-
+		"inclusionsMgr": "Inclusions Manager",
 		"settingsPresetMgr": "Settings Preset Manager",
-		"settingsPresetsBtn": "Settings Presets button",
+		"settingsPresetsBtn": "Settings Presets",
 		"lblOpenSettingsPresets": "Open Settings Preset Manager",
 		"titleSettingsPresets": "BBBM Settings Presets",
 		"promptReload": "Settings preset applied. Reload now to ensure everything initializes correctly",
@@ -92,7 +92,7 @@
 		"name_checkDisabledModules": "Check Disabled Modules",
 		"hint_checkDisabledModules": "When enabled, BBMM will also look for changelogs in installed but disabled modules.",
 		"exclusionsMgr": "Exclusions Manager",
-		"exclusionsMgrBtn": "Exclusions Manager button",
+		"exclusionsMgrBtn": "Exclusions Manager",
 		"lblExclusionsMgr": "Open Exclusions Manager",
 		"titleExclusionsMgr": "BBBM Exclusions Manager",
 		"titleAddModuleExclusion": "BBMM — Add Module Exclusion",
@@ -140,7 +140,10 @@
 		"titleSyncForUsers": "Sync Setting to Users",
 		"infoQueuedUnlock": "Queued unlock for {module}. Will apply on Save.",
 		"infoClearedLocks": "Cleared locks for this setting.",
-		
+		"includeHidden": "Save hidden settings",
+		"includeHiddenWarnTitle": "Include Hidden Settings?",
+		"includeHiddenWarnMsg": "Saving and loading hidden settings could result in unexpected results. It is advised to use the Inclusions Manager to add specific hidden settings. Are you sure you wish to save/export hidden settings?",
+		"includeHiddenWarnLink": "",
 		"click": "Click",
 		"shiftClick": "Shift+Click",
 		"rightClick": "Right-Click",
@@ -153,7 +156,11 @@
 		"name_SetActionShiftClick": "Set Action for Shift+Click:", 
 		"name_SetActionRightClick": "Set Action for Right-Click:", 
 		"name_SetActionShiftRightClick": "Set Action for Shift+Right-Click:", 
-
+		"controlsMgrBtn": "Controls Manager",
+		"controlsPresetMgr": "Controls Preset Manager",
+		"lblOpenControlsPresets": "Open Controls Preset Manager",
+		"titleControlsPresets": "BBMM Controls Presets",
+		
 		"v12Note": "This module offers minimal support for FoundryVTT v12, allowing you to export settings and module states as prep for updating to v13.<br><strong>NOTE:</strong> Some settings may not transfer if the v13 module setting has changed.",
 		"titlev12Legacy": "BBMM: Legacy (v12) Export",
 		"exportedv12Settings": "Exported v12 settings to .json",
@@ -253,6 +260,19 @@
 			"LockedByGM": "Locked by GM",
 			"EnableName": "Enable user/client setting sync",
 			"EnableHint": "GM: When disabled, BBMM will not add lock/sync controls, push values, or enforce/hide user/client settings."
+		},
+
+		"inclusions": {
+			"manager": "Inclusions",
+			"title": "Inclusions Manager",
+			"addSettingTitle": "Add Setting Inclusion",
+			"addSetting": "Add Setting",
+			"none": "No inclusions yet",
+			"noHidden": "No hidden settings available to include",
+			"include": "Include",
+			"failedAddInclusion": "Failed to add inclusion",
+			"failedRemoveInclusion": "Failed to remove inclusion",
+			"remove": "Remove"
 		}
 	}
 }

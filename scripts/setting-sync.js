@@ -16,13 +16,13 @@ import { LT, BBMM_ID } from "./localization.js";
 const BBMM_REG = { byId: new Map() };	// Live registry of settings
 const BBMM_SYNC_CH = `module.${BBMM_ID}`;	// Socket channel for this module
 const ENABLE_KEY = "enableUserSettingSync";
-const SELECT_USERS_KEY = "selectUsersOnPushLock"; 
 const _bbmmPendingOps = [];	 // Pending operations queue (applied on Save Changes)
 let _bbmmTriggerTimer = null; // For bbmmBroadcastTrigger()
 
 /*  ============================================================================
         {HELPERS}
 	============================================================================ */
+
 
 /* Gesture > Action mapping ===================================================
 	Gesture > Action mapping (GM world settings with fallback)
@@ -53,6 +53,33 @@ function _bbmmBuildGestureActionMap() {
 	} catch (err) {
 		DL(2, "_bbmmBuildGestureActionMap(): error, using defaults", err);
 		return { click: "lockSelected", shift: "softLock", right: "lockAll", shiftRight: "clearLocks" };
+	}
+}
+
+/* 
+	Detect if an unlock (hard-lock removal) is queued for a given id.
+	- Returns true if there is a 'lock' op for this id with userIds=[]
+*/
+function _bbmmIsUnlockQueued(id) {
+  try {
+    return _bbmmPendingOps.some(op =>
+      op?.id === id && (
+        (op.op === "lock" && Array.isArray(op.userIds) && op.userIds.length === 0) ||
+        (op.op === "soft" && op.soft === false)
+      )
+    );
+  } catch { return false; }
+}
+
+/* 
+	Detect if any pending operation exists for a given id (lock/soft/push).
+	- Useful to avoid resnapping while a definitive change is queued.
+*/
+function _bbmmHasPendingFor(id) {
+	try {
+		return _bbmmPendingOps.some(op => op?.id === id);
+	} catch {
+		return false;
 	}
 }
 
@@ -535,67 +562,38 @@ async function bbmmResnapUserSync() {
 			const existing = map[id] || {};
 			const prev = existing.value;
 
+			// If we’ve queued an unlock for this id, don’t resnap it back in
+			if (_bbmmIsUnlockQueued?.(id)) {
+				DL(`setting-sync.js |  bbmm-resnap: skipping ${id} (unlock queued)`);
+				continue;
+			}
+
+			// Handle SOFT entries separately
 			if (existing.soft === true) {
-				// GM changed their own value -> clear soft lock entirely
+				// If GM changed their own setting, clear the soft lock entirely
 				if (!objectsEqual(live, prev)) {
 					delete map[id];
 					changed = true;
 					DL(`setting-sync.js |  bbmm-resnap: cleared SOFT ${id} (GM changed value)`);
-					continue;
+					continue; // go to next id
 				}
-				// Preserve soft entry including rev
+
+				// Otherwise, keep soft as-is, refresh the stored value/flags
+				const rev = Number.isInteger(existing.rev) ? existing.rev : 1;
 				map[id] = {
 					namespace: ns,
 					key,
 					value: live,
 					requiresReload: existing.requiresReload ?? !!cfg?.requiresReload,
 					soft: true,
-					rev: Number.isInteger(existing.rev) ? existing.rev : 1
+					rev
 				};
-				continue;
+				// Note: no "changed" flip if nothing materially changed
+				continue; // next id
 			}
 
-			// Soft entries
-			if (state === "soft" && ent?.soft === true) {
-				// Ensure enabled/visible
-				const input = group.querySelector?.("input, select, textarea");
-				if (input) { input.disabled = false; input.readOnly = false; }
-				group.classList.remove("bbmm-locked-hide");
-				group.style.removeProperty("display");
-
-				// Optional: show soft icon if present
-				const icon = group.querySelector?.(".bbmm-lock-icon");
-				if (icon) _bbmmSetLockIconState(icon, "soft");
-
-				// Record ledger immediately when user tweaks the control (even before Save)
-				try {
-					const recValSerialized = JSON.stringify(ent?.value ?? null);
-					const inputs = group.querySelectorAll?.("input, select, textarea") || [];
-
-					const markHandled = async () => {
-						try {
-							const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
-							ledger[id] = recValSerialized;
-							await game.settings.set(BBMM_ID, "softLockLedger", ledger);
-							DL(`setting-sync.js |  soft-ledger: handled value recorded for ${id}`);
-						} catch (e) {
-							DL(2, "setting-sync.js |  soft-ledger: failed to record", e);
-						}
-					};
-
-					for (const inp of inputs) {
-						inp.addEventListener("change", markHandled, { once: false });
-						inp.addEventListener("input", markHandled, { once: false });
-					}
-				} catch (e) {
-					DL(2, "setting-sync.js |  soft-ledger: attach change listeners failed", e);
-				}
-
-				continue;
-			}
-
-			// Hard entries (lock all / partial)
-			// Normalize stored object and keep any targeted userIds
+			// HARD entry (lock all / partial)
+			// Keep any targeted userIds as-is; just refresh stored value & requiresReload
 			const needUpdate = !objectsEqual(live, prev) || (existing.requiresReload !== !!cfg?.requiresReload);
 			if (needUpdate) {
 				map[id] = {
@@ -927,7 +925,7 @@ Hooks.on("closeSettingsConfig", async (app) => {
 		if (!bbmmIsSyncEnabled()) return; // feature disabled?
 		if (!game.user?.isGM) return;
 
-		const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
+		let map = game.settings.get(BBMM_ID, "userSettingSync") || {};
 		const ids = Object.keys(map);
 		if (!ids.length) return;
 
@@ -944,34 +942,56 @@ Hooks.on("closeSettingsConfig", async (app) => {
 			const cfg = game.settings.settings.get(id);
 			if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
 
-			const cur = game.settings.get(ns, key);
-			const prev = map[id]?.value;
+			// If an unlock is queued for this id, remove it and skip resnap
+			if (_bbmmIsUnlockQueued?.(id)) {
+				if (map[id]) {
+					delete map[id];
+					changed = true;
+					DL(`setting-sync.js | closeSettingsConfig: unlock queued, removed ${id}`);
+				}
+				continue;
+			}
 
-			// v13-safe compare
-			if (!objectsEqual(cur, prev)) {
-				// Preserve existing userIds if present
-				const existing = map[id] || {};
+			// If ANY op is queued for this id, skip resnap and let the queued op win after Save
+			if (_bbmmHasPendingFor?.(id)) {
+				DL(`setting-sync.js | closeSettingsConfig: pending op exists, skipping resnap for ${id}`);
+				continue;
+			}
+
+			// Current live GM value vs stored snapshot
+			const cur = game.settings.get(ns, key);
+			const existing = map[id];
+			const prev = existing?.value;
+
+			// ✅ Core rule: if GM changed a setting that had a lock (soft or hard), CLEAR the lock
+			if (existing && !objectsEqual(cur, prev)) {
+				delete map[id];
+				changed = true;
+				DL(`setting-sync.js | closeSettingsConfig: GM changed ${id} -> cleared lock`);
+				continue;
+			}
+
+			// No GM change; keep entry, but refresh requiresReload if it drifted
+			if (existing && (existing.requiresReload !== !!cfg.requiresReload)) {
 				map[id] = {
-					namespace: ns,
-					key,
-					value: cur,
-					requiresReload: existing.requiresReload ?? !!cfg.requiresReload,
-					...(Array.isArray(existing.userIds) ? { userIds: existing.userIds.slice() } : {})
+					...existing,
+					requiresReload: !!cfg.requiresReload
 				};
 				changed = true;
-				DL(`setting-sync.js |  bbmm-setting-lock: resnap on close ${id} ->`, cur);
+				DL(`setting-sync.js | closeSettingsConfig: refreshed requiresReload for ${id}`);
 			}
 		}
 
 		if (changed) {
 			await game.settings.set(BBMM_ID, "userSettingSync", map);
 			bbmmBroadcastTrigger(); // notify players after write
-			DL("setting-sync.js |  bbmm-setting-lock: userSettingSync updated on closeSettingsConfig");
+			DL("setting-sync.js | bbmm-setting-lock: userSettingSync updated on closeSettingsConfig");
 		}
 	} catch (err) {
-		DL(2, "setting-sync.js |  bbmm-setting-lock: resnap on close error", err);
+		DL(2, "setting-sync.js | bbmm-setting-lock: resnap on close error", err);
 	}
 });
+
 
 /*  ============================================================================
         { HOOK: setSetting } 
@@ -1211,31 +1231,64 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 					lockIcon = makeIcon(LT.sync.ToggleHint(), "fa-solid fa-lock-open", true);
 				}
 
-				// sync/push icon: force this one setting now to players
+				// --- NEW: if GM edits a locked setting value, queue CLEAR immediately ---
+				// (prevents resnap/push/reload from re-applying)
+				try {
+					if (state !== "none") {
+						const sel = `input[name="settings.${cfg.namespace}.${cfg.key}"], select[name="settings.${cfg.namespace}.${cfg.key}"], textarea[name="settings.${cfg.namespace}.${cfg.key}"]`;
+						const inputs = form.querySelectorAll?.(sel) || [];
+						if (inputs.length) {
+							const dot = id.indexOf(".");
+							const ns = id.slice(0, dot);
+							const key = id.slice(dot + 1);
+							const clearOnce = async () => {
+								try {
+									if (_bbmmIsUnlockQueued(id)) return;
+
+									// Remove immediately from world map so resnap won’t re-add it
+									let map = game.settings.get(BBMM_ID, "userSettingSync") || {};
+									if (map[id]) {
+										delete map[id];
+										await game.settings.set(BBMM_ID, "userSettingSync", map);
+										bbmmBroadcastTrigger();
+										DL(`setting-sync.js | GM changed ${id} while locked -> immediate CLEAR`);
+									}
+
+									// Also queue clears for consistency (so pendingOps stays in sync)
+									_bbmmApplyClearLocks({ id, ns, key, iconEl: lockIcon });
+								} catch (e) {
+									DL(2, "setting-sync.js | GM-change clearOnce failed", e);
+								}
+							};
+							for (const inp of inputs) {
+								inp.addEventListener("change", clearOnce, { once: true });
+								inp.addEventListener("input", clearOnce, { once: true });
+							}
+						}
+					}
+				} catch (e) {
+					DL(2, "setting-sync.js | attach GM-change clear handler failed", e);
+				}
+				// -----------------------------------------------------------------------
+
+				// push icon...
 				const pushTitle = (LT.sync.PushHint());
 				const pushIcon = makeIcon(pushTitle, "fa-solid fa-arrows-rotate", true);
 				pushIcon.addEventListener("click", (ev) => {
 					try {
 						ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
 
-						const selectUsers = !!game.settings.get(BBMM_ID, SELECT_USERS_KEY);
 						const dot = id.indexOf(".");
 						const ns = id.slice(0, dot);
 						const key = id.slice(1 + dot);
-
-						if (!selectUsers) {
-							// Legacy immediate behavior
-							bbmmPushSetting(ns, key);
-							return;
-						}
-
 						const val = game.settings.get(ns, key);
+
 						const picker = new BBMMUserPicker({
 							title: LT.titleSyncForUsers(),
 							settingId: id,
 							valuePreview: val,
 							confirmLabel: LT.dialogQueueSync(),
-							onlyOnline: true, // show only currently connected users
+							onlyOnline: true,
 							onConfirm: async (userIds) => {
 								_bbmmQueueOp({ op: "push", id, namespace: ns, key, value: val, userIds });
 								ui.notifications.info(LT.infoQueuedSync({ module: id, count: userIds.length }));
@@ -1247,7 +1300,7 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 					}
 				});
 
-				// Click / Shift+Click
+				// Click / Shift+Click gestures (unchanged) …
 				lockIcon.addEventListener("click", (ev) => {
 					try {
 						ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
@@ -1257,8 +1310,6 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 						DL(2, "setting-sync.js | lockIcon click handler error", err);
 					}
 				});
-
-				// Right-click (context menu) -> supports Shift+Right-Click
 				lockIcon.addEventListener("contextmenu", (ev) => {
 					try {
 						ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
@@ -1268,8 +1319,6 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 						DL(2, "setting-sync.js | lockIcon contextmenu handler error", err);
 					}
 				});
-
-				// Keyboard (Enter/Space) = Click
 				lockIcon.addEventListener("keydown", (e) => {
 					try {
 						if (e.key === "Enter" || e.key === " ") {

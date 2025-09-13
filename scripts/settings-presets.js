@@ -416,12 +416,26 @@ async function svc_setSettingsPresets(obj) {
 	- GM: world + client, Non‑GM: client only
 	- includeDisabled=false -> skip modules that are not active (except core/system)
 */
-function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
+function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden = false } = {}) {
 	// Build a bbmm-settings envelope
 	const isGM = game.user.isGM;
 	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
 	const sysId = game.system.id;
 	const skipMap = getSkipMap();
+
+	/* 
+		Get explicit hidden inclusions from Inclusions Manager
+		- Stored in settings as: game.settings.get(BBMM_ID, "userInclusions")
+	*/
+	let includedHidden = new Set();
+	try {
+		const inc = game.settings.get(BBMM_ID, "userInclusions") || {};
+		const arr = Array.isArray(inc.settings) ? inc.settings : [];
+		includedHidden = new Set(arr.map(s => `${s?.namespace ?? ""}.${s?.key ?? ""}`));
+		DL("settings-presets.js | svc_collectAllModuleSettings(): inclusions loaded", { count: includedHidden.size });
+	} catch (e) {
+		DL(2, "settings-presets.js | svc_collectAllModuleSettings(): failed to load inclusions", e);
+	}
 
 	try {
 		for (const def of game.settings.settings.values()) {
@@ -431,6 +445,19 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 			// Players can't read world-scope settings
 			if (scope === "world" && !isGM) continue;
 
+			/* Hidden settings gate =======================================================
+				- Skip hidden (config:false) by default
+				- Always include if explicitly added via Inclusions Manager
+				- Include all hidden only when includeHidden === true
+			============================================================================ */
+			const isHidden = (def?.config === false);
+			const forceIncludeHidden = includedHidden.has(`${namespace}.${key}`);
+			if (isHidden) {
+				if (!forceIncludeHidden && !includeHidden) {
+					continue;
+				}
+			}
+
 			// Respect includeDisabled; let core + system through
 			if (!includeDisabled) {
 				if (namespace !== "core" && namespace !== sysId) {
@@ -438,7 +465,6 @@ function svc_collectAllModuleSettings({ includeDisabled = false } = {}) {
 					if (!mod?.active) continue;
 				}
 			}
-
 
 			// Single source of truth for exclusions 
 			if (isExcludedWith(skipMap, namespace) || isExcludedWith(skipMap, namespace, key)) {
@@ -1348,6 +1374,7 @@ export async function openSettingsPresetManager() {
 			
 			<div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
 				<label><input type="checkbox" name="includeDisabled" checked> ${LT.incDisabledModules()}</label>
+				<label><input type="checkbox" name="includeHidden"> ${LT.includeHidden()}</label>
 			</div>
 
 			<div style="display:flex;gap:.5rem;align-items:center;">
@@ -1417,6 +1444,27 @@ export async function openSettingsPresetManager() {
 
 			DL(`settings-presets.js | openSettingsPresetManager(): \naction = ${action} \nselected = ${selected} \nnewName = ${newName} \nincludeDisabled = ${includeDisabled}`);
 
+			// Read "include hidden" request
+			const chkHidden = root.querySelector('input[name="includeHidden"]');
+			const includeHiddenRaw = !!(chkHidden && chkHidden.checked);
+
+			// If the user asked to include hidden, confirm first
+			let includeHiddenFinal = false;
+			if (includeHiddenRaw) {
+				const ok = await foundry.applications.api.DialogV2.confirm({
+					window: { title: LT.includeHiddenWarnTitle() },
+					content: `<div style="display:flex;flex-direction:column;gap:.5rem;">
+						<p>${LT.includeHiddenWarnMsg()}</p>
+						${LT.includeHiddenWarnLink?.() || ""}
+					</div>`,
+					defaultYes: false,
+					ok: { label: LT.buttons.yes() },
+					cancel: { label: LT.buttons.no() }
+				});
+				includeHiddenFinal = !!ok;
+				if (!ok) DL("settings-presets.js | include hidden CANCELLED — proceeding with non-hidden + inclusions only");
+			}
+
 			// Guard: name required for save-current
 			if (action === "save-current" && !newName) {
 				ui.notifications.warn(`${LT.promptNameSettingsPreset()}.`);
@@ -1428,7 +1476,7 @@ export async function openSettingsPresetManager() {
 					SAVE CURRENT -> new named preset
 				*/
 				if (action === "save-current") {
-					const payload = svc_collectAllModuleSettings({ includeDisabled });
+					const payload = svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
 					DL("settings-presets.js | openSettingsPresetManager(): save-current — collected payload", {
 						counts: {
 							world: Object.keys(payload.world ?? {}).length,
@@ -1462,7 +1510,7 @@ export async function openSettingsPresetManager() {
 					if (!selected) { ui.notifications.warn(`${LT.selectSettingsPreset()}.`); return; }
 
 					// Collect fresh current settings
-					const payload = svc_collectAllModuleSettings({ includeDisabled });
+					const payload = svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
 					DL("settings-presets.js | openSettingsPresetManager(): update — collected payload", {
 						counts: {
 							world: Object.keys(payload.world ?? {}).length,
@@ -1636,7 +1684,7 @@ export async function openSettingsPresetManager() {
 				if (action === "export") {
 					try {
 						DL("settings-presets.js | openSettingsPresetManager(): Export: start");
-						const payload = svc_collectAllModuleSettings({ includeDisabled });
+						const payload = svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
 
 						// Normalize schema types
 						hlp_schemaCorrectNonPlainTypes(payload);

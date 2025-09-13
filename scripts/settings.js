@@ -2,6 +2,7 @@ import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openLegacyExportDialog } from "./legacy.js";
+import { openInclusionsManagerApp } from "./inclusions.js";
 
 const MODULE_SETTING_PRESETS = "module-presets";  // OLD will go away 
 const SETTING_SETTINGS_PRESETS = "settingsPresets"; // OLD will go away
@@ -10,7 +11,8 @@ const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser";
 
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
-	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", "migratedPresetsV1", "userSettingSync"])],
+	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", 
+		"migratedPresetsV1", "userSettingSync", "migratedPresetsV1", "softLockLedger", "softLockRevMap"])],
 	["core", new Set(["moduleConfiguration", "compendiumConfiguration", "time"])],	
 	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
@@ -215,7 +217,9 @@ export async function openBBMMLauncher() {
 			buttons: [
 				{ action: "modules",  label: LT.modulePresetMgr(), default: true },
 				{ action: "settings", label: LT.settingsPresetMgr() },
+				{ action: "controls-presets", label: LT.controlsPresetMgr() },
 				{ action: "exclusions", label: LT.exclusionsMgr() },
+				{ action: "inclusions", label: LT.inclusionsMgr() },	
 				{ action: "cancel",   label: LT.buttons.cancel() }
 			],
 			submit: (res) => resolve(res ?? "cancel"),
@@ -234,6 +238,10 @@ export async function openBBMMLauncher() {
 		openSettingsPresetManager();
 	} else if (choice === "exclusions") {
 		openExclusionsManager();
+	} else if (choice === "inclusions") {
+		openInclusionsManagerApp();
+	} else if (choice === "controls-presets") {
+		openControlsPresetManager();
 	}
 	// "cancel" -> do nothing
 }
@@ -289,7 +297,6 @@ Hooks.once("init", () => {
 		DL(2, "settings.js | BBMM init version gate failed", err);
 	}
 
-	
 	try {
 		DL("settings.js | init(): start");
 
@@ -343,6 +350,16 @@ Hooks.once("init", () => {
 					config: false,	
 					type: Object,
 					default: { modules: [], settings: [] }
+				});
+
+				// User Inclusions (hidden settings to include when saving presets)
+				game.settings.register(BBMM_ID, "userInclusions", {
+					name: "BBMM: User Inclusions",
+					hint: "Hidden settings explicitly included when exporting BBMM settings presets.",
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}
 				});
 
 				// User scoped Settings presets
@@ -402,25 +419,6 @@ Hooks.once("init", () => {
 					default: {}
 				});
 
-				// OLD Settings Presets 
-				game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS, {
-					name: "Module Presets",
-					hint: "Stored module enable/disable presets.",
-					scope: "world",
-					config: false,
-					type: Object,
-					default: {}
-				});
-				
-				// OLD world Presets 
-				game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS, {
-					name: "Settings Presets",
-					hint: "Stored module enable/disable presets.",
-					scope: "world",
-					config: false,
-					type: Object,
-					default: {}
-				});
 			// ===== SETTINGS ITEMS =====
 			// These DO need to be localized
 
@@ -581,8 +579,6 @@ Hooks.once("init", () => {
 					onChange: v => DL(`settings.js | gestureAction_shift -> ${v}`)
 				});
 
-				
-
 				// Set action for Shift+Right-Click (default: clearLocks)
 				game.settings.register(BBMM_ID, "gestureAction_shiftRight", {
 					name: LT.name_SetActionShiftRightClick(),
@@ -610,7 +606,6 @@ Hooks.once("init", () => {
 					},
 					default: "none"
 				});
-
 		}
 	} catch (err) {
 		DL(3, "settings.js | init() error", err);
