@@ -23,17 +23,14 @@ jobs:
         id: get_version
         uses: battila7/get-version-action@v2
 
-      # NEW: decide URLs based on whether this is a prerelease
-      - name: Compute manifest/download URLs
-        id: urls
+      # Use tagged manifest for prerelease; latest for stable
+      - name: Set manifest URL for channel (stable vs prerelease)
+        id: set_manifest
         run: |
           if [ "${{ github.event.release.prerelease }}" = "true" ]; then
-            echo "manifest=https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/module.json" >> $GITHUB_OUTPUT
-            echo "download=https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/bbmm.zip" >> $GITHUB_OUTPUT
+            echo "manifest_url=https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/module.json" >> $GITHUB_OUTPUT
           else
-            # Stable builds use /latest/ manifest so users stay on the stable channel
-            echo "manifest=https://github.com/${{ github.repository }}/releases/latest/download/module.json" >> $GITHUB_OUTPUT
-            echo "download=https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/bbmm.zip" >> $GITHUB_OUTPUT
+            echo "manifest_url=https://github.com/${{ github.repository }}/releases/latest/download/module.json" >> $GITHUB_OUTPUT
           fi
 
       - name: Modify Module Manifest With Release-Specific Values
@@ -43,11 +40,37 @@ jobs:
           files: "module.json"
         env:
           version: ${{ steps.get_version.outputs.version-without-v }}
-          manifest: ${{ steps.urls.outputs.manifest }}
-          download: ${{ steps.urls.outputs.download }}
+          manifest: ${{ steps.set_manifest.outputs.manifest_url }}
+          download: https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/bbmm.zip
+
+      # --- Build packs from committed _source -------------------------------
+
+      - name: Install Foundry CLI
+        run: npm i -D @foundryvtt/foundryvtt-cli
+
+      # Optional: fail fast if _source is missing or dupes exist
+      - name: Verify extracted packs (no dupes)
+        run: node _build/verify-extracted-packs.mjs
+
+      - name: Compile packs from _source
+        run: node _build/compile-all-packs.mjs
+
+      # Useful tree dump for debugging
+      - name: Show packs tree
+        run: |
+          echo "==== packs tree ===="
+          find packs -maxdepth 2 -type f -printf "%p (%k KB)\n" | sort
+
+      # --- Package & publish ------------------------------------------------
 
       - name: Create Module Archive
-        run: zip -r bbmm.zip module.json README.md LICENSE.md CHANGELOG.md scripts/ packs/ styles/ lang/
+        run: |
+          mkdir -p dist
+          if [ -f LICENSE.md ]; then LIC="LICENSE.md"; else LIC="LICENSE"; fi
+          zip -r dist/bbmm.zip \
+            module.json README.md "$LIC" CHANGELOG.md \
+            scripts/ packs/ styles/ lang/ \
+            -x "packs/*/_source/*"
 
       - uses: release-flow/keep-a-changelog-action@v3
         id: changelog
@@ -65,11 +88,8 @@ jobs:
           prerelease: ${{ github.event.release.prerelease }}
           name: ${{ steps.get_version.outputs.version-without-v }}
           body: ${{ steps.changelog.outputs.release-notes }}
-          artifacts: |
-            module.json
-            bbmm.zip
+          artifacts: "module.json, dist/bbmm.zip"
 
-      # Will only run for stable (non-prerelease) – keeps test builds off Foundry
       - name: Publish Module to FoundryVTT Website
         id: publish-to-foundry-website
         if: ${{ ! github.event.release.prerelease }}
