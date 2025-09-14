@@ -8,6 +8,15 @@
 import { DL } from './settings.js';
 import { LT, BBMM_ID } from "./localization.js";
 
+//	Ensure namespace once
+globalThis.bbmm ??= {};
+
+//	Register on bbmm namespace
+Object.assign(globalThis.bbmm, {
+	openExclusionsManagerApp,
+	openAddModuleExclusionApp,
+	openAddSettingExclusionApp
+});
 
 class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
@@ -841,12 +850,5 @@ export function openAddSettingExclusionApp() {
 	new BBMMAddSettingExclusionAppV2().render(true);
 }
 
-//	Ensure namespace once
-globalThis.bbmm ??= {};
 
-//	Register on bbmm namespace
-Object.assign(globalThis.bbmm, {
-	openExclusionsManagerApp,
-	openAddModuleExclusionApp,
-	openAddSettingExclusionApp
-});
+

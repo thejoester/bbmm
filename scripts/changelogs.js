@@ -5,6 +5,7 @@
 
 import { DL } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
+import { hlp_esc } from "./helpers.js";
 
 /* ============================================================================
         {GLOBALS}
@@ -236,17 +237,7 @@ Supports:
 ============================================================================ */
 function _bbmmMarkdownToHtml(md) {
 	try {
-		const escHTML = (s) => {
-			if (foundry?.utils?.escapeHTML) return foundry.utils.escapeHTML(String(s ?? ""));
-			return String(s ?? "")
-				.replaceAll("&", "&amp;")
-				.replaceAll("<", "&lt;")
-				.replaceAll(">", "&gt;")
-				.replaceAll('"', "&quot;")
-				.replaceAll("'", "&#39;");
-		};
-		const escAttr = (s) => escHTML(s);
-
+		
 		function inlineToHtml(text) {
 				/* ==========================================================================
 				Order matters:
@@ -255,16 +246,8 @@ function _bbmmMarkdownToHtml(md) {
 				3) Convert markdown links & autolinks
 				4) Escape remaining non-tag text
  				============================================================================*/
-			const escHTML = (s) => {
-				if (foundry?.utils?.escapeHTML) return foundry.utils.escapeHTML(String(s ?? ""));
-				return String(s ?? "")
-					.replaceAll("&", "&amp;")
-					.replaceAll("<", "&lt;")
-					.replaceAll(">", "&gt;")
-					.replaceAll('"', "&quot;")
-					.replaceAll("'", "&#39;");
-			};
-			const escAttr = (s) => escHTML(s);
+			const escHTML = hlp_esc;
+			const escAttr = hlp_esc;
 
 			// 1) Split by backticks -> protect code segments
 			const parts = String(text ?? "").split(/`/);

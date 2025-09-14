@@ -1,5 +1,9 @@
 import { DL } from './settings.js';
 import { EXPORT_SKIP } from './settings.js';
+
+/* Cache the effective skip map until invalidated */
+let _skipMapCache = null;
+
 /* ---------------------------------------------------------------------- */
 /* General helpers										                  */
 /* ---------------------------------------------------------------------- */
@@ -79,9 +83,6 @@ export function hlp_normalizePresetName(s) {
 /* ---------------------------------------------------------------------- */
 /* Exclusion helpers (used by settings and module presets)                */
 /* ---------------------------------------------------------------------- */ 
-
-/* Cache the effective skip map until invalidated */
-let _skipMapCache = null;
 
 export function invalidateSkipMap() {
 	// Call this if you change bbmm.userExclusions or EXPORT_SKIP at runtime
