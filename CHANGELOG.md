@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0-test.3] - 2025-09-13
+### Added
+- **Compendiums:**
+  - Added Compendium folder "Big Bad Module Manager".
+  - Added Journal for module with documentation.
+  - Added Macro to show changelog report manually. 
+- **Inclusion Manager:**
+  - Added inclusion manager to include hidden settings in presets/inports/exports.
+### Changed
+- **Settings Preset Manager:**
+  - No longer save hidden settings as it could cause issues with many hidden settings. 
+    - See Inclusion Manager to add specific hidden settings you wish to save. 
+### Fixed
+- **Settings Sync:**
+  - When GM changes setting with lock (hard or soft), it will clear lock. 
+
 ## [0.4.0-test.2] - 2025-09-10
 ### Changed
 - **Settings Sync:**
