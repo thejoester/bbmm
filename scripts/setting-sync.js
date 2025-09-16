@@ -850,6 +850,34 @@ Hooks.on("setSetting", async (namespace, key, value) => {
 		if (!bbmmIsSyncEnabled()) return;
 		if (game.user?.isGM) return;
 
+		// --- CONTROLS: if a PLAYER updates core.keybindings, mark any SOFT ctrl revs as handled
+		if (!game.user?.isGM && namespace === "core" && key === "keybindings") {
+			try {
+				const store = _bbmmCtrlGetStore();
+				const revMap = _bbmmCtrlGetRevMap() || {};
+				const ledger = game.settings.get(BBMM_ID, "softLockLedger") || {};
+				let wrote = false;
+
+				for (const [id, rec] of Object.entries(store)) {
+				if (!(rec && rec.soft)) continue;
+				const rev = Number(rec?.rev) || Number(revMap[id]) || 1;
+				const lkey = `@ctrl:${id}`;
+				const last = ledger[lkey];
+				const lastRev = (last && typeof last === "object" && Number.isInteger(last.r)) ? last.r : -1;
+
+				if (lastRev < rev) {
+					ledger[lkey] = { r: rev };
+					wrote = true;
+					DL(`controls | soft-ledger: player handled ${id} (rev=${rev})`);
+				}
+				}
+
+				if (wrote) await game.settings.set(BBMM_ID, "softLockLedger", ledger);
+			} catch (e) {
+				DL(2, "controls | soft-ledger mark on player change failed", e);
+			}
+		}
+
 		const id = `${namespace}.${key}`;
 		const cfg = game.settings.settings.get(id);
 		if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) return;
@@ -1534,6 +1562,53 @@ Hooks.once("ready", async () => {
 					DL(1, "setting-sync.js | controls: socket refresh");
 					await _bbmmCtrlPullApplyAll();
 				}
+
+				if (msg?.t === "bbmm-ctrl-push") {
+					try {
+						// GM should not apply; players only
+						if (game.user?.isGM) return;
+
+						const { ns, action, bindings, targets } = msg;
+
+						// Optional targeting
+						if (Array.isArray(targets) && targets.length && !targets.includes(game.user?.id)) return;
+
+						DL(`controls: PUSH recv ${ns}.${action} | incoming=${Array.isArray(bindings) ? bindings.length : 0}`);
+
+						// --- PHASE 1: just log to confirm end-to-end ---
+						// Once you see this log on a player client after clicking the GM sync icon,
+						// we’ll flip to apply (PHASE 2 below).
+
+						// Uncomment this block when you’re ready to apply on receipt:
+						/*
+						try {
+						const kb = game.keybindings;
+						// Clear existing bindings (API differences across builds)
+						if (typeof kb.reset === "function") {
+							await kb.reset(ns, action);
+						} else {
+							// Fallback: best-effort remove by unbinding each current assignment
+							const cur = kb.get?.(ns, action) ?? [];
+							for (const b of cur) {
+							try { await kb.set(ns, action, { key: null, modifiers: [] }); } catch {}
+							}
+						}
+
+						// Re-apply the GM’s snapshot
+						for (const b of (bindings || [])) {
+							await kb.set(ns, action, { key: b.key, modifiers: b.modifiers || [] });
+						}
+
+						DL(`controls: applied ${ns}.${action} -> ${bindings?.length || 0} binding(s)`);
+						} catch (applyErr) {
+						DL(2, "controls: apply failed", { ns, action, applyErr });
+						}
+						*/
+					} catch (e) {
+						DL(2, "controls: push recv error", e);
+					}
+					return; // handled
+				}
 			});
 		}
 	} catch (err) {
@@ -1586,15 +1661,53 @@ function _bbmmCtrlSame(a = [], b = []) {
 
 function _bbmmCtrlBindings(ns, action) {
   try {
-    // Try API get()
-    const viaAPI = game.keybindings?.get?.(ns, action);
-    if (Array.isArray(viaAPI)) return viaAPI.map(b => ({ key: b?.key, modifiers: (b?.modifiers ?? []).slice() }));
+    const normalize = (b) => {
+      if (!b) return null;
+      const key =
+        (typeof b.key === "string" && b.key) ||
+        (typeof b.code === "string" && b.code) ||
+        (typeof b.k === "string" && b.k) ||
+        null;
+      if (!key) return null;
+      const modsSrc =
+        (Array.isArray(b.modifiers) && b.modifiers) ||
+        (Array.isArray(b.mods) && b.mods) ||
+        [];
+      const modifiers = modsSrc.slice().filter(Boolean).sort(); // stable order
+      return { key, modifiers };
+    };
 
-    // Fallback: read the core setting blob
-    const id = `${ns}.${action}`;
-    const blob = game.settings.get("core", "keybindings") || {};
-    const arr = Array.isArray(blob[id]) ? blob[id] : [];
-    return arr.map(b => ({ key: b?.key, modifiers: (b?.modifiers ?? []).slice() }));
+    let out = [];
+
+    // Preferred: API
+    try {
+      const viaAPI = game.keybindings?.get?.(ns, action);
+      if (Array.isArray(viaAPI)) out = viaAPI.map(normalize).filter(Boolean);
+    } catch {}
+
+    // Fallback: core setting blob(s)
+    if (!out.length) {
+      const id = `${ns}.${action}`;
+      let blob = null;
+      try { blob = game.settings.get("core", "keybindings"); } catch {}
+      const raw =
+        (blob && Array.isArray(blob[id]) && blob[id]) ||
+        (blob?.bindings && Array.isArray(blob.bindings[id]) && blob.bindings[id]) ||
+        [];
+      out = raw.map(normalize).filter(Boolean);
+    }
+
+    // Deduplicate (key + modifiers signature)
+    const seen = new Set();
+    const unique = [];
+    for (const b of out) {
+      const sig = `${b.key}|${b.modifiers.join("+")}`;
+      if (!seen.has(sig)) {
+        seen.add(sig);
+        unique.push(b);
+      }
+    }
+    return unique;
   } catch (err) {
     DL(2, "setting-sync.js | ctrlBindings() failed", { ns, action, err });
     return [];
@@ -1625,6 +1738,7 @@ async function _bbmmCtrlSetBindings(ns, action, arr) {
     DL(2, "setting-sync.js | ctrlSetBindings() failed", { ns, action, err });
   }
 }
+
 async function _bbmmCtrlApply({ ns, action, rec }) {
 	try {
 		if (!_bbmmCtrlEnabled()) return;
@@ -1655,79 +1769,55 @@ async function _bbmmCtrlApply({ ns, action, rec }) {
 	} catch (err) { DL(2, "setting-sync.js | ctrlApply() failed", { ns, action, err }); }
 }
 
+// Pull+apply all (players): hard locks always apply; soft locks = push-once with rev ledger
 async function _bbmmCtrlPullApplyAll() {
-	try {
-		if (!_bbmmCtrlEnabled()) return;
-		const store = _bbmmCtrlGetStore();
-		for (const [id, rec] of Object.entries(store)) {
-			const dot = id.lastIndexOf(".");
-			if (dot <= 0) continue;
-			const ns = id.slice(0, dot);
-			const action = id.slice(dot + 1);
-			await _bbmmCtrlApply({ ns, action, rec });
-		}
-	} catch (err) { DL(2, "setting-sync.js | ctrlPullApplyAll() failed", err); }
-}
+  try {
+    if (!_bbmmCtrlEnabled()) return;
+    const store = _bbmmCtrlGetStore();
+    const revMap = _bbmmCtrlGetRevMap() || {};
+    const ledger = game.settings.get(BBMM_ID, "softLockLedger") || {};
 
-async function _bbmmCtrlGMHard({ ns, action, userIds = [] }) {
-	try {
-		const id = _bbmmCtrlId(ns, action);
-		const store = _bbmmCtrlGetStore();
-		const revMap = _bbmmCtrlGetRevMap();
-		const next = { ...(store[id] ?? {}) };
+    for (const [id, rec] of Object.entries(store)) {
+      const dot = id.lastIndexOf(".");
+      if (dot <= 0) continue;
+      const ns = id.slice(0, dot);
+      const action = id.slice(dot + 1);
 
-		next.lock = {
-			value: _bbmmCtrlBindings(ns, action),
-			// omit userIds if targeting *all* non-GMs (same semantics as settings)
-			...(Array.isArray(userIds) && userIds.length ? { userIds: userIds.slice() } : {})
-		};
-		next.soft = null;
-		next.rev = (Number(next.rev) || 0) + 1;
+      // HARD LOCK: always enforce
+      if (rec?.lock?.value) {
+        const have = _bbmmCtrlBindings(ns, action);
+        if (!_bbmmCtrlSame(have, rec.lock.value)) {
+          DL(1, `controls | apply HARD ${id}`);
+          await _bbmmCtrlSetBindings(ns, action, rec.lock.value);
+        }
+        continue;
+      }
 
-		store[id] = next;
-		revMap[id] = next.rev;
+      // SOFT LOCK: push once per rev, then never re-apply
+      if (rec?.soft?.value) {
+        const rev = Number(rec?.rev) || Number(revMap[id]) || 1;
+        const lkey = `@ctrl:${id}`;
+        const last = ledger[lkey];
+        const lastRev = (last && typeof last === "object" && Number.isInteger(last.r)) ? last.r : -1;
 
-		await _bbmmCtrlSetStore(store);
-		await _bbmmCtrlSetRevMap(revMap);
+        // Already handled this rev? Skip.
+        if (lastRev >= rev) continue;
 
-		ui.notifications?.info?.(LT.controlsLockApplied());
-		game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
-	} catch (err) { DL(2, "setting-sync.js | ctrlGMHard() failed", err); }
-}
+        // First time seeing this rev → apply once, then mark ledger
+        const have = _bbmmCtrlBindings(ns, action);
+        if (!_bbmmCtrlSame(have, rec.soft.value)) {
+          DL(1, `controls | apply SOFT ${id} (rev=${rev})`);
+          await _bbmmCtrlSetBindings(ns, action, rec.soft.value);
+        }
 
-async function _bbmmCtrlGMSoft({ ns, action }) {
-	try {
-		const id = _bbmmCtrlId(ns, action);
-		const store = _bbmmCtrlGetStore();
-		const revMap = _bbmmCtrlGetRevMap();
-		const next = { ...(store[id] ?? {}) };
-		next.soft = { value: _bbmmCtrlBindings(ns, action) };
-		next.lock = null;
-		next.rev = (Number(next.rev) || 0) + 1;
-		store[id] = next;
-		revMap[id] = next.rev;
-		await _bbmmCtrlSetStore(store);
-		await _bbmmCtrlSetRevMap(revMap);
-		ui.notifications?.info?.(LT.controlsSoftApplied());
-		game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
-	} catch (err) { DL(2, "setting-sync.js | ctrlGMSoft() failed", err); }
-}
-
-async function _bbmmCtrlGMClear({ ns, action }) {
-	try {
-		const id = _bbmmCtrlId(ns, action);
-		const store = _bbmmCtrlGetStore();
-		const revMap = _bbmmCtrlGetRevMap();
-		const next = { ...(store[id] ?? {}) };
-		next.lock = null; next.soft = null;
-		next.rev = (Number(next.rev) || 0) + 1;
-		store[id] = next;
-		revMap[id] = next.rev;
-		await _bbmmCtrlSetStore(store);
-		await _bbmmCtrlSetRevMap(revMap);
-		ui.notifications?.info?.(LT.controlsCleared());
-		game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
-	} catch (err) { DL(2, "setting-sync.js | ctrlGMClear() failed", err); }
+        // Mark handled so it won’t re-apply on refresh/load
+        ledger[lkey] = { r: rev, v: JSON.stringify(rec.soft.value ?? []) };
+        await game.settings.set(BBMM_ID, "softLockLedger", ledger);
+      }
+    }
+  } catch (err) {
+    DL(2, "setting-sync.js | ctrlPullApplyAll() failed", err);
+  }
 }
 
 function _bbmmParseBindingId(bindingId) {
@@ -1892,121 +1982,184 @@ function _bbmmCtrlHandlePush({ ns, action }) {
 	}
 }
 
-function _bbmmCtrlWireConfig(app, html) {
+async function _bbmmCtrlSyncAction({ ns, action, userIds }) {
+	try {
+		if (!game.user?.isGM) return;
+		const bindings = _bbmmCtrlBindings(ns, action); // snapshot from GM
+		if (!bindings?.length && bindings?.length !== 0) return;
+
+		// targets: null or [] => all non-GM users
+		let targets = null;
+		if (Array.isArray(userIds)) targets = userIds.slice();
+
+		game.socket?.emit?.(BBMM_SYNC_CH, {
+			t: "bbmm-ctrl-push",
+			namespace: ns,
+			action,
+			bindings,
+			targets
+		});
+
+		ui.notifications?.info?.(
+			LT.infoQueuedSync?.({ module: `${ns}.${action}`, count: Array.isArray(targets) ? targets.length : (game.users?.contents || []).filter(u => !u.isGM).length }) ||
+			"Sync sent"
+		);
+	} catch (err) {
+		DL(2, "ctrlSyncAction() failed", { ns, action, err });
+	}
+}
+
+async function _bbmmCtrlGMSoft({ ns, action }) {
   try {
-
-    if (!_bbmmCtrlEnabled()) return;
-	if (!game.user?.isGM) return; 
-
-    // Players shouldn’t see or use these icons
-    if (!game.user?.isGM) {
-      // in case anything leaked in a previous render, strip it
-      const rootP = html?.[0] || html;
-      rootP?.querySelectorAll?.(".bbmm-lock-icons")?.forEach(el => el.remove());
-      return;
-    }
-
-    const root = html?.[0] || html;
-    if (!root?.querySelectorAll) return;
-
-    const plusButtons = Array.from(root.querySelectorAll('button[data-action="addBinding"]'));
+    const id = _bbmmCtrlId(ns, action);
     const store = _bbmmCtrlGetStore();
-    let rows = 0, attached = 0, skipped = 0;
+    const revMap = _bbmmCtrlGetRevMap();
 
-    for (const plus of plusButtons) {
-      const li = plus.closest('li[data-binding-id]');
-      if (!li) continue;
+    const next = { ...(store[id] ?? {}) };
+    next.soft = { value: _bbmmCtrlBindings(ns, action) };
+    next.lock = null;
+    next.rev = (Number(next.rev) || 0) + 1;
 
-      const bindingId = li.getAttribute('data-binding-id') || "";
-      const { ns, action } = _bbmmParseBindingId(bindingId);
-      if (!ns || !action) continue;
+    store[id] = next;
+    revMap[id] = next.rev;
 
-      rows++;
+    await _bbmmCtrlSetStore(store);
+    await _bbmmCtrlSetRevMap(revMap);
 
-      const cfg = _bbmmKbGetConfig(ns, action) || {};
-      const isUneditable = Array.isArray(cfg.uneditable) && cfg.uneditable.length > 0;
-      const isRestricted = !!cfg.restricted;
-      if (isUneditable || isRestricted) {
-        li.querySelector('.bbmm-lock-icons')?.remove();
-        skipped++;
-        continue;
-      }
-
-      const controlsCell =
-        plus.closest('.controls, .keybinding-controls, .form-fields') || plus.parentElement;
-      if (!controlsCell) continue;
-
-      let bar = li.querySelector('.bbmm-lock-icons');
-      if (!bar) {
-        bar = document.createElement('span');
-        bar.className = 'bbmm-lock-icons';           // 🔸 same class as settings UI → inherits your colors
-        bar.style.display = 'inline-flex';
-        bar.style.alignItems = 'center';
-        bar.style.gap = '.35rem';
-        bar.style.marginLeft = '.25rem';
-        controlsCell.appendChild(bar);
-      } else {
-        bar.innerHTML = '';
-      }
-
-      // util to wire a clickable FA icon that routes gestures
-      const addIcon = (title, classes, onGesture) => {
-        const i = document.createElement('i');
-        i.className = classes;
-        i.title = title;
-        i.style.cursor = 'pointer';
-
-        const stopAll = (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); };
-
-        i.addEventListener('click', (ev) => {
-          stopAll(ev);
-          onGesture?.(ev.shiftKey ? 'shift' : 'click', i);
-        });
-        i.addEventListener('contextmenu', (ev) => {
-          stopAll(ev);
-          onGesture?.(ev.shiftKey ? 'shiftRight' : 'right', i);
-        });
-        i.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter' || ev.key === ' ') {
-            stopAll(ev);
-            onGesture?.('click', i);
-          }
-        });
-
-        bar.appendChild(i);
-        return i;
-      };
-
-      // LOCK icon — initialize from store
-      const id = _bbmmCtrlId(ns, action);
-      const initial = _bbmmCtrlGetLockState(id, store);
-      const lockIcon = addIcon(LT.sync?.ToggleHint?.() || "Lock", "fa-solid fa-lock-open", (gesture, iconEl) => {
-        _bbmmCtrlHandleLockGesture({ ns, action, iconEl, gesture });
-      });
-      _bbmmSetLockIconState(
-        lockIcon,
-        initial === "soft"     ? "softLock"   :
-        initial === "all"      ? "lockAll"    :
-        initial === "partial"  ? "lockSelected" :
-                                 "unlocked"
-      );
-
-      // SYNC icon — trigger a refresh so clients pull+apply immediately
-      addIcon(LT.sync?.PushHint?.() || "Sync", "fa-solid fa-arrows-rotate", () => {
-        try {
-          game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
-          DL(`controls: ${ns}.${action} | sync refresh emitted`);
-        } catch (e) { DL(2, "controls sync emit failed", e); }
-      });
-
-      attached++;
-    }
-
-    DL(`ctrlWireConfig(): rows=${rows}, attached=${attached}, skipped=${skipped}`);
+    ui.notifications?.info?.(LT.controlsSoftApplied());
+    game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
   } catch (err) {
-    DL(2, "ctrlWireConfig() failed", err);
+    DL(2, "setting-sync.js | ctrlGMSoft() failed", { ns, action, err });
   }
 }
+
+function _bbmmCtrlWireConfig(app, html) {
+	try {
+		// GM only; players see nothing
+		if (!game.user?.isGM) return;
+
+		const root = html?.[0] || html || app?.element?.[0] || document;
+		if (!root?.querySelectorAll) return;
+
+		// Controls UI uses .form-group[data-action-id="ns.action"]
+		let groups = Array.from(root.querySelectorAll('.form-group[data-action-id]'));
+
+		// Fallbacks (just in case templates differ)
+		if (!groups.length) {
+			const alt = Array.from(root.querySelectorAll('li[data-binding-id]'));
+			const byGroup = new Map();
+			for (const li of alt) {
+				const g = li.closest('.form-group');
+				if (g) byGroup.set(g, true);
+			}
+			groups = Array.from(byGroup.keys());
+		}
+
+		let attached = 0, skipped = 0;
+		for (const group of groups) {
+			// Avoid duplicate bars on re-renders
+			if (group.querySelector('.bbmm-ctrlbar')) { skipped++; continue; }
+
+			// Find label area
+			const labelEl =
+				group.querySelector('.label, label, .action-name') ||
+				group.querySelector('.form-fields') || group.firstElementChild;
+			if (!labelEl) { skipped++; continue; }
+
+			// Resolve ns/action
+			let ns = 'core', action = '';
+			const actionId = group.getAttribute('data-action-id');
+			if (actionId && actionId.includes('.')) {
+				const dot = actionId.indexOf('.');
+				ns = actionId.slice(0, dot);
+				action = actionId.slice(dot + 1);
+			} else {
+				// backup: parse first li[data-binding-id]
+				const li = group.querySelector('li[data-binding-id]');
+				if (li && typeof _bbmmParseBindingId === 'function') {
+					const p = _bbmmParseBindingId(li.getAttribute('data-binding-id'));
+					ns = p.ns; action = p.action;
+				}
+			}
+			if (!ns || !action) { skipped++; continue; }
+
+			// Build compact toolbar next to label
+			const bar = document.createElement('span');
+			bar.className = 'bbmm-ctrlbar';
+			bar.style.display = 'inline-flex';
+			bar.style.alignItems = 'center';
+			bar.style.gap = '.35rem';
+			bar.style.marginLeft = '.35rem';
+
+			// Sync icon (same visual language as settings push)
+			const syncIcon = document.createElement("i");
+			syncIcon.className = "fa-solid fa-arrows-rotate bbmm-click";
+			syncIcon.setAttribute("role", "button");
+			syncIcon.setAttribute("tabindex", "0");
+			syncIcon.title =
+			LT.sync.PushHint() + "\n" +
+			"• " + LT.sync.ClickPickUsers() + "\n" +
+			"• " + LT.sync.ShiftAll(); 
+
+			bar.appendChild(syncIcon);
+
+			// clicks
+			syncIcon.addEventListener("click", async (ev) => {
+			try {
+				ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+
+				if (ev.shiftKey) {
+				// SHIFT+CLICK => SOFT-LOCK THIS KEYBIND (controls-only)
+				DL(`controls: ${ns}.${action} | soft-lock (Shift+Click)`);
+				await _bbmmCtrlGMSoft({ ns, action });      
+				game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" }); // make players apply immediately
+				return;
+				}
+
+				// CLICK => PICK USERS AND PUSH CURRENT BINDINGS (no locks)
+				DL(`controls: ${ns}.${action} | push to selected users`);
+				const cur = _bbmmCtrlBindings(ns, action); // snapshot current bindings
+
+				const picker = new BBMMUserPicker({
+				title: LT.titleSyncForUsers?.() || "Sync keybind to users",
+				settingId: `${ns}.${action}`,
+				valuePreview: cur,
+				confirmLabel: LT.dialogQueueSync?.() || "Sync",
+				onlyOnline: true,
+				preChecked: "*",
+				onConfirm: async (userIds) => {
+					const targets = Array.isArray(userIds) ? userIds : [];
+					// one-shot push (no lock) — players apply immediately
+					game.socket?.emit?.(BBMM_SYNC_CH, {
+					t: "bbmm-ctrl-push",
+					ns, action,
+					value: cur,
+					targets
+					});
+					ui.notifications?.info?.(LT.infoQueuedSync?.({ module: `${ns}.${action}`, count: targets.length }) ||
+					`Queued sync for ${targets.length} user(s)`);
+				}
+				});
+				picker.show();
+			} catch (err) {
+				DL(2, "controls syncIcon click error", err);
+			}
+			});
+
+			// swallow context menu so we don’t clash with Foundry’s buttons
+			syncIcon.addEventListener("contextmenu", (ev) => {
+			ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+			});
+
+			bar.appendChild(syncIcon);
+			labelEl.appendChild(bar);
+			attached++;
+		}
+
+		DL(`ctrlWireConfig(): groups=${groups.length}, attached=${attached}, skipped=${skipped}`);
+	} catch (err) { DL(2, 'ctrlWireConfig() failed', err); }
+}
+
 
 /*  ============================================================================
         { CONTROLS SYNC HOOKS}
@@ -2021,18 +2174,18 @@ Hooks.on("ready", async () => {
 	} catch (err) { DL(2, "setting-sync.js | controls ready failed", err); }
 });
 
-Hooks.on("renderControlsConfig", (app, html) => {
+Hooks.on('renderKeybindingsConfig', (app, html) => {
 	try {
 		_bbmmCtrlWireConfig(app, html);
 		requestAnimationFrame(() => _bbmmCtrlWireConfig(app, html));
 		setTimeout(() => _bbmmCtrlWireConfig(app, html), 50);
-	} catch (err) { DL(2, "renderControlsConfig failed", err); }
+	} catch (err) { DL(2, 'renderKeybindingsConfig failed', err); }
 });
 
-Hooks.on("renderKeybindingsConfig", (app, html) => {
+Hooks.on('renderControlsConfig', (app, html) => {
 	try {
 		_bbmmCtrlWireConfig(app, html);
 		requestAnimationFrame(() => _bbmmCtrlWireConfig(app, html));
 		setTimeout(() => _bbmmCtrlWireConfig(app, html), 50);
-	} catch (err) { DL(2, "renderKeybindingsConfig failed", err); }
+	} catch (err) { DL(2, 'renderControlsConfig failed', err); }
 });
