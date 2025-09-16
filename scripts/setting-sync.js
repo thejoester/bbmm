@@ -6,6 +6,7 @@
 	============================================================================ */
 
 import { DL } from "./settings.js";
+import { CTRL_STORE_KEY, CTRL_REV_STORE, CTRL_TOGGLE } from "./settings.js"; // Controls-Sync consts
 import { LT, BBMM_ID } from "./localization.js";
 
 
@@ -23,13 +24,13 @@ const objectsEqual = foundry?.utils?.objectsEqual ?? ((a, b) => {
 let _bbmmTriggerTimer = null; // For bbmmBroadcastTrigger()
 
 /*  ============================================================================
-        {HELPERS}
-	============================================================================ */
+        {SETTINGS SYNC HELPERS}
+	========================================================================= */
 
-/* 
-	Detect if an unlock (hard-lock removal) is queued for a given id.
+/*  Detect if unlock is queued =================================================
+	Detect if an lock removal is queued for a given id.
 	- Returns true if there is a 'lock' op for this id with userIds=[]
-*/
+	========================================================================= */
 function _bbmmIsUnlockQueued(id) {
   try {
     return _bbmmPendingOps.some(op =>
@@ -716,6 +717,10 @@ class BBMMUserPicker {
 }
 
 /*  ============================================================================
+        { SETTINGS SYNC HOOKS}
+	========================================================================= */
+
+/*  ============================================================================
 		{ HOOK: Init }
 		 - Capture all registered settings at init 
 		   (for decoration/lock support)
@@ -1073,7 +1078,7 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 					lockIcon = makeIcon(LT.sync.ToggleHint(), "fa-solid fa-lock-open", true);
 				}
 
-				// --- NEW: if GM edits a locked setting value, queue CLEAR immediately ---
+				// if GM edits a locked setting value, queue CLEAR immediately
 				// (prevents resnap/push/reload from re-applying)
 				try {
 					if (state !== "none") {
@@ -1142,7 +1147,7 @@ Hooks.on("renderSettingsConfig", (app, html) => {
 					}
 				});
 
-				// Click / Shift+Click gestures (unchanged) …
+				// Click / Shift+Click gestures
 				lockIcon.addEventListener("click", (ev) => {
 					try {
 						ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
@@ -1368,7 +1373,7 @@ Hooks.once("ready", async () => {
 		if (game.socket) {
 			game.socket.on(BBMM_SYNC_CH, async (msg) => {
 
-				// Soft Clear
+				// Setting Soft Clear
 				if (msg?.t === "bbmm-soft-clear") {
 					// GM only: remove a soft-lock entry when a player changes that setting
 					if (!game.user?.isGM) return;
@@ -1391,7 +1396,7 @@ Hooks.once("ready", async () => {
 					return;	// handled
 				}
 
-				// Sync Push
+				// Setting Sync Push
 				if (msg?.t === "bbmm-sync-push") {
 					// Players only
 					if (game.user?.isGM) return;
@@ -1475,6 +1480,7 @@ Hooks.once("ready", async () => {
 					return; // handled
 				}
 
+				// Setting Sync refresh
 				if (msg?.t === "bbmm-sync-refresh") {
 					if (game.user?.isGM) return; // GM doesn't need to apply
 
@@ -1522,9 +1528,511 @@ Hooks.once("ready", async () => {
 					}
 					return;
 				}
+
+				// Controls refresh
+				if (msg?.t === "bbmm-ctrl-refresh") {
+					DL(1, "setting-sync.js | controls: socket refresh");
+					await _bbmmCtrlPullApplyAll();
+				}
 			});
 		}
 	} catch (err) {
 		DL(3, "setting-sync.js |  bbmm-setting-lock: ready(): error", err);
 	}
+});
+
+
+/*  ============================================================================
+        {CONTROLS SYNC HELPERS}
+	========================================================================= */
+
+function _bbmmCtrlId(ns, action) { return `${ns}.${action}`; }
+
+function _bbmmCtrlGetStore() {
+	try { return game.settings.get(BBMM_ID, CTRL_STORE_KEY) ?? {}; } catch { return {}; }
+}
+
+async function _bbmmCtrlSetStore(next) {
+	try { await game.settings.set(BBMM_ID, CTRL_STORE_KEY, next ?? {}); }
+	catch (err) { DL(2, "setting-sync.js | ctrlSetStore() failed", err); }
+}
+
+function _bbmmCtrlGetRevMap() {
+	try { return game.settings.get(BBMM_ID, CTRL_REV_STORE) ?? {}; } catch { return {}; }
+}
+
+async function _bbmmCtrlSetRevMap(map) {
+	try { await game.settings.set(BBMM_ID, CTRL_REV_STORE, map ?? {}); }
+	catch (err) { DL(2, "setting-sync.js | ctrlSetRevMap() failed", err); }
+}
+
+function _bbmmCtrlEnabled() {
+	try {
+		const master = bbmmIsSyncEnabled();
+		const ctrl = game.settings.get(BBMM_ID, CTRL_TOGGLE) !== false;
+		return master && ctrl;
+	} catch { return false; }
+}
+
+function _bbmmCtrlSame(a = [], b = []) {
+	try {
+		const ser = x => JSON.stringify((x ?? []).map(v => ({
+			key: v?.key,
+			modifiers: (v?.modifiers ?? []).slice().sort()
+		})).sort((x,y)=> (x.key||"").localeCompare(y.key||"")));
+		return ser(a) === ser(b);
+	} catch { return false; }
+}
+
+function _bbmmCtrlBindings(ns, action) {
+  try {
+    // Try API get()
+    const viaAPI = game.keybindings?.get?.(ns, action);
+    if (Array.isArray(viaAPI)) return viaAPI.map(b => ({ key: b?.key, modifiers: (b?.modifiers ?? []).slice() }));
+
+    // Fallback: read the core setting blob
+    const id = `${ns}.${action}`;
+    const blob = game.settings.get("core", "keybindings") || {};
+    const arr = Array.isArray(blob[id]) ? blob[id] : [];
+    return arr.map(b => ({ key: b?.key, modifiers: (b?.modifiers ?? []).slice() }));
+  } catch (err) {
+    DL(2, "setting-sync.js | ctrlBindings() failed", { ns, action, err });
+    return [];
+  }
+}
+
+async function _bbmmCtrlSetBindings(ns, action, arr) {
+  try {
+    const hasPerActionAPI = typeof game.keybindings?.reset === "function" &&
+                            typeof game.keybindings?.set === "function";
+
+    if (hasPerActionAPI) {
+      // Modern API path
+      await game.keybindings.reset(ns, action);
+      for (const b of (arr ?? [])) {
+        if (b && b.key) await game.keybindings.set(ns, action, { key: b.key, modifiers: b.modifiers ?? [] });
+      }
+      return;
+    }
+
+    // Fallback path: write to core keybindings setting
+    const id = `${ns}.${action}`;
+    const current = foundry.utils.duplicate(game.settings.get("core", "keybindings") || {});
+    current[id] = (arr ?? []).map(b => ({ key: b?.key, modifiers: (b?.modifiers ?? []).slice() }));
+    await game.settings.set("core", "keybindings", current);
+
+  } catch (err) {
+    DL(2, "setting-sync.js | ctrlSetBindings() failed", { ns, action, err });
+  }
+}
+async function _bbmmCtrlApply({ ns, action, rec }) {
+	try {
+		if (!_bbmmCtrlEnabled()) return;
+
+		// respect partial locks: if userIds exist and don't include me, skip HARD
+		const myId = game.user?.id;
+		const targeted = Array.isArray(rec?.lock?.userIds) ? rec.lock.userIds : null;
+		if (targeted && targeted.length && (!myId || !targeted.includes(myId))) {
+			return; // locked for some users, but not me
+		}
+
+		const have = _bbmmCtrlBindings(ns, action);
+
+		if (rec?.lock?.value) {
+			if (!_bbmmCtrlSame(have, rec.lock.value)) {
+				DL(1, `setting-sync.js | ctrl apply HARD ${ns}.${action}`);
+				await _bbmmCtrlSetBindings(ns, action, rec.lock.value);
+			}
+			return;
+		}
+
+		if (rec?.soft?.value) {
+			if (!_bbmmCtrlSame(have, rec.soft.value)) {
+				DL(1, `setting-sync.js | ctrl apply SOFT ${ns}.${action}`);
+				await _bbmmCtrlSetBindings(ns, action, rec.soft.value);
+			}
+		}
+	} catch (err) { DL(2, "setting-sync.js | ctrlApply() failed", { ns, action, err }); }
+}
+
+async function _bbmmCtrlPullApplyAll() {
+	try {
+		if (!_bbmmCtrlEnabled()) return;
+		const store = _bbmmCtrlGetStore();
+		for (const [id, rec] of Object.entries(store)) {
+			const dot = id.lastIndexOf(".");
+			if (dot <= 0) continue;
+			const ns = id.slice(0, dot);
+			const action = id.slice(dot + 1);
+			await _bbmmCtrlApply({ ns, action, rec });
+		}
+	} catch (err) { DL(2, "setting-sync.js | ctrlPullApplyAll() failed", err); }
+}
+
+async function _bbmmCtrlGMHard({ ns, action, userIds = [] }) {
+	try {
+		const id = _bbmmCtrlId(ns, action);
+		const store = _bbmmCtrlGetStore();
+		const revMap = _bbmmCtrlGetRevMap();
+		const next = { ...(store[id] ?? {}) };
+
+		next.lock = {
+			value: _bbmmCtrlBindings(ns, action),
+			// omit userIds if targeting *all* non-GMs (same semantics as settings)
+			...(Array.isArray(userIds) && userIds.length ? { userIds: userIds.slice() } : {})
+		};
+		next.soft = null;
+		next.rev = (Number(next.rev) || 0) + 1;
+
+		store[id] = next;
+		revMap[id] = next.rev;
+
+		await _bbmmCtrlSetStore(store);
+		await _bbmmCtrlSetRevMap(revMap);
+
+		ui.notifications?.info?.(LT.controlsLockApplied());
+		game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
+	} catch (err) { DL(2, "setting-sync.js | ctrlGMHard() failed", err); }
+}
+
+async function _bbmmCtrlGMSoft({ ns, action }) {
+	try {
+		const id = _bbmmCtrlId(ns, action);
+		const store = _bbmmCtrlGetStore();
+		const revMap = _bbmmCtrlGetRevMap();
+		const next = { ...(store[id] ?? {}) };
+		next.soft = { value: _bbmmCtrlBindings(ns, action) };
+		next.lock = null;
+		next.rev = (Number(next.rev) || 0) + 1;
+		store[id] = next;
+		revMap[id] = next.rev;
+		await _bbmmCtrlSetStore(store);
+		await _bbmmCtrlSetRevMap(revMap);
+		ui.notifications?.info?.(LT.controlsSoftApplied());
+		game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
+	} catch (err) { DL(2, "setting-sync.js | ctrlGMSoft() failed", err); }
+}
+
+async function _bbmmCtrlGMClear({ ns, action }) {
+	try {
+		const id = _bbmmCtrlId(ns, action);
+		const store = _bbmmCtrlGetStore();
+		const revMap = _bbmmCtrlGetRevMap();
+		const next = { ...(store[id] ?? {}) };
+		next.lock = null; next.soft = null;
+		next.rev = (Number(next.rev) || 0) + 1;
+		store[id] = next;
+		revMap[id] = next.rev;
+		await _bbmmCtrlSetStore(store);
+		await _bbmmCtrlSetRevMap(revMap);
+		ui.notifications?.info?.(LT.controlsCleared());
+		game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
+	} catch (err) { DL(2, "setting-sync.js | ctrlGMClear() failed", err); }
+}
+
+function _bbmmParseBindingId(bindingId) {
+  try {
+    // "ns.action.binding.N" -> { ns, action }
+    const base = String(bindingId || "").replace(/\.binding.*$/, "");
+    const dot = base.indexOf(".");
+    if (dot <= 0) return { ns: "core", action: base || "" };
+    return { ns: base.slice(0, dot), action: base.slice(dot + 1) };
+  } catch (e) {
+    DL(2, "_bbmmParseBindingId() failed", { bindingId, e });
+    return { ns: "core", action: "" };
+  }
+}
+
+function _bbmmKbGetConfig(ns, action) {
+	try {
+		const outer = game.keybindings?.actions;
+		if (!outer) return null;
+		const inner = outer instanceof Map ? outer.get(ns) : outer?.[ns];
+		if (!inner) return null;
+		return inner instanceof Map ? inner.get(action) : inner?.[action] || null;
+	} catch (e) {
+		DL(2, "kb | getConfig failed", { ns, action, e });
+		return null;
+	}
+}
+
+function _bbmmCtrlGetLockState(id, store) {
+  try {
+    const rec = store?.[id];
+    if (!rec) return "none";
+    if (rec?.soft?.value) return "soft";
+
+    // hard lock record present
+    const arr = Array.isArray(rec?.lock?.userIds) ? rec.lock.userIds : null;
+    if (!arr || arr.length === 0) return "all"; // all users
+
+    // If we have a user list, treat as partial (we don’t need to count)
+    return "partial";
+  } catch {
+    return "none";
+  }
+}
+
+function _bbmmCtrlHandleLockGesture({ ns, action, iconEl, gesture }) {
+  try {
+    const id = _bbmmCtrlId(ns, action);
+    const getSnap = () => _bbmmCtrlBindings(ns, action); // current keys
+
+    // same gesture prefs as settings
+    const pref = (k, d) => { try { return game.settings.get(BBMM_ID, k) || d; } catch { return d; } };
+    const map = {
+      click:      pref("gestureAction_click",      "lockSelected"),
+      shift:      pref("gestureAction_shift",      "softLock"),
+      right:      pref("gestureAction_right",      "lockAll"),
+      shiftRight: pref("gestureAction_shiftRight", "clearLocks"),
+    };
+    const act = map[gesture] || "lockSelected";
+
+    // helpers
+    const saveAndPing = async (store, revMap) => {
+      await _bbmmCtrlSetStore(store);
+      if (revMap) await _bbmmCtrlSetRevMap(revMap);
+      game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
+    };
+    const nonGMs = () => (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+
+    // load current store
+    const store = _bbmmCtrlGetStore();
+    const revMap = _bbmmCtrlGetRevMap();
+    const rec = { ...(store[id] ?? {}) };
+
+    // actions
+    const doClear = async () => {
+      rec.lock = null; rec.soft = null;
+      rec.rev = (Number(rec.rev) || 0) + 1;
+      store[id] = rec; revMap[id] = rec.rev;
+      _bbmmSetLockIconState(iconEl, "unlocked");
+      await saveAndPing(store, revMap);
+      ui.notifications?.info?.(LT.controlsCleared());
+    };
+
+    const doLockAll = async () => {
+      rec.lock = { value: getSnap(), userIds: [] }; // [] = all players
+      rec.soft = null;
+      rec.rev = (Number(rec.rev) || 0) + 1;
+      store[id] = rec; revMap[id] = rec.rev;
+      _bbmmSetLockIconState(iconEl, "lockAll");
+      await saveAndPing(store, revMap);
+      ui.notifications?.info?.(LT.controlsLockApplied());
+    };
+
+    const doSoft = async () => {
+      rec.soft = { value: getSnap() };
+      rec.lock = null;
+      rec.rev = (Number(rec.rev) || 0) + 1;
+      store[id] = rec; revMap[id] = rec.rev;
+      _bbmmSetLockIconState(iconEl, "softLock");
+      await saveAndPing(store, revMap);
+      ui.notifications?.info?.(LT.controlsSoftApplied());
+    };
+
+    const doPartial = async () => {
+      // pre-check previous picks if any
+      const prev = store[id];
+      const pre =
+        (prev?.lock && Array.isArray(prev.lock.userIds) && prev.lock.userIds.length)
+          ? prev.lock.userIds.slice()
+          : [];
+
+      const picker = new BBMMUserPicker({
+        title: LT.titleLockForUsers?.() || "Lock Keybinding For Selected Users",
+        settingId: id,
+        valuePreview: getSnap(),
+        preChecked: pre,
+        confirmLabel: LT.dialogQueueLock?.() || "Lock",
+        onConfirm: async (userIds) => {
+          if (!Array.isArray(userIds) || userIds.length === 0) {
+            await doClear();
+            return;
+          }
+          const all = nonGMs();
+          const isAll = userIds.length === all.length;
+
+          rec.lock = { value: getSnap(), userIds: isAll ? [] : userIds.slice() };
+          rec.soft = null;
+          rec.rev = (Number(rec.rev) || 0) + 1;
+          store[id] = rec; revMap[id] = rec.rev;
+
+          _bbmmSetLockIconState(iconEl, isAll ? "lockAll" : "lockSelected");
+          await saveAndPing(store, revMap);
+          ui.notifications?.info?.(LT.controlsLockApplied());
+        }
+      });
+      picker.show();
+    };
+
+    // route
+    switch (act) {
+      case "clearLocks":   return doClear();
+      case "softLock":     return doSoft();
+      case "lockAll":      return doLockAll();
+      case "lockSelected":
+      default:             return doPartial();
+    }
+  } catch (err) {
+    DL(2, "_bbmmCtrlHandleLockGesture() failed", { ns, action, err });
+  }
+}
+
+function _bbmmCtrlHandlePush({ ns, action }) {
+	try {
+		// For now: re-apply the GM’s current binding set to players immediately.
+		// (Hard push semantics; you already have soft/hard via the lock icon)
+		DL(`controls: PUSH now for ${ns}.${action}`);
+		// Reuse your store → notify players to pull&apply
+		game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
+		ui.notifications?.info?.(LT.controlsHardPresetApplied?.() || "Preset hard-pushed to players.");
+	} catch (err) {
+		DL(2, "_bbmmCtrlHandlePush() failed", err);
+	}
+}
+
+function _bbmmCtrlWireConfig(app, html) {
+  try {
+
+    if (!_bbmmCtrlEnabled()) return;
+	if (!game.user?.isGM) return; 
+
+    // Players shouldn’t see or use these icons
+    if (!game.user?.isGM) {
+      // in case anything leaked in a previous render, strip it
+      const rootP = html?.[0] || html;
+      rootP?.querySelectorAll?.(".bbmm-lock-icons")?.forEach(el => el.remove());
+      return;
+    }
+
+    const root = html?.[0] || html;
+    if (!root?.querySelectorAll) return;
+
+    const plusButtons = Array.from(root.querySelectorAll('button[data-action="addBinding"]'));
+    const store = _bbmmCtrlGetStore();
+    let rows = 0, attached = 0, skipped = 0;
+
+    for (const plus of plusButtons) {
+      const li = plus.closest('li[data-binding-id]');
+      if (!li) continue;
+
+      const bindingId = li.getAttribute('data-binding-id') || "";
+      const { ns, action } = _bbmmParseBindingId(bindingId);
+      if (!ns || !action) continue;
+
+      rows++;
+
+      const cfg = _bbmmKbGetConfig(ns, action) || {};
+      const isUneditable = Array.isArray(cfg.uneditable) && cfg.uneditable.length > 0;
+      const isRestricted = !!cfg.restricted;
+      if (isUneditable || isRestricted) {
+        li.querySelector('.bbmm-lock-icons')?.remove();
+        skipped++;
+        continue;
+      }
+
+      const controlsCell =
+        plus.closest('.controls, .keybinding-controls, .form-fields') || plus.parentElement;
+      if (!controlsCell) continue;
+
+      let bar = li.querySelector('.bbmm-lock-icons');
+      if (!bar) {
+        bar = document.createElement('span');
+        bar.className = 'bbmm-lock-icons';           // 🔸 same class as settings UI → inherits your colors
+        bar.style.display = 'inline-flex';
+        bar.style.alignItems = 'center';
+        bar.style.gap = '.35rem';
+        bar.style.marginLeft = '.25rem';
+        controlsCell.appendChild(bar);
+      } else {
+        bar.innerHTML = '';
+      }
+
+      // util to wire a clickable FA icon that routes gestures
+      const addIcon = (title, classes, onGesture) => {
+        const i = document.createElement('i');
+        i.className = classes;
+        i.title = title;
+        i.style.cursor = 'pointer';
+
+        const stopAll = (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); };
+
+        i.addEventListener('click', (ev) => {
+          stopAll(ev);
+          onGesture?.(ev.shiftKey ? 'shift' : 'click', i);
+        });
+        i.addEventListener('contextmenu', (ev) => {
+          stopAll(ev);
+          onGesture?.(ev.shiftKey ? 'shiftRight' : 'right', i);
+        });
+        i.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            stopAll(ev);
+            onGesture?.('click', i);
+          }
+        });
+
+        bar.appendChild(i);
+        return i;
+      };
+
+      // LOCK icon — initialize from store
+      const id = _bbmmCtrlId(ns, action);
+      const initial = _bbmmCtrlGetLockState(id, store);
+      const lockIcon = addIcon(LT.sync?.ToggleHint?.() || "Lock", "fa-solid fa-lock-open", (gesture, iconEl) => {
+        _bbmmCtrlHandleLockGesture({ ns, action, iconEl, gesture });
+      });
+      _bbmmSetLockIconState(
+        lockIcon,
+        initial === "soft"     ? "softLock"   :
+        initial === "all"      ? "lockAll"    :
+        initial === "partial"  ? "lockSelected" :
+                                 "unlocked"
+      );
+
+      // SYNC icon — trigger a refresh so clients pull+apply immediately
+      addIcon(LT.sync?.PushHint?.() || "Sync", "fa-solid fa-arrows-rotate", () => {
+        try {
+          game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
+          DL(`controls: ${ns}.${action} | sync refresh emitted`);
+        } catch (e) { DL(2, "controls sync emit failed", e); }
+      });
+
+      attached++;
+    }
+
+    DL(`ctrlWireConfig(): rows=${rows}, attached=${attached}, skipped=${skipped}`);
+  } catch (err) {
+    DL(2, "ctrlWireConfig() failed", err);
+  }
+}
+
+/*  ============================================================================
+        { CONTROLS SYNC HOOKS}
+	========================================================================= */
+
+Hooks.on("ready", async () => {
+	try {
+		
+		if (!_bbmmCtrlEnabled()) return;
+		DL(1, "setting-sync.js | controls: ready pull+apply");
+		await _bbmmCtrlPullApplyAll();
+	} catch (err) { DL(2, "setting-sync.js | controls ready failed", err); }
+});
+
+Hooks.on("renderControlsConfig", (app, html) => {
+	try {
+		_bbmmCtrlWireConfig(app, html);
+		requestAnimationFrame(() => _bbmmCtrlWireConfig(app, html));
+		setTimeout(() => _bbmmCtrlWireConfig(app, html), 50);
+	} catch (err) { DL(2, "renderControlsConfig failed", err); }
+});
+
+Hooks.on("renderKeybindingsConfig", (app, html) => {
+	try {
+		_bbmmCtrlWireConfig(app, html);
+		requestAnimationFrame(() => _bbmmCtrlWireConfig(app, html));
+		setTimeout(() => _bbmmCtrlWireConfig(app, html), 50);
+	} catch (err) { DL(2, "renderKeybindingsConfig failed", err); }
 });

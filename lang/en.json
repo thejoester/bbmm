@@ -160,6 +160,22 @@
 		"controlsPresetMgr": "Controls Preset Manager",
 		"lblOpenControlsPresets": "Open Controls Preset Manager",
 		"titleControlsPresets": "BBMM Controls Presets",
+
+		"controlsToggleName": "Enable Control (Keybinding) Sync",
+		"controlsToggleHint": "If enabled, the GM can lock or soft-lock keybindings and push them to connected players.",
+		"controlsTtHard": "Hard lock this keybinding for all users (apply exactly; users cannot change).",
+		"controlsTtSoft": "Soft lock this keybinding for all users (apply by default; users can change until GM bumps revision).",
+		"controlsTtClear": "Clear any lock or soft-lock for this keybinding.",
+		"controlsLockApplied": "Keybinding hard lock applied.",
+		"controlsSoftApplied": "Keybinding soft lock applied.",
+		"controlsCleared": "Keybinding lock cleared.",
+		"controlsSoftPresetApplied": "Preset soft-pushed to players.",
+		"controlsHardPresetApplied": "Preset hard-pushed to players.",
+		"keybindColorScopesName": "Color-code keybindings by scope",
+		"keybindColorScopesHint": "If enabled: world keybinds are blue; client keybinds are orange; user keybinds remain default.",
+		"keybindScopeWorldTip": "Scope: World (blue)",
+		"keybindScopeClientTip": "Scope: Client (orange)",
+
 		
 		"v12Note": "This module offers minimal support for FoundryVTT v12, allowing you to export settings and module states as prep for updating to v13.<br><strong>NOTE:</strong> Some settings may not transfer if the v13 module setting has changed.",
 		"titlev12Legacy": "BBMM: Legacy (v12) Export",

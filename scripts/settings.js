@@ -10,6 +10,11 @@ const MODULE_SETTING_PRESETS_U = "modulePresetsUser";
 const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
 const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
 
+/* Controls Sync Globals ======================================================*/
+export const CTRL_STORE_KEY = "userControlSync";				// world: { [id]: {rev, lock?, soft?} }
+export const CTRL_REV_STORE = "softLockRevMap_controls";		// world: { [id]: number }
+export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
+
 let __bbmm_isV12 = null; // cache after init
 
 // Do not export these settings
@@ -76,7 +81,6 @@ async function checkFolderMigration(){
 	}
 }
 
-
 /* V12 Check =============================================================== */
 export function isFoundryV12() {
 	try {
@@ -95,8 +99,6 @@ export function isFoundryV12() {
 		return false;
 	}
 }
-
-
 
 //	Function for debugging - Prints out colored and tagged debug lines
 export function DL(intLogType, stringLogMsg, objObject = null) {
@@ -487,6 +489,18 @@ Hooks.once("init", () => {
 					default: {}
 				});
 
+				// Controls Sync Storage
+				game.settings.register?.(BBMM_ID, CTRL_STORE_KEY, {
+					name: "BBMM Control Sync Store",
+					scope: "world", config: false, default: {}
+				});
+				// Controls Sync RevMap
+				game.settings.register?.(BBMM_ID, CTRL_REV_STORE, {
+					name: "BBMM Control Sync RevMap",
+					scope: "world", config: false, default: {}
+				});
+				
+
 			// ===== SETTINGS ITEMS =====
 			// These DO need to be localized
 
@@ -602,7 +616,13 @@ Hooks.once("init", () => {
 					}
 				});
 
-
+				// Enable/disable BBMM Controls Sync
+				game.settings.register?.(BBMM_ID, CTRL_TOGGLE, {
+					name: LT.controlsToggleName(),
+					hint: LT.controlsToggleHint(),
+					scope: "world", config: true, type: Boolean, default: true
+				});
+				
 				// Choices for lock-gestures 
 				const GESTURE_ACTION_CHOICES = {
 					"lockSelected": LT.name_LockSelected(),
