@@ -4,6 +4,8 @@ title: "[Advice] Briefly describe what you need"
 labels:
   - advice
   - inclusion-exclusion
+assignees:
+  - thejoester
 body:
   - type: markdown
     attributes:
