@@ -41,7 +41,6 @@ body:
         Foundry: v12.xx (or v13.xx)
         System: PF2e 5.xx
         BBMM: 0.x.x
-        OS/Browser (if relevant):
 
   - type: textarea
     id: modules
