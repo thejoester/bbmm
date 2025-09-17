@@ -1,0 +1,124 @@
+name: Inclusion/Exclusion advice
+description: Get guidance on which settings should be included or excluded in a preset/export (with caution around hidden/state data).
+title: "[Advice] Briefly describe what you need"
+labels:
+  - advice
+  - inclusion-exclusion
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! This form helps us recommend **what to include/exclude** in presets and exports.
+        - Avoid sharing secrets (API keys, license keys).
+        - If possible, include screenshots of relevant settings pages.
+        - BBMM avoids auto-saving **live “state” data** to prevent overwriting active sessions; we’ll focus on stable **configuration**.
+
+  - type: dropdown
+    id: context
+    attributes:
+      label: Primary context
+      description: What situation are you preparing for?
+      options:
+        - Preset export to reuse later
+        - World-to-world migration
+        - New world bootstrap (baseline setup)
+        - Troubleshooting a problematic setup
+        - Other (explain below)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: goals
+    attributes:
+      label: Goals (pick all that apply)
+      options:
+        - label: Keep GM-only behaviors and hide player-only noise
+        - label: Improve performance / reduce heavy features
+        - label: Standardize UI/UX across worlds
+        - label: Include safe hidden settings needed for configuration
+        - label: Exclude user-specific or machine-specific settings
+        - label: Avoid restoring live “state” (combat/time/cache/etc.)
+        - label: Other (explain below)
+
+  - type: textarea
+    id: world_system_versions
+    attributes:
+      label: World/System/Versions
+      description: Include Foundry version, system(s), BBMM version, and any other critical version info.
+      placeholder: |
+        Foundry: v12.xx (or v13.xx)
+        System: PF2e 5.xx
+        BBMM: 0.x.x
+        OS/Browser (if relevant):
+
+  - type: textarea
+    id: modules
+    attributes:
+      label: Modules to evaluate (names + package IDs if possible)
+      description: List the modules and any known settings pages/windows they use.
+      placeholder: |
+        - item-piles (item-piles)
+        - pf2e (pf2e)
+        - lib-wrapper (lib-wrapper)
+
+  - type: textarea
+    id: must_keep
+    attributes:
+      label: Settings you absolutely want preserved
+      description: Which configuration values must survive export/import exactly as-is?
+      placeholder: |
+        - Specific UI layout toggles
+        - Permissions defaults
+        - Chat/Log formatting options
+
+  - type: textarea
+    id: must_avoid
+    attributes:
+      label: Things we must NOT include
+      description: Live state or sensitive data you want to exclude.
+      placeholder: |
+        - Current combat/initiative
+        - Live world time/calendar
+        - Cached/temp data
+        - User-specific paths/machine-specific toggles
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Inclusion risk tolerance
+      description: Higher risk means including more that could conflict with a different session or machine.
+      options:
+        - Safe (configuration only, default)
+        - Balanced (most configuration, exclude known live state)
+        - Aggressive (include everything you can; NOT recommended)
+    validations:
+      required: true
+    default: 0
+
+  - type: checkboxes
+    id: hidden_settings
+    attributes:
+      label: Hidden settings preference
+      description: Hidden settings often hold configuration. Including **all** hidden values is not recommended.
+      options:
+        - label: Include only stable configuration-type hidden settings
+        - label: Exclude live/session “state” (combat/time/cache/etc.) — recommended
+        - label: I understand BBMM does not auto-save live state to avoid overwriting active sessions
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Extra details / screenshots / steps / links
+      description: Anything else that helps us advise accurately (links to docs, screenshots, etc.).
+      placeholder: |
+        - Screenshots of module config windows
+        - A short description of your workflow
+        - What you tried already
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: I will not include secrets (license keys, API tokens, passwords) in this issue
+          required: true
