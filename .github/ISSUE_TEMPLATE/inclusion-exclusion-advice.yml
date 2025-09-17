@@ -93,7 +93,6 @@ body:
         - Aggressive (include everything you can; NOT recommended)
     validations:
       required: true
-    default: 0
 
   - type: checkboxes
     id: hidden_settings
