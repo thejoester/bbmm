@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Macro to Inspect Setting Presets.
 - **Inclusion Manager:**
   - Added inclusion manager to include hidden settings in presets/inports/exports.
+- **Controls Sync**
+  - Lets a GM sync key binding settings to players. 
+  - Click: Sync to connected players.
+  - Shift+Click: Will put a "Soft-Lock" on the sync.
 ### Changed
 - **Settings Sync:**
   - Added click gesture detection on the lock icon:
