@@ -6,24 +6,12 @@ const PRESET_MANAGER_ID = "bbmm-settings-preset-manager";	// stable window id
 
 const AppV2 = foundry?.applications?.api?.ApplicationV2;
 if (!AppV2) {
-	// Comment
 	DL(1, "settings-presets.js | ApplicationV2 base class not found.");
 }
 
 // ===== Helpers =====
 
 const BBMM_V2_WINDOWS = new Map();	// id -> app
-
-function hlp_settingExists(ns, key) {
-	// Returns SettingConfig or null if not found
-	try {
-		const cfg = game?.settings?.settings?.get?.(`${ns}.${key}`) ?? null;
-		return cfg || null;
-	} catch (err) {
-		DL(2, `settings-presets.js | hlp_settingExists(): failed for ${ns}.${key}`, err);
-		return null;
-	}
-}
 
 function hlp_valuesEqual(a, b) {
 	// Deep equals with Foundry helper if available
@@ -34,34 +22,6 @@ function hlp_valuesEqual(a, b) {
 		DL(2, "settings-presets.js | hlp_valuesEqual(): compare failed", err);
 		return a === b;
 	}
-}
-
-function hlp_flattenEnvelope(env) {
-	/*
-		env: {
-			type: "bbmm-settings",
-			world: { ns: { key: val } },
-			client: { ns: { key: val } },
-			user: { ns: { key: val } }
-		}
-		→ [{scope, ns, key, value}]
-	*/
-	const out = [];
-	try {
-		for (const scope of ["world", "client", "user"]) {
-			const scopeObj = env?.[scope];
-			if (!scopeObj || typeof scopeObj !== "object") continue;
-			for (const [ns, nsObj] of Object.entries(scopeObj)) {
-				if (!nsObj || typeof nsObj !== "object") continue;
-				for (const [key, value] of Object.entries(nsObj)) {
-					out.push({ scope, ns, key, value });
-				}
-			}
-		}
-	} catch (err) {
-		DL(2, "settings-presets.js | hlp_flattenEnvelope(): error", err);
-	}
-	return out;
 }
 
 Hooks.on("renderDialogV2", (app) => {
@@ -82,6 +42,7 @@ Hooks.on("closeDialogV2", (app) => {
 	}
 });
 
+/*
 // Return an open app by id.
 function getWindowById(id) {
 	// Check v2 registry first
@@ -92,6 +53,7 @@ function getWindowById(id) {
 	const all = Object.values(ui.windows ?? {});
 	return all.find(w => w?.id === id) ?? null;
 }
+*/
 
 /* 
 	Convert a bbmm-settings export envelope:
@@ -317,77 +279,6 @@ function hlp_isRegisteredSetting(namespace, key) {
 
 // ===== SERVICES =====
 
-/*
-	Returns { savedCount, totalCount, log }
-	Each log item: { action: "Saved from Preset" | "Setting Not Found" | "Skipped: Match" | "Error: Save Failed", setting, value }
-*/
-async function svc_applySettingsEnvelopeWithReport(env) {
-	const log = [];
-	let savedCount = 0;
-	let totalCount = 0;
-
-	try {
-		DL("settings-presets.js | svc_applySettingsEnvelopeWithReport(): start");
-
-		if (!env || typeof env !== "object" || env.type !== "bbmm-settings") {
-			DL(2, "settings-presets.js | svc_applySettingsEnvelopeWithReport(): invalid envelope");
-			return { savedCount: 0, totalCount: 0, log: [{ action: "Error: Invalid Envelope", setting: "-", value: null }] };
-		}
-
-		// Flatten env → entries
-		const scopes = ["world", "client", "user"];
-		const entries = [];
-		for (const scope of scopes) {
-			const S = env?.[scope];
-			if (!S || typeof S !== "object") continue;
-			for (const [ns, nsObj] of Object.entries(S)) {
-				if (!nsObj || typeof nsObj !== "object") continue;
-				for (const [key, value] of Object.entries(nsObj)) {
-					entries.push({ ns, key, value });
-				}
-			}
-		}
-		totalCount = entries.length;
-		DL(`settings-presets.js | svc_applySettingsEnvelopeWithReport(): entries=${entries.length}`);
-
-		for (const { ns, key, value } of entries) {
-			const setting = `${ns}.${key}`;
-
-			// 1) existence
-			const cfg = game?.settings?.settings?.get?.(setting);
-			if (!cfg) {
-				log.push({ action: "Setting Not Found", setting, value });
-				continue;
-			}
-
-			// 2) compare
-			let current;
-			try { current = game.settings.get(ns, key); } catch {}
-			if (hlp_valuesEqual(current, value)) {
-				log.push({ action: "Skipped: Match", setting, value });
-				continue;
-			}
-
-			// 3) save
-			try {
-				await game.settings.set(ns, key, value);
-				savedCount++;
-				log.push({ action: "Saved from Preset", setting, value });
-			} catch (errSet) {
-				DL(2, `settings-presets.js | svc_applySettingsEnvelopeWithReport(): set failed for ${setting}`, errSet);
-				log.push({ action: "Error: Save Failed", setting, value });
-			}
-		}
-
-		DL(`settings-presets.js | svc_applySettingsEnvelopeWithReport(): done saved=${savedCount}/${totalCount}`);
-		return { savedCount, totalCount, log };
-	} catch (err) {
-		DL(3, "settings-presets.js | svc_applySettingsEnvelopeWithReport(): error", err);
-		return { savedCount, totalCount, log: [{ action: "Error", setting: "-", value: String(err) }] };
-	}
-}
-
-
 function svc_getSettingsPresets() {
 	return foundry.utils.duplicate(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
 }
@@ -422,17 +313,16 @@ function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden =
 	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
 	const sysId = game.system.id;
 	const skipMap = getSkipMap();
+	let includedPairs = new Set();
+	let includedModules = new Set();
 
-	/* 
-		Get explicit hidden inclusions from Inclusions Manager
-		- Stored in settings as: game.settings.get(BBMM_ID, "userInclusions")
-	*/
-	let includedHidden = new Set();
 	try {
 		const inc = game.settings.get(BBMM_ID, "userInclusions") || {};
-		const arr = Array.isArray(inc.settings) ? inc.settings : [];
-		includedHidden = new Set(arr.map(s => `${s?.namespace ?? ""}.${s?.key ?? ""}`));
-		DL("settings-presets.js | svc_collectAllModuleSettings(): inclusions loaded", { count: includedHidden.size });
+		const arrSettings = Array.isArray(inc.settings) ? inc.settings : [];
+		const arrModules  = Array.isArray(inc.modules)  ? inc.modules  : [];
+		includedPairs = new Set(arrSettings.map(s => `${s?.namespace ?? ""}.${s?.key ?? ""}`));
+		includedModules = new Set(arrModules.map(ns => String(ns ?? "")));
+		DL("settings-presets.js | svc_collectAllModuleSettings(): inclusions loaded", { settings: includedPairs.size, modules: includedModules.size });
 	} catch (e) {
 		DL(2, "settings-presets.js | svc_collectAllModuleSettings(): failed to load inclusions", e);
 	}
@@ -447,15 +337,13 @@ function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden =
 
 			/* Hidden settings gate =======================================================
 				- Skip hidden (config:false) by default
-				- Always include if explicitly added via Inclusions Manager
+				- Always include if explicitly added via Inclusions Manager (pair OR module)
 				- Include all hidden only when includeHidden === true
 			============================================================================ */
 			const isHidden = (def?.config === false);
-			const forceIncludeHidden = includedHidden.has(`${namespace}.${key}`);
+			const forceIncludeHidden = includedPairs.has(`${namespace}.${key}`) || includedModules.has(namespace);
 			if (isHidden) {
-				if (!forceIncludeHidden && !includeHidden) {
-					continue;
-				}
+				if (!forceIncludeHidden && !includeHidden) continue;
 			}
 
 			// Respect includeDisabled; let core + system through
@@ -466,7 +354,7 @@ function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden =
 				}
 			}
 
-			// Single source of truth for exclusions 
+			// EXPORT_SKIP (helpers.js) — inclusions do NOT override these
 			if (isExcludedWith(skipMap, namespace) || isExcludedWith(skipMap, namespace, key)) {
 				DL(`settings-presets.js | svc_collectAllModuleSettings(): excluded ${namespace}.${key}`);
 				continue;
@@ -845,59 +733,6 @@ export async function ui_openSettingsImportWizard(data) {
 	}
 }
 
-// Open the import wizard. `data` is the parsed JSON object from file.
-function ui_openPresetImportReport(log) {
-	try {
-		DL("settings-presets.js | ui_openPresetImportReport(): open");
-
-		const rows = (log ?? []).map(r => `
-			<tr>
-				<td style="white-space:nowrap;padding:.25rem .5rem;">${hlp_esc(String(r.action))}</td>
-				<td style="white-space:nowrap;padding:.25rem .5rem;">${hlp_esc(String(r.setting))}</td>
-				<td style="padding:.25rem .5rem;"><pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_esc(hlp_toPrettyJson(r.value))}</pre></td>
-			</tr>
-		`).join("");
-
-		const content = `
-			<section style="min-width:760px;max-height:70vh;display:flex;flex-direction:column;gap:.5rem;">
-				<div style="overflow:auto;border:1px solid var(--color-border);border-radius:6px;">
-					<table style="width:100%;border-collapse:collapse;font-size:12px;">
-						<thead style="position:sticky;top:0;background:var(--app-background);">
-							<tr>
-								<th style="text-align:left;padding:.5rem;">Action</th>
-								<th style="text-align:left;padding:.5rem;">Setting</th>
-								<th style="text-align:left;padding:.5rem;">Value</th>
-							</tr>
-						</thead>
-						<tbody>${rows}</tbody>
-					</table>
-				</div>
-			</section>
-		`;
-
-		new foundry.applications.api.DialogV2({
-			window: { title: "BBMM: Preset Import Report" },
-			content,
-			buttons: [{ action: "close", label: "Close", default: true }],
-			submit: () => "close"
-		}).render(true);
-	} catch (err) {
-		DL(3, "settings-presets.js | ui_openPresetImportReport(): error", err);
-		ui.notifications.error("Failed to open import report.");
-	}
-}
-
-/* minimal esc + pretty json */
-function _esc(str) {
-	try {
-		return String(str).replace(/[&<>"']/g, s => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[s]));
-	} catch { return String(str ?? ""); }
-}
-function _bbmmSafeJson(v) {
-	try { return typeof v === "string" ? v : JSON.stringify(v, null, 2); }
-	catch { return String(v); }
-}
-
 /* ---------------------------------------------------------------------- */
 /* ui_openPresetPreview(): scrollable diff table                          */
 /* ---------------------------------------------------------------------- */
@@ -908,7 +743,6 @@ function ui_openPresetPreview(rows, presetName = "") {
 	try {
 		DL(`settings-presets.js | ui_openPresetPreview(): open rows=${rows?.length ?? 0}`);
 
-		// Use your helpers if present
 		const esc = (s) => (typeof hlp_esc === "function")
 			? hlp_esc(s)
 			: String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
@@ -1001,7 +835,6 @@ function hlp_diffHighlight(oldVal, newVal) {
 	}
 }
 
-
 /*
 	ApplicationV2: BBMMImportWizard
 */
@@ -1026,7 +859,6 @@ class BBMMImportWizard extends AppV2 {
 		}, { inplace: false });
 	}
 
-	// Return a string, not an element, so there’s nothing to “move” in the DOM
 	async _renderHTML() {
 		// {Render the BBMM Import Wizard form}
 		return `
@@ -1092,7 +924,6 @@ class BBMMImportWizard extends AppV2 {
 		}
 	}
 
-	/** Called once the form is in the DOM. Wires listeners and paints initial list. */
 	activateListeners() {
 		// Prevent double‑wiring if AppV2 rerenders or we get called twice
 		if (this._wired) {
@@ -1117,7 +948,7 @@ class BBMMImportWizard extends AppV2 {
 			return;
 		}
 
-		// Ensure our buttons are non-submitting buttons (defensive in case HTML changes later)
+		// Ensure buttons are non-submitting buttons
 		form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
 
 		// Field handles
@@ -1316,7 +1147,6 @@ class BBMMImportWizard extends AppV2 {
 		return all.filter(e => wanted.has(`${e.namespace}::${e.key}`));
 	}
 }
-
 
 // Settings Preset Manager main
 export async function openSettingsPresetManager() {
@@ -1622,7 +1452,7 @@ export async function openSettingsPresetManager() {
 					try {
 						DL(`settings-presets.js | openSettingsPresetManager(): preview preset "${selected}"`);
 
-						// Build the same payload (bbmm-settings envelope) you build for load
+						// Build the same payload 
 						let payload = preset;
 						const flat = Array.isArray(preset?.items) ? preset.items
 							: (Array.isArray(preset?.entries) ? preset.entries : null);
@@ -1632,7 +1462,7 @@ export async function openSettingsPresetManager() {
 							for (const e of flat) {
 								if (!e || typeof e.namespace !== "string" || typeof e.key !== "string") continue;
 
-								// Skip unregistered (matches your load path)
+								// Skip unregistered
 								if (!hlp_isRegisteredSetting(e.namespace, e.key)) continue;
 
 								const scope = (e.scope === "world") ? "world" : (e.scope === "user" ? "user" : "client");

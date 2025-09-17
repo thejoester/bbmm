@@ -1970,7 +1970,7 @@ import { LT, BBMM_ID } from "./localization.js";
 				syncIcon.setAttribute("role", "button");
 				syncIcon.setAttribute("tabindex", "0");
 				syncIcon.title =
-				LT.sync.PushHint() + "\n" +
+				LT.sync.PushHintControls() + "\n" +
 				"• " + LT.sync.ClickPickUsers() + "\n" +
 				"• " + LT.sync.ShiftAll(); 
 
@@ -2009,8 +2009,7 @@ import { LT, BBMM_ID } from "./localization.js";
 						value: cur,
 						targets
 						});
-						ui.notifications?.info?.(LT.infoQueuedSync?.({ module: `${ns}.${action}`, count: targets.length }) ||
-						`Queued sync for ${targets.length} user(s)`);
+						ui.notifications?.info?.(LT.infoQueuedSync({ module: `${ns}.${action}`, count: targets.length }));
 					}
 					});
 					picker.show();

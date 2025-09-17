@@ -279,7 +279,7 @@ export async function openBBMMLauncher() {
 			buttons: [
 				{ action: "modules",  label: LT.modulePresetMgr(), default: true },
 				{ action: "settings", label: LT.settingsPresetMgr() },
-				{ action: "controls-presets", label: LT.controlsPresetMgr() },
+				// { action: "controls-presets", label: LT.controlsPresetMgr() },
 				{ action: "exclusions", label: LT.exclusionsMgr() },
 				{ action: "inclusions", label: LT.inclusionsMgr() },	
 				{ action: "cancel",   label: LT.buttons.cancel() }
@@ -504,6 +504,42 @@ Hooks.once("init", () => {
 			// ===== SETTINGS ITEMS =====
 			// These DO need to be localized
 
+				// About BBMM menu button
+				game.settings.registerMenu(BBMM_ID, "menuAboutBBMM", {
+					name: LT.aboutName(),
+					label: LT.aboutName(),
+					icon: "fas fa-circle-info",
+					restricted: true,
+					type: class extends FormApplication {
+						constructor(...args){ super(...args); }
+						static get defaultOptions() {
+							return foundry.utils.mergeObject(super.defaultOptions, {
+								id: "bbmm-about-bbmm-opener",
+								title: LT.aboutName(),
+								template: null,
+								width: 600
+							});
+						}
+						async render(...args) {
+							const uuid = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn";
+							try {
+								DL("settings.js | About BBMM button clicked", { uuid });
+								const doc = await fromUuid(uuid);
+								if (!doc) {
+									DL(2, "settings.js | About BBMM open failed: document not found", { uuid });
+									return ui.notifications?.error(LT.aboutOpenMissing());
+								}
+								await doc.sheet.render(true);
+							} catch (err) {
+								DL(2, "settings.js | About BBMM open failed", err);
+								ui.notifications?.error(LT.aboutOpenError());
+							}
+							return this;
+						}
+						async _updateObject() {}
+					}
+				});
+
 				// Add a menu entry in Configure Settings to open the Preset Manager
 				game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
 					name: LT.modulePresetsBtn(),
@@ -576,6 +612,36 @@ Hooks.once("init", () => {
 					}
 				});
 				
+				//  Inclusions Manager menu 
+				game.settings.registerMenu(BBMM_ID, "menuInclusionsManager", {
+					name: LT.inclusions.btnInclusionMgr(),
+					label: LT.inclusions.btnInclusionMgr(),
+					icon: "fas fa-list-check",
+					restricted: true,
+					type: class extends FormApplication {
+						constructor(...args){ super(...args); }
+						static get defaultOptions() {
+							return foundry.utils.mergeObject(super.defaultOptions, {
+								id: "bbmm-inclusions-manager-opener",
+								title: LT.inclusions.btnInclusionMgr(),
+								template: null, // We'll open our own UI (DialogV2/App), no form tpl needed
+								width: 600
+							});
+						}
+						async render(...args) {
+							try {
+								DL("settings.js | Inclusions Manager button clicked");
+								await openInclusionsManagerApp();
+							} catch (err) {
+								DL(2, "settings.js | Inclusions Manager open failed", err);
+								ui.notifications?.error(LT.inclusionsOpenError());
+							}
+							return this;
+						}
+						async _updateObject() {}
+					}
+				});
+
 				// World toggle to Show changelog on GM login
 				game.settings.register(BBMM_ID, "showChangelogsOnLogin", {
 					name: LT.name_showChangelogsOnLogin(),
