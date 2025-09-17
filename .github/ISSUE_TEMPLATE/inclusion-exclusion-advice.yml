@@ -41,18 +41,8 @@ body:
   - type: textarea
     id: modules
     attributes:
-      label: Modules to evaluate (names + package IDs if possible)
-      description: List the modules and any known settings pages/windows they use.
-      placeholder: |
-        - item-piles (item-piles)
-        - pf2e (pf2e)
-        - lib-wrapper (lib-wrapper)
-
-  - type: textarea
-    id: details
-    attributes:
-      label: Provide Details
-      description: Describe what hidden settings you are seeking advice on. Include the module, key and value (if no private data is included). 
+      label: Modules and hidden keys to evaluate (names + package IDs if possible)
+      description: List the modules and settings you are seeking advice on. Include the module, key and value (if no private data is included). 
 
   - type: checkboxes
     id: confirm
