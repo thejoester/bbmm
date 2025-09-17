@@ -13,7 +13,7 @@ body:
         Thanks! This form helps us recommend **what to include/exclude** in presets and exports.
         - Avoid sharing secrets (API keys, license keys).
         - If possible, include screenshots of relevant settings pages.
-        - BBMM avoids auto-saving **live “state” data** to prevent overwriting active sessions; we’ll focus on stable **configuration**.
+        - BBMM avoids auto-saving live “state” data to prevent overwriting active sessions; we’ll focus on stable **configuration**.
 
   - type: dropdown
     id: context
@@ -33,7 +33,10 @@ body:
     id: world_system_versions
     attributes:
       label: World/System/Versions
-      description: Include Foundry version, system(s), BBMM version, and any other critical version info. 
+      description: |
+        Include Foundry version, system(s), BBMM version, and any other critical version info.
+        See the guide for copying details from Foundry:
+        https://github.com/thejoester/bbmm/wiki/How-to-copy-paste-troubleshooting-info-from-foundry
       placeholder: |
         Foundry: v12.xx (or v13.xx)
         System: PF2e 5.xx
@@ -44,7 +47,8 @@ body:
     id: modules
     attributes:
       label: Modules and hidden keys to evaluate (names + package IDs if possible)
-      description: List the modules and settings you are seeking advice on. Include the module, key and value (if no private data is included). 
+      description: |
+        List the modules and settings you are seeking advice on. Include the module, key, and value (only if no private data is included).
 
   - type: checkboxes
     id: confirm
