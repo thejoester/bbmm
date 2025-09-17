@@ -27,19 +27,6 @@ body:
     validations:
       required: true
 
-  - type: checkboxes
-    id: goals
-    attributes:
-      label: Goals (pick all that apply)
-      options:
-        - label: Keep GM-only behaviors and hide player-only noise
-        - label: Improve performance / reduce heavy features
-        - label: Standardize UI/UX across worlds
-        - label: Include safe hidden settings needed for configuration
-        - label: Exclude user-specific or machine-specific settings
-        - label: Avoid restoring live “state” (combat/time/cache/etc.)
-        - label: Other (explain below)
-
   - type: textarea
     id: world_system_versions
     attributes:
@@ -62,57 +49,11 @@ body:
         - lib-wrapper (lib-wrapper)
 
   - type: textarea
-    id: must_keep
-    attributes:
-      label: Settings you absolutely want preserved
-      description: Which configuration values must survive export/import exactly as-is?
-      placeholder: |
-        - Specific UI layout toggles
-        - Permissions defaults
-        - Chat/Log formatting options
-
-  - type: textarea
-    id: must_avoid
-    attributes:
-      label: Things we must NOT include
-      description: Live state or sensitive data you want to exclude.
-      placeholder: |
-        - Current combat/initiative
-        - Live world time/calendar
-        - Cached/temp data
-        - User-specific paths/machine-specific toggles
-
-  - type: dropdown
-    id: risk
-    attributes:
-      label: Inclusion risk tolerance
-      description: Higher risk means including more that could conflict with a different session or machine.
-      options:
-        - Safe (configuration only, default)
-        - Balanced (most configuration, exclude known live state)
-        - Aggressive (include everything you can; NOT recommended)
-    validations:
-      required: true
-
-  - type: checkboxes
-    id: hidden_settings
-    attributes:
-      label: Hidden settings preference
-      description: Hidden settings often hold configuration. Including **all** hidden values is not recommended.
-      options:
-        - label: Include only stable configuration-type hidden settings
-        - label: Exclude live/session “state” (combat/time/cache/etc.) — recommended
-        - label: I understand BBMM does not auto-save live state to avoid overwriting active sessions
-
-  - type: textarea
     id: details
     attributes:
-      label: Extra details / screenshots / steps / links
-      description: Anything else that helps us advise accurately (links to docs, screenshots, etc.).
+      label: Provide Details
+      description: Describe what hidden settings you are seeking advice on. Include the module, key and value (if no private data is included). 
       placeholder: |
-        - Screenshots of module config windows
-        - A short description of your workflow
-        - What you tried already
 
   - type: checkboxes
     id: confirm
