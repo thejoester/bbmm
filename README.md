@@ -26,20 +26,37 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 
 ### Settings Sync
 - For user/client scope settings will have a Lock and a sync icon, 
-  - Lock (toggle): will force player setting to match GM, and hide from player settings. 
+  - Lock (toggle):
+    - Click = Lock Selected (will promtp to select users).
+    - Right-Click = Lock All.
+    - Shift+Click = Soft Lock.
+    - Shift+Right-Click = Clear Locks.
+  - Soft Lock option, will sync user setting once, but allow them to change it unless GM changes setting while soft lock enabled. 
   - Sync: Will push GM setting to currently connected player(s). 
 
-### Exclude modules & settings
-- Add modules to ignore on presets/imports/exports.
-- Add specific setting to ignore on presets/imports/exports.
+### Controls (Key Binds) Sync
+- Allows GM to sync keybinds
+  - Click: prompts to select online users to sync key bindings with.
+    - Players need to be connected.
+  - Shift+Click: Soft-Lock sync. Will change users setting but still allow them to change it.
+    - Players do not need to be connected.
+
+### Exclude or Incluide modules & settings
+- Add specific setting / modules to ignore on presets/imports/exports.
+- Inclusion manager to include hidden settings / modules in presets/inports/exports.
 
 ### Changelog report
 - Opens report on login for GM with latest change logs for modules that contain a changelog file.
+  
+## Roadmap
+These are some features I hope to add to this module in upcoming updates:
 
-## Planned future features
-- Categorize / arrange modules in module list.
-- Add support for Controls (Key bindings).
-- Let GM lock/push setting to specific player.
+### Customize Module List
+- Add tags to modules
+  - Sort/group by tags 
+  - Add personal notes to modules
+- Settings links on module list to module setting
+
 
 ## Screenshots
 <img width="60%" height="60%" alt="image" src="https://github.com/user-attachments/assets/fe5a02f3-dce4-4b0b-8ed1-bd64311ddf72" />
