@@ -33,7 +33,8 @@ body:
     id: world_system_versions
     attributes:
       label: World/System/Versions
-      description: Include Foundry version, system(s), BBMM version, and any other critical version info.
+      description: Include Foundry version, system(s), BBMM version, and any other critical version info.  See the guide for copying details from Foundry:
+        [How to copy/paste troubleshooting info from Foundry](https://github.com/thejoester/bbmm/wiki/How-to-copy-paste-troubleshooting-info-from-foundry).
       placeholder: |
         Foundry: v12.xx (or v13.xx)
         System: PF2e 5.xx
