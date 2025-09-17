@@ -2,18 +2,86 @@ import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openLegacyExportDialog } from "./legacy.js";
+import { openInclusionsManagerApp } from "./inclusions.js";
 
 const MODULE_SETTING_PRESETS = "module-presets";  // OLD will go away 
 const SETTING_SETTINGS_PRESETS = "settingsPresets"; // OLD will go away
 const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
+const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
+
+/* Controls Sync Globals ======================================================*/
+export const CTRL_STORE_KEY = "userControlSync";				// world: { [id]: {rev, lock?, soft?} }
+export const CTRL_REV_STORE = "softLockRevMap_controls";		// world: { [id]: number }
+export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
+
+let __bbmm_isV12 = null; // cache after init
+
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
-	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", "migratedPresetsV1"])],
+	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", 
+		"migratedPresetsV1", "userSettingSync", "migratedPresetsV1", "softLockLedger", "softLockRevMap"])],
 	["core", new Set(["moduleConfiguration", "compendiumConfiguration", "time"])],	
 	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
 
+// Check folder migration 
+async function checkFolderMigration(){
+	if (!game.user.isGM) return; // GM only
+
+	const BBMM_PACK_NAMES = [
+		"bbmm-macros",
+		"bbmm-journal"
+	];
+
+	// Get the full migrations object (always returns an object).
+	function getMigrations() {
+		const obj = game.settings.get(BBMM_ID, "bbmmFlags");
+		return obj && typeof obj === "object" ? { ...obj } : {};
+	}
+
+	// Set/merge a single flag without clobbering others.
+	async function setMigrationFlag(key, value) {
+		const current = getMigrations();
+		current[key] = value;
+		await game.settings.set(BBMM_ID, "bbmmFlags", current);
+	}
+
+	/** Check a flag; falsy if missing. */
+	function hasMigrationFlag(key) {
+		const current = getMigrations();
+		return Boolean(current[key]);
+	}
+
+	if (hasMigrationFlag("folderMigration")) return; // we already migrated
+
+	try {
+		let folder = game.folders.find((f) => f.type === "Compendium" && f.name === BBMM_COMP_FOLDER_NAME);
+		// If folder doesn't exist create it
+		if (!folder) { 
+			folder = await Folder.create({ name: BBMM_COMP_FOLDER_NAME, type: "Compendium", sorting: "a" });
+			DL("settings.js | Created compendium folder:", BBMM_COMP_FOLDER_NAME, folder?.id);
+		}
+
+		// move packs into folder
+		for (const name of BBMM_PACK_NAMES) {
+			const cid = `${BBMM_ID}.${name}`;
+			const pack = game.packs.get(cid);
+			if (!pack) { DL("settings.js | Pack not found, skipping:", cid); continue; }
+			await pack.configure({ folder: folder.id });
+			DL("settings.js | Moved pack into folder:", cid, "→", BBMM_COMP_FOLDER_NAME);
+		}
+
+		// update flag
+		await setMigrationFlag("folderMigration", true);
+		ui.compendium.render(true);
+		DL("settings.js | Compendium folder migration complete.");
+	} catch (err) {
+		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
+	}
+}
+
+/* V12 Check =============================================================== */
 export function isFoundryV12() {
 	try {
 		// if we've already computed it post-init, trust the cache
@@ -24,16 +92,13 @@ export function isFoundryV12() {
 		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
 		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
 		const is12 = major === 12;
-		DL(`isFoundryV12(): gen=${gen} version="${ver}" → ${is12}`);
+		DL(`settings.js | isFoundryV12(): gen=${gen} version="${ver}" → ${is12}`);
 		return is12;
 	} catch (err) {
-		DL(2, "isFoundryV12(): detection failed", err);
+		DL(2, "settings.js | isFoundryV12(): detection failed", err);
 		return false;
 	}
 }
-
-
-let __bbmm_isV12 = null;	// cache after init
 
 //	Function for debugging - Prints out colored and tagged debug lines
 export function DL(intLogType, stringLogMsg, objObject = null) {
@@ -126,14 +191,14 @@ function injectBBMMHeaderButton(root) {
 	// Resolve the root element (jQuery or HTMLElement)
 	root = root instanceof HTMLElement ? root : (root?.[0] ?? null);
 	if (!root) {
-		DL(2, "BBMM header injection: no root element found");
+		DL(2, "settings.js | BBMM header injection: no root element found");
 		return;
 	}
 
 	// Find header and its controls bucket
 	const header = root.querySelector("header.window-header");
 	if (!header) {
-		DL(2, "BBMM header injection: no header found");
+		DL(2, "settings.js | BBMM header injection: no header found");
 		return;
 	}
 	const controls = header.querySelector(".window-controls") || header;
@@ -154,10 +219,10 @@ function injectBBMMHeaderButton(root) {
 		ev.stopPropagation();
 
 		if (game.user.isGM) {
-			DL("Opening BBMM Launcher from header button");
+			DL("settings.js | Opening BBMM Launcher from header button");
 			openBBMMLauncher();
 		} else {
-			DL("Opening BBMM Settings Preset Manager from header button");
+			DL("settings.js | Opening BBMM Settings Preset Manager from header button");
 			openSettingsPresetManager();
 		}
 	});
@@ -186,25 +251,25 @@ function injectBBMMHeaderButton(root) {
 		document.head.appendChild(style);
 	}
 
-	DL("BBMM header button injected");
+	DL("settings.js | BBMM header button injected");
 }
 
 export function openExclusionsManager() {
 	// Wrapper that calls the actual app launcher if present
-	DL("openExclusionsManager(): fired");
+	DL("settings.js | openExclusionsManager(): fired");
 	try {
 		const fn = globalThis.bbmm?.openExclusionsManagerApp ?? globalThis.openExclusionsManagerApp;
 		if (typeof fn === "function") return fn();
-		DL(3, "openExclusionsManager(): launcher not found");
+		DL(3, "settings.js | openExclusionsManager(): launcher not found");
 	ui.notifications?.warn(LT?.exclusionsNotAvailable?.() ?? `${LT.errors.exclusionsMgrNotFound()}.`);
 	} catch (e) {
-		DL(3, "openExclusionsManager(): error", e);
+		DL(3, "settings.js | openExclusionsManager(): error", e);
 	}
 }
 
 // Open a small chooser dialog, then launch the selected manager
 export async function openBBMMLauncher() {
-	DL("openBBMMLauncher()");
+	DL("settings.js | openBBMMLauncher()");
 
 	const choice = await new Promise((resolve) => {
 		const dlg = new foundry.applications.api.DialogV2({
@@ -214,7 +279,9 @@ export async function openBBMMLauncher() {
 			buttons: [
 				{ action: "modules",  label: LT.modulePresetMgr(), default: true },
 				{ action: "settings", label: LT.settingsPresetMgr() },
+				// { action: "controls-presets", label: LT.controlsPresetMgr() },
 				{ action: "exclusions", label: LT.exclusionsMgr() },
+				{ action: "inclusions", label: LT.inclusionsMgr() },	
 				{ action: "cancel",   label: LT.buttons.cancel() }
 			],
 			submit: (res) => resolve(res ?? "cancel"),
@@ -225,7 +292,7 @@ export async function openBBMMLauncher() {
 
 	});
 
-	DL(`openBBMMLauncher(): choice = ${choice}`);
+	DL(`settings.js | openBBMMLauncher(): choice = ${choice}`);
 
 	if (choice === "modules") {
 		openPresetManager();
@@ -233,6 +300,10 @@ export async function openBBMMLauncher() {
 		openSettingsPresetManager();
 	} else if (choice === "exclusions") {
 		openExclusionsManager();
+	} else if (choice === "inclusions") {
+		openInclusionsManagerApp();
+	} else if (choice === "controls-presets") {
+		openControlsPresetManager();
 	}
 	// "cancel" -> do nothing
 }
@@ -252,18 +323,18 @@ async function migrationV1Check() {
 
 			if (Object.keys(oldModule).length) {
 				await game.settings.set(BBMM_ID, MODULE_SETTING_PRESETS_U, oldModule);
-				DL("migrationV1Check(): migrated module presets to user scope");
+				DL("settings.js | migrationV1Check(): migrated module presets to user scope");
 			}
 			if (Object.keys(oldSetting).length) {
 				await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS_U, oldSetting);
-				DL("migrationV1Check(): migrated setting presets to user scope");
+				DL("settings.js | migrationV1Check(): migrated setting presets to user scope");
 			}
 
 			await game.settings.set(BBMM_ID, "migratedPresetsV1", true);
-			DL("migrationV1Check(): migration complete, flag set");
+			DL("settings.js | migrationV1Check(): migration complete, flag set");
 		}
 	} catch (err) {
-		DL(3, "migrationV1Check(): migration error", err);
+		DL(3, "settings.js | migrationV1Check(): migration error", err);
 	}
 	
 }
@@ -277,7 +348,7 @@ Hooks.once("init", () => {
 		const ver = String(game?.version ?? game?.data?.version ?? CONFIG?.version ?? "");
 		const major = Number.isFinite(gen) ? gen : parseInt((ver.split(".")[0] || "0"), 10);
 		__bbmm_isV12 = (major === 12);
-		DL(`BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
+		DL(`settings.js |  BBMM init: major=${major} (gen=${gen}, ver="${ver}") → isV12=${__bbmm_isV12}`);
 
 		// now safely gate your injections
 		if (!__bbmm_isV12) {
@@ -285,16 +356,15 @@ Hooks.once("init", () => {
 			Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
 		}
 	} catch (err) {
-		DL(2, "BBMM init version gate failed", err);
+		DL(2, "settings.js | BBMM init version gate failed", err);
 	}
 
-	
 	try {
-		DL("init(): start");
+		DL("settings.js | init(): start");
 
 		// v12-only legacy export menu
 		if (isFoundryV12()) {
-			DL("init(): Foundry v12 detected — registering Legacy Export menu");
+			DL("settings.js | init(): Foundry v12 detected — registering Legacy Export menu");
 
 			// Add a  menu entry to launch legacy export dialog
 			game.settings.registerMenu(BBMM_ID, "v12ExportSettings", {
@@ -332,6 +402,14 @@ Hooks.once("init", () => {
 					type: Boolean,
 					default: false
 				});
+
+				// Setting to hold module flags
+				game.settings.register(BBMM_ID, "bbmmFlags", {
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}	
+				});
 			// ====== HIDDEN VARIABLES ===== 
 			// These do not need to be localized
 				// User Exclusions 
@@ -342,6 +420,16 @@ Hooks.once("init", () => {
 					config: false,	
 					type: Object,
 					default: { modules: [], settings: [] }
+				});
+
+				// User Inclusions (hidden settings to include when saving presets)
+				game.settings.register(BBMM_ID, "userInclusions", {
+					name: "BBMM: User Inclusions",
+					hint: "Hidden settings explicitly included when exporting BBMM settings presets.",
+					scope: "world",
+					config: false,
+					type: Object,
+					default: {}
 				});
 
 				// User scoped Settings presets
@@ -383,27 +471,74 @@ Hooks.once("init", () => {
 					default: {}
 				});
 
-				// OLD Settings Presets 
-				game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS, {
-					name: "Module Presets",
-					hint: "Stored module enable/disable presets.",
+				// User-scoped ledger: remembers which soft-lock value was last auto-applied per setting id
+				game.settings.register(BBMM_ID, "softLockLedger", {
+					name: "softLockLedger",
+					scope: "user",
+					config: false,
+					type: Object,
+					default: {}	// { "<namespace>.<key>": <serializedValue> }
+				});
+
+				// persistant soft-lock rev map
+				game.settings.register(BBMM_ID, "softLockRevMap", {
+					name: "softLockRevMap",
 					scope: "world",
 					config: false,
 					type: Object,
 					default: {}
+				});
+
+				// Controls Sync Storage
+				game.settings.register?.(BBMM_ID, CTRL_STORE_KEY, {
+					name: "BBMM Control Sync Store",
+					scope: "world", config: false, default: {}
+				});
+				// Controls Sync RevMap
+				game.settings.register?.(BBMM_ID, CTRL_REV_STORE, {
+					name: "BBMM Control Sync RevMap",
+					scope: "world", config: false, default: {}
 				});
 				
-				// OLD world Presets 
-				game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS, {
-					name: "Settings Presets",
-					hint: "Stored module enable/disable presets.",
-					scope: "world",
-					config: false,
-					type: Object,
-					default: {}
-				});
+
 			// ===== SETTINGS ITEMS =====
 			// These DO need to be localized
+
+				// About BBMM menu button
+				game.settings.registerMenu(BBMM_ID, "menuAboutBBMM", {
+					name: LT.aboutName(),
+					label: LT.aboutName(),
+					icon: "fas fa-circle-info",
+					restricted: true,
+					type: class extends FormApplication {
+						constructor(...args){ super(...args); }
+						static get defaultOptions() {
+							return foundry.utils.mergeObject(super.defaultOptions, {
+								id: "bbmm-about-bbmm-opener",
+								title: LT.aboutName(),
+								template: null,
+								width: 600
+							});
+						}
+						async render(...args) {
+							const uuid = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn";
+							try {
+								DL("settings.js | About BBMM button clicked", { uuid });
+								const doc = await fromUuid(uuid);
+								if (!doc) {
+									DL(2, "settings.js | About BBMM open failed: document not found", { uuid });
+									return ui.notifications?.error(LT.aboutOpenMissing());
+								}
+								await doc.sheet.render(true);
+							} catch (err) {
+								DL(2, "settings.js | About BBMM open failed", err);
+								ui.notifications?.error(LT.aboutOpenError());
+							}
+							return this;
+						}
+						async _updateObject() {}
+					}
+				});
 
 				// Add a menu entry in Configure Settings to open the Preset Manager
 				game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
@@ -477,6 +612,36 @@ Hooks.once("init", () => {
 					}
 				});
 				
+				//  Inclusions Manager menu 
+				game.settings.registerMenu(BBMM_ID, "menuInclusionsManager", {
+					name: LT.inclusions.btnInclusionMgr(),
+					label: LT.inclusions.btnInclusionMgr(),
+					icon: "fas fa-list-check",
+					restricted: true,
+					type: class extends FormApplication {
+						constructor(...args){ super(...args); }
+						static get defaultOptions() {
+							return foundry.utils.mergeObject(super.defaultOptions, {
+								id: "bbmm-inclusions-manager-opener",
+								title: LT.inclusions.btnInclusionMgr(),
+								template: null, // We'll open our own UI (DialogV2/App), no form tpl needed
+								width: 600
+							});
+						}
+						async render(...args) {
+							try {
+								DL("settings.js | Inclusions Manager button clicked");
+								await openInclusionsManagerApp();
+							} catch (err) {
+								DL(2, "settings.js | Inclusions Manager open failed", err);
+								ui.notifications?.error(LT.inclusionsOpenError());
+							}
+							return this;
+						}
+						async _updateObject() {}
+					}
+				});
+
 				// World toggle to Show changelog on GM login
 				game.settings.register(BBMM_ID, "showChangelogsOnLogin", {
 					name: LT.name_showChangelogsOnLogin(),
@@ -486,7 +651,8 @@ Hooks.once("init", () => {
 					type: Boolean,
 					default: true
 				});
-
+				
+				// toggle to check disabled modules
 				game.settings.register("bbmm", "checkDisabledModules", {
 					scope: "world",
 					config: true,
@@ -507,15 +673,78 @@ Hooks.once("init", () => {
 					requiresReload: true,
 					onChange: (v) => {
 						try {
-							DL(`bbmm-setting-lock: enableUserSettingSync -> ${v}`);
+							DL(`settings.js | bbmm-setting-lock: enableUserSettingSync -> ${v}`);
 							// Optional: let connected clients know state changed (no-op if they aren't listening)
 							game.socket?.emit?.(`module.${BBMM_ID}`, { t: "bbmm-sync-toggle", enabled: !!v });
 						} catch (err) {
-							DL(2, "bbmm-setting-lock: onChange(enableUserSettingSync) error", err);
+							DL(2, "settings.js | bbmm-setting-lock: onChange(enableUserSettingSync) error", err);
 						}
 					}
 				});
 
+				// Enable/disable BBMM Controls Sync
+				game.settings.register?.(BBMM_ID, CTRL_TOGGLE, {
+					name: LT.controlsToggleName(),
+					hint: LT.controlsToggleHint(),
+					scope: "world", config: true, type: Boolean, default: true
+				});
+				
+				// Choices for lock-gestures 
+				const GESTURE_ACTION_CHOICES = {
+					"lockSelected": LT.name_LockSelected(),
+					"softLock": LT.name_SoftLock(),
+					"lockAll": LT.name_LockAll(),
+					"clearLocks": LT.name_ClearLocks()
+				};
+
+				// Set action for "Click" (default: lock selected)
+				game.settings.register(BBMM_ID, "gestureAction_click", {
+					name: LT.name_SetActionClick(),
+					scope: "world",
+					restricted: true,
+					config: true,
+					type: String,
+					choices: GESTURE_ACTION_CHOICES,
+					default: "lockSelected",
+					onChange: v => DL(`settings.js | gestureAction_click -> ${v}`)
+				});
+
+				// Set action for "Right-Click" (default: lock all)
+				game.settings.register(BBMM_ID, "gestureAction_right", {
+					name: LT.name_SetActionRightClick(),
+					scope: "world",
+					restricted: true,
+					config: true,
+					type: String,
+					choices: GESTURE_ACTION_CHOICES,
+					default: "lockAll",
+					onChange: v => DL(`settings.js | gestureAction_right -> ${v}`)
+				});
+
+				// Set action for "Shift+Click" (default: soft lock)
+				game.settings.register(BBMM_ID, "gestureAction_shift", {
+					name: LT.name_SetActionShiftClick(),
+					scope: "world",
+					restricted: true,
+					config: true,
+					type: String,
+					choices: GESTURE_ACTION_CHOICES,
+					default: "softLock",
+					onChange: v => DL(`settings.js | gestureAction_shift -> ${v}`)
+				});
+
+				// Set action for Shift+Right-Click (default: clearLocks)
+				game.settings.register(BBMM_ID, "gestureAction_shiftRight", {
+					name: LT.name_SetActionShiftRightClick(),
+					scope: "world",
+					restricted: true,
+					config: true,
+					type: String,
+					choices: GESTURE_ACTION_CHOICES,
+					default: "clearLocks",
+					onChange: v => DL(`settings.js | gestureAction_shiftRight -> ${v}`)
+				});
+				
 				// Debug level for THIS module
 				game.settings.register(BBMM_ID, "debugLevel", {
 					name: LT.debugLevel(),
@@ -531,10 +760,9 @@ Hooks.once("init", () => {
 					},
 					default: "none"
 				});
-
 		}
 	} catch (err) {
-		DL(3, "init(): error", err);
+		DL(3, "settings.js | init() error", err);
 	}
 });
 
@@ -542,6 +770,10 @@ Hooks.on("setup", () => DL("settings.js | setup fired"));
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
+
+	//check folder migration
+	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
+
 	if (!isFoundryV12()){
 		// Hook into settings and manage modules window to add app button in header 
 		Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));

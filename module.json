@@ -21,6 +21,7 @@
         "scripts/module-presets.js",
         "scripts/settings-presets.js",
         "scripts/exclusions.js",
+        "scripts/inclusions.js",
         "scripts/setting-sync.js",
         "scripts/changelogs.js"
     ],
@@ -32,7 +33,17 @@
             "path": "packs/bbmm-macros",
             "type": "Macro",
             "ownership": {
-                "PLAYER": "OBSERVER",
+                "PLAYER": "NONE",
+                "ASSISTANT": "OWNER"
+            }
+        },
+		{
+            "name": "bbmm-journal",
+            "label": "BBMM Journal",
+            "path": "packs/bbmm-journal",
+            "type": "JournalEntry",
+            "ownership": {
+                "PLAYER": "NONE",
                 "ASSISTANT": "OWNER"
             }
         }

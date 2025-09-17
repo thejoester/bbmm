@@ -34,7 +34,27 @@
 	display: inline-flex !important;
 }
 
-/* BBMM Launcher dialog: stack footer buttons full-width */
+/* BBMM Inclusions window baseline styling */
+.bbmm-inclusions-app .window-content {
+	/* layout sane defaults */
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+/* Tighten padding */
+.bbmm-inclusions-app .window-content .bbmm-im-root,
+.bbmm-inclusions-app .window-content .bbmm-ai-root {
+	padding: 8px;
+}
+
+/* cap width if a theme tries to stretch it */
+#bbmm-inclusions-manager,
+#bbmm-inclusions-add-setting {
+	max-width: 760px;
+}
+
+/* BBMM Launcher dialog: stack footer buttons full-width */ 
 .bbmm-launcher-dialog footer.form-footer,
 .bbmm-launcher-dialog footer .dialog-buttons {
 	display: grid !important;
@@ -44,7 +64,7 @@
 	justify-items: stretch !important;
 }
 
-/* Make each footer button a full-width block */
+/* Make each footer button a full-width block */ 
 .bbmm-launcher-dialog footer.form-footer button,
 .bbmm-launcher-dialog footer .dialog-buttons > button {
 	display: block !important;
@@ -53,6 +73,24 @@
 	margin: 0 !important;
 	white-space: nowrap !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+	Lock/Sync Icons
+   ───────────────────────────────────────────────────────────── */
+.bbmm-lock-icons i + i { margin-left: .35rem; }
+.bbmm-lock-icons { display:inline-flex; gap:.4rem; margin-left:.4rem; vertical-align:middle; }
+.bbmm-lock-icons .bbmm-badge { opacity:.85; }
+.bbmm-lock-icons .bbmm-click { cursor:pointer; opacity:.85; }
+.bbmm-lock-icons .bbmm-click:hover { opacity:1; transform: translateY(-1px); }
+.bbmm-lock-icons .bbmm-active { color: orange; }
+.bbmm-lock-icons .bbmm-partial { color: #1f449c; } /* partial = softer orange */
+
+/* ─────────────────────────────────────────────────────────────
+	Player Disabled Styles                                                    */
+   ───────────────────────────────────────────────────────────── */
+.bbmm-locked-input { opacity: .65; pointer-events: none; }
+.bbmm-locked-badge { display: inline-flex; align-items: center; gap: .25rem; margin-left: .4rem; color: var(--color-text-dark-secondary, #999); }
+.bbmm-locked-hide { display: none !important; }
 
 /* ─────────────────────────────────────────────────────────────
    Changelog — theme reset + scoped styles

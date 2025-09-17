@@ -1,0 +1,32 @@
+{
+  "name": "View Changelog Report",
+  "type": "script",
+  "flags": {
+    "macro-wheel": {
+      "activeCondition": ""
+    }
+  },
+  "command": "/* ************************************************************************\n  Macro Title: Open BBMM Changelog Report\n  Author: TheJoester\n  Module: Big Bad Module Manager\n  License: MIT License\n\n  Description:\n  Opens the BBMM Changelog Report window manually.\n**************************************************************************/\n\n(() => {\n\ttry { game.modules.get(\"bbmm\")?.api?.openChangelogReport?.(); }\n\tcatch (e) { ui.notifications.error(\"BBMM changelog API not found.\"); }\n})();",
+  "img": "icons/sundries/documents/document-sealed-signatures-red.webp",
+  "author": "EpqDCtSCbVNM4wPj",
+  "scope": "global",
+  "folder": null,
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.348",
+    "systemId": "pf2e",
+    "systemVersion": "7.4.3",
+    "createdTime": 1757800771226,
+    "modifiedTime": 1758040837183,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_id": "RYwtyq1VXqfwSGZe",
+  "sort": 100000,
+  "_key": "!macros!RYwtyq1VXqfwSGZe"
+}

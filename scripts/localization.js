@@ -2,7 +2,7 @@
 BBMM Localization — dynamic LT
 - Works with any bbmm.* key path found in en.json
 - LT.errors.conflictTitle()          -> localize "bbmm.errors.conflictTitle"
-- LT.errors.presetExists({name:...}) -> format  "bbmm.errors.presetExists" with {name}
+- LT.errors.presetExists({name:...}) -> format  "bbmm.errors.presetExists" with {name} 
 */
 
 import { DL } from "./settings.js";

@@ -1,0 +1,416 @@
+{
+  "name": "Big Bad Module Manager",
+  "_id": "u3uUIp6Jfg8411Pn",
+  "pages": [
+    {
+      "sort": 100000,
+      "name": "About",
+      "type": "text",
+      "_id": "LqdPKzBQbWas56RQ",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h3><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h3></div><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / delete preset.</li><li>Export module state to .json.</li><li>import .json to preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / delete preset.</li><li>Export settings state to .json</li><li><p>import .json to preset:</p><ul dir=\"auto\"><li>Choose which modules or specific settings to import.</li></ul></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>Add modules to ignore on presets/imports/exports.</li><li>Add specific setting to ignore on presets/imports/exports.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Include hidden Settings}</h3><ul><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Add hidden settings to always include in presets/imports/exports.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757732832081,
+        "modifiedTime": 1758088338828,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.LqdPKzBQbWas56RQ"
+    },
+    {
+      "sort": 200000,
+      "name": "Module Presets",
+      "type": "text",
+      "_id": "ALKM5KUILeJAZi62",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>Module Presets allow you to <strong data-start=\"306\" data-end=\"348\">save and load groups of active modules</strong>.<br data-start=\"349\" data-end=\"352\" /></p><p>This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><p></p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current module states into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current module state </strong>to the preset.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li><li><p><strong>Import/Export: </strong>Presets are specific to the game world, to use a preset in another game world you can export/import.</p></li></ul><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Import / Export</span></strong></span></h3><ul><li><p><strong>Export:</strong> exports <strong><span style=\"text-decoration:underline\">current module state</span></strong> to a .json file. To export a specific preset you must load it first, then export to .json.</p></li><li><p><strong>Import:</strong> Imports .json file into a preset.</p></li><li><p><strong>Note:</strong> Once you import the preset, you must choose it and load it for it to be activated.</p></li></ul><h3>Also see: </h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusion Manager}</p><p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757733057278,
+        "modifiedTime": 1757742304573,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.ALKM5KUILeJAZi62"
+    },
+    {
+      "sort": 300000,
+      "name": "Settings Presets",
+      "type": "text",
+      "_id": "mB68DCCQ83f9d3EQ",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>Setting Presets allow you to save your current settings state into a preset.</p><p><br data-start=\"349\" data-end=\"352\" />This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><p></p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current settings state into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current settings</strong> to the preset.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li><li><p><strong>Import/Export: </strong>Presets are specific to the game world, to use a preset in another game world you can export/import.</p></li></ul><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Import / Export</span></strong></span></h3><ul><li><p><strong>Export:</strong> exports <span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">current settings state</span></strong></span> to a .json file. To export a specific preset you must load it first, then export to .json.</p></li><li><p><strong>Import:</strong> Imports .json file into a preset. When importing it will let you choose what to import:</p><ul><li><p>\"All Settings\": imports everything from the .json</p></li><li><p>\"Select Modules\": Select which module settings to import.</p></li><li><p>\"Select Settings\": Select specific settings to import.</p></li><li><p><strong>Note:</strong> Anything in the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusions} will not be imported.</p></li></ul></li><li><p><strong>Note:</strong> Once you import the preset, you must choose it and load it for it to be activated.</p></li></ul><h3>Also See</h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}</p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757733847774,
+        "modifiedTime": 1757753172987,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.mB68DCCQ83f9d3EQ"
+    },
+    {
+      "sort": 400000,
+      "name": "Exclusion Manager",
+      "type": "text",
+      "_id": "1mPrapuBoNRZTWXo",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>The Exclusion Manager allows you to add modules or specific settings that will be excluded by this module when Saving Presets or Exporting / Importing from .json. </p><h3></h3>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757740071855,
+        "modifiedTime": 1757742505060,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.1mPrapuBoNRZTWXo"
+    },
+    {
+      "sort": 500000,
+      "name": "Inclusion Manager",
+      "type": "text",
+      "_id": "Q3JVPh8ykzMc3kLS",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>The Inclusion Manager will let you manually add Hidden settings to ensure they are saved in @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets} and exports.</p><p><strong><span style=\"text-decoration:underline\">This tool should be used with a bit of caution!</span></strong> Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p><h2></h2><p></p><p><br /><br /></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757740379508,
+        "modifiedTime": 1758086233798,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Q3JVPh8ykzMc3kLS"
+    },
+    {
+      "sort": 350000,
+      "name": "Hidden settings",
+      "type": "text",
+      "_id": "XsS4wjBTXbMDeHpr",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>By default the settings preset manager will only save / import / export the un-hidden settings. You can manually configure what hidden settings you wish to include in presets and exports using the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Inclusion Manager}. Use this tool with caution! Please see below for more information! </p><h3>Why is data hidden?</h3><p>Many modules (and even Foundry itself) store part of their information in <strong data-start=\"230\" data-end=\"249\">hidden settings</strong>.</p><p data-start=\"254\" data-end=\"271\">These settings:</p><ul data-start=\"272\" data-end=\"471\"><li data-start=\"272\" data-end=\"324\"><p data-start=\"274\" data-end=\"324\">Are not meant to be clicked or changed directly.</p></li><li data-start=\"325\" data-end=\"379\"><p data-start=\"327\" data-end=\"379\">Help keep the Configure Settings menu uncluttered.</p></li><li data-start=\"380\" data-end=\"471\"><p data-start=\"382\" data-end=\"471\">Prevent confusion about options that aren’t useful for players or GMs to edit manually.</p></li></ul><p data-start=\"473\" data-end=\"616\">Behind the scenes, hidden settings are stored in your world’s database (.db) file. There are two main reasons Foundry and modules use them:</p><ol data-start=\"618\" data-end=\"1286\"><li data-start=\"618\" data-end=\"905\"><p data-start=\"621\" data-end=\"905\"><strong data-start=\"621\" data-end=\"647\">Background bookkeeping</strong><br data-start=\"647\" data-end=\"650\" />Modules often need to remember things from one session to the next — like combat states, world time/date, cached module data, or other internal states. Since you don’t need to interact with these directly, they are kept hidden and managed automatically.</p></li><li data-start=\"907\" data-end=\"1286\"><p data-start=\"910\" data-end=\"1286\"><strong data-start=\"910\" data-end=\"942\">Custom configuration windows</strong><br data-start=\"942\" data-end=\"945\" />Some modules don’t list all their settings in the main Configure Settings menu. Instead, they provide a button that opens a custom window or manager (for example, Foundry’s own <strong data-start=\"1123\" data-end=\"1146\">Configure Interface</strong> option). The underlying settings for those windows are hidden so they don’t clutter the main menu, but they still exist and can be saved.</p></li></ol><h2>Why do we need to include hidden settings?</h2><p>Even though they’re invisible in the menu, hidden settings often hold data for the state of a module. Things like saved preferences, remembered choices, or tracking information.</p><p data-start=\"1528\" data-end=\"1772\">This includes the settings tied to <strong data-start=\"1563\" data-end=\"1595\">custom configuration windows</strong> (like advanced managers or setup pages). If these hidden values aren’t included, a module may lose part of its setup when you load a saved preset or import from a .json backup.</p><p data-start=\"1774\" data-end=\"2002\">By including hidden settings in presets/exports, you ensure that <strong data-start=\"1839\" data-end=\"1846\">all</strong> module options — both visible and hidden, including those in custom windows — are preserved so everything continues working exactly as you configured it.</p><h2>Why not just save/export all hidden data?</h2><p>Not all hidden data should be preserved. Some hidden values are <strong data-start=\"1338\" data-end=\"1368\">temporary or session-based</strong> (e.g., live combat trackers, transient caches, current world time). Restoring those over a different session can cause errors, weird behavior, or even data loss.</p><p data-start=\"1532\" data-end=\"1870\" data-is-last-node data-is-only-node><strong data-start=\"1532\" data-end=\"1546\">IMPORTANT:</strong> BBMM does not auto-save this kind of temporary “state” data by default out of caution, so that it won’t overwrite live game state when you restore.</p><p data-start=\"1532\" data-end=\"1870\" data-is-last-node data-is-only-node>You <em data-start=\"1687\" data-end=\"1692\">can</em> include specific hidden settings in a preset if you know they’re safe to restore, but it’s <strong data-start=\"1784\" data-end=\"1822\">advised to add settings cautiously</strong> and focus on stable, configuration-type values.</p><h2>Macro to help determine which hidden data to add to the inclusion manager</h2><p>You can preview the data that is stored in these settings using the included macro: @UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector}. This macro will let you view each modules settings.</p><p><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">How to use:</span></strong></span></p><ul><li><p>Run the macro</p></li><li><p>select module from dropdown on top left:</p><img src=\"modules/bbmm/assets/readme/macro-settings-inspector.png\" /></li><li><p>It may take a second for data to load depending if the module has large data items.</p></li><li><p>Once data loads you will see the data for this module that is saved in your world. If visibility is <strong>Config</strong> this means it is visible in the settings menu and BBMM will save/export it by default. If it is <strong>Hidden</strong> then it will not. you can see the data that is stored in each setting.</p><ul><li><p>For some settings the data will be quite large and is not all displayed. Clicking the value field will expand this, and you can copy or collapse it back.</p><img src=\"modules/bbmm/assets/readme/macro-settings-inspector-2.png\" /></li><li><p>This should give you an idea based on the setting name (key) and the value.</p></li><li><p>If you are in doubt, leave it out.</p></li></ul></li></ul><p>Also, please feel free to ask advice on the <a href=\"https://github.com/thejoester/bbmm\">BBMM GitHub</a>.</p><p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757740476956,
+        "modifiedTime": 1758086138384,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.XsS4wjBTXbMDeHpr"
+    },
+    {
+      "sort": 312500,
+      "name": "Settings Sync",
+      "type": "text",
+      "_id": "MLQHRwurTFNqkFBn",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<header style=\"margin-bottom:.75rem\"><p><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">Control, lock, and synchronize user/client-scoped settings across your world.</span></p></header><h3>Important!</h3><ul><li><p>The GM <span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">MUST</span></strong></span> save settings before applying lock/sync, otherwise it will lock/sync the value prior to save.</p></li><li><p>All Locks / Sync will push when GM clicks <strong>\"Save Changes\"</strong> button on settings window.</p></li><li><p>This feature relies on normal Foundry settings mechanics and BBMM’s sync layer. Modules with custom/nonstandard setting flows may not be fully controllable.</p></li><li><p>It is recommended if you are going to change sync type (from Soft-lock to User Selected for example), that you first clear locks (default Shift + Right-Click) and save, then set new lock. </p></li></ul><hr style=\"margin:.75rem 0\" /><h3 id=\"what-it-does\" style=\"margin:.5rem 0\"><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">What it does</span></h3><p><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">Settings Sync lets a GM centrally manage <strong>user/client-scoped</strong> settings (both Core and Module settings that live on each user’s machine). You can:</span></p><ul style=\"margin:.25rem 0 .75rem 1.25rem\"><li><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\"><strong>Hard-lock</strong> a setting to the GM’s value, hiding it from players. Can choose all players, or select specific players.</span></li><li><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\"><strong>Soft-lock</strong> a setting, will sync the players to the GM's value, but allow them to change after.</span></li><li><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\"><strong>Clear locks</strong> Remove all locks and return control of a setting back to all players.</span></li></ul><p style=\"margin:.5rem 0 .75rem\"><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">If feature is disabled in Settings, BBMM will not sync, listen on sockets, or hide/lock player settings.</span></p><hr style=\"margin:.75rem 0\" /><h3 id=\"using\" style=\"margin:.5rem 0\"><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">Using Settings Sync</span></h3><ol style=\"margin:.25rem 0 .75rem 1.25rem\"><li><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">Open <strong>Configure Settings</strong> (Core or Module).</span></li><li><p><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">For any <em>user/client</em> setting, you’ll see additional BBMM controls:</span></p><div style=\"opacity:.8\"><p><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">(Exact actions for each gesture are configurable in BBMM’s settings.)</span></p></div><ul style=\"margin:.25rem 0 .25rem 1.25rem\"><li><p><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">A <strong>Lock</strong> icon:</span></p><ul><li><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\"><strong>Click</strong> → Select players to lock setting for.</span></li><li><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\"><strong>Shift-click</strong> → Soft Lock</span></li><li><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\"><strong>Right-click</strong> → Hard lock all players</span></li><li><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\"><strong>Shift+Right</strong> → Clear lock</span></li></ul></li><li><p>A Sync icon <span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">→ will prompt to select players, then push the selected saved setting to selected players.</span></p></li></ul></li></ol><hr style=\"margin:.75rem 0\" /><h3 id=\"modes\" style=\"margin:.5rem 0\"><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">Lock modes explained</span></h3><p><strong>Hard Lock All (Solid orange lock) or Hard Lock Selected (Blue person with lock)</strong></p><dl style=\"margin:.25rem 0 .75rem\"><dd style=\"margin:.25rem 0  .5rem 0\"><p><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">Players can’t change the setting; BBMM enforces the GM’s value. If the setting is shown, it will be disabled or visually indicated as controlled.</span></p><p><strong>Soft Lock (Orange hollow lock)</strong></p></dd><dd style=\"margin:.25rem 0  .5rem 0\"><p><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">Players can see and adjust the setting <em>temporarily</em>. BBMM will restore the GM value on next refresh/reload or when the GM triggers a sync refresh. Use Soft-lock when you want to allow brief per-session deviations without permanently changing the standard.</span></p><p><strong>Unlocked (white unlocked lock)</strong></p></dd><dd style=\"margin:.25rem 0  .5rem 0\"><p><span style=\"font-family:var(--font-primary, system-ui);line-height:1.4\">Players have normal control and their local values remain.</span></p></dd></dl><p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757799482479,
+        "modifiedTime": 1758018317528,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.MLQHRwurTFNqkFBn"
+    },
+    {
+      "sort": 150000,
+      "name": "Changelog Report",
+      "type": "text",
+      "_id": "9zaIHbxOwTBL5iwR",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>The <strong data-start=\"145\" data-end=\"165\">Changelog Report</strong> automatically appears when you log into your world if any of your installed modules have updated changelog files. This makes it easy to see what has changed since your last session without digging through GitHub pages or module.json files.</p><p></p><h3>How to Use</h3><ol><li data-start=\"807\" data-end=\"871\"><p data-start=\"810\" data-end=\"871\">On login, review the changelog window if updates are found.</p></li><li data-start=\"872\" data-end=\"928\"><p data-start=\"875\" data-end=\"928\">Use the navigation buttons to move through entries.</p></li><li data-start=\"929\" data-end=\"1005\"><p data-start=\"932\" data-end=\"1005\">Mark entries as <strong data-start=\"948\" data-end=\"963\">seen/unseen</strong> to track which updates you’ve reviewed.</p></li><li data-start=\"1006\" data-end=\"1081\"><p data-start=\"1009\" data-end=\"1081\">Open the source link to view the original changelog details if needed.</p></li></ol><p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757799614210,
+        "modifiedTime": 1757800226619,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.9zaIHbxOwTBL5iwR"
+    },
+    {
+      "sort": 600000,
+      "name": "Macros",
+      "type": "text",
+      "_id": "Tw7LX79cvGnJ3F67",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>Big Bad Module Manager macros found in the compendium:</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe]{View Changelog Report} - Launch the changelog report manually.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.sc6d0g6syYz3nEbB]{BBMM: Setting Preset Inspector} - allows you to inspect a preset, see the saved settings and values contained inside for troubleshooting purposes.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector} - Tool to view module settings to see both visible and hidden settings, and their current values. This is a read only tool. May be useful for deciding what to put on inclusion / exclusion manager. </p><p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1757800788174,
+        "modifiedTime": 1758040924495,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Tw7LX79cvGnJ3F67"
+    },
+    {
+      "sort": 331250,
+      "name": "Controls Sync",
+      "type": "text",
+      "_id": "t1oYUVrmZzIGsUZt",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<h3>What it does</h3><p>Controls Sync lets a GM sync key binding settings to players. Each control setting will have a Sync icon next to the label. It acts in the following ways:</p><ol><li><strong>Click:</strong> Sync to connected players.</li></ol><ul><li>Will open a window showing connected players.</li><li>Select the players you wish to sync the key bind to and sync.</li><li>Players must be online.</li></ul><ol start=\"2\"><li><strong>Shift+Click:</strong> Will put a \"Soft-Lock\" on the sync.</li></ol><ul><li>This will set all players selected key bind(s) to match the GM.</li><li>They will still be able to change them after this if they wish.</li><li>Players do not need to be online.</li></ul>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1758040413862,
+        "modifiedTime": 1758090472122,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.t1oYUVrmZzIGsUZt"
+    }
+  ],
+  "folder": null,
+  "categories": [],
+  "sort": 0,
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "flags": {},
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.348",
+    "systemId": "pf2e",
+    "systemVersion": "7.4.3",
+    "createdTime": 1757732810962,
+    "modifiedTime": 1757732810962,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_key": "!journal!u3uUIp6Jfg8411Pn"
+}

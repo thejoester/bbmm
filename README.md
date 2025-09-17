@@ -98,4 +98,3 @@ If you would like to contribute to the localization, you can do so in one of the
 #### Upload file as Issue:
 1. Download the [en.json](https://github.com/thejoester/bbmm/blob/master/lang/en.json) file,
 2. Rename it to the Open up an [Issue](https://github.com/thejoester/bbmm/issues) and attach the file. 
-
