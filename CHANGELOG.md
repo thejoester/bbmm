@@ -4,23 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0-test.3] - 2025-09-13
+## [0.4.0] - 2025-09-17
 ### Added
 - **Compendiums:**
   - Added Compendium folder "Big Bad Module Manager".
   - Added Journal for module with documentation.
-  - Added Macro to show changelog report manually. 
+  - Added Macro compendium:
+    - Macro to show changelog report manually. 
+    - Macro to Inspect settings. 
+    - Macro to Inspect Setting Presets.
 - **Inclusion Manager:**
   - Added inclusion manager to include hidden settings in presets/inports/exports.
-### Changed
-- **Settings Preset Manager:**
-  - No longer save hidden settings as it could cause issues with many hidden settings. 
-    - See Inclusion Manager to add specific hidden settings you wish to save. 
-### Fixed
-- **Settings Sync:**
-  - When GM changes setting with lock (hard or soft), it will clear lock. 
-
-## [0.4.0-test.2] - 2025-09-10
 ### Changed
 - **Settings Sync:**
   - Added click gesture detection on the lock icon:
@@ -31,16 +25,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Soft Lock option, will sync user setting once, but allow them to change it unless GM changes setting while soft lock enabled. 
   - Icon changes immediately, but changes still only save when clicking "Save Changes" 
   - Settings will allow to change click gesture behavior. 
-
-## [0.4.0-test.1] - 2025-09-10
-### Changed
+- **Settings Preset Manager:**
+  - No longer save hidden settings as it could cause issues with many hidden settings. 
+    - See Inclusion Manager to add specific hidden settings you wish to save. 
+    - Use with Caution! See [Wiki](https://github.com/thejoester/bbmm/wiki) or Journal documentation!
+### Fixed
 - **Settings Sync:**
-  - Added ability to lock/sync setting for specific players.
-    - When clicking lock with show setting and value that is being locked, and list of players to lock. 
-    - When clicking sync, shows connected users allowing to select which users to push sync to.
-    - Locks/Sync apply when GM clicks Save Changes on settings screen.
-    - Oramge lock = all users locked to setting.
-    - Blue user with lock = settings locked for selected players. 
+  - When GM changes setting with lock (hard or soft), it will clear lock. 
 
 ## [0.3.3] - 2025-09-09
 ### Added

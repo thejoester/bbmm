@@ -2038,7 +2038,6 @@ import { LT, BBMM_ID } from "./localization.js";
 
 	Hooks.on("ready", async () => {
 		try {
-			
 			if (!_bbmmCtrlEnabled()) return;
 			DL(1, "setting-sync.js | controls: ready pull+apply");
 			await _bbmmCtrlPullApplyAll();
@@ -2047,6 +2046,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 	Hooks.on('renderKeybindingsConfig', (app, html) => {
 		try {
+			if (!_bbmmCtrlEnabled()) return;
 			_bbmmCtrlWireConfig(app, html);
 			requestAnimationFrame(() => _bbmmCtrlWireConfig(app, html));
 			setTimeout(() => _bbmmCtrlWireConfig(app, html), 50);
@@ -2055,6 +2055,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 	Hooks.on('renderControlsConfig', (app, html) => {
 		try {
+			if (!_bbmmCtrlEnabled()) return;
 			_bbmmCtrlWireConfig(app, html);
 			requestAnimationFrame(() => _bbmmCtrlWireConfig(app, html));
 			setTimeout(() => _bbmmCtrlWireConfig(app, html), 50);
