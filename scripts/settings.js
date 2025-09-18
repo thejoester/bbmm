@@ -1,7 +1,6 @@
 import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
-import { openLegacyExportDialog } from "./legacy.js";
 import { openInclusionsManagerApp } from "./inclusions.js";
 
 const MODULE_SETTING_PRESETS = "module-presets";  // OLD will go away 
@@ -426,6 +425,15 @@ Hooks.once("init", () => {
 				name: "BBMM Control Sync RevMap",
 				scope: "world", config: false, default: {}
 			});
+
+			// Module Management - Notes
+			game.settings.register("bbmm", "moduleNotes", {
+				name: "BBMM Module Notes",
+				scope: "world",
+				config: false,
+				type: Object,
+				default: {}
+			});
 			
 
 		// ===== SETTINGS ITEMS =====
@@ -697,7 +705,7 @@ Hooks.on("setup", () => DL("settings.js | setup fired"));
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
-
+	
 	//check folder migration
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
 
