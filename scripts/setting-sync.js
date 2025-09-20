@@ -1235,6 +1235,122 @@ import { LT, BBMM_ID } from "./localization.js";
 					attached++;
 				}
 
+				/*  GM: late-pass — attach icons to any user/client rows still missing them === */
+				try {
+					const allLabels = form.querySelectorAll?.('label[for^="settings-config-"]') || [];
+					let lateAttached = 0;
+
+					for (const lbl of allLabels) {
+						// skip if already has our bar
+						if (lbl.querySelector?.(".bbmm-lock-icons")) continue;
+
+						const forAttr = lbl.getAttribute("for");
+						if (!forAttr) continue;
+
+						const id = forAttr.replace(/^settings-config-/, "");
+						// Only decorate user/client settings
+						const cfg = game.settings.settings.get(id);
+						if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
+
+						// Find the row group (needed for gesture routing); same method you use
+						const group =
+							lbl.closest(".form-group, .form-group-stacked, .form-fields") ||
+							lbl.parentElement || form;
+
+						// Build inline bar next to the label
+						const bar = document.createElement("span");
+						bar.className = "bbmm-lock-icons";
+						bar.style.display = "inline-flex";
+						bar.style.gap = "0.4rem";
+						bar.style.marginLeft = "0.5rem";
+						lbl.appendChild(bar);
+
+						// Compute lock state exactly as elsewhere
+						const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+						const state = bbmmGetLockState(id, syncMap);
+
+						// Helper to create icons (NO behavior change)
+						const mk = (title, cls) => {
+							const i = document.createElement("i");
+							i.className = cls;
+							i.title = title;
+							i.classList.add("bbmm-click");
+							return i;
+						};
+
+						// LOCK icon — same visuals and gesture routing you already use
+						let lockIcon;
+						if (state === "all") {
+							lockIcon = mk(LT.lockAllTip?.() || "Locked for all players", "fa-solid fa-lock");
+							lockIcon.classList.add("bbmm-active");
+						} else if (state === "partial") {
+							lockIcon = mk(LT.lockPartialTip?.() || "Locked for selected players", "fa-solid fa-user-lock");
+							lockIcon.classList.add("bbmm-partial");
+						} else if (state === "soft") {
+							const softTitle = (LT.nameSoftLock?.() || LT.name_SoftLock?.() || "Soft Lock");
+							lockIcon = mk(softTitle, "fa-regular fa-lock");
+							lockIcon.classList.add("bbmm-active");
+						} else {
+							lockIcon = mk(LT.lockNoneTip?.() || "Lock Player settings", "fa-solid fa-lock-open");
+						}
+
+						// Preserve your click + SHIFT-click + right-click gestures
+						lockIcon.addEventListener("click", (ev) => {
+							try {
+								ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+								const gesture = ev.shiftKey ? "shift" : "click";
+								_bbmmHandleLockGesture({ id, iconEl: lockIcon, gesture });
+							} catch (err) { DL(2, `setting-sync.js | late-pass lock click error for ${id}`, err); }
+						});
+						lockIcon.addEventListener("contextmenu", (ev) => {
+							try {
+								ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+								const gesture = ev.shiftKey ? "shiftRight" : "right";
+								_bbmmHandleLockGesture({ id, iconEl: lockIcon, gesture });
+							} catch (err) { DL(2, `setting-sync.js | late-pass lock contextmenu error for ${id}`, err); }
+						});
+						lockIcon.addEventListener("keydown", (e) => {
+							try {
+								if (e.key === "Enter" || e.key === " ") {
+									_bbmmHandleLockGesture({ id, iconEl: lockIcon, gesture: "click" });
+								}
+							} catch (err) { DL(2, `setting-sync.js | late-pass lock keydown error for ${id}`, err); }
+						});
+						bar.appendChild(lockIcon);
+
+						// SYNC icon — same behavior (opens user picker and queues push)
+						const syncIcon = mk(LT.sync?.PushHint?.() || "Sync setting to connected users", "fa-solid fa-arrows-rotate");
+						syncIcon.addEventListener("click", (ev) => {
+							try {
+								ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+								const dot = id.indexOf("."), ns = id.slice(0, dot), key = id.slice(dot + 1);
+								const val = game.settings.get(ns, key);
+								const picker = new BBMMUserPicker({
+									title: LT.titleSyncForUsers?.() || "Sync to Users",
+									settingId: id,
+									valuePreview: val,
+									confirmLabel: LT.dialogQueueSync?.() || "Queue Sync",
+									onlyOnline: true,
+									onConfirm: async (userIds) => {
+										_bbmmQueueOp({ op: "push", id, namespace: ns, key, value: val, userIds });
+										const msg = LT.infoQueuedSync?.({ module: id, count: userIds.length }) || `Queued sync for ${id} to ${userIds.length} users`;
+										ui.notifications.info(msg);
+									}
+								});
+								picker.render(true);
+							} catch (err) { DL(2, `setting-sync.js | late-pass sync click error for ${id}`, err); }
+						});
+						bar.appendChild(syncIcon);
+
+						lateAttached++;
+						DL(`setting-sync.js |  bbmm-setting-lock: late-pass attached icons for ${id}`);
+					}
+
+					if (lateAttached) DL(`setting-sync.js |  bbmm-setting-lock: late-pass total=${lateAttached}`);
+				} catch (e) {
+					DL(2, "setting-sync.js |  late-pass failed", e);
+				}
+
 				DL(`setting-sync.js |  bbmm-setting-lock: decorate(): user/client found=${found}, bars attached=${attached}`);
 			};
 

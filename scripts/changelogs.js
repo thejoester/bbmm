@@ -79,7 +79,7 @@ Hooks.once("init", () => {
 		// Optional: support a hook-based opener for generic macros
 		Hooks.on("bbmm:openChangelogReport", () => {
 			try { mod.api?.openChangelogReport?.(); }
-			catch (err) { DL(3, `changelog.js | bbmm:openChangelogReport hook error: ${err?.message || err}`, err); }
+			catch (err) { DL(3, `bbmm:openChangelogReport hook error: ${err?.message || err}`, err); }
 		});
 
 		DL("changelog.js | API exposed: api.openChangelogReport()");
@@ -176,7 +176,7 @@ async function _bbmmListModuleFilesCached(modId) {
 			}
 		}
 	} catch (err) {
-		DL(2, `changelog.js | _bbmmListModuleFilesCached: browse failed for ${modId}: ${err?.message || err}`);
+		DL(2, `_bbmmListModuleFilesCached: browse failed for ${modId}: ${err?.message || err}`);
 	}
 
 	_BBMM_DIR_CACHE.set(modId, found);
@@ -220,9 +220,9 @@ function _bbmmSizeFrameOnce(frame, app) {
 		// Keep content scrolling inside, not the window
 		frame.style.overflow = "hidden";
 
-		DL(`changelog.js | _bbmmSizeFrameOnce(): viewport=${vw}x${vh}, base=${baseW}x${baseH}, final=${w}x${h}`);
+		DL(`_bbmmSizeFrameOnce(): viewport=${vw}x${vh}, base=${baseW}x${baseH}, final=${w}x${h}`);
 	} catch (err) {
-		DL(2, `changelog.js | _bbmmSizeFrameOnce error: ${err?.message || err}`, err);
+		DL(2, `_bbmmSizeFrameOnce error: ${err?.message || err}`, err);
 	}
 }
 
@@ -339,7 +339,7 @@ function _bbmmMarkdownToHtml(md) {
 		while (listStack.length) closeList();
 		return html;
 	} catch (err) {
-		DL(2, `changelog.js | _bbmmMarkdownToHtml(): ${err?.message || err}`, err);
+		DL(2, `_bbmmMarkdownToHtml(): ${err?.message || err}`, err);
 		return foundry?.utils?.escapeHTML ? foundry.utils.escapeHTML(String(md ?? "")) : String(md ?? "");
 	}
 }
@@ -351,7 +351,7 @@ async function _bbmmRenderMarkdownOnly(md) {
 			return await TextEditor.renderMarkdown(String(md ?? ""), { sanitize: true });
 		}
 	} catch (err) {
-		DL(2, `changelog.js | renderMarkdown failed: ${err?.message || err}`, err);
+		DL(2, `renderMarkdown failed: ${err?.message || err}`, err);
 	}
 	return _bbmmMarkdownToHtml(md);
 }
@@ -453,10 +453,10 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		// "(<a ...>Label</a> )" -> "(<a ...>Label</a>)"
 		s = s.replace(/\(<a\b([^>]*)>([\s\S]*?)<\/a>\s+\)/gi, "(<a $1>$2</a>)");
 
-		DL(`changelog.js | _fixMdWrappedEmptyAnchors(): applied`);
+		DL(`_fixMdWrappedEmptyAnchors(): applied`);
 		return s;
 	} catch (err) {
-		DL(2, `changelog.js | _fixMdWrappedEmptyAnchors(): ${err?.message || err}`, err);
+		DL(2, `_fixMdWrappedEmptyAnchors(): ${err?.message || err}`, err);
 		return String(html ?? "");
 	}
 	}
@@ -465,9 +465,9 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		try {
 			const sc = root?.querySelector?.(".bbmm-nav-scroll");
 			this._navScrollTop = sc ? sc.scrollTop : 0;
-			DL(`changelog.js | captured nav scrollTop=${this._navScrollTop}`);
+			DL(`Changelog: captured nav scrollTop=${this._navScrollTop}`);
 		} catch (err) {
-			DL(2, `changelog.js | _captureNavScroll(): ${err?.message || err}`, err);
+			DL(2, `_captureNavScroll(): ${err?.message || err}`, err);
 		}
 	}
 	_restoreNavScroll(root) {
@@ -479,9 +479,9 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			// restore immediately, then once more on next frame to survive late layout
 			sc.scrollTop = this._navScrollTop;
 			requestAnimationFrame(() => { sc.scrollTop = this._navScrollTop; });
-			DL(`changelog.js |  restored nav scrollTop=${this._navScrollTop}`);
+			DL(`Changelog: restored nav scrollTop=${this._navScrollTop}`);
 		} catch (err) {
-			DL(2, `changelog.js | _restoreNavScroll(): ${err?.message || err}`, err);
+			DL(2, `_restoreNavScroll(): ${err?.message || err}`, err);
 		}
 	}
 	async _renderHTML() {
@@ -537,7 +537,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			out = this._fixMdWrappedEmptyAnchors(out);
 			enrichedBody = out;
 		} catch (err) {
-			DL(2, `changelog.js | _renderHTML(): build body failed: ${err?.message || err}`, err);
+			DL(2, `_renderHTML(): build body failed: ${err?.message || err}`, err);
 			enrichedBody = current.html ?? current.text ?? "";
 		}
 
@@ -606,7 +606,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		try {
 			const root = element || this.element;
 			if (!root) {
-				DL(2, "changelog.js | _replaceHTML: no root element available");
+				DL(2, "_replaceHTML: no root element available");
 				return;
 			}
 
@@ -615,7 +615,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			} else if (html instanceof HTMLElement || html instanceof DocumentFragment) {
 				root.replaceChildren(html);
 			} else {
-				DL(2, "changelog.js | _replaceHTML: unexpected html payload type");
+				DL(2, "_replaceHTML: unexpected html payload type");
 				return;
 			}
 
@@ -634,7 +634,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 
 			this._onRender(root);
 		} catch (err) {
-			DL(2, `changelog.js | _replaceHTML error: ${err?.message || err}`, err);
+			DL(2, `_replaceHTML error: ${err?.message || err}`, err);
 		}
 	}
 
@@ -642,7 +642,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		try {
 			const root = (html instanceof HTMLElement) ? html : this.element;
 			if (!root) {
-				DL(2, "changelog.js | _onRender: missing root element");
+				DL(2, "_onRender: missing root element");
 				return;
 			}
 
@@ -704,7 +704,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 							this._captureNavScroll(root); // preserve scroll
 							this.index = idx;
 							this.render(); // re-render page area
-							DL(`changelog.js |  switched to index ${idx} (${this.entries[idx]?.id})`);
+							DL(`Changelog: switched to index ${idx} (${this.entries[idx]?.id})`);
 						}
 						return; // handled
 					}
@@ -763,7 +763,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 						}
 					}
 				} catch (err) {
-					DL(2, `changelog.js | _onClick delegated handler error: ${err?.message || err}`, err);
+					DL(2, `_onClick delegated handler error: ${err?.message || err}`, err);
 				}
 			};
 			root.addEventListener("click", this._onClick);
@@ -778,13 +778,13 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 						else this._pendingOnClose.delete(entry.id);
 					}
 				} catch (err) {
-					DL(2, `changelog.js | _onChange delegated handler error: ${err?.message || err}`, err);
+					DL(2, `_onChange delegated handler error: ${err?.message || err}`, err);
 				}
 			};
 			root.addEventListener("change", this._onChange);
 
 		} catch (err) {
-			DL(2, `changelog.js | _onRender (BBMMChangelogJournal) error: ${err?.message || err}`, err);
+			DL(2, `_onRender (BBMMChangelogJournal) error: ${err?.message || err}`, err);
 		}
 	}
 
@@ -800,7 +800,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			}
 			this._pendingOnClose.clear();
 		} catch (err) {
-			DL(2, `changelog.js | close() auto-mark error: ${err?.message || err}`, err);
+			DL(2, `close() auto-mark error: ${err?.message || err}`, err);
 		}
 		return super.close(options);
 	}
@@ -957,9 +957,9 @@ async function _bbmmShowSingleChangelogDialog(entry) {
 							}
 							await _bbmmMarkChangelogSeen(id, version);
 							ui.notifications?.info(`Marked ${title} v${version} as seen.`);
-							DL(`changelog.js | Marked seen for ${id} -> ${version}`);
+							DL(`Changelog marked seen for ${id} -> ${version}`);
 						} catch (err) {
-							DL(3, `changelog.js | Mark seen failed for ${id}: ${err?.message || err}`, err);
+							DL(3, `Mark seen failed for ${id}: ${err?.message || err}`, err);
 						}
 					}
 				},
@@ -971,7 +971,7 @@ async function _bbmmShowSingleChangelogDialog(entry) {
 						const checkbox = html.querySelector('input[name="dontShowAgain"]');
 						if (checkbox?.checked) {
 							_bbmmMarkChangelogSeen(id, version).catch(err => {
-								DL(3, `changelog.js | Mark seen (from 'Don't show again') failed for ${id}: ${err?.message || err}`, err);
+								DL(3, `Mark seen (from 'Don't show again') failed for ${id}: ${err?.message || err}`, err);
 							});
 						}
 					}
@@ -992,9 +992,9 @@ async function _bbmmMarkChangelogSeen(moduleId, version) {
 		seen[moduleId] = version;
 		await game.settings.set(BBMM_ID, "seenChangelogs", seen);
 		const verify = game.settings.get(BBMM_ID, "seenChangelogs") || {};
-		DL(`changelog.js | seenChangelogs updated: ${moduleId} -> ${version}`, verify);
+		DL(`seenChangelogs updated: ${moduleId} -> ${version}`, verify);
 	} catch (err) {
-		DL(3, `changelog.js | Failed to update seenChangelogs for ${moduleId}: ${err?.message || err}`, err);
+		DL(3, `Failed to update seenChangelogs for ${moduleId}: ${err?.message || err}`, err);
 		throw err;
 	}
 }
@@ -1011,10 +1011,10 @@ async function _bbmmUnmarkChangelogSeen(moduleId) {
 			await game.settings.set(BBMM_ID, "seenChangelogs", seen);
 		}
 		const verify = game.settings.get(BBMM_ID, "seenChangelogs") || {};
-		DL(`changelog.js | seenChangelogs updated (removed): ${moduleId}`, verify);
+		DL(`seenChangelogs updated (removed): ${moduleId}`, verify);
 		return true;
 	} catch (err) {
-		DL(3, `changelog.js | Failed to unset seenChangelogs for ${moduleId}: ${err?.message || err}`, err);
+		DL(3, `Failed to unset seenChangelogs for ${moduleId}: ${err?.message || err}`, err);
 		return false;
 	}
 }
@@ -1043,6 +1043,6 @@ export async function BBMM_openChangelogFor(moduleId) {
 			mod
 		});
 	} catch (err) {
-		DL(3, `changelog.js | BBMM_openChangelogFor error: ${err?.message || err}`, err);
+		DL(3, `BBMM_openChangelogFor error: ${err?.message || err}`, err);
 	}
 }

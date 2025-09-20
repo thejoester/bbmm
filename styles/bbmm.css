@@ -224,3 +224,205 @@
 .bbmm-changelog-journal .bbmm-theme-reset .muted {
 	opacity: .75;
 }
+
+/* ==========================================================================
+	BBMM: compact Manage Modules list
+=========================================================================== */
+
+/* container: stretch rows full width, remove gutters */
+.bbmm-modmgmt .bbmm-modlist {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 4px;
+	margin-top: 4px;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* kill default menu padding while our UI is active */
+.bbmm-modmgmt menu.package-list,
+.bbmm-modmgmt menu.package-list.scrollable {
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+
+/* row: fixed grid so text never shifts */
+.bbmm-modmgmt .bbmm-modrow {
+	display: grid;
+	grid-template-columns: 32px 1fr auto;	/* fixed checkbox + flex name + auto tags */
+	align-items: center;
+	gap: 8px;
+
+	width: 100%;
+	max-width: none;
+	padding: 4px 6px;
+	min-height: 30px;
+
+	border: none;
+	border-radius: 6px;
+	background: var(--bg-light, rgba(255,255,255,0.02));
+	transition: background 120ms, outline-color 120ms;
+	cursor: pointer;
+}
+.bbmm-modmgmt .bbmm-modrow:hover {
+	background: var(--bg-hover, rgba(255,255,255,0.06));
+	outline: 1px solid var(--color-border-highlight, #4d84ff);
+	outline-offset: 0;
+}
+
+/* ensure grid children don’t blow out column widths */
+.bbmm-modmgmt .bbmm-modrow > * { min-width: 0; }
+
+/* left: checkbox (lock width) */
+.bbmm-modmgmt .bbmm-col-left {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	min-width: 32px;
+}
+.bbmm-modmgmt .bbmm-toggle { margin: 0; }
+
+/* middle: name only */
+.bbmm-modmgmt .bbmm-col-middle { min-width: 0; }
+.bbmm-modmgmt .bbmm-name {
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* right: tags + edit button */
+.bbmm-modmgmt .bbmm-col-right {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: 4px;
+}
+.bbmm-modmgmt .bbmm-col-right .tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+}
+.bbmm-modmgmt .bbmm-col-right .tag.badge {
+	padding: 0 6px;
+	border-radius: 4px;
+}
+.bbmm-modmgmt .bbmm-col-right .bbmm-edit {
+	height: 20px;
+	min-width: 20px;
+	padding: 0 6px;
+	border: 1px solid var(--color-border-light-2, #2a2a2a);
+	border-radius: 4px;
+	background: rgba(255,255,255,0.04);
+}
+.bbmm-modmgmt .bbmm-col-right .bbmm-edit:hover {
+	background: rgba(255,255,255,0.1);
+	border-color: var(--color-border-highlight, #4d84ff);
+}
+
+/* expandable notes panel — span full row so it doesn’t shift columns */
+.bbmm-modmgmt .bbmm-notes-panel {
+	grid-column: 1 / -1;
+	max-height: 0;
+	overflow: hidden;
+	padding: 0 8px;
+	border-top: 1px solid var(--color-border-light-2, #2a2a2a);
+	transition: max-height 180ms ease, padding 180ms ease;
+}
+.bbmm-modmgmt .bbmm-modrow.bbmm-open .bbmm-notes-panel {
+	max-height: 600px;
+	padding: 8px;
+}
+.bbmm-modmgmt .bbmm-notes-html {
+	max-height: 560px;
+	overflow: auto;
+	line-height: 1.3;
+}
+.bbmm-modmgmt .bbmm-notes-empty {
+	opacity: 0.7;
+	font-style: italic;
+}
+
+/* ==========================================================================
+	BBMM: Module Notes dialog
+=========================================================================== */
+
+/* keep the notes dialog from being width-clamped by themes */
+.window-app:has(#bbmm-notes-*) { 
+	max-width: none !important; 
+}
+
+/* form container */
+.bbmm-notes-form { 
+	display: block;
+	margin: 0;
+	padding: 0;
+	max-height: 100%;
+	overflow-y: auto;
+	padding-bottom: 8px; /* room above buttons */
+}
+
+/* section wrapper with separators (use <hr class="bbmm-hr"> in markup) */
+.bbmm-notes-form .bbmm-notes-section { display: block; }
+.bbmm-notes-form .bbmm-hr {
+	border: 0;
+	border-top: 1px solid var(--color-border-light-2, #2a2a2a);
+	margin: 6px 0 4px; /* tighten space above buttons */
+}
+
+/* header row */
+.bbmm-notes-form .bbmm-notes-head {
+	display: flex;
+	justify-content: flex-start;   /* left align by default */
+	align-items: center;
+	margin: 4px 0;
+}
+.bbmm-notes-form .bbmm-notes-head > label {
+	font-size: 12px;
+	opacity: 0.8;
+	padding: 2px 4px;
+	white-space: nowrap;
+}
+/* heading style when using <h3> instead of <label> */
+.bbmm-notes-form .bbmm-notes-title {
+	font-size: 1.1rem;
+	font-weight: 600;
+	margin: 0;
+	padding: 0 4px;
+	color: var(--color-text-light-1, #ddd);
+}
+
+/* make the editor span full width and look tidy */
+.bbmm-notes-form prose-mirror {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+}
+.bbmm-notes-form .editor {
+	border: 1px solid var(--color-border-light-2, #2a2a2a);
+	border-radius: 6px;
+}
+.bbmm-notes-form .editor .editor-content { min-height: 260px; }
+
+/* BBMM: tighten space above footer buttons in Notes dialog */
+.window-app:has(#bbmm-notes-*) .bbmm-notes-form {
+	padding-bottom: 0;      /* kill extra padding above buttons */
+	margin-bottom: 0;
+}
+.window-app:has(#bbmm-notes-*) .bbmm-notes-form .bbmm-hr:last-of-type {
+	margin-bottom: 4px;     /* shrink the last rule’s bottom gap */
+}
+
+/* Foundry footer row usually has a generous margin-top; tighten it here */
+.window-app:has(#bbmm-notes-*) .dialog-buttons {
+	margin-top: 6px;        /* was ~12–16px in many themes */
+}
+
+/* Optional: reduce window-content padding-bottom if your theme adds a lot */
+.window-app:has(#bbmm-notes-*) .window-content {
+	padding-bottom: 6px;
+}

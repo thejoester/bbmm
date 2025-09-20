@@ -175,13 +175,11 @@
 		"keybindColorScopesHint": "If enabled: world keybinds are blue; client keybinds are orange; user keybinds remain default.",
 		"keybindScopeWorldTip": "Scope: World (blue)",
 		"keybindScopeClientTip": "Scope: Client (orange)",
-
+		
 		"modListEditNotes": "Edit Notes",
 		"modListEditTitle": "Notes – {id}",
 		"modListNotesLabel": "Module Notes",
 		"modListNotesSaved": "Notes saved.",
-		"save": "Save",
-		"cancel": "Cancel",
 
 		"aboutName": "About BBMM",
 		"aboutHint": "Open the About BBMM journal entry.",
