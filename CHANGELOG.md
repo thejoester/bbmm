@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [0.5.0-test.1] - 2025-09-20
 ### Added
 - **Module Management:**
-  - Added enchanced module management
+  - Added enhanced module management
     - Enable/Disable in settings (default: enabled).
     - Added edit button, add notes to module. 
     - If notes exist, when clicking on module in list will expand to show notes. 
