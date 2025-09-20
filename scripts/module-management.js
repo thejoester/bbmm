@@ -8,18 +8,6 @@
 import { DL } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 
-async function _bbmmWaitFor(test, timeoutMs = 1500, intervalMs = 50) {
-	const t0 = Date.now();
-	return new Promise((resolve) => {
-		const tick = () => {
-			try { if (test()) return resolve(true); } catch {}
-			if (Date.now() - t0 >= timeoutMs) return resolve(false);
-			setTimeout(tick, intervalMs);
-		};
-		tick();
-	});
-}
-
 async function _bbmmRenderSavedNotesHTML(moduleId) {
 	try {
 		const KEY = "moduleNotes";
@@ -210,7 +198,7 @@ async function _bbmmOpenNotesDialog(moduleId) {
 
         let dlgRef = null;
         const TARGET_WIDTH = 800;
-        const TARGET_HEIGHT = 430;
+        const TARGET_HEIGHT = 450;
 
         // robust read: prefer live document; fallback to component APIs
         const readFromProseMirror = async () => {
@@ -301,11 +289,20 @@ async function _bbmmOpenNotesDialog(moduleId) {
                     icon: "fa-solid fa-floppy-disk",
                     default: true,
                     callback: async () => {
-                        const html = await readFromProseMirror();	// content-only
+                        const raw = await readFromProseMirror();  // content-only
+                        let html = raw ?? "";
+
+                        // Strip trailing spaces/newlines
+                        html = html.replace(/\s+$/, "");
+
+                        // Remove trailing empty <p> / <div> blocks
+                        html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
+
                         const notes = foundry.utils.duplicate(game.settings.get("bbmm", KEY) || {});
                         notes[moduleId] = html;
                         await game.settings.set("bbmm", KEY, notes);
-                        ui.notifications.info(LT.modListNotesSaved());
+
+                        ui.notifications.info(game.i18n.localize("bbmm.modListNotesSaved"));
                         DL("module-management | saved notes for " + moduleId, { length: html.length });
                     }
                 }
@@ -336,6 +333,13 @@ async function _bbmmOpenNotesDialog(moduleId) {
 /*	render hook */
 Hooks.on("renderModuleManagement", (app, rootEl) => {
 	try {
+
+        // Check if enabled
+		if (!game.settings.get("bbmm", "enableModuleManagement")) {
+			DL("module-management | enhancements disabled (world setting)");
+			return;
+		}
+
 		const root = (rootEl instanceof HTMLElement) ? rootEl : (app?.element ?? null);
 		if (!root) {
 			DL(2, "module-management | renderModuleManagement(): root element missing");

@@ -420,6 +420,7 @@ Hooks.once("init", () => {
 				name: "BBMM Control Sync Store",
 				scope: "world", config: false, default: {}
 			});
+
 			// Controls Sync RevMap
 			game.settings.register?.(BBMM_ID, CTRL_REV_STORE, {
 				name: "BBMM Control Sync RevMap",
@@ -434,8 +435,7 @@ Hooks.once("init", () => {
 				type: Object,
 				default: {}
 			});
-			
-
+		
 		// ===== SETTINGS ITEMS =====
 		// These DO need to be localized
 
@@ -595,6 +595,17 @@ Hooks.once("init", () => {
 				default: false,
 				name: LT.name_checkDisabledModules(),
 				hint: LT.hint_checkDisabledModules()
+			});
+
+			// Enable/disable "enhanced" module manager
+			game.settings.register(BBMM_ID, "enableModuleManagement", {
+				name: LT.enableModuleManagementName(),
+				hint: LT.enableModuleManagementHint(),
+				scope: "world",	
+				config: true,
+				type: Boolean,
+				default: true,
+				restricted: true
 			});
 
 			// Enable/disable BBMM Controls Sync

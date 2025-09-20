@@ -176,6 +176,8 @@
 		"keybindScopeWorldTip": "Scope: World (blue)",
 		"keybindScopeClientTip": "Scope: Client (orange)",
 		
+		"enableModuleManagementName": "Enable enhanced module management",
+		"enableModuleManagementHint": "When enabled, BBMM replaces the stock Manage Modules list with the compact layout and notes UI for all users. Only a GM can change this.",
 		"modListEditNotes": "Edit Notes",
 		"modListEditTitle": "Notes – {id}",
 		"modListNotesLabel": "Module Notes",
@@ -205,6 +207,7 @@
 			"export": "Export",
 			"import": "Import",
 			"load": "Load",
+			"btnSync": "Sync",
 			"preview": "Preview",
 			"update": "Update",
 			"delete": "Delete",

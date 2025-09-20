@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0-test.1] - 2025-09-20
+### Added
+- **Module Management:**
+  - Added enchanced module management
+    - Enable/Disable in settings (default: enabled).
+    - Added edit button, add notes to module. 
+    - If notes exist, when clicking on module in list will expand to show notes. 
+### Fixed
+- **Inclusion Manager:** 
+  - Fixed bug not showing some settings. 
+- **Settings Sync:**
+  - Fixed bug when setting soft lock, users not logged in would not sync. 
+  - Fixed bug where lock/sync icons not showing for some user/client scoped settings.   
+
 ## [0.4.1] - 2025-09-17
 ### Fixed
 - included assets/ folder for images in journal. 

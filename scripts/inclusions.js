@@ -8,6 +8,24 @@ import { DL } from './settings.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { getSkipMap, isExcludedWith } from './helpers.js';
 
+/* Menu -> Setting expansion (so presets include real settings) */
+const MENU_TO_SETTINGS = {
+	"core.fonts": () => ["core.fonts"],
+	"core.webrtc": () => ["core.rtcClientSettings", "core.rtcWorldSettings"],
+	"core.prototypeTokenOverrides": () => ["core.prototypeTokenOverrides"]
+};
+
+async function _resolveMenuIdsToPairs(menuNs, menuKey) {
+	const id = `${menuNs}.${menuKey}`;
+	const fn = MENU_TO_SETTINGS[id];
+	if (typeof fn !== "function") return [];
+	const ids = (fn() || []).filter((sid) => game.settings.settings.has(sid));
+	return ids.map((sid) => {
+		const d = sid.indexOf(".");
+		return { namespace: sid.slice(0, d), key: sid.slice(d + 1) };
+	});
+}
+
 /* BBMMAddSettingInclusionAppV2 ===============================================
 	Add Setting Inclusion (hidden settings only)
 ============================================================================ */
@@ -50,6 +68,11 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 					// Only HIDDEN settings (config:false)
 					if (entry?.config !== false) continue;
 
+					if (isExcludedWith(skipMap, ns) || isExcludedWith(skipMap, ns, key)) {
+						DL(`inclusions.js | _collectSettings(): skipped by EXPORT_SKIP -> ${ns}.${key}`);
+						continue;
+					}
+
 					// Skip already included
 					if (included.has(`${ns}::${key}`)) continue;
 
@@ -59,16 +82,32 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 					const rawName = entry?.name ?? "";
 					const label = rawName ? game.i18n.localize(String(rawName)) : key;
 					const scope = String(entry?.scope ?? "");
-                    // skip if in EXPORT_SKIP in settings.js
-                    if (isExcludedWith(skipMap, ns) || isExcludedWith(skipMap, ns, key)) {
-                        // Optional debug trace
-                        DL(`inclusions.js | _collectSettings(): skipped by EXPORT_SKIP -> ${ns}.${key}`);
-                        continue;
-                    }
+
 					rows.push({ ns, key, nsLabel, label, scope });
 				} catch (e1) {
 					DL(2, "inclusions.js | AddSetting._collectSettings(): item failed", e1);
 				}
+			}
+
+			/* Also list registerMenu entries so users can include them =================== */
+			try {
+				for (const [menuId, menu] of game.settings.menus.entries()) {
+					const dot = menuId.indexOf(".");
+					if (dot <= 0) continue;
+					const ns = menuId.slice(0, dot);
+					const key = menuId.slice(dot + 1);
+
+					// Display-only row; expand to real settings on Include
+					const mod = game.modules.get(ns);
+					const nsLabel = String(mod?.title ?? ns);
+					const label = menu?.name ? game.i18n.localize(String(menu.name)) : key;
+					const scope = menu?.restricted ? "world" : "client";
+
+					rows.push({ ns, key, nsLabel, label, scope, __isMenu: true });
+				}
+				DL("inclusions.js | _collectSettings(): menus appended to rows");
+			} catch (e) {
+				DL(2, "inclusions.js | _collectSettings(): menu enumeration failed", e);
 			}
 
 			// Sort by module label then setting label
@@ -160,7 +199,6 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 	}
 
 	async _replaceHTML(result, _options) {
-        // clamp (optional, keep if you like)
         try {
             const winEl = this.element;
             winEl.style.minWidth  = "520px";
@@ -170,40 +208,43 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
             winEl.style.overflow  = "hidden";
         } catch (e) { DL(2, "inclusions.js | Add: size clamp failed", e); }
 
-        // write HTML
         const content = this.element.querySelector(".window-content") || this.element;
         content.innerHTML = result;
 
-        // avoid double-binding across re-renders
         if (this._delegated) return;
         this._delegated = true;
 
         /* ============================================================================
-		    {LISTENERS — event delegation (like exclusions.js)}
+		    {LISTENERS — event delegation}
 	    ============================================================================ */
         content.addEventListener("click", async (ev) => {
-            // Include row
             const incBtn = ev.target.closest?.(".bbmm-inc-act");
-            if (incBtn instanceof HTMLButtonElement) {
-                const ns = incBtn.dataset.ns || "";
-                const key = incBtn.dataset.key || "";
-                if (!ns || !key) return;
+			if (incBtn instanceof HTMLButtonElement) {
+				const ns = incBtn.dataset.ns || "";
+				const key = incBtn.dataset.key || "";
+				if (!ns || !key) return;
 
-                try {
-                    DL(`inclusions.js | Add: include ${ns}.${key}`);
-                    incBtn.disabled = true;
-                    await this._include(ns, key);
-                    try { this.close({ force: true }); } catch {}
-                    (globalThis.bbmm?.openInclusionsManagerApp || globalThis.openInclusionsManagerApp)?.();
-                } catch (e) {
-                    incBtn.disabled = false;
-                    DL(3, "inclusions.js | Add: include failed", e);
-                    ui.notifications?.error(LT.inclusions.failedAddInclusion());
-                }
-                return;
-            }
+				try {
+					DL(`inclusions.js | Add: include ${ns}.${key}`);
+					incBtn.disabled = true;
 
-            // Close
+					const row = this._rows.find(r => r.ns === ns && r.key === key);
+					if (row?.__isMenu) {
+						await this._includeMenu(ns, key);
+					} else {
+						await this._include(ns, key);
+					}
+
+					try { this.close({ force: true }); } catch {}
+					(globalThis.bbmm?.openInclusionsManagerApp || globalThis.openInclusionsManagerApp)?.();
+				} catch (e) {
+					incBtn.disabled = false;
+					DL(3, "inclusions.js | Add: include failed", e);
+					ui.notifications?.error(LT.inclusions.failedAddInclusion());
+				}
+				return;
+			}
+
             const cancel = ev.target.closest?.('button[data-action="cancel"]');
             if (cancel instanceof HTMLButtonElement) {
                 try { this.close({ force: true }); } catch {}
@@ -214,6 +255,37 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
     }
 
 }
+
+/* attach menu include helper AFTER class */
+BBMMAddSettingInclusionAppV2.prototype._includeMenu = async function(menuNs, menuKey) {
+	try {
+		const pairs = await _resolveMenuIdsToPairs(menuNs, menuKey);
+		if (!pairs.length) {
+			DL(2, `inclusions.js | _includeMenu(): no resolvable settings for ${menuNs}.${menuKey}`);
+			return;
+		}
+
+		const data = foundry.utils.duplicate(game.settings.get(BBMM_ID, "userInclusions") || {});
+		if (!Array.isArray(data.settings)) data.settings = [];
+
+		let added = 0;
+		for (const { namespace, key } of pairs) {
+			const exists = data.settings.some((s) => s?.namespace === namespace && s?.key === key);
+			if (!exists) {
+				data.settings.push({ namespace, key });
+				added++;
+				DL(`inclusions.js | _includeMenu(): added ${namespace}.${key} from ${menuNs}.${menuKey}`);
+			}
+		}
+
+		if (added > 0) {
+			await game.settings.set(BBMM_ID, "userInclusions", data);
+			try { Hooks.callAll("bbmmInclusionsChanged", { type: "menu", id: `${menuNs}.${menuKey}`, added }); } catch {}
+		}
+	} catch (e) {
+		DL(2, "inclusions.js | _includeMenu() failed", e);
+	}
+};
 
 /* BBMMAddModuleInclusionAppV2 ================================================
 	Add whole-module inclusion (hidden settings for that namespace)

@@ -59,7 +59,7 @@ import { LT, BBMM_ID } from "./localization.js";
 					iconEl.title = LT.lockPartialTip();
 					break;
 				case "softLock":
-					// If your FA build lacks 'fa-regular fa-lock', the fallback color still shows via bbmm-active
+					// If FA build lacks 'fa-regular fa-lock', the fallback color still shows via bbmm-active
 					iconEl.className = "fa-regular fa-lock bbmm-active";
 					iconEl.title = LT.name_SoftLock();
 					break;
@@ -163,7 +163,8 @@ import { LT, BBMM_ID } from "./localization.js";
 
 			/* Apply Soft Lock ============================================================== 
 				Soft Lock:
-				- Enable: store { soft:true, value:snapshot } and PUSH ONCE (soft:true) to non-GM users.
+				- Enable: store { soft:true, value:snapshot } 
+					and PUSH ONCE (soft:true) to non-GM users.
 				- Disable: remove soft entry; no push.
 				- Players may change later; we do not revert.
 			================================================================================*/
@@ -528,7 +529,7 @@ import { LT, BBMM_ID } from "./localization.js";
 		online/connected (for Sync)
 	==============================================================================*/
 	class BBMMUserPicker {
-		constructor({ title, settingId, valuePreview, confirmLabel, preChecked, onlyOnline = false, onConfirm }) {
+		constructor({ title, settingId, valuePreview, confirmLabel, preChecked, onlyOnline = false, minimal = false, onConfirm }) {
 			this.title = title;
 			this.settingId = settingId;
 			this.valuePreview = valuePreview;
@@ -536,6 +537,7 @@ import { LT, BBMM_ID } from "./localization.js";
 			this.confirmLabel = confirmLabel || "Queue";
 			this.preChecked = Array.isArray(preChecked) || preChecked === "*" ? preChecked : [];
 			this.onlyOnline = !!onlyOnline;
+			this.minimal = !!minimal;  // hide Setting/Value block when true
 		}
 
 		// Helper: Render a safe preview for the value block
@@ -583,33 +585,23 @@ import { LT, BBMM_ID } from "./localization.js";
 				})();
 
 				// Base population: exclude GMs
-				let users = (game.users?.contents || []).filter(u => !u.isGM);
+				let users = (game.users?.contents ?? []).filter(u => !u.isGM);
 
 				// Sync-only mode: restrict to currently-online users
-				if (this.onlyOnline) {
-					users = users.filter(u => this._isUserOnline(u));
-				}
+				if (this.onlyOnline) users = users.filter(u => this._isUserOnline(u));
 
 				// If no one connected
 				if (!users.length) {
 					const emptyDlg = new foundry.applications.api.DialogV2({
 						window: { title: this.title, modal: true, width: 520 },
 						content: `
-							<section style="display:flex;flex-direction:column;gap:.75rem;min-width:520px;">
-								<div>
-									<div style="font-weight:600;">${LT.dialogSetting()}</div>
-									<div>${this.settingId}</div>
-									<div style="opacity:.8">${settingPretty} • ${ns} (${sourcePretty})</div>
-								</div>
-								<div>
-									<div style="font-weight:600;">${LT.dialogValue()}</div>
-									<pre style="margin:0;padding:.5rem;background:#00000014;border-radius:.25rem;white-space:pre-wrap;word-break:break-word;max-height:12rem;overflow:auto;">${this._renderValuePreview(this.valuePreview)}</pre>
-								</div>
-								<hr/>
-								<p style="margin:.25rem 0 .5rem 0;">${LT.dialogNoUsersConnected()}</p>
-							</section>
+						<section style="display:flex;flex-direction:column;gap:.75rem;min-width:520px;">
+							<p style="margin:.25rem 0 .5rem 0;">
+							${LT.dialogNoUsersConnected()}
+							</p>
+						</section>
 						`,
-						buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
+						buttons: [{ action: "close", label: LT.buttons?.close?.() || "Close", default: true }]
 					});
 					await emptyDlg.render(true);
 					return;
@@ -652,40 +644,41 @@ import { LT, BBMM_ID } from "./localization.js";
 					`;
 				}).join("");
 
+				const headerBlock = this.minimal ? "" : `
+					<div>
+						<div style="font-weight:600;">${LT.dialogSetting()}</div>
+						<div>${this.settingId}</div>
+						<div style="opacity:.8">${settingPretty} • ${ns} (${sourcePretty})</div>
+					</div>
+					`;
+
+				const detailsBlock = this.minimal ? "" : `
+					<div>
+						<div style="font-weight:600;">${LT.dialogValue()}</div>
+						<pre style="margin:0;padding:.5rem;background:#00000014;border-radius:.25rem;white-space:pre-wrap;word-break:break-word;max-height:12rem;overflow:auto;">${this._renderValuePreview(this.valuePreview)}</pre>
+						<div style="font-weight:600;">${LT.dialogNoteCurrentSaved()}</div>
+					</div>
+					`;
+
 				const content = `
 					<section style="display:flex;flex-direction:column;gap:.75rem;min-width:520px;">
-						<div>
-							<div style="font-weight:600;">${LT.dialogSetting()}</div>
-							<div>${this.settingId}</div>
-							<div style="opacity:.8">${settingPretty} • ${ns} (${sourcePretty})</div>
-						</div>
-						<div>
-							<div style="font-weight:600;">${LT.dialogValue()}</div>
-							<pre style="margin:0;padding:.5rem;background:#00000014;border-radius:.25rem;white-space:pre-wrap;word-break:break-word;max-height:12rem;overflow:auto;">${this._renderValuePreview(this.valuePreview)}</pre>
-							<div style="font-weight:600;">${LT.dialogNoteCurrentSaved()}</div>
-						</div>
+						${headerBlock}
+						${detailsBlock}
 						<hr/>
-						<div style="display:flex;align-items:center;justify-content:space-between;">
-							<div style="font-weight:600;">${LT.dialogSelectUsers()}</div>
-							<div style="display:flex;gap:.5rem;">
-								<button type="button" data-action="all">${LT.dialogSelectAll()}</button>
-								<button type="button" data-action="none">${LT.dialogClear()}</button>
-							</div>
-						</div>
-						<div style="max-height:300px;overflow:auto;border:1px solid rgba(255,255,255,.08);border-radius:.25rem;">
-							<table style="width:100%;border-collapse:collapse;">
-								<thead style="position:sticky;top:0;background:rgba(0,0,0,.2);">
-									<tr>
-										<th style="text-align:left;width:2rem;"></th>
-										<th style="text-align:left;">${LT.dialogUser()}</th>
-										<th style="text-align:left;">${LT.dialogRole()}</th>
-									</tr>
-								</thead>
-								<tbody>${rows}</tbody>
-							</table>
-						</div>
+						<table style="border-collapse:collapse;width:100%;">
+							<thead>
+								<tr>
+									<th style="text-align:left;padding:.25rem .5rem;">Select</th>
+									<th style="text-align:left;padding:.25rem .5rem;">User</th>
+									<th style="text-align:left;padding:.25rem .5rem;">Role</th>
+								</tr>
+							</thead>
+							<tbody>
+								${rows}
+							</tbody>
+						</table>
 					</section>
-				`;
+					`;
 
 				const dlg = new foundry.applications.api.DialogV2({
 					window: { title: this.title, modal: true, width: 860 },
@@ -838,7 +831,7 @@ import { LT, BBMM_ID } from "./localization.js";
 				const existing = map[id];
 				const prev = existing?.value;
 
-				// ✅ Core rule: if GM changed a setting that had a lock (soft or hard), CLEAR the lock
+				// Core rule: if GM changed a setting that had a lock (soft or hard), CLEAR the lock
 				if (existing && !objectsEqual(cur, prev)) {
 					delete map[id];
 					changed = true;
@@ -878,7 +871,7 @@ import { LT, BBMM_ID } from "./localization.js";
 			if (!bbmmIsSyncEnabled()) return;
 			if (game.user?.isGM) return;
 
-			// --- CONTROLS: if a PLAYER updates core.keybindings, mark any SOFT ctrl revs as handled
+			// CONTROLS: if a PLAYER updates core.keybindings, mark any SOFT ctrl revs as handled
 			if (!game.user?.isGM && namespace === "core" && key === "keybindings") {
 				try {
 					const store = _bbmmCtrlGetStore();
@@ -1071,7 +1064,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 				DL(`setting-sync.js |  bbmm-setting-lock: decorate(PLAYER-HIDE): seen=${seen}, hidden=${hidden}`);
 
-				// Prevent “Save Changes” from doing anything unexpected (nothing left to serialize for hidden rows)
+				// Prevent “Save Changes” from doing anything unexpected 
 				form.addEventListener("submit", (ev) => {
 					DL("setting-sync.js |  bbmm-setting-lock: submit guard — nothing to save for hidden hard-locked settings");
 				}, true);
@@ -1172,8 +1165,7 @@ import { LT, BBMM_ID } from "./localization.js";
 					} catch (e) {
 						DL(2, "setting-sync.js | attach GM-change clear handler failed", e);
 					}
-					// -----------------------------------------------------------------------
-
+					
 					// push icon...
 					const pushTitle = (LT.sync.PushHint());
 					const pushIcon = makeIcon(pushTitle, "fa-solid fa-arrows-rotate", true);
@@ -1235,7 +1227,7 @@ import { LT, BBMM_ID } from "./localization.js";
 					attached++;
 				}
 
-				/*  GM: late-pass — attach icons to any user/client rows still missing them === */
+				/* GM: late-pass — attach icons to any user/client rows still missing them === */
 				try {
 					const allLabels = form.querySelectorAll?.('label[for^="settings-config-"]') || [];
 					let lateAttached = 0;
@@ -1278,7 +1270,7 @@ import { LT, BBMM_ID } from "./localization.js";
 							return i;
 						};
 
-						// LOCK icon — same visuals and gesture routing you already use
+						// LOCK icon
 						let lockIcon;
 						if (state === "all") {
 							lockIcon = mk(LT.lockAllTip?.() || "Locked for all players", "fa-solid fa-lock");
@@ -1294,7 +1286,7 @@ import { LT, BBMM_ID } from "./localization.js";
 							lockIcon = mk(LT.lockNoneTip?.() || "Lock Player settings", "fa-solid fa-lock-open");
 						}
 
-						// Preserve your click + SHIFT-click + right-click gestures
+						// click + SHIFT-click + right-click gestures
 						lockIcon.addEventListener("click", (ev) => {
 							try {
 								ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
@@ -1318,7 +1310,7 @@ import { LT, BBMM_ID } from "./localization.js";
 						});
 						bar.appendChild(lockIcon);
 
-						// SYNC icon — same behavior (opens user picker and queues push)
+						// SYNC icon
 						const syncIcon = mk(LT.sync?.PushHint?.() || "Sync setting to connected users", "fa-solid fa-arrows-rotate");
 						syncIcon.addEventListener("click", (ev) => {
 							try {
@@ -1707,49 +1699,32 @@ import { LT, BBMM_ID } from "./localization.js";
 						await _bbmmCtrlPullApplyAll();
 					}
 
+					// Control Sync push (players only; apply immediately)
 					if (msg?.t === "bbmm-ctrl-push") {
+						if (game.user?.isGM) return;
+
+						// respect optional targeting
+						const targets = Array.isArray(msg?.targets) ? msg.targets : null;
+						if (targets && targets.length && !targets.includes(game.user.id)) return;
+
+						const ns = msg.namespace, action = msg.action;
+						const arr = Array.isArray(msg.value) ? msg.value : [];
+
 						try {
-							// GM should not apply; players only
-							if (game.user?.isGM) return;
-
-							const { ns, action, bindings, targets } = msg;
-
-							// Optional targeting
-							if (Array.isArray(targets) && targets.length && !targets.includes(game.user?.id)) return;
-
-							DL(`controls: PUSH recv ${ns}.${action} | incoming=${Array.isArray(bindings) ? bindings.length : 0}`);
-
-							// --- PHASE 1: just log to confirm end-to-end ---
-							// Once you see this log on a player client after clicking the GM sync icon,
-							// we’ll flip to apply (PHASE 2 below).
-
-							// Uncomment this block when you’re ready to apply on receipt:
-							/*
-							try {
-							const kb = game.keybindings;
-							// Clear existing bindings (API differences across builds)
-							if (typeof kb.reset === "function") {
-								await kb.reset(ns, action);
+							// Try modern API first
+							if (game.keybindings?.reset && game.keybindings?.set) {
+								await game.keybindings.reset(ns, action);
+								for (const b of arr) await game.keybindings.set(ns, action, b);
 							} else {
-								// Fallback: best-effort remove by unbinding each current assignment
-								const cur = kb.get?.(ns, action) ?? [];
-								for (const b of cur) {
-								try { await kb.set(ns, action, { key: null, modifiers: [] }); } catch {}
-								}
+								// Fallback: write into the core keybindings blob
+								const id = `${ns}.${action}`;
+								const blob = foundry.utils.duplicate(game.settings.get("core", "keybindings") || {});
+								blob[id] = arr.map(b => ({ key: b?.key, modifiers: (b?.modifiers ?? []).slice() }));
+								await game.settings.set("core", "keybindings", blob);
 							}
-
-							// Re-apply the GM’s snapshot
-							for (const b of (bindings || [])) {
-								await kb.set(ns, action, { key: b.key, modifiers: b.modifiers || [] });
-							}
-
-							DL(`controls: applied ${ns}.${action} -> ${bindings?.length || 0} binding(s)`);
-							} catch (applyErr) {
-							DL(2, "controls: apply failed", { ns, action, applyErr });
-							}
-							*/
-						} catch (e) {
-							DL(2, "controls: push recv error", e);
+							ui.notifications?.info?.(LT.sync.Updated?.() || "Keybindings updated.");
+						} catch (err) {
+							DL(2, "ctrl push apply failed", { ns, action, err });
 						}
 						return; // handled
 					}
@@ -1759,7 +1734,6 @@ import { LT, BBMM_ID } from "./localization.js";
 			DL(3, "setting-sync.js |  bbmm-setting-lock: ready(): error", err);
 		}
 	});
-
 
 /* ============================================================================
 		{CONTROLS SYNC HELPERS}
@@ -1954,7 +1928,7 @@ import { LT, BBMM_ID } from "./localization.js";
 			// Already handled this rev? Skip.
 			if (lastRev >= rev) continue;
 
-			// First time seeing this rev → apply once, then mark ledger
+			// First time seeing this rev -> apply once, then mark ledger
 			const have = _bbmmCtrlBindings(ns, action);
 			if (!_bbmmCtrlSame(have, rec.soft.value)) {
 			DL(1, `controls | apply SOFT ${id} (rev=${rev})`);
@@ -2014,6 +1988,26 @@ import { LT, BBMM_ID } from "./localization.js";
 	} catch (err) {
 		DL(2, "setting-sync.js | ctrlGMSoft() failed", { ns, action, err });
 	}
+	}
+
+	/*  GM: push current bindings for a control to selected users (instant) ======= */
+	async function _bbmmCtrlSyncToUsers({ ns, action, userIds }) {
+		try {
+			// snapshot current GM bindings for this action
+			const value = _bbmmCtrlBindings(ns, action);
+
+			// emit one-time push to players (optionally targeted)
+			game.socket?.emit?.(BBMM_SYNC_CH, {
+				t: "bbmm-ctrl-push",
+				namespace: ns,
+				action,
+				value,                 // array of {key, modifiers[]}
+				targets: Array.isArray(userIds) && userIds.length ? userIds : null
+			});
+			ui.notifications?.info?.(LT.infoQueuedSync?.({ module: `${ns}.${action}`, count: (userIds?.length ?? 0) }) || `Synced ${ns}.${action} to ${userIds?.length ?? 0} users`);
+		} catch (err) {
+			DL(2, "ctrlSyncToUsers() failed", { ns, action, err });
+		}
 	}
 
 	/*  Wire Control Config UI ======================================================
@@ -2092,47 +2086,53 @@ import { LT, BBMM_ID } from "./localization.js";
 
 				bar.appendChild(syncIcon);
 
-				// clicks
-				syncIcon.addEventListener("click", async (ev) => {
+				// LEFT CLICK -> open minimal user picker, then IMMEDIATELY SYNC (no queue)
+				syncIcon.addEventListener("click", (ev) => {
 				try {
+					if (ev.shiftKey) return;
 					ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
-
-					if (ev.shiftKey) {
-					// SHIFT+CLICK => SOFT-LOCK THIS KEYBIND (controls-only)
-					DL(`controls: ${ns}.${action} | soft-lock (Shift+Click)`);
-					await _bbmmCtrlGMSoft({ ns, action });      
-					game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" }); // make players apply immediately
-					return;
-					}
-
-					// CLICK => PICK USERS AND PUSH CURRENT BINDINGS (no locks)
-					DL(`controls: ${ns}.${action} | push to selected users`);
-					const cur = _bbmmCtrlBindings(ns, action); // snapshot current bindings
+					if (syncIcon.dataset.busy === "1") return; 
 
 					const picker = new BBMMUserPicker({
-					title: LT.titleSyncForUsers?.() || "Sync keybind to users",
+					title: LT.titleSyncForUsers(),
 					settingId: `${ns}.${action}`,
-					valuePreview: cur,
-					confirmLabel: LT.dialogQueueSync?.() || "Sync",
-					onlyOnline: true,
+					valuePreview: null,
+					confirmLabel: LT.buttons.btnSync(),
 					preChecked: "*",
+					onlyOnline: true,
+					minimal: true,
 					onConfirm: async (userIds) => {
-						const targets = Array.isArray(userIds) ? userIds : [];
-						// one-shot push (no lock) — players apply immediately
-						game.socket?.emit?.(BBMM_SYNC_CH, {
-						t: "bbmm-ctrl-push",
-						ns, action,
-						value: cur,
-						targets
-						});
-						ui.notifications?.info?.(LT.infoQueuedSync({ module: `${ns}.${action}`, count: targets.length }));
+						try {
+						syncIcon.dataset.busy = "1";
+						await _bbmmCtrlSyncToUsers({ ns, action, userIds });
+						} finally {
+						delete syncIcon.dataset.busy;
+						}
 					}
 					});
 					picker.show();
 				} catch (err) {
-					DL(2, "controls syncIcon click error", err);
+					DL(2, "controls sync click error", err);
 				}
 				});
+
+				// SHIFT+CLICK -> sync immediately to ALL non-GMs (no dialog)
+				syncIcon.addEventListener("mousedown", async (ev) => {
+				try {
+					if (ev.button !== 0 || !ev.shiftKey) return; // only shift-left
+					ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+					if (syncIcon.dataset.busy === "1") return;   // debounce
+					syncIcon.dataset.busy = "1";
+					try {
+					const allNonGM = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+					await _bbmmCtrlSyncToUsers({ ns, action, userIds: allNonGM });
+					} finally {
+					delete syncIcon.dataset.busy;
+					}
+				} catch (err) {
+					DL(2, "controls sync shift-click error", err);
+				}
+				}, true);
 
 				// swallow context menu so we don’t clash with Foundry’s buttons
 				syncIcon.addEventListener("contextmenu", (ev) => {
