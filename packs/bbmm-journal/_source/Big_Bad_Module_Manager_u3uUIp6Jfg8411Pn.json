@@ -15,7 +15,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h3><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h3></div><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / delete preset.</li><li>Export module state to .json.</li><li>import .json to preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / delete preset.</li><li>Export settings state to .json</li><li><p>import .json to preset:</p><ul dir=\"auto\"><li>Choose which modules or specific settings to import.</li></ul></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>Add modules to ignore on presets/imports/exports.</li><li>Add specific setting to ignore on presets/imports/exports.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Include hidden Settings}</h3><ul><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Add hidden settings to always include in presets/imports/exports.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
+        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h3><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h3></div><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Rc4FRPurKuPwxhou]{Enhanced Module Management}</h3><ul><li><p>Add Notes per module</p></li><li><p>Click to expand and show notes</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / delete preset.</li><li>Export module state to .json.</li><li>import .json to preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / delete preset.</li><li>Export settings state to .json</li><li><p>import .json to preset:</p><ul dir=\"auto\"><li>Choose which modules or specific settings to import.</li></ul></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>Add modules to ignore on presets/imports/exports.</li><li>Add specific setting to ignore on presets/imports/exports.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Include hidden Settings}</h3><ul><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Add hidden settings to always include in presets/imports/exports.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
       },
       "video": {
         "controls": true,
@@ -36,7 +36,7 @@
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757732832081,
-        "modifiedTime": 1758088338828,
+        "modifiedTime": 1758414199593,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.LqdPKzBQbWas56RQ"
@@ -391,6 +391,45 @@
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.t1oYUVrmZzIGsUZt"
+    },
+    {
+      "sort": 125000,
+      "name": "Enhanced Module Management",
+      "type": "text",
+      "_id": "Rc4FRPurKuPwxhou",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>This feature will let you click an edit button on the module list for each module and enter notes. You can then click any module to expand it and see those notes. </p><img src=\"modules/bbmm/assets/readme/enhanced-module-management1.png\" /><p></p><h3><strong><span style=\"text-decoration:underline\">Future features</span></strong></h3><p>I am working to add the following features to the Enhanced Module Management:</p><ul><li><p>Add Tags to modules</p></li><li><p>Ability to filter/sort by tags</p></li><li><p>Direct link to settings</p></li><li><p>Direct link to Change Logs if available</p></li><li><p>Direct link to README if available</p></li><li><p>Ability to rename module in list.</p></li></ul>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.348",
+        "systemId": "pf2e",
+        "systemVersion": "7.4.3",
+        "createdTime": 1758413865302,
+        "modifiedTime": 1758414193503,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Rc4FRPurKuPwxhou"
     }
   ],
   "folder": null,
