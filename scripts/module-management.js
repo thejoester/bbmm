@@ -48,17 +48,23 @@ function _bbmmBuildModRow(li) {
 	try {
 		const pkgId = li.getAttribute("data-module-id") || li.getAttribute("data-package-id") || "";
 		const nameEl = li.querySelector(".package-overview .title");
-		const versionEl = li.querySelector(".package-overview .badge, .package-overview .tag.badge");
-		const authorEl = li.querySelector(".package-description .author");
 		const cb = li.querySelector('label.package-title input[type="checkbox"]');
 
 		const name = (nameEl?.textContent ?? pkgId).trim();
-		const version = (versionEl?.textContent ?? "").trim();
-		const author = (authorEl?.textContent ?? "").trim();
+		
+
+        // build a lowercased "search blob" from the original LI's text + id
+		const searchBlob =
+			((li.textContent ?? "") + " " + pkgId)
+				.replace(/\s+/g, " ")
+				.toLowerCase()
+				.trim();
 
 		const row = document.createElement("div");
 		row.className = "bbmm-modrow";
 		row.dataset.packageId = pkgId;
+
+        row.dataset.search = searchBlob; // used by filter
 
 		// left: checkbox
 		const colLeft = document.createElement("div");
@@ -115,8 +121,9 @@ function _bbmmBuildModRow(li) {
 
 		// ── Expand/Collapse on row click (not selection) ──────────────────────
 		row.addEventListener("click", async (ev) => {
-			// ignore clicks on interactive controls
-			if (ev.target.closest("button, a, input, label, .bbmm-col-right")) return;
+			
+            // ignore clicks on interactive controls and inside notes panel
+            if (ev.target.closest("button, a, input, label, .bbmm-col-right, .bbmm-notes-panel")) return;
 
 			const isOpen = row.classList.toggle("bbmm-open");
 			if (!isOpen) {
@@ -146,7 +153,7 @@ function _bbmmBuildModRow(li) {
 async function _bbmmOpenNotesDialog(moduleId) {
     try {
         const KEY = "moduleNotes";
-        const allNotes = game.settings.get("bbmm", KEY) || {};
+        const allNotes = game.settings.get(BBMM_ID, KEY) || {};
         const saved = typeof allNotes === "object" ? (allNotes[moduleId] || "") : "";
         const seed = _bbmmExtractEditorContent(saved);
 
@@ -298,11 +305,11 @@ async function _bbmmOpenNotesDialog(moduleId) {
                         // Remove trailing empty <p> / <div> blocks
                         html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
 
-                        const notes = foundry.utils.duplicate(game.settings.get("bbmm", KEY) || {});
+                        const notes = foundry.utils.duplicate(game.settings.get(BBMM_ID, KEY) || {});
                         notes[moduleId] = html;
-                        await game.settings.set("bbmm", KEY, notes);
+                        await game.settings.set(BBMM_ID, KEY, notes);
 
-                        ui.notifications.info(game.i18n.localize("bbmm.modListNotesSaved"));
+                        ui.notifications.info(game.i18n.localize(LT.modListNotesSaved()));
                         DL("module-management | saved notes for " + moduleId, { length: html.length });
                     }
                 }
@@ -339,7 +346,32 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 			DL("module-management | enhancements disabled (world setting)");
 			return;
 		}
-
+    
+        // Guard static SearchFilter methods — tolerate undefined query
+        try {
+            if (!SearchFilter.__bbmmPatched) {
+                const origClean = SearchFilter.cleanQuery;
+                SearchFilter.cleanQuery = function (q) {
+                    if (q == null) return "";
+                    if (typeof q !== "string") q = String(q);
+                    try { return origClean.call(this, q); }
+                    catch { return (q ?? "").trim?.() ?? ""; }
+                };
+                const origTest = SearchFilter.testQuery;
+                SearchFilter.testQuery = function (query, ...rest) {
+                    if (query == null) {
+                        try { query = this?.input?.value ?? ""; } catch { query = ""; }
+                    }
+                    try { return origTest.call(this, query, ...rest); }
+                    catch (e) { DL(2, "module-management | guarded SearchFilter.testQuery error", e); return true; }
+                };
+                SearchFilter.__bbmmPatched = true;
+                DL("module-management | patched static SearchFilter.cleanQuery/testQuery");
+            }
+        } catch (e) {
+            DL(2, "module-management | failed to patch static SearchFilter", e);
+        }
+            
 		const root = (rootEl instanceof HTMLElement) ? rootEl : (app?.element ?? null);
 		if (!root) {
 			DL(2, "module-management | renderModuleManagement(): root element missing");
@@ -349,7 +381,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 
 		DL("module-management | renderModuleManagement(): init (v13)");
 
-		// v13 rows live in a <menu class="package-list scrollable">
+		
 		const list =
 			root.querySelector("menu.package-list.scrollable") ||
 			root.querySelector("menu.package-list") ||
@@ -379,7 +411,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 			if (row) {
 				grid.appendChild(row);
 				li.dataset.bbmmTransformed = "1";
-				li.style.display = "none";	// keep for form submit; hide visually
+				li.classList.add("bbmm-hidden-source");	// visually hide but keep display semantics
 				built++;
 			}
 		}
@@ -389,8 +421,110 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 			return;
 		}
 
-		// append inside the <menu> so it inherits the scroll behavior
-		list.appendChild(grid);
+		// put BBMM grid as a SIBLING after the native <menu>
+        list.insertAdjacentElement("afterend", grid);
+
+        // push the native menu off-screen so core search still operates but theme rules won't hide our grid
+        list.classList.add("bbmm-source-offscreen");
+
+        // Mirror the native filter's visibility onto BBMM rows
+        try {
+            const menuEl = root.querySelector("menu.package-list") || root.querySelector(".package-list");
+            const grid = menuEl?.nextElementSibling?.classList?.contains("bbmm-modlist")
+                ? menuEl.nextElementSibling
+                : root.querySelector(".bbmm-modlist");
+            if (!menuEl || !grid) throw new Error("missing menu/grid");
+
+            // recompute maps whenever we mirror so we never go stale (tabs, re-renders, etc.)
+            const buildMaps = () => {
+                const liById = new Map();
+                for (const li of menuEl.querySelectorAll(':scope > li.package')) {
+                    const id = li.getAttribute("data-module-id") || li.getAttribute("data-package-id") || "";
+                    if (id) liById.set(id, li);
+                }
+                const rowById = new Map();
+                for (const row of grid.querySelectorAll(".bbmm-modrow")) {
+                    const id = row.dataset.packageId || "";
+                    if (id) rowById.set(id, row);
+                }
+                return { liById, rowById };
+            };
+
+            const isNativeShown = (li) => {
+                // we ONLY care about core/theming visibility flags; our bbmm-hidden-source offscreen trick is fine
+                if (li.hidden) return false;
+                if (li.classList.contains("hidden")) return false;
+                const cs = getComputedStyle(li);
+                if (cs.display === "none" || cs.visibility === "hidden") return false;
+                return true;
+            };
+
+            const mirrorOnce = () => {
+                const { liById, rowById } = buildMaps();
+
+                let shown = 0, hidden = 0, firstShownId = null;
+                for (const [id, li] of liById) {
+                    const row = rowById.get(id);
+                    if (!row) continue;
+                    const show = isNativeShown(li);
+                    row.style.display = show ? "grid" : "none";  	// ensure it paints
+                    if (show && !firstShownId) firstShownId = id;
+                    show ? shown++ : hidden++;
+                }
+
+                // If the grid itself is being hidden by theme/native, force it on.
+                const cs = getComputedStyle(grid);
+                if (cs.display === "none") grid.classList.add("bbmm-force-visible");
+
+                DL(`module-management | mirror(filter): shown=${shown}, hidden=${hidden}` +
+                (firstShownId ? `, first=${firstShownId}` : ``) +
+                `, gridDisplay=${getComputedStyle(grid).display}`);
+            };
+
+            // Try to patch SearchFilter.filter if/when it exists (best path)
+            const tryPatchSearchFilter = () => {
+                const sf = app?.searchFilter;
+                if (!sf || sf.__bbmmMirrorPatched) return false;
+                const origFilter = sf.filter.bind(sf);
+                sf.filter = (query, ...args) => {
+                    const r = origFilter(query, ...args);
+                    queueMicrotask(mirrorOnce);
+                    return r;
+                };
+                sf.__bbmmMirrorPatched = true;
+                DL("module-management | patched app.searchFilter.filter() to mirror results");
+                return true;
+            };
+            if (!tryPatchSearchFilter()) {
+                let attempts = 0;
+                const t = setInterval(() => { if (tryPatchSearchFilter() || ++attempts >= 10) clearInterval(t); }, 50);
+            }
+
+            // Delegated fallback: works even if a theme swaps the input element
+            if (!root.__bbmmDelegatedMirror) {
+                const schedule = () => requestAnimationFrame(() => requestAnimationFrame(mirrorOnce));
+                const onKeyOrInput = (ev) => {
+                    const target = ev.target;
+                    if (!(target instanceof HTMLInputElement)) return;
+                    // Foundry v13 uses name="search"
+                    if (target.name !== "search") return;
+                    schedule();
+                };
+                root.addEventListener("input", onKeyOrInput, true);
+                root.addEventListener("keyup", onKeyOrInput, true);
+                root.__bbmmDelegatedMirror = true;
+                DL("module-management | delegated mirror bound on window root");
+            }
+
+            // Also mirror when native list mutates (tabs, module toggles, etc.)
+            const mo = new MutationObserver(() => requestAnimationFrame(mirrorOnce));
+            mo.observe(menuEl, { attributes: true, attributeFilter: ["class","style","hidden"], subtree: true, childList: true });
+
+            // Initial mirror
+            requestAnimationFrame(mirrorOnce);
+        } catch (e) {
+            DL(2, "module-management | mirror patch failed", e);
+        }
 
 		DL(`module-management | injected compact grid with ${built} rows`);
 	} catch (err) {

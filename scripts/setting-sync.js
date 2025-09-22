@@ -449,46 +449,66 @@ import { LT, BBMM_ID } from "./localization.js";
 
 			// HARD/PARTIAL LOCK ops
 			for (const op of _bbmmPendingOps.filter(o => o.op === "lock")) {
-				const { id, namespace, key, value, userIds } = op;
-				const cfg = game.settings.settings.get(id);
-				if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
+				try {
+					const { id, namespace, key, value, userIds } = op;
+					const cfg = game.settings.settings.get(id);
+					if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
 
-				const allTargets = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
-				const selected = (Array.isArray(userIds) ? userIds : []).filter(uid => allTargets.includes(uid));
+					// Current world’s non-GM targets
+					const allTargets = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+					const selected = (Array.isArray(userIds) ? userIds : []).filter(uid => allTargets.includes(uid));
 
-				// No users -> unlock
-				if (selected.length === 0) {
-					if (map[id]) {
-						delete map[id];
+					// SPECIAL CASE: no players exist yet — store as a GLOBAL LOCK so it applies
+					// to future players when they appear.
+					if (allTargets.length === 0) {
+						map[id] = {
+							namespace,
+							key,
+							value,
+							requiresReload: !!cfg?.requiresReload
+						};
 						mapChanged = true;
-						DL(`setting-sync.js |  bbmm-apply: lock REMOVE ${id} (no users)`);
+						DL(`setting-sync.js |  bbmm-apply: lock ${id} (no players yet → global)`);
+						continue;
 					}
-					continue;
-				}
 
-				// All non-GMs -> global lock (omit userIds)
-				if (selected.length === allTargets.length) {
+					// No selected users out of existing non-GM users ⇒ remove lock
+					// (This path is now only reached when there ARE players but none were selected.)
+					if (selected.length === 0) {
+						if (map[id]) {
+							delete map[id];
+							mapChanged = true;
+							DL(`setting-sync.js |  bbmm-apply: lock REMOVE ${id} (no selected users)`);
+						}
+						continue;
+					}
+
+					// All current non-GM users covered ⇒ store as global (omit userIds)
+					if (selected.length === allTargets.length) {
+						map[id] = {
+							namespace,
+							key,
+							value,
+							requiresReload: !!cfg?.requiresReload
+						};
+						mapChanged = true;
+						DL(`setting-sync.js |  bbmm-apply: lock ${id} (all users → global)`);
+						continue;
+					}
+
+					// Partial coverage ⇒ store specific userIds
 					map[id] = {
 						namespace,
 						key,
 						value,
+						userIds: selected,
 						requiresReload: !!cfg?.requiresReload
 					};
 					mapChanged = true;
-					DL(`setting-sync.js |  bbmm-apply: lock ${id} (all users)`);
-					continue;
+					DL(`setting-sync.js |  bbmm-apply: lock ${id} (partial users=${selected.length}/${allTargets.length})`);
+				} catch (e) {
+					DL(2, "setting-sync.js |  bbmm-apply: lock loop error", e);
 				}
-
-				// Partial
-				map[id] = {
-					namespace,
-					key,
-					value,
-					requiresReload: !!cfg?.requiresReload,
-					userIds: selected.slice()
-				};
-				mapChanged = true;
-				DL(`setting-sync.js |  bbmm-apply: lock ${id} (users=${selected.length})`);
 			}
 
 			// PUSH ops (hard push now)
@@ -562,27 +582,30 @@ import { LT, BBMM_ID } from "./localization.js";
 	/*  Get lock state for a setting: "none", "partial", or "all" ================== */	
 	function bbmmGetLockState(id, map) {
 		try {
-			
 			const rec = map?.[id];
 			if (!rec) return "none";
 
-			// Soft lock takes precedence over targeted locks for icon state
+			// Soft lock takes precedence for icon state
 			if (rec?.soft === true) return "soft";
 
+			// Current non-GM targets in this world
 			const targets = (() => {
 				try {
 					const users = game.users?.contents || [];
 					return users.filter(u => !u.isGM).map(u => u.id);
 				} catch { return []; }
 			})();
+
 			const arr = Array.isArray(rec.userIds) ? rec.userIds : null;
 
-			// No list stored -> treat as "all"
-			if (!arr || !arr.length) return "all";
+			// If no explicit user list is stored, treat as global lock
+			if (!arr || !arr.length) {
+				// IMPORTANT: if there are no non-GM users yet, we still consider this "all"
+				// so the GM sees a solid lock that will apply to future players.
+				return "all";
+			}
 
-			// If there are no targetable users, keep it "partial" to avoid false "all"
-			if (targets.length === 0) return "partial";
-
+			// Normal coverage check when a user list exists
 			const set = new Set(arr);
 			let covered = 0;
 			for (const uid of targets) if (set.has(uid)) covered++;
@@ -1471,12 +1494,47 @@ import { LT, BBMM_ID } from "./localization.js";
 				return;
 			}
 
-			/* Apply any unallplied soft locks for players ============================= */
+			/* SETTINGS — apply pending SOFT locks at login (players only; jump ledger to world rev) */
 			if (!game.user?.isGM) {
-				try { await _bbmmApplyPendingSoftLocks(); }
-				catch (e) { DL(2, "setting-sync.js |  ready: settings-soft-apply failed", e); }
+				try {
+					const map	 = game.settings.get(BBMM_ID, "userSettingSync") || {};
+					const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
+					let applied = 0;
+
+					for (const [id, ent] of Object.entries(map)) {
+						try {
+							if (!ent?.soft) continue;
+
+							const dot = id.indexOf(".");
+							if (dot <= 0) continue;
+							const ns  = id.slice(0, dot);
+							const key = id.slice(dot + 1);
+
+							const worldRev = Number.isInteger(ent.rev) ? ent.rev : 0;
+							const prevRev  = Number.isInteger(ledger[id]?.r) ? ledger[id].r : 0;
+							if (worldRev <= prevRev) continue; // already up-to-date
+
+							await game.settings.set(ns, key, ent.value);
+
+							// Jump ledger directly to worldRev
+							ledger[id] = { v: JSON.stringify(ent.value ?? null), r: worldRev };
+							applied++;
+							DL(`setting-sync.js |  SOFT login-apply: set ${id} rev=${worldRev}`);
+						} catch (eApply) {
+							DL(2, `setting-sync.js |  SOFT login-apply failed for ${id}`, eApply);
+						}
+					}
+
+					if (applied > 0) {
+						await game.settings.set(BBMM_ID, "softLockLedger", ledger);
+						DL(`setting-sync.js |  SOFT login-apply complete: applied=${applied}`);
+					}
+				} catch (e) {
+					DL(2, "setting-sync.js |  SOFT login-apply block failed", e);
+				}
 			}
 
+			/* GM BLOCK ======================================================================== */
 			if (game.user?.isGM) {
 
 				/* 	BBMM Lock: resnap userSettingSync ==========================================
@@ -1582,6 +1640,7 @@ import { LT, BBMM_ID } from "./localization.js";
 			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
 			const initialEntries = Object.values(syncMap);
 
+			// If there is a sync map - 
 			if (initialEntries.length) {
 				let changed = false, needsReload = false;
 
@@ -1590,12 +1649,15 @@ import { LT, BBMM_ID } from "./localization.js";
 						const cfg = game.settings.settings.get(`${ent.namespace}.${ent.key}`);
 						if (!cfg || !(cfg.scope === "user" || cfg.scope === "client")) continue;
 
-						// Soft locks are advisory: do NOT auto-apply at ready; they were pushed once on enable
+						// Soft locks are advisory: do NOT auto-apply here; they’re handled above for login and by socket pushes
 						if (ent?.soft === true) continue;
 
+						// get current setting
 						const current = game.settings.get(ent.namespace, ent.key);
+						// compare if different
 						if (!objectsEqual(current, ent.value)) {
 							DL(`setting-sync.js |  bbmm-setting-lock: apply ${ent.namespace}.${ent.key} ->`, ent.value);
+							// update setting
 							await game.settings.set(ent.namespace, ent.key, ent.value);
 							changed = true;
 							if (ent.requiresReload || cfg.requiresReload) needsReload = true;
@@ -1605,6 +1667,7 @@ import { LT, BBMM_ID } from "./localization.js";
 					}
 				}
 
+				// See if we need to reload
 				if (changed && needsReload) {
 					try {
 						new foundry.applications.api.DialogV2({
@@ -1628,6 +1691,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 			// All clients: listen for live refresh/push triggers
 			if (game.socket) {
+
 				game.socket.on(BBMM_SYNC_CH, async (msg) => {
 
 					// Setting Soft Clear
@@ -1697,19 +1761,17 @@ import { LT, BBMM_ID } from "./localization.js";
 							DL(`setting-sync.js |  bbmm-setting-lock: push apply ${id} ->`, value);
 							await game.settings.set(namespace, key, value);
 
-							// Mark handled for soft
+							// Mark handled for soft — record exact world rev
 							if (soft === true) {
 								try {
 									const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
 									const prev = ledger[id];
 									const prevRev = (prev && typeof prev === "object" && Number.isInteger(prev.r)) ? prev.r : -1;
 
-									ledger[id] = {
-										v: JSON.stringify(value ?? null),
-										r: Number.isInteger(softRev) ? softRev : (prevRev > -1 ? prevRev : 1)
-									};
+									const recordRev = Number.isInteger(softRev) ? softRev : prevRev;
+									ledger[id] = { v: JSON.stringify(value ?? null), r: recordRev };
 									await game.settings.set(BBMM_ID, "softLockLedger", ledger);
-									DL(`setting-sync.js |  soft-ledger: marked applied rev=${Number.isInteger(softRev) ? softRev : (prevRev > -1 ? prevRev : 1)} for ${id}`);
+									DL(`setting-sync.js |  soft-ledger: marked applied rev=${recordRev} for ${id}`);
 								} catch (e) {
 									DL(2, "setting-sync.js |  soft-ledger: mark after push failed", e);
 								}
@@ -1753,7 +1815,7 @@ import { LT, BBMM_ID } from "./localization.js";
 							const cfg = game.settings.settings.get(id);
 							if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
 
-							// SKIP soft in on-demand refresh (soft is push-on-enable only)
+							// SKIP soft in on-demand refresh (soft handled by login + push)
 							if (ent?.soft === true) continue;
 
 							const current = game.settings.get(ent.namespace, ent.key);
@@ -1827,6 +1889,7 @@ import { LT, BBMM_ID } from "./localization.js";
 			DL(3, "setting-sync.js |  bbmm-setting-lock: ready(): error", err);
 		}
 	});
+
 
 /* ============================================================================
 		{CONTROLS SYNC HELPERS}

@@ -3,8 +3,6 @@ import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp } from "./inclusions.js";
 
-const MODULE_SETTING_PRESETS = "module-presets";  // OLD will go away 
-const SETTING_SETTINGS_PRESETS = "settingsPresets"; // OLD will go away
 const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
 const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
@@ -16,8 +14,8 @@ export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
 
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
-	["bbmm", new Set(["settingsPresets", "module-presets", "settingsPresetsUser", "modulePresetsUser", 
-		"migratedPresetsV1", "userSettingSync", "migratedPresetsV1", "softLockLedger", "softLockRevMap"])],
+	["bbmm", new Set(["settingsPresetsUser", "modulePresetsUser"])],
+		// "userSettingSync", "softLockLedger", "softLockRevMap"
 	["core", new Set(["moduleConfiguration", "compendiumConfiguration", "time"])],	
 	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
@@ -286,51 +284,14 @@ export async function openBBMMLauncher() {
 	// "cancel" -> do nothing
 }
 
-/*  Migrationv1 Checker
-	- Migrates users of v0.0.7 and below from WORLD scoped preset
-	  data to USER scoped preset data. 
-*/
-async function migrationV1Check() {
-	if (!game.user.isGM) return; // Only needed for GMs
-	
-	try {
-		const migrated = game.settings.get(BBMM_ID, "migratedPresetsV1");
-		if (!migrated) {
-			const oldModule = game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS) ?? {};
-			const oldSetting = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) ?? {};
-
-			if (Object.keys(oldModule).length) {
-				await game.settings.set(BBMM_ID, MODULE_SETTING_PRESETS_U, oldModule);
-				DL("settings.js | migrationV1Check(): migrated module presets to user scope");
-			}
-			if (Object.keys(oldSetting).length) {
-				await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS_U, oldSetting);
-				DL("settings.js | migrationV1Check(): migrated setting presets to user scope");
-			}
-
-			await game.settings.set(BBMM_ID, "migratedPresetsV1", true);
-			DL("settings.js | migrationV1Check(): migration complete, flag set");
-		}
-	} catch (err) {
-		DL(3, "settings.js | migrationV1Check(): migration error", err);
-	}
-	
-}
-
 Hooks.once("init", () => {
+
 	try {
 		// ===== FLAGS ======
-			//	World-scoped one-time migration flag
-			game.settings.register(BBMM_ID, "migratedPresetsV1", {
-				name: "BBMM Migration Flag",
-				scope: "world",
-				config: false,
-				type: Boolean,
-				default: false
-			});
-
 			// Setting to hold module flags
 			game.settings.register(BBMM_ID, "bbmmFlags", {
+				name: LT._settings.bbmmFlags_name(),
+				hint: LT._settings.bbmmFlags_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -340,8 +301,8 @@ Hooks.once("init", () => {
 		// These do not need to be localized
 			// User Exclusions 
 			game.settings.register(BBMM_ID, "userExclusions", {
-				name: "BBMM: User Exclusions",
-				hint: "Modules or Settings to be ignored when importing/exporting BBMM presets.",
+				name: LT._settings.userExclusions_name(),
+				hint: LT._settings.userExclusions_hint(),
 				scope: "world",	
 				config: false,	
 				type: Object,
@@ -350,8 +311,8 @@ Hooks.once("init", () => {
 
 			// User Inclusions (hidden settings to include when saving presets)
 			game.settings.register(BBMM_ID, "userInclusions", {
-				name: "BBMM: User Inclusions",
-				hint: "Hidden settings explicitly included when exporting BBMM settings presets.",
+				name: LT._settings.userInclusions_name(),
+				hint: LT._settings.userInclusions_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -360,8 +321,8 @@ Hooks.once("init", () => {
 
 			// User scoped Settings presets
 			game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS_U, {
-				name: "Module Presets (User)",
-				hint: "User-scoped stored module enable/disable presets.",
+				name: LT._settings.settingsPresetsUser_name(),
+				hint: LT._settings.settingsPresetsUser_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
@@ -370,8 +331,8 @@ Hooks.once("init", () => {
 
 			// User scoped Module Presets
 			game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS_U, {
-				name: "Settings Presets (User)",
-				hint: "User-scoped stored settings presets.",
+				name:  LT._settings.modulePresetsUser_name(),
+				hint: LT._settings.modulePresetsUser_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
@@ -380,17 +341,18 @@ Hooks.once("init", () => {
 
 			// HIDDEN World map of { [moduleId]: "x.y.z" } that we've marked as seen
 			game.settings.register(BBMM_ID, "seenChangelogs", {
-				name: "Seen Changelogs",
-				hint: "Private setting: Internal map of module versions marked as 'seen'.",
+				name: LT._settings.seenChangelogs_name(),
+				hint: LT._settings.seenChangelogs_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
 				default: {}
 			});
 
+			// User map of soft-locked settings
 			game.settings.register(BBMM_ID, "userSettingSync", {
-				name: "User Setting Sync",
-				hint: "GM: settings marked for sync are enforced on players when they load.",
+				name: LT._settings.userSettingSync_name(),
+				hint: LT._settings.userSettingSync_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -399,16 +361,18 @@ Hooks.once("init", () => {
 
 			// User-scoped ledger: remembers which soft-lock value was last auto-applied per setting id
 			game.settings.register(BBMM_ID, "softLockLedger", {
-				name: "softLockLedger",
+				name: LT._settings.softLockLedger_name(),
+				hint: LT._settings.softLockLedger_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
 				default: {}	// { "<namespace>.<key>": <serializedValue> }
 			});
 
-			// persistant soft-lock rev map
+			// persistant soft-lock rev map - Master list of soft lock values and revisions
 			game.settings.register(BBMM_ID, "softLockRevMap", {
-				name: "softLockRevMap",
+				name: LT._settings.softLockRevMap_name(),
+				hint: LT._settings.softLockRevMap_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -417,19 +381,26 @@ Hooks.once("init", () => {
 
 			// Controls Sync Storage
 			game.settings.register?.(BBMM_ID, CTRL_STORE_KEY, {
-				name: "BBMM Control Sync Store",
-				scope: "world", config: false, default: {}
+				name: LT._settings.userControlSync_name(),
+				hint: LT._settings.userControlSync_hint(),
+				scope: "world", 
+				config: false, 
+				default: {}
 			});
 
 			// Controls Sync RevMap
 			game.settings.register?.(BBMM_ID, CTRL_REV_STORE, {
-				name: "BBMM Control Sync RevMap",
-				scope: "world", config: false, default: {}
+				name: LT._settings.softLockRevMap_controls_name(),
+				hint: LT._settings.softLockRevMap_controls_hint(),
+				scope: "world", 
+				config: false, 
+				default: {}
 			});
 
 			// Module Management - Notes
 			game.settings.register("bbmm", "moduleNotes", {
-				name: "BBMM Module Notes",
+				name: LT._settings.moduleNotes_name(),
+				hint: LT._settings.moduleNotes_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -712,7 +683,10 @@ Hooks.once("init", () => {
 	}
 });
 
-Hooks.on("setup", () => DL("settings.js | setup fired"));
+Hooks.on("setup", () => {
+	DL("settings.js | setup fired");
+});
+
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
@@ -723,7 +697,6 @@ Hooks.once("ready", async () => {
 	// Hook into settings and manage modules window to add app button in header 
 	Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
 	Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
-	await migrationV1Check(); // mivgrationV1
 	
 });
 

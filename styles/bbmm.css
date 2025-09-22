@@ -229,17 +229,6 @@
 	BBMM: compact Manage Modules list
 =========================================================================== */
 
-/* container: stretch rows full width, remove gutters */
-.bbmm-modmgmt .bbmm-modlist {
-	display: flex;
-	flex-direction: column;
-	align-items: stretch;
-	gap: 4px;
-	margin-top: 4px;
-	padding-left: 0;
-	padding-right: 0;
-}
-
 /* kill default menu padding while our UI is active */
 .bbmm-modmgmt menu.package-list,
 .bbmm-modmgmt menu.package-list.scrollable {
@@ -247,10 +236,32 @@
 	padding-right: 0 !important;
 }
 
+/* Move the native <menu> off-screen (NOT display:none) so core search still runs */
+.bbmm-modmgmt menu.package-list.bbmm-source-offscreen,
+.bbmm-modmgmt .package-list.bbmm-source-offscreen {
+	position: absolute !important;
+	left: -100000px !important;
+	top: 0 !important;
+	width: 1px !important;
+	height: 1px !important;
+	overflow: hidden !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+}
+
+/* Our grid is now a sibling of <menu> — stretch full width and stay visible */
+.bbmm-modmgmt .bbmm-modlist {
+	display: block;          /* outside the menu, so normal block */
+	margin-top: 6px;
+}
+.bbmm-modmgmt .bbmm-modlist.bbmm-force-visible { /* JS may add this when filtering */
+	display: block !important;
+}
+
 /* row: fixed grid so text never shifts */
 .bbmm-modmgmt .bbmm-modrow {
 	display: grid;
-	grid-template-columns: 32px 1fr auto;	/* fixed checkbox + flex name + auto tags */
+	grid-template-columns: 32px 1fr auto; /* fixed checkbox + flex name + auto tags */
 	align-items: center;
 	gap: 8px;
 
@@ -294,7 +305,7 @@
 	text-overflow: ellipsis;
 }
 
-/* right: tags + edit button */
+/* right: tag icons + edit button */
 .bbmm-modmgmt .bbmm-col-right {
 	display: flex;
 	align-items: center;
@@ -345,6 +356,13 @@
 .bbmm-modmgmt .bbmm-notes-empty {
 	opacity: 0.7;
 	font-style: italic;
+}
+
+/* compact reset for the native menu list when our UI is active */
+.bbmm-modmgmt .bbmm-compact {
+	list-style: none;
+	margin: 0;
+	padding: 0;
 }
 
 /* ==========================================================================
