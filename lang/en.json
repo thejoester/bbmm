@@ -160,6 +160,7 @@
 		"controlsPresetMgr": "Controls Preset Manager",
 		"lblOpenControlsPresets": "Open Controls Preset Manager",
 		"titleControlsPresets": "BBMM Controls Presets",
+		"lockNoneTip": "Lock Player settings",
 
 		"controlsToggleName": "Enable Control (Keybinding) Sync",
 		"controlsToggleHint": "If enabled, the GM can lock or soft-lock keybindings and push them to connected players.",

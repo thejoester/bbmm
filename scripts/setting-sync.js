@@ -1383,17 +1383,17 @@ import { LT, BBMM_ID } from "./localization.js";
 						// LOCK icon
 						let lockIcon;
 						if (state === "all") {
-							lockIcon = mk(LT.lockAllTip?.() || "Locked for all players", "fa-solid fa-lock");
+							lockIcon = mk(LT.lockAllTip(), "fa-solid fa-lock");
 							lockIcon.classList.add("bbmm-active");
 						} else if (state === "partial") {
-							lockIcon = mk(LT.lockPartialTip?.() || "Locked for selected players", "fa-solid fa-user-lock");
+							lockIcon = mk(LT.lockPartialTip(), "fa-solid fa-user-lock");
 							lockIcon.classList.add("bbmm-partial");
 						} else if (state === "soft") {
-							const softTitle = (LT.nameSoftLock?.() || LT.name_SoftLock?.() || "Soft Lock");
+							const softTitle = (LT.name_SoftLock());
 							lockIcon = mk(softTitle, "fa-regular fa-lock");
 							lockIcon.classList.add("bbmm-active");
 						} else {
-							lockIcon = mk(LT.lockNoneTip?.() || "Lock Player settings", "fa-solid fa-lock-open");
+							lockIcon = mk(LT.lockNoneTip(), "fa-solid fa-lock-open");
 						}
 
 						// click + SHIFT-click + right-click gestures
