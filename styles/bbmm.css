@@ -364,6 +364,38 @@
 	margin: 0;
 	padding: 0;
 }
+/* Make the window body a flex column so the list can flex + scroll */
+.bbmm-modmgmt .window-content {
+	display: flex;
+	flex-direction: column;
+	min-height: 0; /* allow children to shrink below content height */
+}
+
+/* Let our BBMM grid be the scrolling region */
+.bbmm-modmgmt .bbmm-modlist {
+	flex: 1 1 auto;   /* take remaining height */
+	min-height: 0;    /* critical for flex overflow */
+	overflow: auto;   /* <-- scrolling now happens here */
+}
+
+/*  Window sizing clamp  */
+.bbmm-modmgmt.window-app {
+	max-height: 72vh;
+}
+/* Make the body a column, but clamp its height */
+.bbmm-modmgmt .window-content {
+	display: flex;
+	flex-direction: column;
+	max-height: calc(72vh - 48px);    
+	overflow: hidden;                 
+}
+
+/* The BBMM grid is the only thing that scrolls */
+.bbmm-modmgmt .bbmm-modlist {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+}
 
 /* ==========================================================================
 	BBMM: Module Notes dialog
