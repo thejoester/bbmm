@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 - **Module Management:** 
   - Fixed scroll issue with module management window. 
+- **Changelog Report:**
+  - fixed depriciation warning for `FilePicker` and `TextEditor`.
 
 ## [0.5.0-test.2] - 2025-09-20
 ### Fixed
