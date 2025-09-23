@@ -26,6 +26,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Can now export/import sync and lock states
 - **Changelog Report:**
   - fixed depriciation warning for `FilePicker` and `TextEditor`.
+### Changed
+- **Documentation:**
+  - Updated Journal Documentation
 
 ## [0.4.1] - 2025-09-17
 ### Fixed
