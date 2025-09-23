@@ -160,6 +160,7 @@
 		"controlsPresetMgr": "Controls Preset Manager",
 		"lblOpenControlsPresets": "Open Controls Preset Manager",
 		"titleControlsPresets": "BBMM Controls Presets",
+		"lockNoneTip": "Lock Player settings",
 
 		"controlsToggleName": "Enable Control (Keybinding) Sync",
 		"controlsToggleHint": "If enabled, the GM can lock or soft-lock keybindings and push them to connected players.",
@@ -175,6 +176,13 @@
 		"keybindColorScopesHint": "If enabled: world keybinds are blue; client keybinds are orange; user keybinds remain default.",
 		"keybindScopeWorldTip": "Scope: World (blue)",
 		"keybindScopeClientTip": "Scope: Client (orange)",
+		
+		"enableModuleManagementName": "Enable enhanced module management",
+		"enableModuleManagementHint": "When enabled, BBMM replaces the stock Manage Modules list with the compact layout and notes UI for all users. Only a GM can change this.",
+		"modListEditNotes": "Edit Notes",
+		"modListEditTitle": "Notes – {id}",
+		"modListNotesLabel": "Module Notes",
+		"modListNotesSaved": "Notes saved.",
 
 		"aboutName": "About BBMM",
 		"aboutHint": "Open the About BBMM journal entry.",
@@ -200,6 +208,7 @@
 			"export": "Export",
 			"import": "Import",
 			"load": "Load",
+			"btnSync": "Sync",
 			"preview": "Preview",
 			"update": "Update",
 			"delete": "Delete",
@@ -301,6 +310,33 @@
 			"inclusionsOpenError": "Failed to open the Inclusions Manager.",
 			"addModuleWarnTitle": "Include Entire Module?",
 			"addModuleWarnMsg": "It is not recommended to include an entire module unless you are sure the data it is saving will be safe. See {docLink} for more information. Continue?"
+		},
+
+		"_settings": {
+			"bbmmFlags_name": "BBMM Flags",
+			"bbmmFlags_hint": "BBMM hidden Flags",
+			"userExclusions_name": "BBMM: User Exclusions",
+			"userExclusions_hint": "Modules or Settings to be ignored when importing/exporting BBMM presets.",
+			"userInclusions_name": "BBMM: User Inclusions",
+			"userInclusions_hint": "Hidden settings explicitly included when exporting BBMM settings presets.",
+			"settingsPresetsUser_name":"Settings Presets (User)",
+			"settingsPresetsUser_hint": "User-scoped stored settings presets.",
+			"modulePresetsUser_name": "Module Presets (User)",
+			"modulePresetsUser_hint": "User-scoped stored module enable/disable presets.",
+			"seenChangelogs_name": "Seen Changelogs",
+			"seenChangelogs_hint": "Internal map of changelogs marked as 'seen'.",
+			"userSettingSync_name": "User Soft Locks",
+			"userSettingSync_hint": "Settings marked for soft lock.",
+			"softLockLedger_name": "BBMM Soft Lock Ledger",
+			"softLockLedger_hint": "Remembers which soft-lock value was last auto-applied per setting id",
+			"softLockRevMap_name": "BBMM Soft Lock Rev Map",
+			"softLockRevMap_hint": "Master list of soft lock values and revisions",
+			"userControlSync_name": "BBMM Control Sync Store",
+			"userControlSync_hint": "Master list of controls soft locks",
+			"softLockRevMap_controls_name": "BBMM Control Sync Rev Map",
+			"softLockRevMap_controls_hint": "Remembers which controls soft lock value was last applied",
+			"moduleNotes_name": "BBMM Module Notes",
+			"moduleNotes_hint": "Notes added to modules."
 		}
 	}
 }

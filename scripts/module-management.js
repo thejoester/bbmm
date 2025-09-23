@@ -1,0 +1,537 @@
+/* BBMM: Manage Modules list restyle ===========================================
+   	- Hook: renderModuleManagement
+	- Goals:
+		• Make each module entry a compact, cardlike row (similar to changelog left column)
+		• Whole row visually selectable (does not toggle enable/disable yet)
+		• Keep this purely presentational (no core behavior changes)
+============================================================================== */
+import { DL } from "./settings.js";
+import { LT, BBMM_ID } from "./localization.js";
+
+async function _bbmmRenderSavedNotesHTML(moduleId) {
+	try {
+		const KEY = "moduleNotes";
+		const all = game.settings.get("bbmm", KEY) || {};
+		const raw = _bbmmExtractEditorContent(all[moduleId] || "");
+		if (!raw) return "";
+
+		// Try to enrich (safe; NOT TextEditor.create)
+		try {
+			const html = await TextEditor.enrichHTML(raw, { async: true, secrets: false });
+			return html || raw;
+		} catch (e) {
+			DL(2, "module-management | enrichHTML failed; using raw", e);
+			return raw;
+		}
+	} catch (err) {
+		DL(2, "module-management | _bbmmRenderSavedNotesHTML(): error", err);
+		return "";
+	}
+}
+
+// Extract just the editor content HTML from whatever we have saved
+function _bbmmExtractEditorContent(html) {
+    try {
+        if (!html) return "";
+        if (!html.includes("editor-menu") && !html.includes("ProseMirror")) return html.trim();
+        const tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        const pm = tmp.querySelector(".ProseMirror");
+        if (pm) return pm.innerHTML.trim();
+        tmp.querySelectorAll("menu.editor-menu, .editor-prosemirror, .editor").forEach(el => el.remove());
+        return tmp.innerHTML.trim();
+    } catch { return html || ""; }
+}
+
+/*	build one compact row from an existing <li> */
+function _bbmmBuildModRow(li) {
+	try {
+		const pkgId = li.getAttribute("data-module-id") || li.getAttribute("data-package-id") || "";
+		const nameEl = li.querySelector(".package-overview .title");
+		const cb = li.querySelector('label.package-title input[type="checkbox"]');
+
+		const name = (nameEl?.textContent ?? pkgId).trim();
+		
+
+        // build a lowercased "search blob" from the original LI's text + id
+		const searchBlob =
+			((li.textContent ?? "") + " " + pkgId)
+				.replace(/\s+/g, " ")
+				.toLowerCase()
+				.trim();
+
+		const row = document.createElement("div");
+		row.className = "bbmm-modrow";
+		row.dataset.packageId = pkgId;
+
+        row.dataset.search = searchBlob; // used by filter
+
+		// left: checkbox
+		const colLeft = document.createElement("div");
+		colLeft.className = "bbmm-col-left";
+		if (cb) {
+			cb.classList.add("bbmm-toggle");
+			colLeft.appendChild(cb);
+		}
+		row.appendChild(colLeft);
+
+		// middle
+        const colMid = document.createElement("div");
+        colMid.className = "bbmm-col-middle";
+
+        const elName = document.createElement("div");
+        elName.className = "bbmm-name";
+        elName.textContent = name;
+
+        colMid.appendChild(elName);
+        row.appendChild(colMid);
+
+		// right: tags + edit button
+		const colRight = document.createElement("div");
+		colRight.className = "bbmm-col-right";
+		const tags = li.querySelectorAll(".package-overview .tag");
+		if (tags.length) {
+			const frag = document.createDocumentFragment();
+			for (const t of tags) {
+				const clone = t.cloneNode(true);
+				clone.classList.add("bbmm-tag");
+				frag.appendChild(clone);
+			}
+			colRight.appendChild(frag);
+		}
+
+		const editBtn = document.createElement("button");
+		editBtn.type = "button";
+		editBtn.className = "bbmm-edit tag flexrow";
+		editBtn.setAttribute("aria-label", LT.modListEditNotes());
+		editBtn.innerHTML = `<i class="fa-solid fa-pen-to-square fa-fw"></i>`;
+		editBtn.addEventListener("click", (ev) => {
+			ev.stopPropagation();
+			_bbmmOpenNotesDialog(pkgId);
+		});
+		colRight.appendChild(editBtn);
+
+		row.appendChild(colRight);
+
+		// ── BBMM notes preview panel (starts collapsed) ───────────────────────
+		const notesPanel = document.createElement("div");
+		notesPanel.className = "bbmm-notes-panel";
+		notesPanel.innerHTML = `<div class="bbmm-notes-empty"></div>`;
+		row.appendChild(notesPanel);
+
+		// ── Expand/Collapse on row click (not selection) ──────────────────────
+		row.addEventListener("click", async (ev) => {
+			
+            // ignore clicks on interactive controls and inside notes panel
+            if (ev.target.closest("button, a, input, label, .bbmm-col-right, .bbmm-notes-panel")) return;
+
+			const isOpen = row.classList.toggle("bbmm-open");
+			if (!isOpen) {
+				DL(`module-management | collapsed ${pkgId}`);
+				return;
+			}
+
+			// expand: load notes from settings each time (fresh)
+			try {
+				const html = await _bbmmRenderSavedNotesHTML(pkgId);
+				notesPanel.innerHTML = html
+					? `<div class="bbmm-notes-html">${html}</div>`
+					: `<div class="bbmm-notes-empty"></div>`;
+				DL(`module-management | expanded ${pkgId} (notes length: ${html?.length || 0})`);
+			} catch (e) {
+				DL(2, "module-management | expand failed", e);
+			}
+		});
+
+		return row;
+	} catch (err) {
+		DL(3, "module-management | _bbmmBuildModRow(): failed", err);
+		return null;
+	}
+}
+
+async function _bbmmOpenNotesDialog(moduleId) {
+    try {
+        const KEY = "moduleNotes";
+        const allNotes = game.settings.get(BBMM_ID, KEY) || {};
+        const saved = typeof allNotes === "object" ? (allNotes[moduleId] || "") : "";
+        const seed = _bbmmExtractEditorContent(saved);
+
+        // bare content <div> per DialogV2 rules
+        const content = document.createElement("div");
+
+        // build the form
+        const form = document.createElement("form");
+        form.className = "bbmm-notes-form";
+
+        // section with separators
+        const section = document.createElement("section");
+        section.className = "bbmm-notes-section";
+
+        // top rule
+        const hrTop = document.createElement("hr");
+        hrTop.className = "bbmm-hr";
+        section.appendChild(hrTop);
+
+        // header row (right-aligned heading)
+        const head = document.createElement("div");
+        head.className = "bbmm-notes-head";
+        const heading = document.createElement("h3");
+        heading.textContent = LT.modListNotesLabel();
+        heading.className = "bbmm-notes-title";
+        head.appendChild(heading);
+        section.appendChild(head);
+
+        // editor (full width)
+        const pm = foundry.applications.elements.HTMLProseMirrorElement.create({
+            name: "notes",
+            value: seed,
+            height: 200,
+            collaborate: false,
+            toggled: false,
+            aria: { label: "BBMM Notes" },
+            dataset: { bbmmId: moduleId }
+        });
+        section.appendChild(pm);
+
+        // bottom rule
+        const hrBot = document.createElement("hr");
+        hrBot.className = "bbmm-hr";
+        section.appendChild(hrBot);
+
+        // assemble
+        form.appendChild(section);
+        content.appendChild(form);
+
+        let dlgRef = null;
+        const TARGET_WIDTH = 800;
+        const TARGET_HEIGHT = 450;
+
+        // robust read: prefer live document; fallback to component APIs
+        const readFromProseMirror = async () => {
+            try {
+                const live =
+                    document.querySelector(`prose-mirror[data-bbmm-id="${moduleId}"]`) ||
+                    dlgRef?.element?.querySelector?.(`prose-mirror[data-bbmm-id="${moduleId}"]`) ||
+                    dlgRef?.element?.querySelector?.('prose-mirror[name="notes"]');
+
+                if (!live) { DL(2, `module-management | <prose-mirror> not found for read (id=${moduleId})`); return ""; }
+
+                const doc = live.shadowRoot?.querySelector?.(".ProseMirror");
+                if (doc?.innerHTML) {
+                    const s = doc.innerHTML.trim();
+                    DL(`module-management | read via shadow .ProseMirror (content-only): ${s.length} chars`);
+                    return s;
+                }
+                if (typeof live.getHTML === "function") {
+                    const a = await live.getHTML();
+                    const s = _bbmmExtractEditorContent(a || "");
+                    DL(`module-management | read via pm.getHTML() ⇒ content-only: ${s.length} chars`);
+                    return s;
+                }
+                const b = _bbmmExtractEditorContent(live.value ?? "");
+                if (b) {
+                    DL(`module-management | read via pm.value ⇒ content-only: ${b.length} chars`);
+                    return b;
+                }
+                DL("module-management | readFromProseMirror(): empty");
+                return "";
+            } catch (e) {
+                DL(2, "module-management | readFromProseMirror(): error", e);
+                return "";
+            }
+        };
+
+        const dlg = new foundry.applications.api.DialogV2({
+            id: `bbmm-notes-${moduleId}`,
+            modal: false,
+            window: {
+                title: LT.modListEditTitle({ id: moduleId }),
+                icon: "fa-solid fa-pen-to-square",
+                resizable: false
+            },
+            content,
+            render: (app) => {
+                dlgRef = app;
+
+                // helper: center using constants (no center())
+                const _bbmmCenter = () => {
+                    try {
+                        const left = Math.max((window.innerWidth  - TARGET_WIDTH)  / 2, 0);
+                        const top  = Math.max((window.innerHeight - TARGET_HEIGHT) / 2, 0);
+                        app.setPosition({ width: TARGET_WIDTH, height: TARGET_HEIGHT, left, top });
+                    } catch (e) {
+                        DL(2, "module-management | _bbmmCenter(): error", e);
+                    }
+                };
+
+                try {
+                    const el = app.element;
+
+                    // defeat theme clamps + pin dimensions
+                    el.style.maxWidth = "none";
+                    el.style.width = `${TARGET_WIDTH}px`;
+                    el.style.minWidth = `${TARGET_WIDTH}px`;
+                    el.style.height = `${TARGET_HEIGHT}px`;
+
+                    // initial center
+                    _bbmmCenter();
+                    requestAnimationFrame(() => requestAnimationFrame(_bbmmCenter));
+
+                    // one-shot: if the element changes size once after paint, recenter then disconnect
+                    const ro = new ResizeObserver(() => {
+                        ro.disconnect();
+                        _bbmmCenter();
+                    });
+                    ro.observe(el);
+                } catch (e) {
+                    DL(2, "module-management | render(): sizing error", e);
+                }
+            },
+            buttons: [
+                { action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark" },
+                {
+                    action: "save",
+                    label: LT.buttons.save(),
+                    icon: "fa-solid fa-floppy-disk",
+                    default: true,
+                    callback: async () => {
+                        const raw = await readFromProseMirror();  // content-only
+                        let html = raw ?? "";
+
+                        // Strip trailing spaces/newlines
+                        html = html.replace(/\s+$/, "");
+
+                        // Remove trailing empty <p> / <div> blocks
+                        html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
+
+                        const notes = foundry.utils.duplicate(game.settings.get(BBMM_ID, KEY) || {});
+                        notes[moduleId] = html;
+                        await game.settings.set(BBMM_ID, KEY, notes);
+
+                        ui.notifications.info(game.i18n.localize(LT.modListNotesSaved()));
+                        DL("module-management | saved notes for " + moduleId, { length: html.length });
+                    }
+                }
+            ]
+        });
+
+        await dlg.render(true);
+        // assert width again after paint
+        try {
+            const el = dlg.element;
+            el.style.maxWidth = "none";
+            el.style.width = `${TARGET_WIDTH}px`;
+            el.style.minWidth = `${TARGET_WIDTH}px`;
+            el.style.height = `${TARGET_HEIGHT}px`;
+
+            const left = Math.max((window.innerWidth  - TARGET_WIDTH)  / 2, 0);
+            const top  = Math.max((window.innerHeight - TARGET_HEIGHT) / 2, 0);
+            dlg.setPosition({ width: TARGET_WIDTH, height: TARGET_HEIGHT, left, top });
+        } catch (e) {
+            DL(2, "module-management | post-render sizing error", e);
+        }
+        DL("module-management | opened notes dialog (V2) for " + moduleId);
+    } catch (err) {
+        DL(3, "module-management | _bbmmOpenNotesDialog(DialogV2): error", err);
+    }
+}
+
+/*	render hook */
+Hooks.on("renderModuleManagement", (app, rootEl) => {
+	try {
+
+        // Check if enabled
+		if (!game.settings.get("bbmm", "enableModuleManagement")) {
+			DL("module-management | enhancements disabled (world setting)");
+			return;
+		}
+    
+        // Guard static SearchFilter methods — tolerate undefined query
+        try {
+            if (!SearchFilter.__bbmmPatched) {
+                const origClean = SearchFilter.cleanQuery;
+                SearchFilter.cleanQuery = function (q) {
+                    if (q == null) return "";
+                    if (typeof q !== "string") q = String(q);
+                    try { return origClean.call(this, q); }
+                    catch { return (q ?? "").trim?.() ?? ""; }
+                };
+                const origTest = SearchFilter.testQuery;
+                SearchFilter.testQuery = function (query, ...rest) {
+                    if (query == null) {
+                        try { query = this?.input?.value ?? ""; } catch { query = ""; }
+                    }
+                    try { return origTest.call(this, query, ...rest); }
+                    catch (e) { DL(2, "module-management | guarded SearchFilter.testQuery error", e); return true; }
+                };
+                SearchFilter.__bbmmPatched = true;
+                DL("module-management | patched static SearchFilter.cleanQuery/testQuery");
+            }
+        } catch (e) {
+            DL(2, "module-management | failed to patch static SearchFilter", e);
+        }
+            
+		const root = (rootEl instanceof HTMLElement) ? rootEl : (app?.element ?? null);
+		if (!root) {
+			DL(2, "module-management | renderModuleManagement(): root element missing");
+			return;
+		}
+		root.classList.add("bbmm-modmgmt");
+
+		DL("module-management | renderModuleManagement(): init (v13)");
+
+		
+		const list =
+			root.querySelector("menu.package-list.scrollable") ||
+			root.querySelector("menu.package-list") ||
+			root.querySelector(".package-list");
+
+		if (!list) {
+			DL(2, "module-management | package list not found");
+		 return;
+		}
+
+		// clean any old grids from previous renders
+		for (const old of list.querySelectorAll(".bbmm-modlist")) old.remove();
+
+		list.classList.add("bbmm-compact");
+
+		const grid = document.createElement("div");
+		grid.className = "bbmm-modlist";
+
+		// Only direct module rows
+		const items = list.querySelectorAll(":scope > li.package");
+		DL(`module-management | found ${items.length} list items`);
+
+		let built = 0;
+		for (const li of items) {
+			if (li.dataset.bbmmTransformed === "1") continue;
+			const row = _bbmmBuildModRow(li);
+			if (row) {
+				grid.appendChild(row);
+				li.dataset.bbmmTransformed = "1";
+				li.classList.add("bbmm-hidden-source");	// visually hide but keep display semantics
+				built++;
+			}
+		}
+
+		if (!built) {
+			DL(2, "module-management | nothing transformed (selectors may need tuning)");
+			return;
+		}
+
+		// put BBMM grid as a SIBLING after the native <menu>
+        list.insertAdjacentElement("afterend", grid);
+
+        // push the native menu off-screen so core search still operates but theme rules won't hide our grid
+        list.classList.add("bbmm-source-offscreen");
+
+        // Mirror the native filter's visibility onto BBMM rows
+        try {
+            const menuEl = root.querySelector("menu.package-list") || root.querySelector(".package-list");
+            const grid = menuEl?.nextElementSibling?.classList?.contains("bbmm-modlist")
+                ? menuEl.nextElementSibling
+                : root.querySelector(".bbmm-modlist");
+            if (!menuEl || !grid) throw new Error("missing menu/grid");
+
+            // recompute maps whenever we mirror so we never go stale (tabs, re-renders, etc.)
+            const buildMaps = () => {
+                const liById = new Map();
+                for (const li of menuEl.querySelectorAll(':scope > li.package')) {
+                    const id = li.getAttribute("data-module-id") || li.getAttribute("data-package-id") || "";
+                    if (id) liById.set(id, li);
+                }
+                const rowById = new Map();
+                for (const row of grid.querySelectorAll(".bbmm-modrow")) {
+                    const id = row.dataset.packageId || "";
+                    if (id) rowById.set(id, row);
+                }
+                return { liById, rowById };
+            };
+
+            const isNativeShown = (li) => {
+                // we ONLY care about core/theming visibility flags; our bbmm-hidden-source offscreen trick is fine
+                if (li.hidden) return false;
+                if (li.classList.contains("hidden")) return false;
+                const cs = getComputedStyle(li);
+                if (cs.display === "none" || cs.visibility === "hidden") return false;
+                return true;
+            };
+
+            const mirrorOnce = () => {
+                const { liById, rowById } = buildMaps();
+
+                let shown = 0, hidden = 0, firstShownId = null;
+                for (const [id, li] of liById) {
+                    const row = rowById.get(id);
+                    if (!row) continue;
+                    const show = isNativeShown(li);
+                    row.style.display = show ? "grid" : "none";  	// ensure it paints
+                    if (show && !firstShownId) firstShownId = id;
+                    show ? shown++ : hidden++;
+                }
+
+                // If the grid itself is being hidden by theme/native, force it on.
+                const cs = getComputedStyle(grid);
+                if (cs.display === "none") grid.classList.add("bbmm-force-visible");
+
+                DL(`module-management | mirror(filter): shown=${shown}, hidden=${hidden}` +
+                (firstShownId ? `, first=${firstShownId}` : ``) +
+                `, gridDisplay=${getComputedStyle(grid).display}`);
+            };
+
+            // Try to patch SearchFilter.filter if/when it exists (best path)
+            const tryPatchSearchFilter = () => {
+                const sf = app?.searchFilter;
+                if (!sf || sf.__bbmmMirrorPatched) return false;
+                const origFilter = sf.filter.bind(sf);
+                sf.filter = (query, ...args) => {
+                    const r = origFilter(query, ...args);
+                    queueMicrotask(mirrorOnce);
+                    return r;
+                };
+                sf.__bbmmMirrorPatched = true;
+                DL("module-management | patched app.searchFilter.filter() to mirror results");
+                return true;
+            };
+            if (!tryPatchSearchFilter()) {
+                let attempts = 0;
+                const t = setInterval(() => { if (tryPatchSearchFilter() || ++attempts >= 10) clearInterval(t); }, 50);
+            }
+
+            // Delegated fallback: works even if a theme swaps the input element
+            if (!root.__bbmmDelegatedMirror) {
+                const schedule = () => requestAnimationFrame(() => requestAnimationFrame(mirrorOnce));
+                const onKeyOrInput = (ev) => {
+                    const target = ev.target;
+                    if (!(target instanceof HTMLInputElement)) return;
+                    // Foundry v13 uses name="search"
+                    if (target.name !== "search") return;
+                    schedule();
+                };
+                root.addEventListener("input", onKeyOrInput, true);
+                root.addEventListener("keyup", onKeyOrInput, true);
+                root.__bbmmDelegatedMirror = true;
+                DL("module-management | delegated mirror bound on window root");
+            }
+
+            // Also mirror when native list mutates (tabs, module toggles, etc.)
+            const mo = new MutationObserver(() => requestAnimationFrame(mirrorOnce));
+            mo.observe(menuEl, { attributes: true, attributeFilter: ["class","style","hidden"], subtree: true, childList: true });
+
+            // Initial mirror
+            requestAnimationFrame(mirrorOnce);
+        } catch (e) {
+            DL(2, "module-management | mirror patch failed", e);
+        }
+
+		DL(`module-management | injected compact grid with ${built} rows`);
+	} catch (err) {
+		DL(3, "module-management | renderModuleManagement(): error", err);
+	}
+});
+
+Hooks.on("setup", () => DL("module-management.js | setup fired"));
+Hooks.on("ready", () => DL("module-management.js | ready fired"));
+Hooks.once("init", () => {DL("module-management.js | init hook — file loaded");});

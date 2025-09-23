@@ -1,7 +1,7 @@
 {
     "id": "bbmm",
     "title": "Big Bad Module Manager",
-    "version": "0.3.3",
+    "version": "0.4.0",
     "authors": [
         {
             "name": "TheJoester",
@@ -23,6 +23,7 @@
         "scripts/exclusions.js",
         "scripts/inclusions.js",
         "scripts/setting-sync.js",
+        "scripts/module-management.js",
         "scripts/changelogs.js"
     ],
     "socket": true,
@@ -37,7 +38,7 @@
                 "ASSISTANT": "OWNER"
             }
         },
-		{
+        {
             "name": "bbmm-journal",
             "label": "BBMM Journal",
             "path": "packs/bbmm-journal",
@@ -74,7 +75,7 @@
     "description": "Utility to manage modules and settings.",
     "url": "https://github.com/thejoester/bbmm/",
     "manifest": "https://github.com/thejoester/bbmm/releases/latest/download/module.json",
-    "download": "https://github.com/thejoester/bbmm/releases/download/0.2.1/bbmm.zip",
+    "download": "https://github.com/thejoester/bbmm/releases/download/0.4.0/bbmm.zip",
     "readme": "https://github.com/thejoester/bbmm/blob/main/CHANGELOG.md",
     "bugs": "https://github.com/thejoester/bbmm/issues",
     "changelog": "https://github.com/thejoester/bbmm/blob/main/README.md"

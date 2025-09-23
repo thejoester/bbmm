@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-09-22
+### Added 
+- **Module Management:**
+  - Added enhanced module management
+    - Enable/Disable in settings (default: enabled).
+    - Added edit button, add notes to module. 
+    - If notes exist, when clicking on module in list will expand to show notes. 
+- **Controls Sync:**
+  - (these were added in 0.4.0 but was not included in notes)
+  - Lets a GM sync key binding settings to players. 
+  - Click: Sync to connected players.
+  - Shift+Click: Will put a "Soft-Lock" on the sync.
+### Fixed
+- **Inclusion Manager:** 
+  - Fixed bug not showing some settings. 
+- **Settings Sync:**
+  - Fixed bug when setting soft lock, users not logged in would not sync. 
+  - Fixed bug where lock/sync icons not showing for some user/client scoped settings.   
+  - Fixed bug when locking settings when no users setup it did not save
+  - Can now export/import sync and lock states
+- **Changelog Report:**
+  - fixed depriciation warning for `FilePicker` and `TextEditor`.
+### Changed
+- **Documentation:**
+  - Updated Journal Documentation
+
 ## [0.4.1] - 2025-09-17
 ### Fixed
 - included assets/ folder for images in journal. 
@@ -19,10 +45,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Macro to Inspect Setting Presets.
 - **Inclusion Manager:**
   - Added inclusion manager to include hidden settings in presets/inports/exports.
-- **Controls Sync**
-  - Lets a GM sync key binding settings to players. 
-  - Click: Sync to connected players.
-  - Shift+Click: Will put a "Soft-Lock" on the sync.
 ### Changed
 - **Settings Sync:**
   - Added click gesture detection on the lock icon:
