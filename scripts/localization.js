@@ -13,9 +13,11 @@ export const BBMM_ID = "bbmm";
 	L: localize a key (no placeholders)
 */
 export function L(key) {
-	// Debug
-	//DL("L(): start");
 	try {
+		// If translations not loaded yet, just return the key without warning
+		if (!game?.i18n?.translations || Object.keys(game.i18n.translations).length === 0) {
+			return key;
+		}
 		const s = game.i18n.localize(key);
 		if (s === key) DL(2, "L(): missing key", { key });
 		return s;
