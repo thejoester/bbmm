@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [0.5.1] - 2025-09-28
 ### Changed
 - **Localization:**
-  - Updated Itialian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
   - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
 ### Fixed
 - **Module Management:**
