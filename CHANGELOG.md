@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.5.1] - 2025-09-28
+### Changed
+- **Localization:**
+  - Updated Itialian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
 ### Fixed
 - **Module Management:**
   - fexed bug where "deactivate all modules" button was not functioning. 
