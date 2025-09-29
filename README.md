@@ -32,7 +32,7 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 I would like to extend a thanks to the following people for helping contribute to this module!
 
 ### Translations
-- French (fr): Retculo
+- French (fr): [Retculo](https://gitlocalize.com/users/rectulo)
 - Italian (it): [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+author%3AGregoryWarn)
 
 ## Contribute
