@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
 ### Fixed
 - **Module Management:**
-  - fexed bug where "deactivate all modules" button was not functioning. 
+  - fixed bug where "deactivate all modules" button was not functioning. 
 - **Module:**
   - suppressed false positive console errors about missing localization keys before localization was finished loading. 
 
