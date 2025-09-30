@@ -15,7 +15,7 @@ async function _bbmmRenderSavedNotesHTML(moduleId) {
 		const raw = _bbmmExtractEditorContent(all[moduleId] || "");
 		if (!raw) return "";
 
-		// Try to enrich (safe; NOT TextEditor.create)
+		// Try to enrich
 		try {
 			const html = await TextEditor.enrichHTML(raw, { async: true, secrets: false });
 			return html || raw;
@@ -43,31 +43,6 @@ function _bbmmExtractEditorContent(html) {
     } catch { return html || ""; }
 }
 
-/*	BBMM: set all BBMM module toggles, and mirror to native if linked */
-function _bbmmSetAllModuleToggles(root, state) {
-	try {
-		const grid = root?.querySelector(".bbmm-modlist");
-		if (!grid) return;
-		let count = 0;
-		grid.querySelectorAll('input.bbmm-toggle[type="checkbox"]').forEach(clone => {
-			if (typeof state === "boolean") {
-				if (clone.checked === state) return;
-				clone.checked = state;
-			}
-			const nativeCb = clone.bbmmNative;
-			if (nativeCb) {
-				if (typeof state === "boolean") nativeCb.checked = state;
-				// fire change so any native listeners react
-				nativeCb.dispatchEvent(new Event("change", { bubbles: true }));
-			}
-			count++;
-		});
-		DL(`module-management | _bbmmSetAllModuleToggles: ${typeof state === "boolean" ? (state ? "checked" : "unchecked") : "synced"} ${count} clone(s)`);
-	} catch (e) {
-		DL(2, "module-management | _bbmmSetAllModuleToggles failed", e);
-	}
-}
-
 /*	BBMM: copy native checkbox states → BBMM clones (no mass toggle) */
 function _bbmmSyncClonesFromNative(root) {
 	try {
@@ -83,6 +58,193 @@ function _bbmmSyncClonesFromNative(root) {
 	} catch (e) {
 		DL(2, "module-management | _bbmmSyncClonesFromNative failed", e);
 	}
+}
+
+async function _bbmmOpenNotesDialog(moduleId) {
+    try {
+        const KEY = "moduleNotes";
+        const allNotes = game.settings.get(BBMM_ID, KEY) || {};
+        const saved = typeof allNotes === "object" ? (allNotes[moduleId] || "") : "";
+        const seed = _bbmmExtractEditorContent(saved);
+
+        // bare content 
+        const content = document.createElement("div");
+
+        // build the form
+        const form = document.createElement("form");
+        form.className = "bbmm-notes-form";
+
+        // section with separators
+        const section = document.createElement("section");
+        section.className = "bbmm-notes-section";
+
+        // top rule
+        const hrTop = document.createElement("hr");
+        hrTop.className = "bbmm-hr";
+        section.appendChild(hrTop);
+
+        // header row (right-aligned heading)
+        const head = document.createElement("div");
+        head.className = "bbmm-notes-head";
+        const heading = document.createElement("h3");
+        heading.textContent = LT.modListNotesLabel();
+        heading.className = "bbmm-notes-title";
+        head.appendChild(heading);
+        section.appendChild(head);
+
+        // editor (full width)
+        const pm = foundry.applications.elements.HTMLProseMirrorElement.create({
+            name: "notes",
+            value: seed,
+            height: 200,
+            collaborate: false,
+            toggled: false,
+            aria: { label: "BBMM Notes" },
+            dataset: { bbmmId: moduleId }
+        });
+        section.appendChild(pm);
+
+        // bottom rule
+        const hrBot = document.createElement("hr");
+        hrBot.className = "bbmm-hr";
+        section.appendChild(hrBot);
+
+        // assemble
+        form.appendChild(section);
+        content.appendChild(form);
+
+        let dlgRef = null;
+        const TARGET_WIDTH = 800;
+        const TARGET_HEIGHT = 450;
+
+        // robust read: prefer live document; fallback to component APIs
+        const readFromProseMirror = async () => {
+            try {
+                const live =
+                    document.querySelector(`prose-mirror[data-bbmm-id="${moduleId}"]`) ||
+                    dlgRef?.element?.querySelector?.(`prose-mirror[data-bbmm-id="${moduleId}"]`) ||
+                    dlgRef?.element?.querySelector?.('prose-mirror[name="notes"]');
+
+                if (!live) { DL(2, `module-management | <prose-mirror> not found for read (id=${moduleId})`); return ""; }
+
+                const doc = live.shadowRoot?.querySelector?.(".ProseMirror");
+                if (doc?.innerHTML) {
+                    const s = doc.innerHTML.trim();
+                    DL(`module-management | read via shadow .ProseMirror (content-only): ${s.length} chars`);
+                    return s;
+                }
+                if (typeof live.getHTML === "function") {
+                    const a = await live.getHTML();
+                    const s = _bbmmExtractEditorContent(a || "");
+                    DL(`module-management | read via pm.getHTML() ⇒ content-only: ${s.length} chars`);
+                    return s;
+                }
+                const b = _bbmmExtractEditorContent(live.value ?? "");
+                if (b) {
+                    DL(`module-management | read via pm.value ⇒ content-only: ${b.length} chars`);
+                    return b;
+                }
+                DL("module-management | readFromProseMirror(): empty");
+                return "";
+            } catch (e) {
+                DL(2, "module-management | readFromProseMirror(): error", e);
+                return "";
+            }
+        };
+
+        const dlg = new foundry.applications.api.DialogV2({
+            id: `bbmm-notes-${moduleId}`,
+            modal: false,
+            window: {
+                title: LT.modListEditTitle({ id: moduleId }),
+                icon: "fa-solid fa-pen-to-square",
+                resizable: false
+            },
+            content,
+            render: (app) => {
+                dlgRef = app;
+
+                // helper: center using constants 
+                const _bbmmCenter = () => {
+                    try {
+                        const left = Math.max((window.innerWidth  - TARGET_WIDTH)  / 2, 0);
+                        const top  = Math.max((window.innerHeight - TARGET_HEIGHT) / 2, 0);
+                        app.setPosition({ width: TARGET_WIDTH, height: TARGET_HEIGHT, left, top });
+                    } catch (e) {
+                        DL(2, "module-management | _bbmmCenter(): error", e);
+                    }
+                };
+
+                try {
+                    const el = app.element;
+
+                    // defeat theme clamps + pin dimensions
+                    el.style.maxWidth = "none";
+                    el.style.width = `${TARGET_WIDTH}px`;
+                    el.style.minWidth = `${TARGET_WIDTH}px`;
+                    el.style.height = `${TARGET_HEIGHT}px`;
+
+                    // initial center
+                    _bbmmCenter();
+                    requestAnimationFrame(() => requestAnimationFrame(_bbmmCenter));
+
+                    // one-shot: if the element changes size once after paint, recenter then disconnect
+                    const ro = new ResizeObserver(() => {
+                        ro.disconnect();
+                        _bbmmCenter();
+                    });
+                    ro.observe(el);
+                } catch (e) {
+                    DL(2, "module-management | render(): sizing error", e);
+                }
+            },
+            buttons: [
+                { action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark" },
+                {
+                    action: "save",
+                    label: LT.buttons.save(),
+                    icon: "fa-solid fa-floppy-disk",
+                    default: true,
+                    callback: async () => {
+                        const raw = await readFromProseMirror();  // content-only
+                        let html = raw ?? "";
+
+                        // Strip trailing spaces/newlines
+                        html = html.replace(/\s+$/, "");
+
+                        // Remove trailing empty <p> / <div> blocks
+                        html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
+
+                        const notes = foundry.utils.duplicate(game.settings.get(BBMM_ID, KEY) || {});
+                        notes[moduleId] = html;
+                        await game.settings.set(BBMM_ID, KEY, notes);
+
+                        ui.notifications.info(game.i18n.localize(LT.modListNotesSaved()));
+                        DL("module-management | saved notes for " + moduleId, { length: html.length });
+                    }
+                }
+            ]
+        });
+
+        await dlg.render(true);
+        // assert width again after paint
+        try {
+            const el = dlg.element;
+            el.style.maxWidth = "none";
+            el.style.width = `${TARGET_WIDTH}px`;
+            el.style.minWidth = `${TARGET_WIDTH}px`;
+            el.style.height = `${TARGET_HEIGHT}px`;
+
+            const left = Math.max((window.innerWidth  - TARGET_WIDTH)  / 2, 0);
+            const top  = Math.max((window.innerHeight - TARGET_HEIGHT) / 2, 0);
+            dlg.setPosition({ width: TARGET_WIDTH, height: TARGET_HEIGHT, left, top });
+        } catch (e) {
+            DL(2, "module-management | post-render sizing error", e);
+        }
+        DL("module-management | opened notes dialog (V2) for " + moduleId);
+    } catch (err) {
+        DL(3, "module-management | _bbmmOpenNotesDialog(DialogV2): error", err);
+    }
 }
 
 /*	build one compact row from an existing <li> */
@@ -189,13 +351,13 @@ function _bbmmBuildModRow(li) {
 
 		row.appendChild(colRight);
 
-		// ── BBMM notes preview panel (starts collapsed) ───────────────────────
+		// BBMM notes preview panel (starts collapsed) 
 		const notesPanel = document.createElement("div");
 		notesPanel.className = "bbmm-notes-panel";
 		notesPanel.innerHTML = `<div class="bbmm-notes-empty"></div>`;
 		row.appendChild(notesPanel);
 
-		// ── Expand/Collapse on row click (not selection) ──────────────────────
+		// Expand/Collapse on row click
 		row.addEventListener("click", async (ev) => {
 			
             // ignore clicks on interactive controls and inside notes panel
@@ -224,193 +386,6 @@ function _bbmmBuildModRow(li) {
 		DL(3, "module-management | _bbmmBuildModRow(): failed", err);
 		return null;
 	}
-}
-
-async function _bbmmOpenNotesDialog(moduleId) {
-    try {
-        const KEY = "moduleNotes";
-        const allNotes = game.settings.get(BBMM_ID, KEY) || {};
-        const saved = typeof allNotes === "object" ? (allNotes[moduleId] || "") : "";
-        const seed = _bbmmExtractEditorContent(saved);
-
-        // bare content <div> per DialogV2 rules
-        const content = document.createElement("div");
-
-        // build the form
-        const form = document.createElement("form");
-        form.className = "bbmm-notes-form";
-
-        // section with separators
-        const section = document.createElement("section");
-        section.className = "bbmm-notes-section";
-
-        // top rule
-        const hrTop = document.createElement("hr");
-        hrTop.className = "bbmm-hr";
-        section.appendChild(hrTop);
-
-        // header row (right-aligned heading)
-        const head = document.createElement("div");
-        head.className = "bbmm-notes-head";
-        const heading = document.createElement("h3");
-        heading.textContent = LT.modListNotesLabel();
-        heading.className = "bbmm-notes-title";
-        head.appendChild(heading);
-        section.appendChild(head);
-
-        // editor (full width)
-        const pm = foundry.applications.elements.HTMLProseMirrorElement.create({
-            name: "notes",
-            value: seed,
-            height: 200,
-            collaborate: false,
-            toggled: false,
-            aria: { label: "BBMM Notes" },
-            dataset: { bbmmId: moduleId }
-        });
-        section.appendChild(pm);
-
-        // bottom rule
-        const hrBot = document.createElement("hr");
-        hrBot.className = "bbmm-hr";
-        section.appendChild(hrBot);
-
-        // assemble
-        form.appendChild(section);
-        content.appendChild(form);
-
-        let dlgRef = null;
-        const TARGET_WIDTH = 800;
-        const TARGET_HEIGHT = 450;
-
-        // robust read: prefer live document; fallback to component APIs
-        const readFromProseMirror = async () => {
-            try {
-                const live =
-                    document.querySelector(`prose-mirror[data-bbmm-id="${moduleId}"]`) ||
-                    dlgRef?.element?.querySelector?.(`prose-mirror[data-bbmm-id="${moduleId}"]`) ||
-                    dlgRef?.element?.querySelector?.('prose-mirror[name="notes"]');
-
-                if (!live) { DL(2, `module-management | <prose-mirror> not found for read (id=${moduleId})`); return ""; }
-
-                const doc = live.shadowRoot?.querySelector?.(".ProseMirror");
-                if (doc?.innerHTML) {
-                    const s = doc.innerHTML.trim();
-                    DL(`module-management | read via shadow .ProseMirror (content-only): ${s.length} chars`);
-                    return s;
-                }
-                if (typeof live.getHTML === "function") {
-                    const a = await live.getHTML();
-                    const s = _bbmmExtractEditorContent(a || "");
-                    DL(`module-management | read via pm.getHTML() ⇒ content-only: ${s.length} chars`);
-                    return s;
-                }
-                const b = _bbmmExtractEditorContent(live.value ?? "");
-                if (b) {
-                    DL(`module-management | read via pm.value ⇒ content-only: ${b.length} chars`);
-                    return b;
-                }
-                DL("module-management | readFromProseMirror(): empty");
-                return "";
-            } catch (e) {
-                DL(2, "module-management | readFromProseMirror(): error", e);
-                return "";
-            }
-        };
-
-        const dlg = new foundry.applications.api.DialogV2({
-            id: `bbmm-notes-${moduleId}`,
-            modal: false,
-            window: {
-                title: LT.modListEditTitle({ id: moduleId }),
-                icon: "fa-solid fa-pen-to-square",
-                resizable: false
-            },
-            content,
-            render: (app) => {
-                dlgRef = app;
-
-                // helper: center using constants (no center())
-                const _bbmmCenter = () => {
-                    try {
-                        const left = Math.max((window.innerWidth  - TARGET_WIDTH)  / 2, 0);
-                        const top  = Math.max((window.innerHeight - TARGET_HEIGHT) / 2, 0);
-                        app.setPosition({ width: TARGET_WIDTH, height: TARGET_HEIGHT, left, top });
-                    } catch (e) {
-                        DL(2, "module-management | _bbmmCenter(): error", e);
-                    }
-                };
-
-                try {
-                    const el = app.element;
-
-                    // defeat theme clamps + pin dimensions
-                    el.style.maxWidth = "none";
-                    el.style.width = `${TARGET_WIDTH}px`;
-                    el.style.minWidth = `${TARGET_WIDTH}px`;
-                    el.style.height = `${TARGET_HEIGHT}px`;
-
-                    // initial center
-                    _bbmmCenter();
-                    requestAnimationFrame(() => requestAnimationFrame(_bbmmCenter));
-
-                    // one-shot: if the element changes size once after paint, recenter then disconnect
-                    const ro = new ResizeObserver(() => {
-                        ro.disconnect();
-                        _bbmmCenter();
-                    });
-                    ro.observe(el);
-                } catch (e) {
-                    DL(2, "module-management | render(): sizing error", e);
-                }
-            },
-            buttons: [
-                { action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark" },
-                {
-                    action: "save",
-                    label: LT.buttons.save(),
-                    icon: "fa-solid fa-floppy-disk",
-                    default: true,
-                    callback: async () => {
-                        const raw = await readFromProseMirror();  // content-only
-                        let html = raw ?? "";
-
-                        // Strip trailing spaces/newlines
-                        html = html.replace(/\s+$/, "");
-
-                        // Remove trailing empty <p> / <div> blocks
-                        html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
-
-                        const notes = foundry.utils.duplicate(game.settings.get(BBMM_ID, KEY) || {});
-                        notes[moduleId] = html;
-                        await game.settings.set(BBMM_ID, KEY, notes);
-
-                        ui.notifications.info(game.i18n.localize(LT.modListNotesSaved()));
-                        DL("module-management | saved notes for " + moduleId, { length: html.length });
-                    }
-                }
-            ]
-        });
-
-        await dlg.render(true);
-        // assert width again after paint
-        try {
-            const el = dlg.element;
-            el.style.maxWidth = "none";
-            el.style.width = `${TARGET_WIDTH}px`;
-            el.style.minWidth = `${TARGET_WIDTH}px`;
-            el.style.height = `${TARGET_HEIGHT}px`;
-
-            const left = Math.max((window.innerWidth  - TARGET_WIDTH)  / 2, 0);
-            const top  = Math.max((window.innerHeight - TARGET_HEIGHT) / 2, 0);
-            dlg.setPosition({ width: TARGET_WIDTH, height: TARGET_HEIGHT, left, top });
-        } catch (e) {
-            DL(2, "module-management | post-render sizing error", e);
-        }
-        DL("module-management | opened notes dialog (V2) for " + moduleId);
-    } catch (err) {
-        DL(3, "module-management | _bbmmOpenNotesDialog(DialogV2): error", err);
-    }
 }
 
 /*	render hook */
@@ -486,7 +461,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 			if (row) {
 				grid.appendChild(row);
 				li.dataset.bbmmTransformed = "1";
-				li.classList.add("bbmm-hidden-source"); // visually hide but keep display semantics
+				li.classList.add("bbmm-hidden-source");	// visually hide but keep display semantics
 				built++;
 			}
 		}
@@ -589,7 +564,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 			mo.observe(menuEl, { attributes: true, attributeFilter: ["class","style","hidden"], subtree: true, childList: true });
 			requestAnimationFrame(mirrorOnce);
 
-			/* Bulk button integration: mirror core actions to BBMM clones (no native change events) */
+			// Bulk button integration: mirror core actions to BBMM clones
 			try {
 				if (!root.dataset.bbmmBulkBound) {
 					const handler = (ev) => {
@@ -607,8 +582,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 
 						if (!isBulk) return;
 
-						// Let core flip NATIVE checkboxes silently; then we only mirror NATIVE → BBMM clones.
-						// Important: DO NOT dispatch change on natives here to avoid dependency prompts.
+						// Let core flip NATIVE checkboxes silently; then mirror NATIVE → BBMM clones.
 						queueMicrotask(() => _bbmmSyncClonesFromNative(root));
 						setTimeout(() => _bbmmSyncClonesFromNative(root), 60);
 						setTimeout(() => _bbmmSyncClonesFromNative(root), 200);
@@ -624,6 +598,63 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				DL(2, "module-management | bulk button wiring failed", e);
 			}
 
+			/* ===== Dependency dialog & native mutations → resync BBMM ===== */
+			try {
+				// Observe native menu for any attribute/child changes
+				if (!menuEl.__bbmmSyncMo) {
+					const mo2 = new MutationObserver(() => {
+						requestAnimationFrame(() => _bbmmSyncClonesFromNative(root));
+					});
+					mo2.observe(menuEl, { attributes: true, subtree: true, childList: true });
+					menuEl.__bbmmSyncMo = mo2;
+					DL("module-management | mutation observer bound for native→BBMM sync");
+				}
+
+				// After ANY DialogV2 renders or closes, resync 
+				if (!window.__bbmmDialogSyncBound) {
+					try {
+						Hooks.on?.("closeDialogV2", () => {
+							setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
+							setTimeout(() => _bbmmSyncClonesFromNative(root), 100);
+							setTimeout(() => _bbmmSyncClonesFromNative(root), 200);
+						});
+						Hooks.on?.("renderDialogV2", (dlgApp, el) => {
+							// Also catch button presses inside the dialog
+							el.addEventListener("click", (ev) => {
+								if (ev.target.closest('button,[type="submit"]')) {
+									setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
+									setTimeout(() => _bbmmSyncClonesFromNative(root), 100);
+								}
+							}, true);
+						});
+					} catch {}
+
+					// Fallback: capture clicks within any V2 dialog container
+					document.addEventListener("click", (ev) => {
+						const dlg = ev.target.closest('.app-v2[data-application="dialogv2"], .dialog-v2, .dialog');
+						if (!dlg) return;
+						if (ev.target.closest('button,[type="submit"]')) {
+							setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
+							setTimeout(() => _bbmmSyncClonesFromNative(root), 120);
+						}
+					}, true);
+
+					window.__bbmmDialogSyncBound = true;
+					DL("module-management | dialog sync bound (DialogV2 close/render/click)");
+				}
+
+				// Also resync when the form element fires change 
+				const formEl = root.querySelector('form.package-list') || root.querySelector('form[method="post"]');
+				if (formEl && !formEl.__bbmmChangeSync) {
+					formEl.addEventListener("change", () => {
+						queueMicrotask(() => _bbmmSyncClonesFromNative(root));
+					});
+					formEl.__bbmmChangeSync = "1";
+				}
+			} catch (e) {
+				DL(2, "module-management | dependency resync wiring failed", e);
+			}
+
 		} catch (e) {
 			DL(2, "module-management | mirror patch failed", e);
 		}
@@ -633,7 +664,6 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		DL(3, "module-management | renderModuleManagement(): error", err);
 	}
 });
-
 
 Hooks.on("setup", () => DL("module-management.js | setup fired"));
 Hooks.on("ready", () => DL("module-management.js | ready fired"));
