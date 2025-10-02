@@ -25,7 +25,7 @@ function _bbmmModuleHasConfigSettings(modId) {
 }
 
 /* 	Open the Configure Settings sheet and focus the specific module tab. */
-async function _bbmmOpenModuleSettingsTab(modId) {
+async function _bbmmOpenModuleSettingsTab(modId) {	
 	try {
 		const mod = game.modules.get(modId);
 		if (!mod) {
@@ -77,7 +77,7 @@ function _bbmmCreateSettingsGear(modId) {
 	const btn = document.createElement("button");
 	btn.type = "button";
 	btn.className = "bbmm-settings tag flexrow";
-	btn.setAttribute("aria-label", LT.modListOpenSettings());
+	btn.setAttribute("aria-label", LT.openSettings());
 	btn.setAttribute("data-bbmm-action", "open-settings");
 	btn.setAttribute("data-mod-id", modId);
 	btn.innerHTML = `<i class="fa-solid fa-gear fa-fw"></i>`;
@@ -89,6 +89,7 @@ function _bbmmCreateSettingsGear(modId) {
 	return btn;
 }
 
+/* Render saved notes HTML for display in the expanded panel */
 async function _bbmmRenderSavedNotesHTML(moduleId) {
 	try {
 		const KEY = "moduleNotes";
@@ -110,7 +111,7 @@ async function _bbmmRenderSavedNotesHTML(moduleId) {
 	}
 }
 
-// Extract just the editor content HTML from whatever we have saved
+/* Extract just the editor content HTML from whatever we have saved */
 function _bbmmExtractEditorContent(html) {
     try {
         if (!html) return "";
@@ -124,7 +125,7 @@ function _bbmmExtractEditorContent(html) {
     } catch { return html || ""; }
 }
 
-/*	BBMM: copy native checkbox states → BBMM clones (no mass toggle) */
+/* copy native checkbox states → BBMM clones (no mass toggle) */
 function _bbmmSyncClonesFromNative(root) {
 	try {
 		const natives = root.querySelectorAll('label.package-title input[type="checkbox"]');
@@ -141,6 +142,7 @@ function _bbmmSyncClonesFromNative(root) {
 	}
 }
 
+/* Open the notes editor dialog for a specific module */
 async function _bbmmOpenNotesDialog(moduleId) {
     try {
         const KEY = "moduleNotes";
@@ -418,7 +420,7 @@ function _bbmmBuildModRow(li) {
 			}
 			colRight.appendChild(frag);
 		}
-		// settings gear button
+		// settings gear (if applicable)
 		try {
 			if (_bbmmModuleHasConfigSettings(pkgId)) {
 				const gearBtn = _bbmmCreateSettingsGear(pkgId);
@@ -430,7 +432,7 @@ function _bbmmBuildModRow(li) {
 		} catch (e) {
 			DL(2, `module-management | settings gear inject failed for ${pkgId}`, e);
 		}
-		// Edit button
+		// Edit notes button
 		const editBtn = document.createElement("button");
 		editBtn.type = "button";
 		editBtn.className = "bbmm-edit tag flexrow";
@@ -444,13 +446,13 @@ function _bbmmBuildModRow(li) {
 
 		row.appendChild(colRight);
 
-		// BBMM notes preview panel (starts collapsed) 
+		// notes panel (initially collapsed)
 		const notesPanel = document.createElement("div");
 		notesPanel.className = "bbmm-notes-panel";
 		notesPanel.innerHTML = `<div class="bbmm-notes-empty"></div>`;
 		row.appendChild(notesPanel);
 
-		// Expand/Collapse on row click
+		// expand/collapse on row click (not on interactive controls)
 		row.addEventListener("click", async (ev) => {
 			
             // ignore clicks on interactive controls and inside notes panel
@@ -491,7 +493,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 			return;
 		}
 
-		// Guard static SearchFilter methods — tolerate undefined query
+		// Patch static SearchFilter methods to be more robust
 		try {
 			if (!SearchFilter.__bbmmPatched) {
 				const origClean = SearchFilter.cleanQuery;
@@ -515,7 +517,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		} catch (e) {
 			DL(2, "module-management | failed to patch static SearchFilter", e);
 		}
-
+		// Find the root element
 		const root = (rootEl instanceof HTMLElement) ? rootEl : (app?.element ?? null);
 		if (!root) {
 			DL(2, "module-management | renderModuleManagement(): root element missing");
@@ -524,7 +526,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		root.classList.add("bbmm-modmgmt");
 
 		DL("module-management | renderModuleManagement(): init (v13)");
-
+		// Find the <menu> or .package-list container
 		const list =
 			root.querySelector("menu.package-list.scrollable") ||
 			root.querySelector("menu.package-list") ||
