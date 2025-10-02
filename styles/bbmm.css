@@ -397,6 +397,31 @@
 	overflow: auto;
 }
 
+/* Settings gear chip aligns with your tag+flexrow buttons */
+.bbmm-col-right .bbmm-settings {
+	padding: 0 6px;
+	gap: 4px;
+}
+/* Remove button outline for settings gear so it looks like a plain icon */
+.bbmm-col-right .bbmm-settings {
+	all: unset;                /* reset button defaults */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.bbmm-col-right .bbmm-settings i {
+	font-size: 13px;
+	color: var(--color-text-light-primary);
+	opacity: 0.9;
+}
+
+.bbmm-col-right .bbmm-settings:hover i {
+	opacity: 1;
+	color: var(--color-text-hyperlink);
+}
+
 /* ==========================================================================
 	BBMM: Module Notes dialog
 =========================================================================== */

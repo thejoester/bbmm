@@ -35,7 +35,6 @@
 		"settings": "settings",
 		"myPreset": "My Preset",
 		"incDisabledModules": "Include disabled modules",
-
 		"titleImportIssues": "Import Check — Issues Detected",
 		"descImportIssues": "The imported preset was saved, but the following issues were found",
 		"importNamePrompt": "Please enter a preset name",
@@ -43,7 +42,6 @@
 		"promptWhatImport": "What would you like to import",
 		"importComplete": "Import complete",
 		"exportNamePrompt": "Please enter an export name",
-
 		"modulePresetMgr": "Module Preset Manager",
 		"titleModulesNotInstalled": "Modules not installed",
 		"descModulesNotInstalled": "Module not installed",
@@ -161,7 +159,6 @@
 		"lblOpenControlsPresets": "Open Controls Preset Manager",
 		"titleControlsPresets": "BBMM Controls Presets",
 		"lockNoneTip": "Lock Player settings",
-
 		"controlsToggleName": "Enable Control (Keybinding) Sync",
 		"controlsToggleHint": "If enabled, the GM can lock or soft-lock keybindings and push them to connected players.",
 		"controlsTtHard": "Hard lock this keybinding for all users (apply exactly; users cannot change).",
@@ -176,25 +173,27 @@
 		"keybindColorScopesHint": "If enabled: world keybinds are blue; client keybinds are orange; user keybinds remain default.",
 		"keybindScopeWorldTip": "Scope: World (blue)",
 		"keybindScopeClientTip": "Scope: Client (orange)",
-		
 		"enableModuleManagementName": "Enable enhanced module management",
 		"enableModuleManagementHint": "When enabled, BBMM replaces the stock Manage Modules list with the compact layout and notes UI for all users. Only a GM can change this.",
 		"modListEditNotes": "Edit Notes",
 		"modListEditTitle": "Notes – {id}",
 		"modListNotesLabel": "Module Notes",
 		"modListNotesSaved": "Notes saved.",
-
 		"aboutName": "About BBMM",
 		"aboutHint": "Open the About BBMM journal entry.",
 		"aboutOpenMissing": "About BBMM journal entry not found.",
 		"aboutOpenError": "Failed to open the About BBMM journal.",
-		
 		"v12Note": "This module offers minimal support for FoundryVTT v12, allowing you to export settings and module states as prep for updating to v13.<br><strong>NOTE:</strong> Some settings may not transfer if the v13 module setting has changed.",
 		"titlev12Legacy": "BBMM: Legacy (v12) Export",
 		"exportedv12Settings": "Exported v12 settings to .json",
 		"exportedv12Modules": "Exported v12 module states to .json",
 		"titlePresetPreview": "Preset changes preview",
 		"noteSaveBeforeLoad": "Tip: Save your current settings before loading a different preset to avoid losing changes",
+		"openSettings": "Open Settings",
+		"openReadme": "Open Readme",
+		"openChangelog": "Open Changelog",
+		"openedSettingsFor": "Opened settings for {title}.",
+		"noSettingsFoundFor": "No configurable settings for {title}.",
 		
 		"buttons": {
 			"yes": "Yes",

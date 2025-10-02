@@ -8,6 +8,87 @@
 import { DL } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 
+/* Return true if the module has at least one configurable setting (config === true). */
+function _bbmmModuleHasConfigSettings(modId) {
+	try {
+		if (!modId) return false;
+		for (const [fullKey, cfg] of game.settings.settings) {
+			// keys look like "<moduleId>.<settingKey>"
+			if (!fullKey?.startsWith(`${modId}.`)) continue;
+			if (cfg?.config === true) return true;
+		}
+		return false;
+	} catch (err) {
+		DL(3, `_bbmmModuleHasConfigSettings(): error for ${modId}`, err);
+		return false;
+	}
+}
+
+/* 	Open the Configure Settings sheet and focus the specific module tab. */
+async function _bbmmOpenModuleSettingsTab(modId) {
+	try {
+		const mod = game.modules.get(modId);
+		if (!mod) {
+			DL(2, `_bbmmOpenModuleSettingsTab(): module not found ${modId}`);
+			return;
+		}
+		if (!_bbmmModuleHasConfigSettings(modId)) {
+			ui.notifications.warn(LT.noSettingsFoundFor({ title: mod.title ?? modId }));
+			DL(2, `_bbmmOpenModuleSettingsTab(): no configurable settings for ${modId}`);
+			return;
+		}
+
+		const app = new SettingsConfig();
+
+		// Render and then poll the global document for the tab button (matches your macro)
+		app.render(true);
+
+		// Poll up to ~600ms (12 * 50ms) for the tab button to exist, then click it.
+		let tries = 12;
+		const tryFocus = () => {
+			try {
+				const btn = document.querySelector(`.tabs button[data-tab="${modId}"]`);
+				if (btn) {
+					btn.click();
+					ui.notifications.info(LT.openedSettingsFor({ title: mod.title ?? modId }));
+					DL(`_bbmmOpenModuleSettingsTab(): focused settings for ${modId}`);
+					return;
+				}
+			} catch (e) {
+				DL(2, `_bbmmOpenModuleSettingsTab(): tab lookup error for ${modId}`, e);
+			}
+			if (--tries > 0) {
+				setTimeout(tryFocus, 50);
+			} else {
+				ui.notifications.warn(LT.noSettingsFoundFor({ title: mod.title ?? modId }));
+				DL(2, `_bbmmOpenModuleSettingsTab(): tab button not found for ${modId} after polling`);
+			}
+		};
+
+		// Small initial delay to match your macro behavior
+		setTimeout(tryFocus, 300);
+	} catch (err) {
+		DL(3, "_bbmmOpenModuleSettingsTab(): error", err);
+	}
+}
+
+/* Create the small gear button for a module row. */
+function _bbmmCreateSettingsGear(modId) {
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "bbmm-settings tag flexrow";
+	btn.setAttribute("aria-label", LT.modListOpenSettings());
+	btn.setAttribute("data-bbmm-action", "open-settings");
+	btn.setAttribute("data-mod-id", modId);
+	btn.innerHTML = `<i class="fa-solid fa-gear fa-fw"></i>`;
+	btn.addEventListener("click", (ev) => {
+		ev.preventDefault();
+		ev.stopPropagation();
+		_bbmmOpenModuleSettingsTab(modId);
+	});
+	return btn;
+}
+
 async function _bbmmRenderSavedNotesHTML(moduleId) {
 	try {
 		const KEY = "moduleNotes";
@@ -337,7 +418,19 @@ function _bbmmBuildModRow(li) {
 			}
 			colRight.appendChild(frag);
 		}
-
+		// settings gear button
+		try {
+			if (_bbmmModuleHasConfigSettings(pkgId)) {
+				const gearBtn = _bbmmCreateSettingsGear(pkgId);
+				colRight.prepend(gearBtn); // ensure left-most
+				DL(`module-management | settings gear added for ${pkgId}`);
+			} else {
+				DL(`module-management | no config settings for ${pkgId}`);
+			}
+		} catch (e) {
+			DL(2, `module-management | settings gear inject failed for ${pkgId}`, e);
+		}
+		// Edit button
 		const editBtn = document.createElement("button");
 		editBtn.type = "button";
 		editBtn.className = "bbmm-edit tag flexrow";
