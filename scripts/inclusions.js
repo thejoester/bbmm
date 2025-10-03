@@ -679,13 +679,13 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					`;
 					// Enrich so the <a class="content-link" data-uuid="..."> opens the sheet when clicked
 					const contentHtml = await TextEditor.enrichHTML(raw, { async: true });
-
+					
 					const ok = await foundry.applications.api.DialogV2.confirm({
 						window: { title: game.i18n.localize("bbmm.inclusions.addModuleWarnTitle") || "Include Entire Module?" },
 						content: contentHtml,
 						defaultYes: false,
-						ok: { label: game.i18n.localize("bbmm.buttons.yes") },   // already in your en.json
-						cancel: { label: game.i18n.localize("bbmm.buttons.no") } // already in your en.json
+						ok: { label: game.i18n.localize("bbmm.buttons.yes") }, 
+						cancel: { label: game.i18n.localize("bbmm.buttons.no") } 
 					});
 					DL(`inclusions.js | Manager: add-module confirm -> ${ok ? "YES" : "NO"}`);
 

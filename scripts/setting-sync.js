@@ -39,7 +39,7 @@ import { LT, BBMM_ID } from "./localization.js";
 			// Coerce a value to the registered setting type so set() actually flips it
 			const normalizeValue = (cfg, v) => {
 				try {
-					// Foundry V13 uses cfg.type or cfg.choices/Range components
+					// If no type, return as-is
 					const T = cfg?.type;
 					if (T === Boolean || T === "Boolean") {
 						if (typeof v === "string") return v === "true";

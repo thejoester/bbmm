@@ -40,7 +40,7 @@ async function _bbmmOpenModuleSettingsTab(modId) {
 
 		const app = new SettingsConfig();
 
-		// Render and then poll the global document for the tab button (matches your macro)
+		// Render and then poll the global document for the tab button
 		app.render(true);
 
 		// Poll up to ~600ms (12 * 50ms) for the tab button to exist, then click it.
@@ -65,7 +65,7 @@ async function _bbmmOpenModuleSettingsTab(modId) {
 			}
 		};
 
-		// Small initial delay to match your macro behavior
+		// Small initial delay
 		setTimeout(tryFocus, 300);
 	} catch (err) {
 		DL(3, "_bbmmOpenModuleSettingsTab(): error", err);
@@ -125,7 +125,7 @@ function _bbmmExtractEditorContent(html) {
     } catch { return html || ""; }
 }
 
-/* copy native checkbox states → BBMM clones (no mass toggle) */
+/* copy native checkbox states → BBMM clones */
 function _bbmmSyncClonesFromNative(root) {
 	try {
 		const natives = root.querySelectorAll('label.package-title input[type="checkbox"]');
@@ -302,7 +302,7 @@ async function _bbmmOpenNotesDialog(moduleId) {
                         notes[moduleId] = html;
                         await game.settings.set(BBMM_ID, KEY, notes);
 
-                        ui.notifications.info(game.i18n.localize(LT.modListNotesSaved()));
+                        ui.notifications.info(LT.modListNotesSaved());
                         DL("module-management | saved notes for " + moduleId, { length: html.length });
                     }
                 }
@@ -452,7 +452,7 @@ function _bbmmBuildModRow(li) {
 		notesPanel.innerHTML = `<div class="bbmm-notes-empty"></div>`;
 		row.appendChild(notesPanel);
 
-		// expand/collapse on row click (not on interactive controls)
+		// expand/collapse on row click 
 		row.addEventListener("click", async (ev) => {
 			
             // ignore clicks on interactive controls and inside notes panel
@@ -525,7 +525,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		}
 		root.classList.add("bbmm-modmgmt");
 
-		DL("module-management | renderModuleManagement(): init (v13)");
+		DL("module-management | renderModuleManagement(): initiated");
 		// Find the <menu> or .package-list container
 		const list =
 			root.querySelector("menu.package-list.scrollable") ||
@@ -622,7 +622,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 					(firstShownId ? `, first=${firstShownId}` : ``) +
 					`, gridDisplay=${getComputedStyle(grid).display}`);
 			};
-
+			// Try to patch the app's SearchFilter.filter() method to catch searches
 			const tryPatchSearchFilter = () => {
 				const sf = app?.searchFilter;
 				if (!sf || sf.__bbmmMirrorPatched) return false;
@@ -636,11 +636,12 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				DL("module-management | patched app.searchFilter.filter() to mirror results");
 				return true;
 			};
+			// Try once now, then poll a few times in case the SearchFilter isn't ready yet
 			if (!tryPatchSearchFilter()) {
 				let attempts = 0;
 				const t = setInterval(() => { if (tryPatchSearchFilter() || ++attempts >= 10) clearInterval(t); }, 50);
 			}
-
+			
 			if (!root.__bbmmDelegatedMirror) {
 				const schedule = () => requestAnimationFrame(() => requestAnimationFrame(mirrorOnce));
 				const onKeyOrInput = (ev) => {
@@ -654,7 +655,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				root.__bbmmDelegatedMirror = true;
 				DL("module-management | delegated mirror bound on window root");
 			}
-
+			// Observe the native menu for any attribute/child changes that might affect visibility
 			const mo = new MutationObserver(() => requestAnimationFrame(mirrorOnce));
 			mo.observe(menuEl, { attributes: true, attributeFilter: ["class","style","hidden"], subtree: true, childList: true });
 			requestAnimationFrame(mirrorOnce);
@@ -666,7 +667,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 						const btn = ev.target.closest("button");
 						if (!btn) return;
 
-						// Prefer data-action if Foundry exposes it (v13)
+						// Prefer data-action if Foundry exposes it
 						const act = (btn.dataset?.action || "").toLowerCase();
 						// Fallback to label text (English)
 						const label = (btn.textContent || btn.ariaLabel || "").trim().toLowerCase();
@@ -693,7 +694,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				DL(2, "module-management | bulk button wiring failed", e);
 			}
 
-			/* ===== Dependency dialog & native mutations → resync BBMM ===== */
+			// Observe the native menu for changes that might affect checkbox states
 			try {
 				// Observe native menu for any attribute/child changes
 				if (!menuEl.__bbmmSyncMo) {
@@ -749,11 +750,9 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 			} catch (e) {
 				DL(2, "module-management | dependency resync wiring failed", e);
 			}
-
 		} catch (e) {
 			DL(2, "module-management | mirror patch failed", e);
 		}
-
 		DL(`module-management | injected compact grid with ${built} rows`);
 	} catch (err) {
 		DL(3, "module-management | renderModuleManagement(): error", err);

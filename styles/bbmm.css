@@ -397,7 +397,9 @@
 	overflow: auto;
 }
 
-/* Settings gear chip aligns with your tag+flexrow buttons */
+/* ==========================================================================
+	BBMM: Settings gear icon in Manage Modules
+=========================================================================== */
 .bbmm-col-right .bbmm-settings {
 	padding: 0 6px;
 	gap: 4px;
@@ -497,7 +499,7 @@
 	margin-top: 6px;        /* was ~12–16px in many themes */
 }
 
-/* Optional: reduce window-content padding-bottom if your theme adds a lot */
+/* ensure the window content has a bit of padding below the form */
 .window-app:has(#bbmm-notes-*) .window-content {
 	padding-bottom: 6px;
 }

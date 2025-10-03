@@ -396,12 +396,7 @@ function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden =
 	return out;
 }
 
-/* 	
-	Apply settings export (bbmm-settings).
-	- GM applies world + client; non‑GM applies client only
-	- Skips namespaces where module not installed (collects report)
-	- Always reloads after apply (per your requirement)
-*/
+// Prompt for a local JSON file and parse it
 async function svc_applySettingsExport(exportData) {
 	// Validate envelope
 	if (!exportData || exportData.type !== "bbmm-settings") {
@@ -659,7 +654,7 @@ export async function ui_openSettingsImportWizard(data) {
 			return;
 		}
 
-		// Normalize (your existing compat function is fine to keep, or inline it here)
+		// Normalize to flat entries array
 		const normalizeToEntriesCompat = (jsonIn) => {
 			/** @type {{namespace:string,key:string,value:any,scope:'world'|'client'|'user',config:boolean}[]} */
 			const entries = [];
@@ -907,7 +902,7 @@ class BBMMImportWizard extends AppV2 {
 			contentRegion.style.height = "100%";
 			contentRegion.style.minHeight = "0";
 
-			// Inject: result is expected to be a STRING here (like your macro)
+			// Inject the HTML
 			const htmlStr = (result instanceof HTMLElement) ? result.innerHTML : String(result ?? "");
 			contentRegion.innerHTML = htmlStr;
 

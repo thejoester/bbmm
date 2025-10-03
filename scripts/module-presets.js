@@ -10,7 +10,7 @@ const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  en
 function hlp_validateModulePresetJSON(data) {
 
 	// Accept ONLY our known payloads
-	// 1) Current state export
+	// "bbmm-state": { type, name, created, modules[], versions{} }
 	if (data && typeof data === "object" && data.type === "bbmm-state" && Array.isArray(data.modules)) {
 		return { kind: "state", modules: [...new Set(data.modules.filter(x => typeof x === "string"))] };
 	}
@@ -323,7 +323,7 @@ async function exportCurrentModuleStateDialog() {
 
 // Import module preset json file, validate it, save as preset. 
 async function importModuleStateAsPreset(data) {
-	// 1) validate shape
+	// validate file structure
 	const validated = hlp_validateModulePresetJSON(data);
 	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
 		DL(3, "module-presets.js | Not a BBMM export. Expected a file created by BBMM.");
@@ -337,10 +337,10 @@ async function importModuleStateAsPreset(data) {
 	}
 	const modules = validated.modules;
 
-	// 2) compute report now (so we can show it after save)
+	// compute report now (so we can show it after save)
 	const report = hlp_validateModuleState(modules);
 
-	// 3) ask for preset name and save
+	// ask for preset name and save
 	const dlgName = new foundry.applications.api.DialogV2({
 		window: { title: LT.titleImportPreset() },
 		content: `
@@ -370,7 +370,7 @@ async function importModuleStateAsPreset(data) {
 
 			// Show issues once (if any)
 			if (report.unknown.length || report.depIssues.length) {
-				await showImportIssuesDialog(report); // this already returns a Promise in your file
+				await showImportIssuesDialog(report); 
 			}
 
 			DL("module-presets.js | importModuleStateAsPreset() returning ", res);
@@ -501,9 +501,7 @@ export async function openPresetManager() {
 			const newName = (txt instanceof HTMLInputElement) ? txt.value.trim() : "";
 
 			try {
-				/*
-					Save Current → create/overwrite preset with current enabled modules
-				*/
+				// Save Current → save enabled modules as NEW preset
 				if (action === "save-current") {
 					if (!newName) { ui.notifications.warn(`${LT.promptNewPresetName()}.`); return; }
 
@@ -520,9 +518,7 @@ export async function openPresetManager() {
 					return;
 				}
 
-				/*
-					Update → overwrite the SELECTED preset with CURRENT enabled modules
-				*/
+				// Update → overwrite selected preset with current enabled modules
 				if (action === "update") {
 					if (!selected) { ui.notifications.warn(`${LT.warnUpdatePreset()}.`); return; }
 
@@ -540,9 +536,7 @@ export async function openPresetManager() {
 					return;
 				}
 
-				/*
-					Load → apply preset (then optional reload)
-				*/
+				// Load → apply selected preset
 				if (action === "load") {
 					if (!selected) return ui.notifications.warn("Select a preset to load.");
 
@@ -569,9 +563,7 @@ export async function openPresetManager() {
 					return;
 				}
 
-				/*
-					Delete → remove preset
-				*/
+				// Delete → delete selected preset
 				if (action === "delete") {
 					if (!selected) return ui.notifications.warn(`${LT.warnSelectPresetDelete()}.`);
 
@@ -592,18 +584,14 @@ export async function openPresetManager() {
 					return;
 				}
 
-				/*
-					Export current module state to file
-				*/
+				// Export current enabled modules to JSON file
 				if (action === "bbmm-export-state") {
 					DL("module-presets.js | export-current: starting");
 					exportCurrentModuleStateDialog();
 					return;
 				}
 
-				/*
-					Import module state from a file and save as preset 
-				*/
+				// Import module state from JSON file, validate, save as preset
 				if (action === "bbmm-import-state") {
 					const file = await hlp_pickLocalJSONFile();
 					if (!file) return;
@@ -641,7 +629,7 @@ export async function openPresetManager() {
 }
 
 Hooks.once("ready", () => {
-	window.openPresetManager = openPresetManager; // run it from console
+	window.openPresetManager = openPresetManager; 
 	const mod = game.modules.get("bbmm");
 	if (!mod) return;
 	mod.api ??= {};
