@@ -188,6 +188,11 @@
     "exportedv12Modules": "État du module v12 exporté au format .json",
     "titlePresetPreview": "Aperçu des changements de préréglage",
     "noteSaveBeforeLoad": "Astuce : sauvegardez vos paramètres actuels avant de charger un préréglage different pour éviter de perdre vos changements",
+    "openSettings": "Ouvrir les paramètres",
+    "openReadme": "Ouvrir le fichier Lisez-moi",
+    "openChangelog": "Ouvrir le journal des modifications",
+    "openedSettingsFor": "Paramètres ouverts pour {title}.",
+    "noSettingsFoundFor": "Aucun paramètre configurable pour {title}.",
     "buttons": {
       "yes": "Oui",
       "no": "Non",
