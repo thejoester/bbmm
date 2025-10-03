@@ -35,7 +35,6 @@
 		"settings": "impostazioni",
 		"myPreset": "Il mio Preset",
 		"incDisabledModules": "Includi moduli disabilitati",
-
 		"titleImportIssues": "Controllo importazione — Problemi rilevati",
 		"descImportIssues": "Il preset importato è stato salvato, ma sono stati rilevati i seguenti problemi",
 		"importNamePrompt": "Inserisci un nome per il preset",
@@ -43,7 +42,6 @@
 		"promptWhatImport": "Cosa desideri importare",
 		"importComplete": "Importazione completata",
 		"exportNamePrompt": "Inserisci un nome per l’esportazione",
-
 		"modulePresetMgr": "Gestore Preset Moduli",
 		"titleModulesNotInstalled": "Moduli non installati",
 		"descModulesNotInstalled": "Modulo non installato",
@@ -161,7 +159,6 @@
 		"lblOpenControlsPresets": "Apri gestore preset controlli",
 		"titleControlsPresets": "Preset controlli BBMM",
 		"lockNoneTip": "Blocca impostazioni giocatore",
-
 		"controlsToggleName": "Abilita sincronizzazione controlli (tasti)",
 		"controlsToggleHint": "Se abilitato, il GM può bloccare o semi-bloccare le scorciatoie e inviarle ai giocatori connessi.",
 		"controlsTtHard": "Blocca rigidamente questa scorciatoia per tutti gli utenti (si applica esattamente; gli utenti non possono modificarla).",
@@ -176,25 +173,27 @@
 		"keybindColorScopesHint": "Se abilitato: scorciatoie mondo in blu; client in arancione; utente rimane predefinito.",
 		"keybindScopeWorldTip": "Ambito: Mondo (blu)",
 		"keybindScopeClientTip": "Ambito: Client (arancione)",
-		
 		"enableModuleManagementName": "Abilita gestione moduli avanzata",
 		"enableModuleManagementHint": "Se abilitato, BBMM sostituisce la lista standard dei moduli con un’interfaccia compatta e annotazioni per tutti gli utenti. Solo il GM può cambiarla.",
 		"modListEditNotes": "Modifica note",
 		"modListEditTitle": "Note – {id}",
 		"modListNotesLabel": "Note modulo",
 		"modListNotesSaved": "Note salvate.",
-
 		"aboutName": "Informazioni su BBMM",
 		"aboutHint": "Apri la voce diario Informazioni su BBMM.",
 		"aboutOpenMissing": "Voce diario Informazioni su BBMM non trovata.",
 		"aboutOpenError": "Impossibile aprire la voce diario Informazioni su BBMM.",
-		
 		"v12Note": "Questo modulo offre supporto minimo per FoundryVTT v12, consentendo di esportare impostazioni e stati moduli come preparazione all’aggiornamento a v13.<br><strong>NOTA:</strong> Alcune impostazioni potrebbero non trasferirsi se quelle in v13 sono cambiate.",
 		"titlev12Legacy": "BBMM: Esportazione legacy (v12)",
 		"exportedv12Settings": "Impostazioni v12 esportate in .json",
 		"exportedv12Modules": "Stati moduli v12 esportati in .json",
 		"titlePresetPreview": "Anteprima modifiche preset",
 		"noteSaveBeforeLoad": "Suggerimento: salva le impostazioni attuali prima di caricare un preset diverso per evitare di perdere modifiche",
+		"openSettings": "Apri Impostazioni",
+		"openReadme": "Apri Leggimi",
+		"openChangelog": "Apri Changelog",
+		"openedSettingsFor": "Impostazioni aperte per {title}.",
+		"noSettingsFoundFor": "Nessuna impostazione configurabile per {title}.",
 		
 		"buttons": {
 			"yes": "Sì",
