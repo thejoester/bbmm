@@ -269,8 +269,8 @@
 			"remote_placeholder": "Remote changelog cannot be loaded in-app. Use the Open File button to view it.",
 			"mark_current_unseen": "Mark Current Unseen",
 			"mark_all_unseen": "Mark All Unseen",
-			"dontShowAgain": "Don’t show again for this version"
-
+			"dontShowAgain": "Don’t show again for this version",
+			"noneFound": "No new changelogs found."
 		},
 
 		"sync": {
@@ -308,7 +308,9 @@
 			"active": "Active",
 			"inclusionsOpenError": "Failed to open the Inclusions Manager.",
 			"addModuleWarnTitle": "Include Entire Module?",
-			"addModuleWarnMsg": "It is not recommended to include an entire module unless you are sure the data it is saving will be safe. See {docLink} for more information. Continue?"
+			"addModuleWarnSeeDoc": "See Documentation",
+			"addModuleWarnMsg": "It is not recommended to include an entire module unless you are sure the data it is saving will be safe. {docLink} Continue?"
+			
 		},
 
 		"_settings": {

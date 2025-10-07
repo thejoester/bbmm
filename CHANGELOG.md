@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2025-10-07
+### Changed
+- **Inclusion Manager:**
+  - updated warning text when including module: fixed link so it works and localized the text.
+- **Macros (Compendium):** 
+  - Updated the `BBMM: Game Settings Inspector` macro to allow to browse user flags for current user and all users. 
+    - This module currently does not support user flags at this time, it may be something that will be supported later but this macro may help locate where something is saved.
+
 ## [0.5.4] - 2025-10-06
 ### Changed
 - **Localization:**

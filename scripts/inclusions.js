@@ -658,39 +658,85 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			DL(`inclusions.js | BBMMInclusionsAppV2.click(): ${action}`);
 
 			if (action === "add-module") {
-				/*
-				try { this.close({ force: true }); } catch {}
-				DL(`inclusions.js | Manager: openAddModuleInclusionApp typeof=${typeof (globalThis.bbmm?.openAddModuleInclusionApp)}`);
-				try { (globalThis.bbmm?.openAddModuleInclusionApp || globalThis.openAddModuleInclusionApp)?.(); }
-				catch (e) { DL(3, "inclusions.js | Manager: Add Module failed to open", e); ui.notifications?.error(LT.inclusions.failedAddInclusion()); }
-				return;
-				*/
+
 				// Add Module (confirm first)
 				const addModuleBtn = ev.target.closest?.('button[data-action="add-module"]');
 				if (addModuleBtn instanceof HTMLButtonElement) {
-					// Build a proper Foundry content-link to the compendium page and color it orange
-					const uuid = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS";
-					const raw = `
-						<p>
-							It is not recommended to include an entire module unless you are sure the data it is saving will be safe.
-							See <a class="content-link" data-uuid="${uuid}" style="color: orange;">Documentation</a> for more information.
-							Continue?
-						</p>
-					`;
-					// Enrich so the <a class="content-link" data-uuid="..."> opens the sheet when clicked
-					const contentHtml = await TextEditor.enrichHTML(raw, { async: true });
 					
+					// Build the dialog body with a proper content-link, styled orange
+					const uuid = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS";
+					const docLink = `<a class="bbmm-doc-link content-link" data-uuid="${uuid}" style="color: orange;">${LT.inclusions.addModuleWarnSeeDoc()}</a>`;
+					const raw = LT.inclusions.addModuleWarnMsg({ docLink });
+
+					// Enrich (async to get content-link handled)
+					const contentHtml = await TextEditor.enrichHTML(raw, { async: true });
+
+					// Temporary handler to catch clicks on the doc link
+					const onDocLinkClick = async (e) => {
+						const a = e.target?.closest?.(".bbmm-doc-link");
+						if (!a) return;
+
+						e.preventDefault();
+						e.stopPropagation();
+
+						try {
+							DL("inclusions.js | add-module dialog: opening documentation UUID", { uuid: a.dataset.uuid });
+
+							const doc = await fromUuid(a.dataset.uuid);
+
+							// JournalEntryPage → open parent JournalEntry to that page, read-only
+							if (doc?.documentName === "JournalEntryPage") {
+								const parent = doc.parent;
+								if (parent?.sheet) {
+									if (typeof parent.view === "function") {
+										await parent.view({ pageId: doc.id });
+									} else {
+										await parent.sheet.render(true, { pageId: doc.id, editable: false });
+									}
+									return;
+								}
+							}
+
+							// JournalEntry → open read-only
+							if (doc?.documentName === "JournalEntry" && doc.sheet) {
+								if (typeof doc.view === "function") {
+									await doc.view();
+								} else {
+									await doc.sheet.render(true, { editable: false });
+								}
+								return;
+							}
+
+							// Fallback
+							if (doc?.sheet) {
+								await doc.sheet.render(true);
+								return;
+							}
+
+							ui.notifications?.warn("Document not found or no sheet.");
+						} catch (err) {
+							DL(3, "inclusions.js | add-module dialog: failed to open documentation", err);
+							ui.notifications?.error("Failed to open Documentation (see console).");
+						}
+					};
+					document.addEventListener("click", onDocLinkClick, true);
+
 					const ok = await foundry.applications.api.DialogV2.confirm({
 						window: { title: game.i18n.localize("bbmm.inclusions.addModuleWarnTitle") || "Include Entire Module?" },
 						content: contentHtml,
 						defaultYes: false,
-						ok: { label: game.i18n.localize("bbmm.buttons.yes") }, 
-						cancel: { label: game.i18n.localize("bbmm.buttons.no") } 
+						ok: { label: game.i18n.localize("bbmm.buttons.yes") },
+						cancel: { label: game.i18n.localize("bbmm.buttons.no") }
+					}).finally(() => {
+						// Always remove the temporary handler when the dialog resolves
+						document.removeEventListener("click", onDocLinkClick, true);
 					});
+
 					DL(`inclusions.js | Manager: add-module confirm -> ${ok ? "YES" : "NO"}`);
 
 					if (!ok) return;
 
+					// Proceed: close manager, open Add Module picker
 					try { this.close({ force: true }); } catch {}
 					(globalThis.bbmm?.openAddModuleInclusionApp || globalThis.openAddModuleInclusionApp)?.();
 					return;

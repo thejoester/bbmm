@@ -44,7 +44,7 @@ Hooks.once("init", () => {
 				// Collect updated modules with changelogs
 				const entries = await _bbmmCollectUpdatedModulesWithChangelogs();
 				if (!entries.length) {
-					ui.notifications?.info(LT?.changelog.none_found());
+					ui.notifications?.info(LT.changelog.noneFound());
 					return;
 				}
 
@@ -56,7 +56,7 @@ Hooks.once("init", () => {
 				// Filter out empty texts
 				const nonEmpty = entries.filter(e => (e.text && e.text.trim().length));
 				if (!nonEmpty.length) {
-					ui.notifications?.info(LT?.changelog?.none_found_nonempty?.() ?? "No non-empty changelog files found.");
+					ui.notifications?.info(LT.changelog.noneFound());
 					return;
 				}
 

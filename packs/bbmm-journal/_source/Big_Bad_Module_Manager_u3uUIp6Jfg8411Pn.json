@@ -171,7 +171,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>The Inclusion Manager will let you manually add Hidden settings to ensure they are saved in @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets} and exports.</p><p><strong><span style=\"text-decoration:underline\">This tool should be used with a bit of caution!</span></strong> Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p><h2></h2><p></p><p><br /><br /></p>"
+        "content": "<p>The Inclusion Manager will let you manually add Hidden settings to ensure they are saved in @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets} and exports.</p><p><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">This tool should be used with a bit of caution!</span></strong></span> Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p><h2></h2><p><br /><br /></p>"
       },
       "video": {
         "controls": true,
@@ -188,11 +188,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.348",
+        "coreVersion": "13.350",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757740379508,
-        "modifiedTime": 1758086233798,
+        "modifiedTime": 1759829974048,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Q3JVPh8ykzMc3kLS"
@@ -430,6 +430,45 @@
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Rc4FRPurKuPwxhou"
+    },
+    {
+      "sort": 700000,
+      "name": "Toubleshooting",
+      "type": "text",
+      "_id": "EWkK8UJBIc3junpJ",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>If you have issues please consider the following:</p><ul><li><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusions} will take priority over inclusions. Check the module or setting is not also in the Exclusions Manager. </p></li><li><p>Settings for modules that are not enabled will not appear when adding settings. </p></li></ul><p>If you are having issues or have questions please <a href=\"https://github.com/thejoester/bbmm/issues\">open an issue</a> on Github. </p><p></p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.350",
+        "systemId": "pf2e",
+        "systemVersion": "7.5.2",
+        "createdTime": 1759830012035,
+        "modifiedTime": 1759830417597,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.EWkK8UJBIc3junpJ"
     }
   ],
   "folder": null,
