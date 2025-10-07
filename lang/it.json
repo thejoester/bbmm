@@ -308,7 +308,7 @@
 			"active": "Attivo",
 			"inclusionsOpenError": "Impossibile aprire Gestore inclusioni.",
 			"addModuleWarnTitle": "Includere l’intero modulo?",
-			"addModuleWarnSeeDoc": "See Documentation",
+			"addModuleWarnSeeDoc": "Vedi Documentazione",
 			"addModuleWarnMsg": "Non è consigliato includere un intero modulo a meno che tu non sia sicuro che i dati salvati siano sicuri. {docLink} Continua?"
 			
 		},
