@@ -290,7 +290,8 @@
 			"EnableName": "Enable user/client setting sync",
 			"EnableHint": "GM: When disabled, BBMM will not add lock/sync controls, push values, or enforce/hide user/client settings.",
 			"ClickPickUsers": "Click: Select online users to sync",
-			"ShiftAll": "Shift+Click: Soft-Lock keybinds"
+			"ShiftAll": "Shift+Click: Soft-Lock keybinds",
+			"RightClearSoft": "Right-Click: Clear soft-lock"
 		},
 
 		"inclusions": {

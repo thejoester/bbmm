@@ -28,6 +28,7 @@ import { LT, BBMM_ID } from "./localization.js";
 ============================================================================ */
 
 	/* Apply Pending Soft Locks ================================================== */
+	/*
 	async function _bbmmApplyPendingSoftLocks() {
 		try {
 			if (game.user?.isGM) return;	// players only
@@ -112,7 +113,7 @@ import { LT, BBMM_ID } from "./localization.js";
 			DL(2, "setting-sync.js |  settings-soft-apply: unexpected error", err);
 		}
 	}
-
+	*/
 
 	/*  Detect if unlock is queued =================================================
 		Detect if an lock removal is queued for a given id.
@@ -137,7 +138,7 @@ import { LT, BBMM_ID } from "./localization.js";
 		try {
 			iconEl.classList.remove(
 				"fa-lock-open", "fa-user-lock", "fa-lock",
-				"fa-solid", "fa-regular", "bbmm-active", "bbmm-partial"
+				"fa-solid", "fa-regular", "bbmm-active", "bbmm-partial", "fa-arrows-rotate"
 			);
 
 			switch (state) {
@@ -153,6 +154,23 @@ import { LT, BBMM_ID } from "./localization.js";
 				case "lockAll":
 					iconEl.className = "fa-solid fa-lock bbmm-active";
 					iconEl.title = LT.lockAllTip();
+					break;
+				case "controlSoft":
+					// Use the proper class tokens (no leading dot) and keep the clickable marker so the icon stays visible
+					iconEl.className = "fa-solid fa-arrows-rotate bbmm-active bbmm-click";
+					iconEl.title = LT.sync.PushHintControls() + "\n" +
+						"• " + LT.sync.ClickPickUsers() + "\n" +
+						"• " + LT.sync.ShiftAll() + "\n" +
+						"• " + LT.sync.RightClearSoft();
+					break;
+
+				case "controlClear":
+					// Ensure the sync icon keeps the required FA style prefix and clickable marker
+					iconEl.className = "fa-solid fa-arrows-rotate bbmm-click";
+					iconEl.title = LT.sync.PushHintControls() + "\n" +
+						"• " + LT.sync.ClickPickUsers() + "\n" +
+						"• " + LT.sync.ShiftAll() + "\n" +
+						"• " + LT.sync.RightClearSoft();
 					break;
 				default:
 					iconEl.className = "fa-solid fa-lock-open";
@@ -1895,6 +1913,24 @@ import { LT, BBMM_ID } from "./localization.js";
 		{CONTROLS SYNC HELPERS}
 ============================================================================ */
 
+	/*  Get Control Soft-Lock Ledger ======================================= */
+	function _bbmmGetControlLedger() {
+		try {
+			return game.settings.get(BBMM_ID, "controlSoftLedger") ?? {};
+		} catch {
+			return {};
+		}
+	}
+
+	/*  Set Control Soft-Lock Ledger ======================================= */
+	async function _bbmmSetControlLedger(ledger) {
+		try {
+			return await game.settings.set(BBMM_ID, "controlSoftLedger", ledger);
+		} catch (err) {
+			DL(2, "setting-sync.js | failed to save controlSoftLedger", err);
+		}
+	}
+
 	/*  Build unique control ID =====================================================
 		Join namespace + action into a single string identifier.
 	============================================================================= */
@@ -2122,31 +2158,63 @@ import { LT, BBMM_ID } from "./localization.js";
 		Queue/update a soft lock entry for namespace+action.
 		Snapshot GM binding state, increment rev, save to store.
 	============================================================================= */
-	async function _bbmmCtrlGMSoft({ ns, action }) {
+	async function _bbmmCtrlGMSoft({ ns, action, iconEl = null }) {
 		try {
 			const id = _bbmmCtrlId(ns, action);
+			DL(`ctrlGMSoft(): start for ${id}`);
+
 			const store = _bbmmCtrlGetStore();
 			const revMap = _bbmmCtrlGetRevMap();
 
+			/* Apply Soft Lock ================================================== */
 			const next = { ...(store[id] ?? {}) };
 			next.soft = { value: _bbmmCtrlBindings(ns, action) };
 			next.lock = null;
 			next.rev = (Number(next.rev) || 0) + 1;
-
 			store[id] = next;
 			revMap[id] = next.rev;
+			DL(`Soft lock APPLIED for ${id} (rev=${next.rev})`);
 
+			/* Persist store + revMap ============================================= */
 			await _bbmmCtrlSetStore(store);
 			await _bbmmCtrlSetRevMap(revMap);
 
+			/* Update Ledger (tracks which users have seen this soft lock)  */
+			try {
+				const ledger = _bbmmGetControlLedger();
+				const userId = game.user?.id;
+				if (userId) {
+					ledger[userId] ??= [];
+					if (!ledger[userId].includes(id)) ledger[userId].push(id);
+					await _bbmmSetControlLedger(ledger);
+				}
+			} catch (ledgerErr) {
+				DL(2, "ctrlGMSoft(): failed to update controlSoftLedger", ledgerErr);
+			}
+
+			/* Update UI icon (orange tint for soft lock) ======================== */
+			try {
+				if (iconEl) {
+					_bbmmSetLockIconState(iconEl, "controlSoft");
+				} else {
+					const sel = `.form-group[data-action-id="${ns}.${action}"] .bbmm-ctrlbar i.fa-arrows-rotate`;
+					const el = document.querySelector(sel);
+					if (el) _bbmmSetLockIconState(el, "controlSoft");
+				}
+			} catch (iconErr) {
+				DL(2, "ctrlGMSoft(): icon tint update failed", iconErr);
+			}
+
+			/* Notify and broadcast =========================================== */
 			ui.notifications?.info?.(LT.controlsSoftApplied());
 			game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
+			DL(`ctrlGMSoft(): broadcast bbmm-ctrl-refresh after soft lock for ${id}`);
 		} catch (err) {
 			DL(2, "setting-sync.js | ctrlGMSoft() failed", { ns, action, err });
 		}
 	}
 
-	/*  GM: push current bindings for a control to selected users (instant) ======= */
+	/*  GM: push current bindings for a control to selected users (instant) ======= 
 	async function _bbmmCtrlSyncToUsers({ ns, action, userIds }) {
 		try {
 			// snapshot current GM bindings for this action
@@ -2164,7 +2232,7 @@ import { LT, BBMM_ID } from "./localization.js";
 		} catch (err) {
 			DL(2, "ctrlSyncToUsers() failed", { ns, action, err });
 		}
-	}
+	}*/
 
 	/*  Wire Control Config UI ======================================================
 		Decorate Controls Configuration window with Sync/Lock icons.
@@ -2238,9 +2306,25 @@ import { LT, BBMM_ID } from "./localization.js";
 				syncIcon.title =
 				LT.sync.PushHintControls() + "\n" +
 				"• " + LT.sync.ClickPickUsers() + "\n" +
-				"• " + LT.sync.ShiftAll(); 
+				"• " + LT.sync.ShiftAll() + "\n" +
+				"• " + LT.sync.RightClearSoft();
 
 				bar.appendChild(syncIcon);
+
+				// (Click/keyboard handlers handled later in this function; remove duplicate broken handlers)
+
+				// Highlight if currently soft-locked
+				const id = `${ns}.${action}`;
+				try {
+					const store = _bbmmCtrlGetStore();
+					DL(`setting-sync.js | controls: wiring ${id}`, store?.[id] ?? {});
+					if (store?.[id]?.soft?.value) {
+						_bbmmSetLockIconState(syncIcon, "controlSoft");
+					} else {
+						_bbmmSetLockIconState(syncIcon, "controlClear");
+					}
+				} catch {}
+
 
 				// LEFT CLICK -> open minimal user picker, then IMMEDIATELY SYNC (no queue)
 				syncIcon.addEventListener("click", async (ev) => {
@@ -2248,10 +2332,20 @@ import { LT, BBMM_ID } from "./localization.js";
 						ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
 
 						if (ev.shiftKey) {
-							// SHIFT+CLICK => SOFT-LOCK THIS KEYBIND (controls-only)
 							DL(`controls: ${ns}.${action} | soft-lock (Shift+Click)`);
-							await _bbmmCtrlGMSoft({ ns, action });      
-							game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" }); // make players apply immediately
+							await _bbmmCtrlGMSoft({ ns, action });
+
+							// Refresh icon state (we have syncIcon here!)
+							try {
+								const id = `${ns}.${action}`;
+								const store = _bbmmCtrlGetStore();
+								const state = store?.[id]?.soft?.value ? "controlSoft" : "controlClear";
+								_bbmmSetLockIconState(syncIcon, state);
+							} catch (err) {
+								DL(2, "ctrl soft-lock: failed to update icon state", err);
+							}
+
+							game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
 							return;
 						}
 
@@ -2281,6 +2375,29 @@ import { LT, BBMM_ID } from "./localization.js";
 						picker.show();
 					} catch (err) {
 						DL(2, "controls syncIcon click error", err);
+					}
+				});
+
+				// RIGHT CLICK -> clear soft lock for this control
+				syncIcon.addEventListener("contextmenu", async (ev) => {
+					ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+
+					try {
+						const id = _bbmmCtrlId(ns, action);
+						const store = _bbmmCtrlGetStore();
+						const revMap = _bbmmCtrlGetRevMap();
+
+						if (store?.[id]?.soft) {
+							delete store[id].soft;
+							delete revMap[id];
+							await _bbmmCtrlSetStore(store);
+							await _bbmmCtrlSetRevMap(revMap);
+							_bbmmSetLockIconState(syncIcon, "controlClear");
+							ui.notifications?.info?.(`Soft lock cleared for ${ns}.${action}`);
+							game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
+						}
+					} catch (err) {
+						DL(2, "setting-sync.js | failed to clear control soft lock (right click)", err);
 					}
 				});
 
@@ -2321,7 +2438,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 	Hooks.on('renderControlsConfig', (app, html) => {
 		try {
-			if (!_bbmmCtrlEnabled()) return;
+			if (!_bbmmCtrlEnabled()) return; // controls sync disabled
 			_bbmmCtrlWireConfig(app, html);
 			requestAnimationFrame(() => _bbmmCtrlWireConfig(app, html));
 			setTimeout(() => _bbmmCtrlWireConfig(app, html), 50);
