@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6-test.3] - 2025-10-09
+### Changed
+- **Inclusion/Exclusion Managers:**
+  - Changed buttons on exclusion manager window to match inclusion manager. 
+
 ## [0.5.6-test.2] - 2025-10-09
 - **Inclusion/Exclusion Managers:**
   - When adding inclusions/exclusions, window will not close allowing to add multiple settings/modules. 
