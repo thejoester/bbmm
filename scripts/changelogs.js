@@ -87,7 +87,6 @@ Hooks.once("ready", async () => {
 
 	try {
 
-		
 		const meta = game.settings.settings.get(`${BBMM_ID}.seenChangelogs`); 
 		DL(`changelog.js | seenChangelogs schema: type=${meta?.type?.name}, default=${JSON.stringify(meta?.default)}`);
 
@@ -331,7 +330,7 @@ function _bbmmMarkdownToHtml(md) {
 	}
 }
 
-// Helper: Render Markdown
+/* Helper: Render Markdown =========================================== */
 async function _bbmmRenderMarkdownOnly(md) {
 	try {
 
@@ -829,10 +828,8 @@ function _bbmmCenterFrame(frame, app) {
 	}
 }
 
-/* ============================================================================
-	{HELPER}
-	Scan all modules for new/updated changelogs since last seen
-============================================================================ */
+
+/* Scan all modules for new/updated changelogs since last seen ============= */
 async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	const start = performance.now();
 	DL("changelog.js |  changelog collector: starting scan");
@@ -873,10 +870,7 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	return results;
 }
 
-/* ============================================================================
-	{HELPER}
-	Fetch Changelogs URL
-============================================================================ */
+/* Fetch Changelogs URL ============================================ */
 async function _bbmmFindChangelogURL(mod) {
 	try {
 		const files = await _bbmmListModuleFilesCached(mod.id);
@@ -893,10 +887,7 @@ async function _bbmmFindChangelogURL(mod) {
 	return null; // never fall back to remote
 }
 
-/* ============================================================================
-	{HELPER}
-	Fetch Changelogs Text
-============================================================================ */
+/* Fetch Changelogs Text ============================================ */
 async function _bbmmFetchChangelogText(url) {
 	try {
 		if (!url) return "";
@@ -909,10 +900,7 @@ async function _bbmmFetchChangelogText(url) {
 	}
 }
 
-/* ============================================================================
-	{UI}
-	Dialog 
-============================================================================ */
+/* Show a single changelog dialog ============================================ */
 async function _bbmmShowSingleChangelogDialog(entry) {
 	const { id, title, version, url } = entry;
 
@@ -978,10 +966,7 @@ async function _bbmmShowSingleChangelogDialog(entry) {
 	});
 }
 
-/* ============================================================================
-	{HELPER}
-	Mark Changelog seen
-============================================================================ */	
+/* Mark Changelog seen ========================================== */
 async function _bbmmMarkChangelogSeen(moduleId, version) {
 	try {
 		const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {};
@@ -995,10 +980,7 @@ async function _bbmmMarkChangelogSeen(moduleId, version) {
 	}
 }
 
-/* ============================================================================
-	{HELPER}
-	Unmark Changelog seen
-============================================================================ */
+/* Unmark Changelog seen ========================================= */
 async function _bbmmUnmarkChangelogSeen(moduleId) {
 	try {
 		const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {};
@@ -1015,10 +997,7 @@ async function _bbmmUnmarkChangelogSeen(moduleId) {
 	}
 }
 
-/* ============================================================================
-	{HELPER}
-	manually open a specific module's changelog
-============================================================================ */
+/* manually open a specific module's changelog =================== */
 export async function BBMM_openChangelogFor(moduleId) {
 	try {
 		const mod = game.modules.get(moduleId);
