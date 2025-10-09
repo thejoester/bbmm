@@ -109,6 +109,11 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 				.bbmm-am-table .bbmm-exc-act:focus-visible{
 					outline:2px solid var(--color-border-highlight,#79c);outline-offset:2px
 				}
+				.bbmm-am-table .bbmm-exc-act.bbmm-exc-done{
+					pointer-events:none;
+					opacity:.75;
+					font-weight:700;
+				}
 			</style>
 
 			<section class="bbmm-am-root">
@@ -151,38 +156,50 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		footer.style.justifyContent = "flex-end";
 		footer.style.marginTop = "0.75rem";
 
-		const cancelBtn = document.createElement("button");
-		cancelBtn.type = "button";
-		cancelBtn.innerText = LT.buttons.cancel();
-		cancelBtn.addEventListener("click", () => {
+		const closeBtn = document.createElement("button");
+		closeBtn.type = "button";
+		closeBtn.innerText = LT.buttons.close();
+		closeBtn.addEventListener("click", () => {
 			DL("AddModule.cancel(): reopen manager");
 			try { this.close({ force: true }); } catch {}
 			setTimeout(() => {
 				try {
 					(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-				} catch (e) { DL(3, "AddModule.cancel(): reopen failed", e); }
+				} catch (e) { DL(3, "AddModule.close(): reopen failed", e); }
 			}, 0);
 		});
 
-		footer.appendChild(cancelBtn);
+		footer.appendChild(closeBtn);
 		content.appendChild(footer);
 
 		content.addEventListener("click", async (ev) => {
 			const btn = ev.target.closest?.(".bbmm-exc-act");
-			if (!(btn instanceof HTMLButtonElement)) return;
+			if (btn instanceof HTMLButtonElement) {
+				const id = btn.dataset.id || "";
+				if (!id) return;
+				try {
+					btn.disabled = true;
+					await this._exclude(id);
 
-			const id = btn.dataset.id || "";
-			if (!id) return;
+					// Keep dialog open; mark on success 
+					btn.classList.add("bbmm-exc-done");
+					btn.setAttribute("aria-label", "Excluded");
+					btn.innerHTML = "✓";
+					btn.disabled = true;
+					DL(`exclusions.js | AddModule: module ${id} marked as excluded`);
+				} catch (e) {
+					btn.disabled = false;
+					DL(3, "exclude failed", e);
+					ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+				}
+				return;
+			}
 
-			try {
-				btn.disabled = true;
-				await this._exclude(id);
+			// Footer "Cancel"/"Close" should just close
+			const cancel = ev.target.closest?.('button[data-action="cancel"], [data-action="close"], .bbmm-close');
+			if (cancel) {
 				try { this.close({ force: true }); } catch {}
-				setTimeout(() => { try { openExclusionsManagerApp(); } catch (e) { DL(3,'reopen exclusions failed',e); } }, 0);
-			} catch (e) {
-				btn.disabled = false;
-				DL(3, "exclude failed", e);
-				ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+				return;
 			}
 		});
 	}
@@ -259,6 +276,43 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				}
 			}
 
+			// Also list registerMenu entries as exclude-able placeholders
+			try {
+				for (const [menuId, menu] of game.settings.menus.entries()) {
+					const dot = menuId.indexOf(".");
+					if (dot <= 0) continue;
+
+					const ns  = String(menuId.slice(0, dot));
+					const key = String(menuId.slice(dot + 1));
+					if (!ns || !key) continue;
+
+					// skip already excluded
+					const pairKey = `${ns}::${key}`;
+					if (excluded.has(pairKey)) continue;
+
+					// Module title (fallback to namespace)
+					const mod = game.modules.get(ns);
+					const modTitle = String(mod?.title ?? ns);
+
+					// Menu label (localized if provided)
+					let setTitle = key;
+					try {
+						if (menu?.name) {
+							const nm = game.i18n.localize(String(menu.name));
+							setTitle = nm || key;
+						}
+					} catch { /* keep fallback */ }
+
+					const scope = menu?.restricted ? "world" : "client";
+
+					// Mark this as a menu row; exclusion will store a placeholder pair
+					rows.push({ namespace: ns, key, modTitle, setTitle, scope, __isMenu: true });
+				}
+				DL("exclusions.js | AddSetting._collectSettings(): menus appended", { count: rows.length });
+			} catch (e) {
+				DL(2, "exclusions.js | AddSetting._collectSettings(): menu enumeration failed", e);
+			}
+
 			// Sort by module title, then setting title
 			rows.sort((a, b) =>
 				a.modTitle.localeCompare(b.modTitle, game.i18n.lang || undefined, { sensitivity: "base" }) ||
@@ -273,6 +327,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		}
 	}
 
+	// Add {namespace,key} to userExclusions.settings
 	async _exclude(namespace, key) {
 		const data = game.settings.get("bbmm", "userExclusions") || {};
 		if (!Array.isArray(data.settings)) data.settings = [];
@@ -280,6 +335,22 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		if (!exists) data.settings.push({ namespace, key });
 		await game.settings.set("bbmm", "userExclusions", data);
 		try { Hooks.callAll("bbmmExclusionsChanged", { type: "setting", namespace, key }); } catch {}
+	}
+
+	// Special case: exclude a menu placeholder
+	async _excludeMenu(namespace, key) {
+		try {
+			const data = game.settings.get("bbmm", "userExclusions") || {};
+			if (!Array.isArray(data.settings)) data.settings = [];
+			const exists = data.settings.some(s => s?.namespace === namespace && s?.key === key);
+			if (!exists) data.settings.push({ namespace, key });
+			await game.settings.set("bbmm", "userExclusions", data);
+			try { Hooks.callAll("bbmmExclusionsChanged", { type: "menu", namespace, key }); } catch {}
+			DL(`exclusions.js | _excludeMenu(): stored placeholder for ${namespace}.${key}`);
+		} catch (e) {
+			DL(3, "exclusions.js | _excludeMenu() failed", e);
+			throw e;
+		}
 	}
 
 	async _renderHTML(_context, _options) {
@@ -354,6 +425,12 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 					outline:2px solid var(--color-border-highlight,#79c);
 					outline-offset:2px;
 				}
+
+				.bbmm-as-table .bbmm-exc-act.bbmm-exc-done{
+					pointer-events:none;
+					opacity:.75;
+					font-weight:700;
+				}
 			</style>
 
 			<section class="bbmm-as-root">
@@ -396,20 +473,20 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		footer.style.justifyContent = "flex-end";
 		footer.style.marginTop = "0.75rem";
 
-		const cancelBtn = document.createElement("button");
-		cancelBtn.type = "button";
-		cancelBtn.innerText = LT.buttons.cancel();
-		cancelBtn.addEventListener("click", () => {
-			DL("exclusions.js | AddSetting.cancel(): reopen manager");
+		const closeBtn = document.createElement("button");
+		closeBtn.type = "button";
+		closeBtn.innerText = LT.buttons.close();
+		closeBtn.addEventListener("click", () => {
+			DL("exclusions.js | AddSetting.closeBtn(): reopen manager");
 			try { this.close({ force: true }); } catch {}
 			setTimeout(() => {
 				try {
 					(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-				} catch (e) { DL(3, "exclusions.js | AddSetting.cancel(): reopen failed", e); }
+				} catch (e) { DL(3, "exclusions.js | AddSetting.closeBtn(): reopen failed", e); }
 			}, 0);
 		});
 
-		footer.appendChild(cancelBtn);
+		footer.appendChild(closeBtn);
 		content.appendChild(footer);
 
 		// Delegated click: Exclude 
@@ -418,28 +495,44 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 		content.addEventListener("click", async (ev) => {
 			const btn = ev.target.closest?.(".bbmm-exc-act");
-			if (!(btn instanceof HTMLButtonElement)) return;
+			if (btn instanceof HTMLButtonElement) {
+				ev.preventDefault();
+				ev.stopPropagation();
 
-			ev.preventDefault();
-			ev.stopPropagation();
+				const ns  = btn.dataset.ns  || "";
+				const key = btn.dataset.key || "";
+				if (!ns || !key) return;
 
-			const ns = btn.dataset.ns || "";
-			const key = btn.dataset.key || "";
-			if (!ns || !key) return;
+				try {
+					btn.disabled = true;
 
-			try {
-				btn.disabled = true;
-				await this._exclude(ns, key);
+					// menu or setting?
+					const row = this._rows?.find?.(r => r.namespace === ns && r.key === key);
+					if (row?.__isMenu) {
+						await this._excludeMenu(ns, key);   // placeholder
+					} else {
+						await this._exclude(ns, key);       // normal setting pair
+					}
+
+					// Keep dialog open; mark on success
+					btn.classList.add("bbmm-exc-done");
+					btn.setAttribute("aria-label", "Excluded");
+					btn.innerHTML = "✓";
+					btn.disabled = true;
+					DL("exclusions.js | AddSetting: row marked as excluded");
+				} catch (e) {
+					btn.disabled = false;
+					DL(3, "exclusions.js | AddSetting.exclude failed", e);
+					ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+				}
+				return;
+			}
+
+			// Footer "Cancel"/"Close" should close without reopening the manager
+			const cancel = ev.target.closest?.('button[data-action="cancel"], [data-action="close"], .bbmm-close');
+			if (cancel) {
 				try { this.close({ force: true }); } catch {}
-				setTimeout(() => {
-					try {
-						(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-					} catch (e) { DL(3, "exclusions.js | AddSetting.reopen manager failed", e); }
-				}, 0);
-			} catch (e) {
-				btn.disabled = false;
-				DL(3, "exclusions.js | AddSetting.exclude failed", e);
-				ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+				return;
 			}
 		});
 	}
@@ -479,11 +572,24 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 	//	Resolve a setting display name; fallback to the raw key if unnamed.
 	_getSettingLabel(ns, key) {
+		// Try a real setting entry first
 		const entry = game.settings.settings.get(`${ns}.${key}`);
-		// entry?.name is often a localization key or a plain string; localize either way
-		const raw = entry?.name ?? "";
-		const label = raw ? game.i18n.localize(String(raw)) : "";
-		return label || String(key);
+		if (entry) {
+			const raw = entry?.name ?? "";
+			const label = raw ? game.i18n.localize(String(raw)) : "";
+			if (label) return label;
+		}
+
+		// If not a setting (placeholder), fall back to the menu label
+		try {
+			const menu = game.settings.menus.get(`${ns}.${key}`);
+			if (menu?.name) {
+				return game.i18n.localize(String(menu.name));
+			}
+		} catch { /* ignore */ }
+
+		// Final fallback
+		return String(key);
 	}
 
 	// Remove a module from userExclusions.settings 
