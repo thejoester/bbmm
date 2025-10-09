@@ -806,8 +806,8 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			<style>${css}</style>
 			<section class="bbmm-exc-root">
 				<div class="bbmm-exc-toolbar">
-					<button type="button" class="bbmm-btn" data-action="add-module">${LT.buttons.addModule()}</button>
 					<button type="button" class="bbmm-btn" data-action="add-setting">${LT.buttons.addSetting()}</button>
+					<button type="button" class="bbmm-btn" data-action="add-module">${LT.buttons.addModule()}</button>
 					<div></div>
 					<div class="bbmm-x-count">${LT.total()}: ${this._rows.length}</div>
 				</div>
