@@ -178,11 +178,6 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		this._rows = [];
 	}
 
-	// Add custom class for styling
-	static DEFAULT_OPTIONS = foundry.utils.mergeObject(super.DEFAULT_OPTIONS, {
-		classes: [...(super.DEFAULT_OPTIONS?.classes ?? []), "bbmm-ai-app"]
-	});
-
 	/* ============================================================================
 		{DATA HELPERS}
 	============================================================================ */
@@ -316,12 +311,17 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 	============================================================================ */
 
 	async _renderHTML() {
-		if (typeof this._collectSettings === "function") {
-			try { await this._collectSettings(); } catch (e) { DL(2, "inclusions.js | AddSetting._renderHTML(): _collectSettings failed", e); }
+		// Make sure rows are populated
+		try {
+			if (typeof this._collectSettings === "function") {
+				await this._collectSettings();
+			}
+		} catch (e) {
+			DL(2, "inclusions.js | AddSetting._renderHTML(): _collectSettings failed", e);
+			this._rows = this._rows || [];
 		}
-		this._rows = Array.isArray(this._rows) ? this._rows : [];
 
-		const rowsHtml = this._rows.map(r => `
+		const rowsHtml = (Array.isArray(this._rows) ? this._rows : []).map(r => `
 			<tr>
 				<td class="c-ns" title="${foundry.utils.escapeHTML(r.ns)}">${foundry.utils.escapeHTML(r.nsLabel)}</td>
 				<td class="c-setting" title="${foundry.utils.escapeHTML(r.key)}">${foundry.utils.escapeHTML(r.label)}</td>
@@ -335,6 +335,26 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		`).join("");
 
 		return `
+			<style>
+				#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+				.bbmm-ai-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
+				.bbmm-ai-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
+				.bbmm-ai-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+				.bbmm-ai-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
+				.bbmm-ai-table thead th:nth-child(4){width:96px;text-align:right}
+				.bbmm-ai-table tbody td{padding:8px 10px;border-bottom:1px solid var(--color-border-light-2);vertical-align:middle}
+				.bbmm-ai-table tbody tr:nth-child(odd){background:rgba(255,255,255,.03)}
+				.bbmm-ai-table .c-act{display:flex;justify-content:flex-end}
+				.bbmm-ai-table .bbmm-inc-act.bbmm-inc-done{pointer-events:none;opacity:.75;font-weight:700}
+
+				/* Footer: force full width; beat theme rules */
+				#${this.id} .bbmm-footer{margin-top:10px}
+				#${this.id} .bbmm-footer-close{
+					display:flex;justify-content:center;align-items:center;
+					width:100% !important;height:36px;padding:0 14px;border-radius:8px;font-weight:600
+				}
+			</style>
+
 			<div class="bbmm-ai-root">
 				<div class="bbmm-ai-scroller">
 					<table class="bbmm-ai-table">
@@ -342,6 +362,7 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 						<tbody>${rowsHtml || `<tr><td colspan="4" style="text-align:center;opacity:.8;padding:18px 0">${LT.inclusions.none()}.</td></tr>`}</tbody>
 					</table>
 				</div>
+
 				<div class="bbmm-footer">
 					<button type="button" class="bbmm-footer-close" data-action="close">${LT.buttons.close()}</button>
 				</div>
@@ -481,11 +502,6 @@ class BBMMAddModuleInclusionAppV2 extends foundry.applications.api.ApplicationV2
 		this._rows = [];
 	}
 
-	// Add custom class for styling
-	static DEFAULT_OPTIONS = foundry.utils.mergeObject(super.DEFAULT_OPTIONS, {
-		classes: [...(super.DEFAULT_OPTIONS?.classes ?? []), "bbmm-am-app"]
-	});
-
 	_collectModules() {
 	try {
 		const data = game.settings.get(BBMM_ID, "userInclusions") || {};
@@ -532,19 +548,28 @@ class BBMMAddModuleInclusionAppV2 extends foundry.applications.api.ApplicationV2
 	}
 
 	async _renderHTML() {
-		if (typeof this._collectModules === "function") {
-			try { await this._collectModules(); } catch (e) { DL(2, "inclusions.js | AddModule._renderHTML(): _collectModules failed", e); }
-		} else {
-			// safe fallback
-			const data = game.settings.get(BBMM_ID, "userInclusions") || {};
-			const included = new Set(Array.isArray(data.modules) ? data.modules : []);
-			this._rows = Array.from(game.modules.values()).map(m => ({
-				ns: m.id, title: String(m?.title ?? m.id), active: !!m.active, included: included.has(m.id)
-			})).sort((a,b)=>a.title.localeCompare(b.title, game.i18n.lang||undefined,{sensitivity:"base"}));
+		// Populate rows if needed
+		try {
+			if (typeof this._collectModules === "function") {
+				await this._collectModules();
+			} else {
+				// Fallback collector (safe): all modules by title
+				const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+				const included = new Set(Array.isArray(data.modules) ? data.modules : []);
+				this._rows = Array.from(game.modules.values()).map(m => ({
+					ns: m.id,
+					title: String(m?.title ?? m.id),
+					active: !!m.active,
+					included: included.has(m.id)
+				}));
+				this._rows.sort((a,b) => a.title.localeCompare(b.title, game.i18n.lang || undefined, { sensitivity: "base" }));
+			}
+		} catch (e) {
+			DL(2, "inclusions.js | AddModule._renderHTML(): collect failed", e);
+			this._rows = this._rows || [];
 		}
-		this._rows = Array.isArray(this._rows) ? this._rows : [];
 
-		const rowsHtml = this._rows.map(r => `
+		const rowsHtml = (Array.isArray(this._rows) ? this._rows : []).map(r => `
 			<tr>
 				<td class="c-title" title="${foundry.utils.escapeHTML(r.title)}">${foundry.utils.escapeHTML(r.title)}</td>
 				<td class="c-state">${r.active ? "✓" : ""}</td>
@@ -557,13 +582,34 @@ class BBMMAddModuleInclusionAppV2 extends foundry.applications.api.ApplicationV2
 		`).join("");
 
 		return `
+			<style>
+				#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+				.bbmm-am-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
+				.bbmm-am-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
+				.bbmm-am-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+				.bbmm-am-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
+				.bbmm-am-table thead th:nth-child(2){width:110px}
+				.bbmm-am-table thead th:last-child{width:96px;text-align:right}
+				.bbmm-am-table tbody td{padding:8px 10px;border-bottom:1px solid var(--color-border-light-2);vertical-align:middle}
+				.bbmm-am-table tbody tr:nth-child(odd){background:rgba(255,255,255,.03)}
+				.bbmm-am-table .c-act{display:flex;justify-content:flex-end}
+				.bbmm-am-table .bbmm-inc-mod-act.bbmm-inc-done{pointer-events:none;opacity:.75;font-weight:700}
+
+				#${this.id} .bbmm-footer{margin-top:10px}
+				#${this.id} .bbmm-footer-close{
+					display:flex;justify-content:center;align-items:center;
+					width:100% !important;height:36px;padding:0 14px;border-radius:8px;font-weight:600
+				}
+			</style>
+
 			<div class="bbmm-am-root">
 				<div class="bbmm-am-scroller">
 					<table class="bbmm-am-table">
-						<thead><tr><th>${LT.module()}</th><th>${LT.active()}</th><th></th></tr></thead>
+						<thead><tr><th>${LT.module()}</th><th>${LT.inclusions.active()}</th><th></th></tr></thead>
 						<tbody>${rowsHtml || `<tr><td colspan="3" style="text-align:center;opacity:.8;padding:18px 0">${LT.inclusions.none()}.</td></tr>`}</tbody>
 					</table>
 				</div>
+
 				<div class="bbmm-footer">
 					<button type="button" class="bbmm-footer-close" data-action="close">${LT.buttons.close()}</button>
 				</div>
@@ -647,11 +693,6 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		});
 	}
 
-	// Add custom class for styling
-	static DEFAULT_OPTIONS = foundry.utils.mergeObject(super.DEFAULT_OPTIONS, {
-		classes: [...(super.DEFAULT_OPTIONS?.classes ?? []), "bbmm-inc-mgr-app"]
-	});
-
 	/* ============================================================================
 		{DATA HELPERS}
 	============================================================================ */
@@ -698,23 +739,38 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 	============================================================================ */
 
 	async _renderHTML() {
+		// Build rows (modules + settings) 
 		const inc = game.settings.get(BBMM_ID, "userInclusions") || {};
 		const mods = Array.isArray(inc.modules)  ? inc.modules  : [];
 		const sets = Array.isArray(inc.settings) ? inc.settings : [];
 
+		// Module rows
 		const modRows = mods.map(ns => {
 			const mod = game.modules.get(ns);
 			const title = String(mod?.title ?? ns);
-			return { type: "Module", identifier: title, _ns: ns, _key: "", _id: ns };
+			return {
+				type: "Module",
+				identifier: title,
+				_ns: ns,
+				_key: "",
+				_id: ns
+			};
 		});
 
+		// Setting rows
 		const setRows = sets.map(s => {
 			const ns = String(s?.namespace ?? "");
 			const key = String(s?.key ?? "");
 			const mod = game.modules.get(ns);
 			const nsLabel = String(mod?.title ?? ns);
 			const settingLabel = this._getSettingLabel(ns, key);
-			return { type: "Setting", identifier: `${nsLabel}, ${settingLabel}`, _ns: ns, _key: key, _id: `${ns}.${key}` };
+			return {
+				type: "Setting",
+				identifier: `${nsLabel}, ${settingLabel}`,
+				_ns: ns,
+				_key: key,
+				_id: `${ns}.${key}`
+			};
 		});
 
 		this._rows = [...modRows, ...setRows];
@@ -739,7 +795,50 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			</tr>
 		`).join("");
 
-		return `
+		const html = `
+			<style>
+				#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+				.bbmm-x-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
+
+				.bbmm-x-toolbar{display:grid;grid-template-columns:auto auto 1fr max-content;align-items:center;column-gap:8px}
+				.bbmm-x-toolbar .bbmm-btn{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+
+				.bbmm-x-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
+				.bbmm-x-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:.95rem}
+
+				.bbmm-x-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
+				.bbmm-x-table thead th:first-child{width:72px}
+				.bbmm-x-table thead th:last-child{width:44px;text-align:right}
+
+				.bbmm-x-table tbody td{padding:8px 10px;border-bottom:1px solid var(--color-border-light-2);vertical-align:middle}
+				.bbmm-x-table tbody tr:nth-child(odd){background:rgba(255,255,255,.03)}
+
+				.bbmm-x-table .c-type{
+					width:72px;
+					white-space:nowrap;
+					overflow:hidden;
+					text-overflow:ellipsis;
+					color:#9bd;
+				}
+				.bbmm-x-table .c-id{
+					width:auto;
+					font-family:ui-monospace,Menlo,Consolas,monospace;
+					word-break:break-word
+				}
+				.bbmm-x-table .c-del{text-align:right}
+				.bbmm-x-table .bbmm-x-del{
+					display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px
+				}
+				.bbmm-x-count{opacity:.85;font-weight:600}
+
+				/* Footer: full-width Close (match exclusions) */
+				.bbmm-footer{display:block;margin-top:10px}
+				.bbmm-footer-close{
+					display:flex;justify-content:center;align-items:center;
+					width:100%;height:36px;padding:0 14px;border-radius:8px;font-weight:600;
+				}
+			</style>
+
 			<section class="bbmm-x-root">
 				<div class="bbmm-x-toolbar">
 					<button type="button" class="bbmm-btn bbmm-x-add-setting" data-action="add-setting">${LT.buttons.addSetting()}</button>
@@ -760,7 +859,10 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				</div>
 			</section>
 		`;
+
+		return html;
 	}
+
 	async _replaceHTML(result, _options) {
 		// Clamp + layout 
 		const winEl = this.element;
