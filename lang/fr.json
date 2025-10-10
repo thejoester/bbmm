@@ -265,7 +265,8 @@
       "remote_placeholder": "Le journal des changements distant ne peut être chargé dans l'application. Utilisez le bouton \"Ouvrir un fichier\" pour le voir.",
       "mark_current_unseen": "Marquer le journal des changements actuel comme non lu",
       "mark_all_unseen": "Marquer tout comme non lu",
-      "dontShowAgain": "Ne plus afficher pour cette version"
+      "dontShowAgain": "Ne plus afficher pour cette version",
+      "noneFound": "Aucun nouveau journal des modifications n'a été trouvé."
     },
     "sync": {
       "BadgeUser": "Option utilisateur",
@@ -301,7 +302,8 @@
       "active": "Actif",
       "inclusionsOpenError": "Échec de l'ouverture du gestionnaire d'inclusions",
       "addModuleWarnTitle": "Inclure le module entier ?",
-      "addModuleWarnMsg": "Il est déconseillé d'inclure un module entier, sauf si vous êtes certain que les données qu'il enregistre seront en sécurité. Consultez {docLink} pour plus d'informations. Continuer ?"
+      "addModuleWarnSeeDoc": "Voir la documentation",
+      "addModuleWarnMsg": "Il n'est pas recommandé d'inclure un module entier à moins d'être sûr que les données qu'il enregistre seront en sécurité. {docLink} Continuer ?"
     },
     "_settings": {
       "bbmmFlags_name": "Drapeaux BGGM",
