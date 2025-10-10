@@ -397,6 +397,14 @@ Hooks.once("init", () => {
 				default: {}
 			});
 
+			// Ledger of soft-locked compendium entries per user
+			game.settings.register(BBMM_ID, "controlSoftLedger", {
+				scope: "world",
+				config: false,
+				type: Object,
+				default: {}, // { userId: [ "compendium.action" ] }
+			});
+
 			// Module Management - Notes
 			game.settings.register("bbmm", "moduleNotes", {
 				name: LT._settings.moduleNotes_name(),

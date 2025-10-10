@@ -109,6 +109,11 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 				.bbmm-am-table .bbmm-exc-act:focus-visible{
 					outline:2px solid var(--color-border-highlight,#79c);outline-offset:2px
 				}
+				.bbmm-am-table .bbmm-exc-act.bbmm-exc-done{
+					pointer-events:none;
+					opacity:.75;
+					font-weight:700;
+				}
 			</style>
 
 			<section class="bbmm-am-root">
@@ -151,38 +156,50 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		footer.style.justifyContent = "flex-end";
 		footer.style.marginTop = "0.75rem";
 
-		const cancelBtn = document.createElement("button");
-		cancelBtn.type = "button";
-		cancelBtn.innerText = LT.buttons.cancel();
-		cancelBtn.addEventListener("click", () => {
+		const closeBtn = document.createElement("button");
+		closeBtn.type = "button";
+		closeBtn.innerText = LT.buttons.close();
+		closeBtn.addEventListener("click", () => {
 			DL("AddModule.cancel(): reopen manager");
 			try { this.close({ force: true }); } catch {}
 			setTimeout(() => {
 				try {
 					(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-				} catch (e) { DL(3, "AddModule.cancel(): reopen failed", e); }
+				} catch (e) { DL(3, "AddModule.close(): reopen failed", e); }
 			}, 0);
 		});
 
-		footer.appendChild(cancelBtn);
+		footer.appendChild(closeBtn);
 		content.appendChild(footer);
 
 		content.addEventListener("click", async (ev) => {
 			const btn = ev.target.closest?.(".bbmm-exc-act");
-			if (!(btn instanceof HTMLButtonElement)) return;
+			if (btn instanceof HTMLButtonElement) {
+				const id = btn.dataset.id || "";
+				if (!id) return;
+				try {
+					btn.disabled = true;
+					await this._exclude(id);
 
-			const id = btn.dataset.id || "";
-			if (!id) return;
+					// Keep dialog open; mark on success 
+					btn.classList.add("bbmm-exc-done");
+					btn.setAttribute("aria-label", "Excluded");
+					btn.innerHTML = "✓";
+					btn.disabled = true;
+					DL(`exclusions.js | AddModule: module ${id} marked as excluded`);
+				} catch (e) {
+					btn.disabled = false;
+					DL(3, "exclude failed", e);
+					ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+				}
+				return;
+			}
 
-			try {
-				btn.disabled = true;
-				await this._exclude(id);
+			// Footer "Cancel"/"Close" should just close
+			const cancel = ev.target.closest?.('button[data-action="cancel"], [data-action="close"], .bbmm-close');
+			if (cancel) {
 				try { this.close({ force: true }); } catch {}
-				setTimeout(() => { try { openExclusionsManagerApp(); } catch (e) { DL(3,'reopen exclusions failed',e); } }, 0);
-			} catch (e) {
-				btn.disabled = false;
-				DL(3, "exclude failed", e);
-				ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+				return;
 			}
 		});
 	}
@@ -233,7 +250,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				try {
 					const ns  = String(s?.namespace ?? "");
 					const key = String(s?.key ?? "");
-					const scope = String(s?.scope ?? "client");	// "world" | "client" | "user"
+					const scope = String(s?.scope ?? "client");	
 					if (!ns || !key) continue;
 
 					const pairKey = `${ns}::${key}`;
@@ -259,6 +276,43 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				}
 			}
 
+			// Also list registerMenu entries as exclude-able placeholders
+			try {
+				for (const [menuId, menu] of game.settings.menus.entries()) {
+					const dot = menuId.indexOf(".");
+					if (dot <= 0) continue;
+
+					const ns  = String(menuId.slice(0, dot));
+					const key = String(menuId.slice(dot + 1));
+					if (!ns || !key) continue;
+
+					// skip already excluded
+					const pairKey = `${ns}::${key}`;
+					if (excluded.has(pairKey)) continue;
+
+					// Module title (fallback to namespace)
+					const mod = game.modules.get(ns);
+					const modTitle = String(mod?.title ?? ns);
+
+					// Menu label (localized if provided)
+					let setTitle = key;
+					try {
+						if (menu?.name) {
+							const nm = game.i18n.localize(String(menu.name));
+							setTitle = nm || key;
+						}
+					} catch { /* keep fallback */ }
+
+					const scope = menu?.restricted ? "world" : "client";
+
+					// Mark this as a menu row; exclusion will store a placeholder pair
+					rows.push({ namespace: ns, key, modTitle, setTitle, scope, __isMenu: true });
+				}
+				DL("exclusions.js | AddSetting._collectSettings(): menus appended", { count: rows.length });
+			} catch (e) {
+				DL(2, "exclusions.js | AddSetting._collectSettings(): menu enumeration failed", e);
+			}
+
 			// Sort by module title, then setting title
 			rows.sort((a, b) =>
 				a.modTitle.localeCompare(b.modTitle, game.i18n.lang || undefined, { sensitivity: "base" }) ||
@@ -273,6 +327,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		}
 	}
 
+	// Add {namespace,key} to userExclusions.settings
 	async _exclude(namespace, key) {
 		const data = game.settings.get("bbmm", "userExclusions") || {};
 		if (!Array.isArray(data.settings)) data.settings = [];
@@ -280,6 +335,22 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		if (!exists) data.settings.push({ namespace, key });
 		await game.settings.set("bbmm", "userExclusions", data);
 		try { Hooks.callAll("bbmmExclusionsChanged", { type: "setting", namespace, key }); } catch {}
+	}
+
+	// Special case: exclude a menu placeholder
+	async _excludeMenu(namespace, key) {
+		try {
+			const data = game.settings.get("bbmm", "userExclusions") || {};
+			if (!Array.isArray(data.settings)) data.settings = [];
+			const exists = data.settings.some(s => s?.namespace === namespace && s?.key === key);
+			if (!exists) data.settings.push({ namespace, key });
+			await game.settings.set("bbmm", "userExclusions", data);
+			try { Hooks.callAll("bbmmExclusionsChanged", { type: "menu", namespace, key }); } catch {}
+			DL(`exclusions.js | _excludeMenu(): stored placeholder for ${namespace}.${key}`);
+		} catch (e) {
+			DL(3, "exclusions.js | _excludeMenu() failed", e);
+			throw e;
+		}
 	}
 
 	async _renderHTML(_context, _options) {
@@ -354,6 +425,12 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 					outline:2px solid var(--color-border-highlight,#79c);
 					outline-offset:2px;
 				}
+
+				.bbmm-as-table .bbmm-exc-act.bbmm-exc-done{
+					pointer-events:none;
+					opacity:.75;
+					font-weight:700;
+				}
 			</style>
 
 			<section class="bbmm-as-root">
@@ -396,20 +473,20 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		footer.style.justifyContent = "flex-end";
 		footer.style.marginTop = "0.75rem";
 
-		const cancelBtn = document.createElement("button");
-		cancelBtn.type = "button";
-		cancelBtn.innerText = LT.buttons.cancel();
-		cancelBtn.addEventListener("click", () => {
-			DL("exclusions.js | AddSetting.cancel(): reopen manager");
+		const closeBtn = document.createElement("button");
+		closeBtn.type = "button";
+		closeBtn.innerText = LT.buttons.close();
+		closeBtn.addEventListener("click", () => {
+			DL("exclusions.js | AddSetting.closeBtn(): reopen manager");
 			try { this.close({ force: true }); } catch {}
 			setTimeout(() => {
 				try {
 					(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-				} catch (e) { DL(3, "exclusions.js | AddSetting.cancel(): reopen failed", e); }
+				} catch (e) { DL(3, "exclusions.js | AddSetting.closeBtn(): reopen failed", e); }
 			}, 0);
 		});
 
-		footer.appendChild(cancelBtn);
+		footer.appendChild(closeBtn);
 		content.appendChild(footer);
 
 		// Delegated click: Exclude 
@@ -418,28 +495,44 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 		content.addEventListener("click", async (ev) => {
 			const btn = ev.target.closest?.(".bbmm-exc-act");
-			if (!(btn instanceof HTMLButtonElement)) return;
+			if (btn instanceof HTMLButtonElement) {
+				ev.preventDefault();
+				ev.stopPropagation();
 
-			ev.preventDefault();
-			ev.stopPropagation();
+				const ns  = btn.dataset.ns  || "";
+				const key = btn.dataset.key || "";
+				if (!ns || !key) return;
 
-			const ns = btn.dataset.ns || "";
-			const key = btn.dataset.key || "";
-			if (!ns || !key) return;
+				try {
+					btn.disabled = true;
 
-			try {
-				btn.disabled = true;
-				await this._exclude(ns, key);
+					// menu or setting?
+					const row = this._rows?.find?.(r => r.namespace === ns && r.key === key);
+					if (row?.__isMenu) {
+						await this._excludeMenu(ns, key); // store placeholder
+					} else {
+						await this._exclude(ns, key); // store real setting
+					}
+
+					// Keep dialog open; mark on success
+					btn.classList.add("bbmm-exc-done");
+					btn.setAttribute("aria-label", "Excluded");
+					btn.innerHTML = "✓";
+					btn.disabled = true;
+					DL("exclusions.js | AddSetting: row marked as excluded");
+				} catch (e) {
+					btn.disabled = false;
+					DL(3, "exclusions.js | AddSetting.exclude failed", e);
+					ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+				}
+				return;
+			}
+
+			// Footer "Cancel"/"Close" should close without reopening the manager
+			const cancel = ev.target.closest?.('button[data-action="cancel"], [data-action="close"], .bbmm-close');
+			if (cancel) {
 				try { this.close({ force: true }); } catch {}
-				setTimeout(() => {
-					try {
-						(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-					} catch (e) { DL(3, "exclusions.js | AddSetting.reopen manager failed", e); }
-				}, 0);
-			} catch (e) {
-				btn.disabled = false;
-				DL(3, "exclusions.js | AddSetting.exclude failed", e);
-				ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+				return;
 			}
 		});
 	}
@@ -479,11 +572,24 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 	//	Resolve a setting display name; fallback to the raw key if unnamed.
 	_getSettingLabel(ns, key) {
+		// Try a real setting entry first
 		const entry = game.settings.settings.get(`${ns}.${key}`);
-		// entry?.name is often a localization key or a plain string; localize either way
-		const raw = entry?.name ?? "";
-		const label = raw ? game.i18n.localize(String(raw)) : "";
-		return label || String(key);
+		if (entry) {
+			const raw = entry?.name ?? "";
+			const label = raw ? game.i18n.localize(String(raw)) : "";
+			if (label) return label;
+		}
+
+		// If not a setting (placeholder), fall back to the menu label
+		try {
+			const menu = game.settings.menus.get(`${ns}.${key}`);
+			if (menu?.name) {
+				return game.i18n.localize(String(menu.name));
+			}
+		} catch { /* ignore */ }
+
+		// Final fallback
+		return String(key);
 	}
 
 	// Remove a module from userExclusions.settings 
@@ -614,11 +720,45 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		this._rows = rows;
 	}
 
-	async _renderHTML(_context, _options) {
-		// DL('_renderHTML(): fired');
-		this._buildRows();
+	async _renderHTML() {
+		// Build rows from userExclusions (modules + settings)
+		const exc = game.settings.get(BBMM_ID, "userExclusions") || {};
+		const mods = Array.isArray(exc.modules)  ? exc.modules  : [];
+		const sets = Array.isArray(exc.settings) ? exc.settings : [];
 
-		const rows = this._rows.map(r => `
+		// Module rows (use module title for Identifier)
+		const modRows = mods.map(ns => {
+			const mod = game.modules.get(ns);
+			const title = String((mod?.title ?? ns) || ns);
+			return {
+				type: "Module",
+				identifier: title,
+				_ns: ns,
+				_key: "",
+				_id: ns
+			};
+		});
+
+		// Setting rows: "Module Title, Setting Label"
+		const setRows = sets.map(s => {
+			const ns  = String(s?.namespace ?? "");
+			const key = String(s?.key ?? "");
+			const mod = game.modules.get(ns);
+			const nsLabel = String((mod?.title ?? ns) || ns);
+			const entry = game.settings.settings.get(`${ns}.${key}`);
+			const label = entry?.name ? game.i18n.localize(String(entry.name)) : key;
+			return {
+				type: "Setting",
+				identifier: `${nsLabel}, ${label}`,
+				_ns: ns,
+				_key: key,
+				_id: `${ns}.${key}`
+			};
+		});
+
+		this._rows = [...modRows, ...setRows];
+
+		const rowsHTML = this._rows.map(r => `
 			<tr>
 				<td class="c-type">${r.type}</td>
 				<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">
@@ -626,105 +766,84 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				</td>
 				<td class="c-del">
 					<button type="button"
-						class="bbmm-x-del"
+						class="bbmm-exc-del"
+						data-action="delete"
 						data-type="${r.type === "Module" ? "module" : "setting"}"
 						data-id="${r.type === "Module" ? (r._id ?? "") : ""}"
 						data-ns="${r._ns ?? ""}"
 						data-key="${r._key ?? ""}"
-						title="${LT.removeFromExclusions()}">
+						aria-label="Remove">
 						<i class="fas fa-trash"></i>
 					</button>
 				</td>
 			</tr>
 		`).join("");
 
-		const html = `
-			<style>
-				/* Make the app body flex so the scroller can own overflow */
-				#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
-				.bbmm-x-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
+		// Scoped CSS so this window looks correct regardless of global/theme CSS.
+		const css = `
+			#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+			#${this.id} .bbmm-exc-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
+			#${this.id} .bbmm-exc-toolbar{display:grid;grid-template-columns:auto auto 1fr max-content;align-items:center;column-gap:8px}
+			#${this.id} .bbmm-exc-toolbar .bbmm-btn{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
 
-				/* Toolbar: two fixed cells + spacer + count */
-				.bbmm-x-toolbar{display:grid;grid-template-columns:auto auto 1fr max-content;align-items:center;column-gap:8px}
-				.bbmm-x-toolbar .bbmm-btn{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+			#${this.id} .bbmm-exc-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
+			#${this.id} .bbmm-exc-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:.95rem}
+			#${this.id} .bbmm-exc-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
+			#${this.id} .bbmm-exc-table thead th:first-child{width:72px}
+			#${this.id} .bbmm-exc-table thead th:last-child{width:44px;text-align:right}
+			#${this.id} .bbmm-exc-table tbody td{padding:8px 10px;border-bottom:1px solid var(--color-border-light-2);vertical-align:middle}
+			#${this.id} .bbmm-exc-table tbody tr:nth-child(odd){background:rgba(255,255,255,.03)}
+			#${this.id} .bbmm-exc-table .c-type{width:72px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9bd}
+			#${this.id} .bbmm-exc-table .c-id{width:auto;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+			#${this.id} .bbmm-exc-table .c-del{text-align:right}
+			#${this.id} .bbmm-exc-table .c-del .bbmm-exc-del{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px}
 
-				.bbmm-x-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
-				.bbmm-x-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:.95rem}
+			#${this.id} .bbmm-footer{margin-top:10px}
+			#${this.id} .bbmm-footer .bbmm-footer-close{display:flex;justify-content:center;align-items:center;width:100%;height:36px;padding:0 14px;border-radius:8px;font-weight:600}
+		`;
 
-				/* Header */
-				.bbmm-x-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
-				.bbmm-x-table thead th:first-child{width:72px}          /* Type column tighter */
-				.bbmm-x-table thead th:last-child{width:44px;text-align:right} /* Trash col */
-
-				/* Body */
-				.bbmm-x-table tbody td{padding:8px 10px;border-bottom:1px solid var(--color-border-light-2);vertical-align:middle}
-				.bbmm-x-table tbody tr:nth-child(odd){background:rgba(255,255,255,.03)}
-
-				/* Column widths */
-				.bbmm-x-table .c-type{
-					width:72px;                 /* match header */
-					white-space:nowrap;
-					overflow:hidden;
-					text-overflow:ellipsis;
-					color:#9bd;
-				}
-				.bbmm-x-table .c-id{
-					width:auto;
-					font-family:ui-monospace,Menlo,Consolas,monospace;
-					word-break:break-word
-				}
-				.bbmm-x-table .c-del{
-					width:44px;                 /* match header */
-					padding-right:8px;
-					display:flex;
-					justify-content:flex-end;   /* push trash right */
-					align-items:center
-				}
-
-				/* Trash button sizing */
-				.bbmm-x-table .bbmm-x-del{
-					display:inline-flex;
-					align-items:center;
-					justify-content:center;
-					width:28px;
-					height:28px
-				}
-
-				.bbmm-x-count{opacity:.85;font-weight:600}
-			</style>
-
-
-
-			<section class="bbmm-x-root">
-				<div class="bbmm-x-toolbar">
-					<button type="button" class="bbmm-btn bbmm-x-add-module" data-action="add-module">${LT.buttons.addModule()}</button>
-					<button type="button" class="bbmm-btn bbmm-x-add-setting" data-action="add-setting">${LT.buttons.	addSetting()}</button>
+		return `
+			<style>${css}</style>
+			<section class="bbmm-exc-root">
+				<div class="bbmm-exc-toolbar">
+					<button type="button" class="bbmm-btn" data-action="add-setting">${LT.buttons.addSetting()}</button>
+					<button type="button" class="bbmm-btn" data-action="add-module">${LT.buttons.addModule()}</button>
 					<div></div>
 					<div class="bbmm-x-count">${LT.total()}: ${this._rows.length}</div>
 				</div>
 
-				<div class="bbmm-x-scroller">
-					<table class="bbmm-x-table">
-						<thead><tr><th>${LT.type()}</th><th>${LT.identifier()}</th><th></th></tr></thead>
-						<tbody>${rows || `<tr><td colspan="3" class="c-empty" style="text-align:center;opacity:.8;padding:18px 0">${LT.noExclusionsYet()}.</td></tr>`}</tbody>
+				<div class="bbmm-exc-scroller">
+					<table class="bbmm-exc-table">
+						<thead>
+							<tr>
+								<th>${LT.type()}</th>
+								<th>${LT.identifier()}</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>
+							${rowsHTML || `<tr><td colspan="3" class="c-empty" style="text-align:center;opacity:.8;padding:18px 0">No exclusions.</td></tr>`}
+						</tbody>
 					</table>
+				</div>
+
+				<div class="bbmm-footer">
+					<button type="button" class="bbmm-footer-close" data-action="close">${LT.buttons.close()}</button>
 				</div>
 			</section>
 		`;
-
-		return html;
 	}
 
 	async _replaceHTML(result, _options) {
-		// clamp + layout 
+		// Clamp window
 		const winEl = this.element;
 		try {
-			winEl.style.minWidth  = this._minW + "px";
-			winEl.style.maxWidth  = this._maxW + "px";
-			winEl.style.minHeight = this._minH + "px";
-			winEl.style.maxHeight = this._maxH + "px";
+			winEl.style.minWidth  = "560px";
+			winEl.style.maxWidth  = "920px";
+			winEl.style.minHeight = "360px";
+			winEl.style.maxHeight = "800px";
 			winEl.style.overflow  = "hidden";
-		} catch (e) { DL(2, "exclusions.js | BBMMExclusionsAppV2: size clamp failed", e); }
+		} catch (e) { DL(2, "exclusions.js | Manager: size clamp failed", e); }
 
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
@@ -732,43 +851,25 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		// avoid double-binding across re-renders
 		if (this._delegated) return;
 		this._delegated = true;
-		
-		const footer = document.createElement("footer");
-		footer.classList.add("form-footer");
-		footer.style.display = "flex";
-		footer.style.justifyContent = "flex-end";
-		footer.style.marginTop = "0.75rem";
-
-		const cancelBtn = document.createElement("button");
-		cancelBtn.type = "button";
-		cancelBtn.innerText = LT.buttons.close();
-		cancelBtn.addEventListener("click", () => {
-			DL("exclusions.js | ExclusionsManager.cancel(): close");
-			try { this.close({ force: true }); } catch {}
-		});
-
-		footer.appendChild(cancelBtn);
-		content.appendChild(footer);
 
 		content.addEventListener("click", async (ev) => {
-			const btn = ev.target.closest?.("button[data-action], .bbmm-x-del");
-			if (!(btn instanceof HTMLButtonElement)) return;
+			// find the nearest button with either a data-action or the delete class
+			const btn = ev.target?.closest?.('button[data-action], button.bbmm-exc-del');
+			if (!btn) return;
 
 			ev.preventDefault();
 			ev.stopPropagation();
 
 			const action = btn.dataset.action || "";
-			DL(`exclusions.js | BBMMExclusionsAppV2.click(): ${action}`);
+			DL(`exclusions.js | Manager.click(): ${action || btn.className}`);
 
-			if (action === "add-module") {
+			// Close (bottom button) or header X
+			if (action === "close" || action === "cancel" || btn.classList.contains("bbmm-close")) {
 				try { this.close({ force: true }); } catch {}
-				setTimeout(() => {
-					try { openAddModuleExclusionApp(); }
-					catch (e) { DL(3, "exclusions.js | openAddModuleExclusionApp(): failed", e); }
-				}, 0);
 				return;
 			}
 
+			// Open Add Setting Exclusion
 			if (action === "add-setting") {
 				try { this.close({ force: true }); } catch {}
 				setTimeout(() => {
@@ -777,61 +878,60 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				}, 0);
 				return;
 			}
-			
-			// delete handling
-			if (btn.classList.contains("bbmm-x-del")) {
-				ev.preventDefault();
-				ev.stopPropagation();
 
-				const type = btn.dataset.type;
-				if (type === "module") {
-					const id = btn.dataset.id || "";
-					if (!id) return;
-					DL(`id: `, id);
-					const mod = game.modules.get(id);
-					const title = String(mod?.title ?? id);
-					const ok = await this._confirmDelete(`${LT.confirmRemoveModuleExclusion({title: title })}?`);
-					if (!ok) return;
-
-					try {
-						DL(`delete confirmed - firing _removeExcludedModule(id): `, id);
-						btn.disabled = true;
-						await this._removeExcludedModule(id);
-						await this.render(true);	// re-render manager
-					} catch (e) {
-						btn.disabled = false;
-						ui.notifications?.error(`${LT.errors.failedRemoveModuleExclusion()}.`);
-					}
-					return;
-				}
-
-				if (type === "setting") {
-					// read attributes the button was rendered with
-					const ns  = btn.dataset.ns  || "";
-					const key = btn.dataset.key || "";
-					if (!ns || !key) return;
-
-					DL("exclusions.js | delete(setting): opening confirm", { ns, key });
-					const ok = await this._confirmDelete(`${LT.confirmRemoveSettingExclusion({ ns: ns, key: key })}?`);
-					if (!ok) return;
-
-					try {
-						btn.disabled = true;
-						DL(`exclusions.js | delete confirmed - firing _removeExcludedSetting(): ${ns}.${key}`);
-						await this._removeExcludedSetting(ns, key);
-						await this.render(true); // refresh the list
-					} catch (e) {
-						btn.disabled = false;
-						DL(3, "exclusions.js | _removeExcludedSetting() failed", e);
-						ui.notifications?.error(LT.failRemoveSettingExclusion());
-					}
-					return;
-				}
+			// Open Add Module Exclusion
+			if (action === "add-module") {
+				try { this.close({ force: true }); } catch {}
+				setTimeout(() => {
+					try { (globalThis.bbmm?.openAddModuleExclusionApp || globalThis.openAddModuleExclusionApp)?.(); }
+					catch (e) { DL(3, "exclusions.js | openAddModuleExclusionApp(): failed", e); }
+				}, 0);
+				return;
 			}
-			
+
+			// Immediate delete — NO PROMPT
+			if (action === "delete" || btn.classList.contains("bbmm-exc-del")) {
+				const type = btn.dataset.type || "";
+				const ns   = btn.dataset.ns   || "";
+				const key  = btn.dataset.key  || "";
+
+				try {
+					btn.disabled = true;
+
+					const data = game.settings.get(BBMM_ID, "userExclusions") || {};
+
+					if (type === "module" && ns) {
+						const list = Array.isArray(data.modules) ? data.modules : [];
+						data.modules = list.filter(x => x !== ns);
+						await game.settings.set(BBMM_ID, "userExclusions", data);
+						try { Hooks.callAll("bbmmExclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
+						DL(`exclusions.js | delete(module): ${ns}`);
+						await this.render(true);
+						return;
+					}
+
+					if (type === "setting" && ns && key) {
+						const list = Array.isArray(data.settings) ? data.settings : [];
+						data.settings = list.filter(s => !(s?.namespace === ns && s?.key === key));
+						await game.settings.set(BBMM_ID, "userExclusions", data);
+						try { Hooks.callAll("bbmmExclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
+						DL(`exclusions.js | delete(setting): ${ns}.${key}`);
+						await this.render(true);
+						return;
+					}
+
+					// Fallback (missing ids)
+					btn.disabled = false;
+					DL(2, "exclusions.js | delete: unknown type or missing ids", { type, ns, key });
+				} catch (e) {
+					btn.disabled = false;
+					DL(3, "exclusions.js | delete: failed", e);
+					ui.notifications?.error("Failed to remove exclusion. See console.");
+				}
+				return;
+			}
 		});
 	}
-
 }
 
 // PUBLIC LAUNCHERS
