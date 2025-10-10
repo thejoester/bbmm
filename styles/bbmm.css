@@ -77,16 +77,25 @@
 /* ─────────────────────────────────────────────────────────────
 	Lock/Sync Icons
    ───────────────────────────────────────────────────────────── */
-.bbmm-lock-icons i + i { margin-left: .35rem; }
-.bbmm-lock-icons { display:inline-flex; gap:.4rem; margin-left:.4rem; vertical-align:middle; }
-.bbmm-lock-icons .bbmm-badge { opacity:.85; }
-.bbmm-lock-icons .bbmm-click { cursor:pointer; opacity:.85; }
-.bbmm-lock-icons .bbmm-click:hover { opacity:1; transform: translateY(-1px); }
-.bbmm-lock-icons .bbmm-active { color: orange; }
-.bbmm-lock-icons .bbmm-partial { color: #1f449c; } /* partial = softer orange */
+.bbmm-lock-icons {
+	display: inline-flex;
+	gap: 0.4rem;
+	margin-left: 0.4rem;
+	vertical-align: middle;
+}
+.bbmm-lock-icons i + i { margin-left: 0.35rem; }
+.bbmm-lock-icons .bbmm-badge { opacity: 0.85; }
+.bbmm-lock-icons .bbmm-click {cursor: pointer; opacity: 0.85; }
+.bbmm-lock-icons .bbmm-click:hover { opacity: 1; transform: translateY(-1px); }
+
+/* Active: orange tint */
+.bbmm-active { color: orange !important; }
+
+/* Partial: blue tint */
+.bbmm-lock-icons .bbmm-partial { color: #1f449c; }
 
 /* ─────────────────────────────────────────────────────────────
-	Player Disabled Styles                                                    */
+	Player Disabled Styles
    ───────────────────────────────────────────────────────────── */
 .bbmm-locked-input { opacity: .65; pointer-events: none; }
 .bbmm-locked-badge { display: inline-flex; align-items: center; gap: .25rem; margin-left: .4rem; color: var(--color-text-dark-secondary, #999); }

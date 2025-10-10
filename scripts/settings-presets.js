@@ -9,12 +9,14 @@ if (!AppV2) {
 	DL(1, "settings-presets.js | ApplicationV2 base class not found.");
 }
 
-// ===== Helpers =====
+/* =======================================================================
+	{HELPERS}
+======================================================================= */
 
 const BBMM_V2_WINDOWS = new Map();	// id -> app
 
+/* Deep equals for settings values =====================================*/
 function hlp_valuesEqual(a, b) {
-	// Deep equals with Foundry helper if available
 	try {
 		if (foundry?.utils?.isPropertyEqual) return foundry.utils.isPropertyEqual(a, b);
 		return JSON.stringify(a) === JSON.stringify(b);
@@ -24,42 +26,25 @@ function hlp_valuesEqual(a, b) {
 	}
 }
 
+/* V2 Window Registry ================================================== */
 Hooks.on("renderDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.set(app.id, app);
-		//DL(`settings-presets.js | renderDialogV2: registered ${app?.id}`);
 	} catch (e) {
-		//DL(2, "settings-presets.js | renderDialogV2: registry failed", e);
+		DL(2, "settings-presets.js | renderDialogV2: registry failed", e);		
 	}
 });
 
+/* V2 Window Unregistry ================================================ */
 Hooks.on("closeDialogV2", (app) => {
 	try {
 		if (app?.id) BBMM_V2_WINDOWS.delete(app.id);
-		//DL(`settings-presets.js | closeDialogV2: unregistered ${app?.id}`);
 	} catch (e) {
-		//DL(2, "settings-presets.js | closeDialogV2: unregistry failed", e);
+		DL(2, "settings-presets.js | closeDialogV2: unregistry failed", e);
 	}
 });
 
-/*
-// Return an open app by id.
-function getWindowById(id) {
-	// Check v2 registry first
-	const v2 = BBMM_V2_WINDOWS.get(id);
-	if (v2) return v2;
-
-	// Fallback for classic windows tracked in ui.windows
-	const all = Object.values(ui.windows ?? {});
-	return all.find(w => w?.id === id) ?? null;
-}
-*/
-
-/* 
-	Convert a bbmm-settings export envelope:
-	{ world:{ns:{key:val}}, client:{...}, user:{...} }
-	-> flat entries: [{namespace,key,scope,value}, ...] 
-*/
+/* Normalize a bbmm-settings envelope to flat entries array ============= */
 function hlp_normalizeToEntries(bbmmExport) {
 	// Build skip map once (EXPORT_SKIP + userExclusions)
 	const skip = getSkipMap();
@@ -117,6 +102,7 @@ function hlp_normalizeToEntries(bbmmExport) {
 	return entries;
 }
 
+/* Convert flat entries array back to bbmm-settings envelope ============= */
 function hlp_entriesToEnvelope(entries) {
 	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
 	for (const e of entries || []) {
@@ -127,13 +113,14 @@ function hlp_entriesToEnvelope(entries) {
 	return out;
 }
 
-// Default preset name suggestion
+/* Default preset name suggestion ======================================= */
 function hlp_defaultPresetName() {
 	const d = new Date();
 	const pad = (n) => `${n}`.padStart(2, "0");
 	return `${LT.imported()} ${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/* Find existing preset key case-insensitively =========================== */
 function hlp_findExistingSettingsPresetKey(name) {
 	const wanted = hlp_normalizePresetName(name);
 	const presets = svc_getSettingsPresets();
@@ -143,7 +130,7 @@ function hlp_findExistingSettingsPresetKey(name) {
 	return null;
 }
 
-// JSON (de)hydration helpers so Sets/Maps survive JSON.stringify
+/* JSON (de)hydration helpers so Sets/Maps survive JSON.stringify ======== */
 function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 	const here = path || "<root>";
 	const ROOT = depth === 0;
@@ -224,6 +211,7 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 	return out;
 }
 
+/* Revives JSON-safe wrappers back into real Sets/Maps recursively ======= */
 function hlp_fromJsonSafe(value) {
 	if (Array.isArray(value)) return value.map(v => hlp_fromJsonSafe(v));
 	if (value && typeof value === "object") {
@@ -236,10 +224,12 @@ function hlp_fromJsonSafe(value) {
 	return value;
 }
 
+/* Detect plain empty object (not Array, not null, no keys) =========== */
 function hlp_isPlainEmptyObject(v) {
 	return v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0;
 }
 
+/* Correct non-plain types in a bbmm-settings envelope ================ */
 function hlp_schemaCorrectNonPlainTypes(out) {
 	for (const [fullKey, cfg] of game.settings.settings.entries()) {
 		const [namespace, key] = fullKey.split(".");
@@ -271,18 +261,22 @@ function hlp_schemaCorrectNonPlainTypes(out) {
 	}
 }
 
-// Return true if this setting exists in the registry
+/* Return true if this setting exists in the registry ================= */
 function hlp_isRegisteredSetting(namespace, key) {
 	const fullKey = `${namespace}.${key}`;
 	return game.settings?.settings?.has(fullKey) === true;
 }
 
-// ===== SERVICES =====
+/* =======================================================================
+	{SERVICES}
+======================================================================= */
 
+/* Get all saved presets from settings store ============================ */
 function svc_getSettingsPresets() {
 	return foundry.utils.duplicate(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
 }
 
+/* Save all presets to settings store ============================ */
 async function svc_setSettingsPresets(obj) {
 	// Write to user-scoped store "settingsPresetsUser"
 	try {
@@ -300,13 +294,14 @@ async function svc_setSettingsPresets(obj) {
 	}
 }
 
-/*	
-	Collect all Settings - except excluded
-	Collect module settings by scope, optionally restricting to active modules.
+/* Collect all Settings - except excluded ================================
+	Collect module settings by scope, 
+		optionally restricting to active modules.
 	- Skips config:false entries
 	- GM: world + client, Non‑GM: client only
-	- includeDisabled=false -> skip modules that are not active (except core/system)
-*/
+	- includeDisabled=false -> skip modules that are not active 
+		(except core/system)
+======================================================================= */
 function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden = false } = {}) {
 	// Build a bbmm-settings envelope
 	const isGM = game.user.isGM;
@@ -396,7 +391,7 @@ function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden =
 	return out;
 }
 
-// Prompt for a local JSON file and parse it
+/* Prompt for a local JSON file and parse it ========================== */
 async function svc_applySettingsExport(exportData) {
 	// Validate envelope
 	if (!exportData || exportData.type !== "bbmm-settings") {
@@ -497,7 +492,7 @@ async function svc_applySettingsExport(exportData) {
 	return { applied, skipped, missingModules };
 }
 
-// Conflict-safe Preset Save
+/* Conflict-safe Preset Save Rename/Overwrite/Cancel prompt =========== */
 function svc_askSettingsPresetConflict(existingKey) {
 	return new Promise((resolve) => {
 		new foundry.applications.api.DialogV2({
@@ -517,11 +512,7 @@ function svc_askSettingsPresetConflict(existingKey) {
 	});
 }
 
-/*
-	Preset persistence
-	- Registers bbmm.presets (world, hidden) if needed
-	- Saves/updates presets[name] = { created, updated, items:[entry...] }
-*/
+/* Export Preset to File ============================================== */
 async function svc_savePresetToSettings(presetName, selectedEntries) {
 	try {
 		const current = foundry.utils.duplicate(
@@ -543,7 +534,7 @@ async function svc_savePresetToSettings(presetName, selectedEntries) {
 	}
 }
 
-// Save Settings Preset
+/* Save Settings Preset with conflict resolution ====================== */
 async function svc_saveSettingsPreset(name, payload) {
 	const rawInput = String(name).trim();
 	let finalName = rawInput;
@@ -567,6 +558,10 @@ async function svc_saveSettingsPreset(name, payload) {
 	return { status: "saved", name: finalName };
 }
 
+/* plan settings changes ================================================= 
+	- Build a list of setting changes between live settings and  
+		bbmm-export envelope 
+======================================================================= */
 async function svc_planSettingsChanges(env) {
 	const rows = [];
 	try {
@@ -620,9 +615,11 @@ async function svc_planSettingsChanges(env) {
 	}
 }
 
-// ===== UI =====
+/* =======================================================================
+	{UI HELPERS}
+======================================================================= */
 
-//	Rename Prompt
+/*	Rename Prompt ===================================================== */
 function ui_promptRenamePreset(defaultName) {
 	return new Promise((resolve) => {
 		new foundry.applications.api.DialogV2({
@@ -644,7 +641,9 @@ function ui_promptRenamePreset(defaultName) {
 	});
 }
 
-// Open the import wizard. `data` is the parsed JSON object from file.
+/* Open the import wizard ================================================
+	- `data` is the parsed JSON object from file.
+======================================================================== */
 export async function ui_openSettingsImportWizard(data) {
 	try {
 		// If no data was passed in, prompt the user to pick a JSON file
@@ -728,12 +727,7 @@ export async function ui_openSettingsImportWizard(data) {
 	}
 }
 
-/* ---------------------------------------------------------------------- */
-/* ui_openPresetPreview(): scrollable diff table                          */
-/* ---------------------------------------------------------------------- */
-/* ---------------------------------------------------------------------- */
-/* ui_openPresetPreview(): clamped single-scroller w/ sticky header       */
-/* ---------------------------------------------------------------------- */
+/* Preview the changes that would be made by applying a preset ======== */
 function ui_openPresetPreview(rows, presetName = "") {
 	try {
 		DL(`settings-presets.js | ui_openPresetPreview(): open rows=${rows?.length ?? 0}`);
@@ -807,7 +801,7 @@ function ui_openPresetPreview(rows, presetName = "") {
 	}
 }
 
-// helper: simple inline diff highlighting
+/* Simple char-diff highlight for small strings ======================== */
 function hlp_diffHighlight(oldVal, newVal) {
 	try {
 		const oldStr = (typeof oldVal === "string") ? oldVal : JSON.stringify(oldVal, null, 2);
@@ -830,9 +824,7 @@ function hlp_diffHighlight(oldVal, newVal) {
 	}
 }
 
-/*
-	ApplicationV2: BBMMImportWizard
-*/
+/* Import Wizard App ================================================== */
 class BBMMImportWizard extends AppV2 {
 	constructor(state) {
 		super({
@@ -1143,16 +1135,12 @@ class BBMMImportWizard extends AppV2 {
 	}
 }
 
-// Settings Preset Manager main
+/* Settings Preset Manager ============================================= */
 export async function openSettingsPresetManager() {
 	// Stable id for this manager window so we can find/close it reliably
 	const PRESET_MANAGER_ID = "bbmm-settings-preset-manager";
 
-	/*
-		Find an open window by id.
-		- First check a global DialogV2/ApplicationV2 registry (BBMM_V2_WINDOWS) if one exists.
-		- Fallback to legacy ui.windows for classic Application windows.
-	*/
+	// Helper: find an existing window by id, checking v2 registry first if present
 	const getWindowById = (id) => {
 		try {
 			// Check v2 registry if present
@@ -1217,10 +1205,7 @@ export async function openSettingsPresetManager() {
 		</section>
 	`;
 
-	/*
-		Create DialogV2 with a stable id so we can close/refresh later.
-		We’ll re-center it on render to avoid off-screen growth.
-	*/
+	// Construct the DialogV2
 	const dlg = new foundry.applications.api.DialogV2({
 		id: PRESET_MANAGER_ID,
 		window: { title: LT.titleSettingsPresetMgr(), resizable: true },
@@ -1229,10 +1214,7 @@ export async function openSettingsPresetManager() {
 		buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
 	});
 
-	/*
-		Attach listeners after the DialogV2 DOM is in place.
-		Also normalize button types and re-center the window so it never sits off-screen.
-	*/
+	// Render it
 	const onRender = (app) => {
 		if (app !== dlg) return;
 		Hooks.off("renderDialogV2", onRender);
@@ -1241,10 +1223,10 @@ export async function openSettingsPresetManager() {
 		try { dlg.setPosition({ height: "auto", left: null, top: null }); } catch {}
 
 		const root = app.element;
-		const form = root?.querySelector("form");	// DialogV2 wraps content in a form
+		const form = root?.querySelector("form");
 		if (!form) return;
 
-		// Ensure all action buttons are non-submitting buttons (defensive)
+		// Ensure all action buttons are non-submitting buttons 
 		form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
 
 		// Single delegated click handler for all actions
@@ -1258,7 +1240,7 @@ export async function openSettingsPresetManager() {
 			ev.stopPropagation();
 			ev.stopImmediatePropagation();
 
-			// Read controls directly from the dialog root (more reliable with DialogV2)
+			// Read controls directly from the dialog root
 			const sel = root.querySelector('select[name="presetName"]');
 			const txt = root.querySelector('input[name="newName"]');
 			const chk = root.querySelector('input[name="includeDisabled"]');
@@ -1297,9 +1279,7 @@ export async function openSettingsPresetManager() {
 			}
 
 			try {
-				/*
-					SAVE CURRENT -> new named preset
-				*/
+				// SAVE CURRENT -> collect current settings and save as new preset
 				if (action === "save-current") {
 					const payload = svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
 					DL("settings-presets.js | openSettingsPresetManager(): save-current — collected payload", {
@@ -1328,9 +1308,7 @@ export async function openSettingsPresetManager() {
 					return;
 				}
 
-				/*
-					UPDATE -> overwrite the SELECTED preset with CURRENT settings
-				*/
+				// UPDATE -> collect current settings and overwrite selected preset
 				if (action === "update") {
 					if (!selected) { ui.notifications.warn(`${LT.selectSettingsPreset()}.`); return; }
 
@@ -1356,15 +1334,13 @@ export async function openSettingsPresetManager() {
 
 					ui.notifications.info(`${LT.updatedSettingsPreset({ name: selected})}.`);
 
-					// Refresh list (no need to rebuild options, but keep consistent)
+					// Refresh list
 					app.close();
 					openSettingsPresetManager();
 					return;
 				}
 
-				/*
-					LOAD -> apply preset
-				*/
+				// LOAD -> apply the selected preset to current settings
 				if (action === "load") {
 					if (!selected) return ui.notifications.warn(`${LT.selectSettingsPresetLoad()}.`);
 					const preset = svc_getSettingsPresets()[selected];
@@ -1437,6 +1413,7 @@ export async function openSettingsPresetManager() {
 					return;
 				}
 
+				// PREVIEW -> show a diff of what would change if we loaded the selected preset
 				if (action === "preview") {
 					DL(`settings-presets.js | Preview button clicked`);
 					// Same selected check as load
@@ -1480,9 +1457,8 @@ export async function openSettingsPresetManager() {
 					}
 					return;
 				}
-				/*
-					DELETE -> remove a preset
-				*/
+				
+				// DELETE -> delete the selected preset after confirmation
 				if (action === "delete") {
 					if (!selected) return ui.notifications.warn(`${LT.errors.selectSettingPresetDelete()}.`);
 					const ok = await foundry.applications.api.DialogV2.confirm({
@@ -1503,9 +1479,7 @@ export async function openSettingsPresetManager() {
 					return;
 				}
 
-				/*
-					EXPORT -> file
-				*/
+				// EXPORT settings to a JSON file
 				if (action === "export") {
 					try {
 						DL("settings-presets.js | openSettingsPresetManager(): Export: start");
@@ -1528,7 +1502,7 @@ export async function openSettingsPresetManager() {
 					return;
 				}
 
-				// Import settings from a file
+				// IMPORT settings from a JSON file
 				if (action === "import") {
 					const file = await hlp_pickLocalJSONFile();
 					if (!file) return;
