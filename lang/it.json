@@ -269,8 +269,8 @@
 			"remote_placeholder": "Il changelog remoto non può essere caricato nell’app. Usa il pulsante Apri File per visualizzarlo.",
 			"mark_current_unseen": "Segna attuale come non visto",
 			"mark_all_unseen": "Segna tutti come non visti",
-			"dontShowAgain": "Non mostrare più per questa versione"
-			
+			"dontShowAgain": "Non mostrare più per questa versione",
+			"noneFound": "Nessun nuovo changelog trovato."			
 		},
 
 		"sync": {
@@ -308,7 +308,9 @@
 			"active": "Attivo",
 			"inclusionsOpenError": "Impossibile aprire Gestore inclusioni.",
 			"addModuleWarnTitle": "Includere l’intero modulo?",
-			"addModuleWarnMsg": "Non è consigliato includere un intero modulo a meno che tu non sia sicuro che i dati salvati siano sicuri. Vedi {docLink} per maggiori informazioni. Continuare?"
+			"addModuleWarnSeeDoc": "Vedi Documentazione",
+			"addModuleWarnMsg": "Non è consigliato includere un intero modulo a meno che tu non sia sicuro che i dati salvati siano sicuri. {docLink} Continua?"
+			
 		},
 
 		"_settings": {
