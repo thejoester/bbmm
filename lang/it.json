@@ -194,7 +194,7 @@
 		"openChangelog": "Apri Changelog",
 		"openedSettingsFor": "Impostazioni aperte per {title}.",
 		"noSettingsFoundFor": "Nessuna impostazione configurabile per {title}.",
-		
+		"modListNotesDeleted": "Note eliminate.",	
 		"buttons": {
 			"yes": "Sì",
 			"no": "No",
@@ -222,8 +222,7 @@
 			"importToPreset": "Importa in preset",
 			"expSettingsJSON": "esporta impostazioni in .json",
 			"expModuleStateJSON": "esporta stato moduli in .json"
-		},
-		
+		},		
 		"errors": {
 			"conflictTitleExists": "Preset esistente",
 			"dependencyMissing": "Dipendenze mancanti",
@@ -255,7 +254,6 @@
 			"failedOpenLegacyExport": "Impossibile aprire finestra esportazione legacy (vedi console)",
 			"failedModulestateExp": "Esportazione stato moduli fallita (vedi console)"
 		},
-
 		"changelog": {
 			"window_title": "Changelog moduli",
 			"source": "Fonte",
@@ -272,7 +270,6 @@
 			"dontShowAgain": "Non mostrare più per questa versione",
 			"noneFound": "Nessun nuovo changelog trovato."			
 		},
-
 		"sync": {
 			"BadgeUser": "Impostazione a livello utente",
 			"BadgeClient": "Impostazione a livello client",
@@ -290,9 +287,9 @@
 			"EnableName": "Abilita sincronizzazione impostazioni utente/client",
 			"EnableHint": "GM: se disabilitato, BBMM non aggiungerà controlli di blocco/sync, non invierà valori e non forzerà/nasconderà impostazioni utente/client.",
 			"ClickPickUsers": "Click: seleziona utenti online da sincronizzare",
-			"ShiftAll": "Shift+Click: Soft-Lock scorciatoie"
+			"ShiftAll": "Shift+Click: Soft-Lock scorciatoie",
+			"RightClearSoft": "Clic destro: cancella Soft-Lock"
 		},
-
 		"inclusions": {
 			"manager": "Inclusioni",
 			"title": "Gestore inclusioni",
@@ -309,10 +306,10 @@
 			"inclusionsOpenError": "Impossibile aprire Gestore inclusioni.",
 			"addModuleWarnTitle": "Includere l’intero modulo?",
 			"addModuleWarnSeeDoc": "Vedi Documentazione",
-			"addModuleWarnMsg": "Non è consigliato includere un intero modulo a meno che tu non sia sicuro che i dati salvati siano sicuri. {docLink} Continua?"
-			
+			"addModuleWarnMsg": "Non è consigliato includere un intero modulo a meno che tu non sia sicuro che i dati salvati siano sicuri. {docLink} Continua?",
+			"menuHasNoHidden": "Quel menu non ha impostazioni nascoste da includere.",
+			"noHiddenTooltip": "Nessuna impostazione nascosta da includere"			
 		},
-
 		"_settings": {
 			"bbmmFlags_name": "BBMM Flags",
 			"bbmmFlags_hint": "Flag nascosti BBMM",
@@ -338,6 +335,53 @@
 			"softLockRevMap_controls_hint": "Memorizza quale valore di blocco leggero dei controlli è stato applicato per ultimo",
 			"moduleNotes_name": "Note moduli BBMM",
 			"moduleNotes_hint": "Note aggiunte ai moduli."
+		},
+		"macro": {
+  			"columnName": "Nome",
+ 			"columnHint": "Suggerimento",
+ 			"columnNamespace": "Spazio nomi",
+  			"columnAction": "Azione",
+  			"columnKeys": "Tasti",
+  			"columnRestricted": "Limitato",
+  			"columnEditable": "Modificabile",
+  			"columnUneditable": "Non modificabile",
+  			"columnMods": "Modificatori",
+  			"labelLoading": "Caricamento…",
+  			"key": "Chiave",
+  			"value": "Valore",
+  			"scope": "Ambito",
+  			"type": "Tipo",
+  			"copy": "Copia",
+ 			"collapse": "Comprimi",
+  			"settings": "Impostazioni",
+  			"search": "Cerca…",
+  			"showing": "Mostrando",
+  			"of": "di",
+  			"btnInspect": "Ispeziona",
+  			"visibility": "Visibilità",
+  			"copiedValToClipboard": "Valore copiato negli appunti.",
+  			"failedCopyToClipboard": "Copia negli appunti non riuscita. Seleziona il testo e premi Ctrl+C.",
+  			"titleLoading": "BBMM — Caricamento",
+  			"noEntriesFound": "Nessuna voce trovata o caricamento annullato.",
+  			"titleInspectSettings": "BBMM — Ispeziona impostazioni e flag",
+  			"titleLoadingSettings": "BBMM — Caricamento impostazioni",
+  			"labelLoadingNumSettings": "Caricamento di {ns} impostazioni…",
+  			"failedOpenSettingsInspector": "Impossibile aprire l'Ispettore delle impostazioni (vedi console).",
+  			"titleLoadingFlagsMe": "BBMM — Caricamento flag (Miei)",
+  			"labelLoadingNumFlags": "Caricamento flag '{ns}'…",
+  			"titleLoadingFlagsAll": "BBMM — Caricamento flag (Tutti gli utenti)",
+  			"flagsUserMe": "Flag utente (Io)",
+  			"flagsUserAll": "Flag utente (Tutti gli utenti)",
+  			"titleInspectPreset": "BBMM — Ispeziona preset impostazioni",
+  			"inspectSettingsPresetName": "BBMM — Ispeziona preset impostazioni: {name}",
+  			"presetFilterPlaceholder": "Cerca spazio dei nomi, chiave, ambito, visibilità, valore…",
+  			"settingsPresetNoneFound": "Nessun preset di impostazioni BBMM trovato.",
+  			"presetMalformed": "Il preset è malformato o non contiene elementi.",
+  			"failedOpenPresetInspector": "Impossibile aprire l'Ispettore dei preset (vedi console).",
+  			"failedOpenKeybindInspector": "Impossibile aprire l'Ispettore dei comandi da tastiera (vedi console).",
+  			"titleKeybindInspecor": "BBMM — Ispeziona comandi da tastiera",
+  			"keybindFilterPlaceholder": "Cerca spazio nomi, azione, nome, suggerimento, tasti…",
+  			"selectPreset": "Seleziona un preset di impostazioni."
 		}
 	}
 }
