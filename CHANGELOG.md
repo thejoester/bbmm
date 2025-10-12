@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2025-10-11
+### Changed
+- **Module Management:**
+  - [Issue #48](https://github.com/thejoester/bbmm/issues/48): If there are no notes for a module, it will show the module description from the module.json if it exists when expanded. 
+- **Macros:**
+  - Consolidated macros into module code so they could be localized. 
+  - Added macro to reset changelog seen state and reopen changelog report. 
+### Fixed 
+- **Changelog Report:**
+  - [Issue #47](https://github.com/thejoester/bbmm/issues/47): Fixed issue with some changelog text pushing off window, and forcing buttons off window. 
+- **Macros:**
+  - (Multiple) copy button in macros now functional to copy value to clipboard. 
+
 ## [0.5.6] - 2025-10-09
 ### Changed
 - **Controls Sync:**

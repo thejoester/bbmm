@@ -327,7 +327,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>Big Bad Module Manager macros found in the compendium:</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe]{View Changelog Report} - Launch the changelog report manually.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.sc6d0g6syYz3nEbB]{BBMM: Setting Preset Inspector} - allows you to inspect a preset, see the saved settings and values contained inside for troubleshooting purposes.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector} - Tool to view module settings to see both visible and hidden settings, and their current values. This is a read only tool. May be useful for deciding what to put on inclusion / exclusion manager. </p><p></p>"
+        "content": "<p>Big Bad Module Manager macros found in the compendium:</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe]{View Changelog Report} - Launch the changelog report manually.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.KKjNNKp07HamxcUO]{BBMM: Reset Changelog} - Reset the \"seen\" state of changelogs and launch Changelog Report. </p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.sc6d0g6syYz3nEbB]{BBMM: Setting Preset Inspector} - allows you to inspect a preset, see the saved settings and values contained inside for troubleshooting purposes.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector} - Tool to view module settings to see both visible and hidden settings, and their current values. This is a read only tool. May be useful for deciding what to put on inclusion / exclusion manager.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.cwDZlfhhZAZaUPER]{BBMM: Keybind inspector} - Tool to inspect keybiniding details. </p><p></p><p></p>"
       },
       "video": {
         "controls": true,
@@ -344,11 +344,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.348",
+        "coreVersion": "13.350",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757800788174,
-        "modifiedTime": 1758040924495,
+        "modifiedTime": 1760257988593,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Tw7LX79cvGnJ3F67"
