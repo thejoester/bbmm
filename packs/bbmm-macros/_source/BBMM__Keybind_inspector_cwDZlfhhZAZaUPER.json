@@ -1,0 +1,32 @@
+{
+  "name": "BBMM: Keybind inspector",
+  "type": "script",
+  "author": "EpqDCtSCbVNM4wPj",
+  "img": "icons/commodities/tech/metal-panel.webp",
+  "scope": "global",
+  "command": "/* BBMM — Inspect Keybinds =================================================\n      - Tool to inspect all registered keybindings in Foundry VTT v13\n========================================================================= */\n(async () => {\n\tconst api = game.modules.get(\"bbmm\")?.api;\n\tif (!api) return ui.notifications.error(\"BBMM API not available.\");\n\tapi.openKeybindInspector();\n})();",
+  "folder": null,
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "flags": {
+    "macro-wheel": {
+      "activeCondition": ""
+    }
+  },
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.350",
+    "systemId": "pf2e",
+    "systemVersion": "7.6.0",
+    "createdTime": 1760243401603,
+    "modifiedTime": 1760249566692,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_id": "cwDZlfhhZAZaUPER",
+  "sort": 0,
+  "_key": "!macros!cwDZlfhhZAZaUPER"
+}

@@ -24,7 +24,8 @@
         "scripts/inclusions.js",
         "scripts/setting-sync.js",
         "scripts/module-management.js",
-        "scripts/changelogs.js"
+        "scripts/changelogs.js",
+        "scripts/macros.js"
     ],
     "socket": true,
     "packs": [

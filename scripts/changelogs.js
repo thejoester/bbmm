@@ -175,43 +175,49 @@ async function _bbmmListModuleFilesCached(modId) {
 ============================================================================ */
 function _bbmmSizeFrameOnce(frame, app) {
 	try {
-		// Viewport
-		const vw = window?.innerWidth ?? 1280;
-		const vh = window?.innerHeight ?? 900;
+		// Viewport (prefer visual viewport if present)
+		const vw = window?.visualViewport?.width ?? window?.innerWidth ?? 1280;
+		const vh = window?.visualViewport?.height ?? window?.innerHeight ?? 900;
 
-		// Margins  
+		// Margins
 		const marginW = 40;
 		const marginH = 60;
 
-		// Hard ceiling for very tall displays 
-		const HARD_MAX_H = 900;
+		// Caps (from constructor or defaults)
+		const MIN_W = Number(app?._MIN_W ?? 480);
+		const MAX_W = Number(app?._MAX_W ?? 1200);
 
-		// Respect constructor base size
-		const baseW = Math.max(720, Number(app?._baseW ?? 900));
+		// Base sizes
+		const baseW = Math.max(MIN_W, Math.min(MAX_W, Number(app?._baseW ?? 900)));
 		const baseH = Math.max(400, Number(app?._baseH ?? 640));
 
-		// Width: base -> capped to viewport
-		const maxW = Math.max(600, Math.min(vw - marginW, 1600));
-		const w = Math.min(Math.max(baseW, 720), maxW);
+		// Width: clamp to viewport and max cap
+		const usableW = Math.max(MIN_W, vw - marginW);
+		const w = Math.max(MIN_W, Math.min(MAX_W, Math.min(baseW, usableW)));
 
-		// Height: start at base, clamp to viewport 
-		const h = Math.min(Math.max(baseH, 400), vh - marginH);
+		// Height: clamp to 75% of viewport (minus margins)
+		const capH = Math.max(400, Math.floor(vh * 0.75) - marginH);
+		const h = Math.min(Math.max(baseH, 400), capH);
 
-		// Apply initial size 
+		// Apply to inner frame
 		frame.style.width = `${w}px`;
 		frame.style.height = `${h}px`;
-		frame.style.minWidth = "720px";
-		frame.style.maxWidth = `${maxW}px`;
-		frame.style.maxHeight = `min(${HARD_MAX_H}px, calc(100vh - ${marginH}px))`;
-
-		// Keep content scrolling inside, not the window
+		frame.style.maxWidth = `${MAX_W}px`;
+		frame.style.maxHeight = `calc(75vh - ${marginH}px)`;
 		frame.style.overflow = "hidden";
 
-		DL(`changelog.js | _bbmmSizeFrameOnce(): viewport=${vw}x${vh}, base=${baseW}x${baseH}, final=${w}x${h}`);
+		// Also clamp the outer window (in case a saved size restores)
+		const win = frame.closest?.(".window-app#bbmm-changelog-journal");
+		if (win) {
+			win.style.maxHeight = "75vh";
+		}
+
+		DL(`_bbmmSizeFrameOnce(): final=${w}x${h}, capH=${capH}, vw=${vw}, vh=${vh}`);
 	} catch (err) {
-		DL(2, `changelog.js | _bbmmSizeFrameOnce error: ${err?.message || err}`, err);
+		DL(3, `changelog.js | _bbmmSizeFrameOnce error: ${err?.message || err}`, err);
 	}
 }
+
 
 /* ============================================================================
 	Convert basic subset of Markdown to HTML
@@ -360,33 +366,43 @@ async function _bbmmRenderMarkdownOnly(md) {
 /* Main Workflow ============================================================ */
 class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 	constructor(entries) {
-		// Detect viewport height and pick a safe base height
+		const MIN_W = 480;
+		const MAX_W = 1200;
+		const MARGIN = 80;
+
+		const vvW = (window?.visualViewport?.width ?? window?.innerWidth ?? MAX_W) - MARGIN;
+		const startW = Math.max(MIN_W, Math.min(MAX_W, vvW));
+
 		const _vh = (window?.visualViewport?.height ?? window?.innerHeight ?? 900);
 		const _height = _vh < 800 ? 500 : 640;
 
 		super({
 			id: "bbmm-changelog-journal",
 			window: { title: LT.changelog.window_title(), modal: true },
-			width: 900,
-			minWidth: 900,
+			width: startW,
+			minWidth: MIN_W,
 			height: _height,
 			resizable: false,
 			classes: ["bbmm-changelog-journal"]
 		});
 
-		// Remember base size so the sizer doesn't undershoot it
-		this._baseW = 900;
+		this._MIN_W = MIN_W;
+		this._MAX_W = MAX_W;
+
+		// Keep base modest so sizer won't re-widen above the cap
+		this._baseW = Math.max(MIN_W, Math.min(MAX_W, 900));
 		this._baseH = _height;
 
 		this.entries = Array.isArray(entries) ? entries : [];
 		this.index = 0;
 
-		// track per-session states
 		this._markedSeen = new Set();
 		this._pendingOnClose = new Set();
 
 		this._sizedOnce = false;
 		this._centeredOnce = false;
+
+		DL("BBMMChangelogJournal(): init", { startW, MIN_W, MAX_W });
 	}
 
 	/* ============================================================================
@@ -544,7 +560,9 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 
 		// compose the full view
 		const content = `
-			<section class="bbmm-shell bbmm-changelog bbmm-changelog-journal" style="display:flex;gap:.75rem;min-height:0;height:100%; width: 1200px; min-width:1200px;">
+			<section class="bbmm-shell bbmm-changelog bbmm-changelog-journal"
+				style="display:flex;gap:.75rem;min-height:0;height:100%;width:100%;min-width:0;">
+
 				<!-- Sidebar -->
 				<aside class="bbmm-theme-reset" style="width:300px;min-width:220px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;padding:.5rem;border-right:1px solid var(--color-border-light, #888);">
 					<div class="bbmm-nav-scroll" style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:.5rem;">

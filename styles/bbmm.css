@@ -102,7 +102,7 @@
 .bbmm-locked-hide { display: none !important; }
 
 /* ─────────────────────────────────────────────────────────────
-   Changelog — theme reset + scoped styles
+	Changelog — theme reset + scoped styles
    ───────────────────────────────────────────────────────────── */
 
 /* Use Foundry/theme defaults inside the right pane */
@@ -118,26 +118,53 @@
 .bbmm-changelog-journal .bbmm-theme-reset .panel {
 	background: transparent;
 	color: inherit;
-	border-color: currentColor;
+	border-color: currentColor;	
 }
 
 /* Fix the changelog window width exactly */
 .app#bbmm-changelog-journal,
 .window-app#bbmm-changelog-journal {
-	width: 900px !important;
-	min-width: 900px !important;
-	max-width: 900px !important;
+	max-width: 1200px !important;
+	min-width: 480px !important;
+	width: auto !important;
+	box-sizing: border-box;  
+	max-height: 75vh !important;
 }
+
+/* SHELL: ensure it can shrink and never force overflow */
+.bbmm-changelog-journal .bbmm-shell {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+	min-width: 0;               
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+/* Allow the right-side pane to wrap and never force horizontal overflow */
 .bbmm-changelog-journal .right {
-	min-width: 560px;
+	flex: 1 1 auto;
+	min-width: 0 !important;   
+	max-width: 100%;
+	overflow-x: hidden;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+/* LAYOUT: give the left nav a fixed basis; let the right side be flexible */
+.bbmm-changelog-journal .left {
+	flex: 0 0 260px;                /* fixed sidebar width */
+	max-width: 260px;
+	min-width: 200px;               /* optional floor */
 }
 
 /* HEADINGS / TEXT rhythm */
 .bbmm-heading {
-	display: inline-flex;    
-	align-items: baseline;    
-	gap: 0.4rem;              
-	margin: 0;                
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.4rem;
+	margin: 0;
 }
 
 .bbmm-heading .bbmm-version {
@@ -193,7 +220,7 @@
 	/* comfortable tap target */
 	padding: 0.4rem 0.5rem;
 	line-height: 1.3;
-	min-height: 2.8rem; 
+	min-height: 2.8rem;
 }
 
 .bbmm-changelog-journal .bbmm-nav-item div {
@@ -207,19 +234,21 @@
 	border-color: var(--color-border, #666);
 	box-shadow: inset 0 0 0 9999px color-mix(in srgb, currentColor 6%, transparent);
 }
+
 .bbmm-nav-item[data-active="1"] {
 	outline: 2px solid orange;
-	outline-offset: -2px; 
-	border-radius: 8px;  
+	outline-offset: -2px;
+	border-radius: 8px;
 }
+
 /* Hover / focus */
 .bbmm-changelog-journal .bbmm-nav-item:hover,
 .bbmm-changelog-journal .bbmm-nav-item:focus {
 	border-color: var(--color-border, #ffffff);
 	box-shadow: inset 0 0 0 2px orange;
 	background-color: rgba(119, 78, 0, 0.432);
-	color: white;             
-	border-radius: 8px;        
+	color: white;
+	border-radius: 8px;
 	cursor: pointer;
 }
 
@@ -232,6 +261,94 @@
 /* De-emphasis utility used in body text */
 .bbmm-changelog-journal .bbmm-theme-reset .muted {
 	opacity: .75;
+}
+
+/* ─────────────────────────────────────────────────────────────
+	Text wrapping & overflow control in changelog body
+   ───────────────────────────────────────────────────────────── */
+
+/* Make the window content a flex column so inner panes can shrink/scroll */
+.bbmm-changelog-journal .window-content {
+	display: flex;
+	flex-direction: column;
+	min-height: 0; /* allow children to be smaller than their content */
+}
+
+/* The changelog body becomes the scrolling region */
+.bbmm-changelog-journal .bbmm-changelog-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+}
+
+/* Flex children must be allowed to shrink to enable wrapping */
+.bbmm-changelog-journal .window-content,
+.bbmm-changelog-journal .right,
+.bbmm-changelog-journal .bbmm-changelog-body {
+	min-width: 0 !important;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+/* Wrap everything in the body (except code blocks) */
+.bbmm-changelog-journal .bbmm-changelog-body,
+.bbmm-changelog-journal .bbmm-changelog-body *:not(pre):not(code) {
+	white-space: normal !important;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+	hyphens: auto;
+	min-width: 0 !important; 
+	max-width: 100%;
+}
+
+/* Long URLs can still be extreme—break them aggressively */
+.bbmm-changelog-journal .bbmm-changelog-body a {
+	overflow-wrap: anywhere;
+	word-break: break-all;
+}
+
+/* Inline code should WRAP; only code blocks should keep preformatted width */
+.bbmm-changelog-journal .bbmm-changelog-body code {
+	white-space: normal !important;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+/* Preserve code formatting; scroll instead of expanding */
+.bbmm-changelog-journal .bbmm-changelog-body pre,
+.bbmm-changelog-journal .bbmm-changelog-body code {
+	white-space: pre;
+	max-width: 100%;
+	overflow: auto;
+}
+
+/* keep wide tables usable without pushing the pane */
+.bbmm-changelog-journal .bbmm-changelog-body table {
+	display: block;
+	table-layout: fixed;
+	width: 100%;
+	overflow-x: auto;
+}
+
+/* Media should never push layout wider than the pane */
+.bbmm-changelog-journal .bbmm-changelog-body img,
+.bbmm-changelog-journal .bbmm-changelog-body table {
+	max-width: 100%;
+	height: auto;
+}
+
+/* Kill common nowrap culprits from third-party styles */
+.bbmm-changelog-journal .bbmm-changelog-body .label,
+.bbmm-changelog-journal .bbmm-changelog-body .tag,
+.bbmm-changelog-journal .bbmm-changelog-body .badge {
+	white-space: normal !important;
+}
+
+/* Final guardrail: descendants cannot impose a larger min-width */
+.bbmm-changelog-journal .bbmm-changelog-body * {
+	min-width: 0 !important;
+	max-width: 100%;
+	box-sizing: border-box;
 }
 
 /* ==========================================================================

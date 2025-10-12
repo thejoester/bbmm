@@ -194,7 +194,7 @@
 		"openChangelog": "Open Changelog",
 		"openedSettingsFor": "Opened settings for {title}.",
 		"noSettingsFoundFor": "No configurable settings for {title}.",
-		
+		"modListNotesDeleted": "Notes deleted.",	
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",
@@ -222,8 +222,7 @@
 			"importToPreset": "Import to Preset",
 			"expSettingsJSON": "export settings to .json",
 			"expModuleStateJSON": "export module state to .json"
-		},
-		
+		},		
 		"errors": {
 			"conflictTitleExists": "Preset Exists",
 			"dependencyMissing": "Dependencies missing",
@@ -255,7 +254,6 @@
 			"failedOpenLegacyExport": "Failed to open legacy export dialog (See console)",
 			"failedModulestateExp": "Module state export failed (See console)"
 		},
-
 		"changelog": {
 			"window_title": "Module Changelogs",
 			"source": "Source",
@@ -272,7 +270,6 @@
 			"dontShowAgain": "Don’t show again for this version",
 			"noneFound": "No new changelogs found."
 		},
-
 		"sync": {
 			"BadgeUser": "User-scoped setting",
 			"BadgeClient": "Client-scoped setting",
@@ -293,7 +290,6 @@
 			"ShiftAll": "Shift+Click: Soft-Lock keybinds",
 			"RightClearSoft": "Right-Click: Clear soft-lock"
 		},
-
 		"inclusions": {
 			"manager": "Inclusions",
 			"title": "Inclusions Manager",
@@ -314,7 +310,6 @@
 			"menuHasNoHidden": "That menu has no hidden settings to include.",
 			"noHiddenTooltip": "No hidden settings to include"
 		},
-
 		"_settings": {
 			"bbmmFlags_name": "BBMM Flags",
 			"bbmmFlags_hint": "BBMM hidden Flags",
@@ -340,6 +335,53 @@
 			"softLockRevMap_controls_hint": "Remembers which controls soft lock value was last applied",
 			"moduleNotes_name": "BBMM Module Notes",
 			"moduleNotes_hint": "Notes added to modules."
+		},
+		"macro": {
+			"columnName": "Name",
+			"columnHint": "Hint",
+			"columnNamespace": "Namespace",
+			"columnAction": "Action",
+			"columnKeys": "Keys",
+			"columnRestricted": "Restricted",
+			"columnEditable": "Editable",
+			"columnUneditable": "Uneditable",
+			"columnMods": "Modifiers",
+			"labelLoading": "Loading…",
+			"key": "Key",
+			"value": "Value",
+			"scope": "Scope",
+			"type": "Type",
+			"copy": "Copy",
+			"collapse": "Collapse",
+			"settings": "Settings",
+			"search": "Search…",
+			"showing": "Showing",
+			"of": "of",
+			"btnInspect": "Inspect",
+			"visibility": "Visibility",
+			"copiedValToClipboard": "Copied value to clipboard.",
+			"failedCopyToClipboard": "Clipboard copy failed. Select text and press Ctrl+C.",
+			"titleLoading": "BBMM — Loading",
+			"noEntriesFound": "No entries found or loading cancelled.",
+			"titleInspectSettings": "BBMM — Inspect Settings & Flags",
+			"titleLoadingSettings": "BBMM — Loading Settings",
+			"labelLoadingNumSettings": "Loading {ns} settings…",
+			"failedOpenSettingsInspector": "Failed to open Settings Inspector (see console).",
+			"titleLoadingFlagsMe": "BBMM — Loading Flags (Me)",
+			"labelLoadingNumFlags": "Loading '{ns}' flags…",
+			"titleLoadingFlagsAll": "BBMM — Loading Flags (All Users)",
+			"flagsUserMe": "User Flags (Me)",
+			"flagsUserAll": "User Flags (All Users)",
+			"titleInspectPreset": "BBMM — Inspect Settings Preset",
+			"inspectSettingsPresetName": "BBMM — Inspect Settings Preset: {name}",
+			"presetFilterPlaceholder": "Search namespace, key, scope, visibility, value…",
+			"settingsPresetNoneFound":"No BBMM settings presets found.",
+			"presetMalformed": "Preset is malformed or has no items.",
+			"failedOpenPresetInspector": "Failed to open Preset Inspector (see console).",
+			"failedOpenKeybindInspector": "Failed to open Keybinding Inspector (see console).",
+			"titleKeybindInspecor": "BBMM — Inspect Keybindings",
+			"keybindFilterPlaceholder": "Search namespace, action, name, hint, keys…",
+			"selectPreset":"Select a settings preset."
 		}
 	}
 }

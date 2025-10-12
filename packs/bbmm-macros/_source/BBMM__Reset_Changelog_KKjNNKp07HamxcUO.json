@@ -1,0 +1,32 @@
+{
+  "folder": null,
+  "name": "BBMM: Reset Changelog",
+  "type": "script",
+  "author": "EpqDCtSCbVNM4wPj",
+  "img": "icons/magic/time/arrows-circling-pink.webp",
+  "scope": "global",
+  "command": "/* ===========================================================================\n   BBMM: Reset changelog\n   - resets the changelog seen state to force it to reappear\n=========================================================================== */\n(async () => {\n\ttry { \n      await game.settings.set(\"bbmm\", \"seenChangelogs\", {});\n      cl = await game.settings.get(\"bbmm\", \"seenChangelogs\");\n      console.log(cl);\n\n      game.modules.get(\"bbmm\")?.api?.openChangelogReport?.(); }\n\tcatch (e) { ui.notifications.error(\"BBMM changelog API not found.\"); }\n})();",
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "flags": {
+    "macro-wheel": {
+      "activeCondition": ""
+    }
+  },
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.350",
+    "systemId": "pf2e",
+    "systemVersion": "7.6.0",
+    "createdTime": 1760243404490,
+    "modifiedTime": 1760243533493,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_id": "KKjNNKp07HamxcUO",
+  "sort": 0,
+  "_key": "!macros!KKjNNKp07HamxcUO"
+}

@@ -93,20 +93,58 @@ function _bbmmCreateSettingsGear(modId) {
 async function _bbmmRenderSavedNotesHTML(moduleId) {
 	try {
 		const KEY = "moduleNotes";
-		const all = game.settings.get("bbmm", KEY) || {};
-		const raw = _bbmmExtractEditorContent(all[moduleId] || "");
-		if (!raw) return "";
 
-		// Try to enrich
+		// Use the correct namespace id (BBMM_ID), not a string literal.
+		const all = game.settings.get(BBMM_ID, KEY) || {};
+		const raw = _bbmmExtractEditorContent(all[moduleId] || "").trim();
+
+		// If we have user notes, those take priority.
+		if (raw) {
+			try {
+				const html = await TextEditor.enrichHTML(raw, { async: true, secrets: false });
+				return html || raw;
+			} catch (e) {
+				DL(2, "_bbmmRenderSavedNotesHTML(): enrichHTML failed; using raw", e);
+				return raw;
+			}
+		}
+
+		// No user note — fall back to module description if available.
+		const desc = _bbmmGetModuleDescription(moduleId).trim();
+		if (!desc) return "";
+
 		try {
-			const html = await TextEditor.enrichHTML(raw, { async: true, secrets: false });
-			return html || raw;
+			const html = await TextEditor.enrichHTML(desc, { async: true, secrets: false });
+			return html || desc;
 		} catch (e) {
-			DL(2, "module-management | enrichHTML failed; using raw", e);
-			return raw;
+			DL(2, "_bbmmRenderSavedNotesHTML(): enrichHTML(desc) failed; using raw", e);
+			return desc;
 		}
 	} catch (err) {
-		DL(2, "module-management | _bbmmRenderSavedNotesHTML(): error", err);
+		DL(3, "_bbmmRenderSavedNotesHTML(): error", err);
+		return "";
+	}
+}
+
+/* Get the module description from various possible sources */
+function _bbmmGetModuleDescription(moduleId) {
+	try {
+		const mod = game.modules.get(moduleId);
+		if (!mod) return "";
+
+		// Prefer direct property, then manifest, then metadata, then legacy data
+		let desc =
+			mod.description ??
+			mod?.manifest?.description ??
+			mod?.metadata?.description ??
+			mod?.data?.description ?? // legacy fallback
+			"";
+
+		// Some manifests put markdown or HTML here; return as-is.
+		if (typeof desc !== "string") desc = String(desc ?? "");
+		return desc;
+	} catch (e) {
+		DL(2, "_bbmmGetModuleDescription(): failed", e);
 		return "";
 	}
 }
@@ -139,6 +177,44 @@ function _bbmmSyncClonesFromNative(root) {
 		DL(`module-management | _bbmmSyncClonesFromNative: synced ${n} clone(s)`);
 	} catch (e) {
 		DL(2, "module-management | _bbmmSyncClonesFromNative failed", e);
+	}
+}
+
+/* Determine if the given HTML is effectively empty (no visible content) */
+function _bbmmIsEmptyNoteHTML(html) {
+	try {
+		if (!html) return true;
+		let s = String(html);
+
+		// Normalize whitespace
+		s = s.replace(/\s+/g, " ");
+
+		// Drop ProseMirror trailing breaks
+		s = s.replace(/<br[^>]*class=["']?ProseMirror-trailingBreak["']?[^>]*>/gi, "");
+
+		// Drop generic <br>, &nbsp;, zero-width, and whitespace
+		s = s.replace(/<br\s*\/?>/gi, "")
+			.replace(/&nbsp;/gi, " ")
+			.replace(/[\u200B-\u200D\uFEFF]/g, " ")
+			.trim();
+
+		// Remove empty paragraph/div blocks (including nested empties)
+		// e.g., <p> </p>, <div><br></div>, etc.
+		let prev;
+		do {
+			prev = s;
+			s = s.replace(/<(p|div)>\s*<\/\1>/gi, "");
+			s = s.replace(/<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\1>/gi, "");
+		} while (s !== prev);
+
+		// If nothing left or only bare tags without visible text, consider empty
+		// Strip all tags and inspect remaining text
+		const textOnly = s.replace(/<[^>]*>/g, "").trim();
+		return textOnly.length === 0;
+	} catch (e) {
+		DL(2, "_bbmmIsEmptyNoteHTML(): error while normalizing", e);
+		// Fail-safe: don’t treat as empty on error
+		return false;
 	}
 }
 
@@ -284,28 +360,45 @@ async function _bbmmOpenNotesDialog(moduleId) {
             buttons: [
                 { action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark" },
                 {
-                    action: "save",
-                    label: LT.buttons.save(),
-                    icon: "fa-solid fa-floppy-disk",
-                    default: true,
-                    callback: async () => {
-                        const raw = await readFromProseMirror();  // content-only
-                        let html = raw ?? "";
+					action: "save",
+					label: LT.buttons.save(),
+					icon: "fa-solid fa-floppy-disk",
+					default: true,
+					callback: async () => {
+						const raw = await readFromProseMirror();	// content-only HTML
+						let html = raw ?? "";
 
-                        // Strip trailing spaces/newlines
-                        html = html.replace(/\s+$/, "");
+						// Trim trailing whitespace
+						html = html.replace(/\s+$/, "");
 
-                        // Remove trailing empty <p> / <div> blocks
-                        html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
+						// Remove trailing empty <p>/<div> blocks
+						html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
 
-                        const notes = foundry.utils.duplicate(game.settings.get(BBMM_ID, KEY) || {});
-                        notes[moduleId] = html;
-                        await game.settings.set(BBMM_ID, KEY, notes);
+						// If effectively empty (including ProseMirror-trailingBreak cases) → delete entry
+						const notes = foundry.utils.duplicate(game.settings.get(BBMM_ID, KEY) || {});
+						if (_bbmmIsEmptyNoteHTML(html)) {
+							if (moduleId in notes) delete notes[moduleId];
 
-                        ui.notifications.info(LT.modListNotesSaved());
-                        DL("module-management | saved notes for " + moduleId, { length: html.length });
-                    }
-                }
+							// If nothing left, store {} to keep setting small
+							if (!Object.keys(notes).length) {
+								await game.settings.set(BBMM_ID, KEY, {});
+							} else {
+								await game.settings.set(BBMM_ID, KEY, notes);
+							}
+
+							ui.notifications.info(LT.modListNotesDeleted?.() ?? "Note cleared.");
+							DL(`module-management | cleared empty note for ${moduleId}`);
+							return;
+						}
+
+						// Non-empty → save/update
+						notes[moduleId] = html;
+						await game.settings.set(BBMM_ID, KEY, notes);
+
+						ui.notifications.info(LT.modListNotesSaved());
+						DL(`module-management | saved notes for ${moduleId}`, { length: html.length });
+					}
+				}
             ]
         });
 
