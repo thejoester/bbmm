@@ -193,6 +193,7 @@
     "openChangelog": "Ouvrir le journal des modifications",
     "openedSettingsFor": "Paramètres ouverts pour {title}.",
     "noSettingsFoundFor": "Aucun paramètre configurable pour {title}.",
+    "modListNotesDeleted": "Notes supprimées.",
     "buttons": {
       "yes": "Oui",
       "no": "Non",
@@ -285,7 +286,8 @@
       "EnableName": "Activer la synchronisation des paramètres utilisateur/client",
       "EnableHint": "MJ : lorsqu'il est désactivé, BGGM n'ajoutera ni contrôles de verrouillage/synchronisation, n'imposera pas de valeurs et n'appliquera ni ne masquera les paramètres utilisateur/client.",
       "ClickPickUsers": "Clic : sélectionnez les utilisateurs en ligne à synchroniser",
-      "ShiftAll": "Maj+Clic : définir sans imposer les raccourcis claviers"
+      "ShiftAll": "Maj+Clic : définir sans imposer les raccourcis claviers",
+      "RightClearSoft": "Clic droit : effacer le verrouillage logiciel"
     },
     "inclusions": {
       "manager": "Inclusions",
@@ -303,11 +305,13 @@
       "inclusionsOpenError": "Échec de l'ouverture du gestionnaire d'inclusions",
       "addModuleWarnTitle": "Inclure le module entier ?",
       "addModuleWarnSeeDoc": "Voir la documentation",
-      "addModuleWarnMsg": "Il n'est pas recommandé d'inclure un module entier à moins d'être sûr que les données qu'il enregistre seront en sécurité. {docLink} Continuer ?"
+      "addModuleWarnMsg": "Il n'est pas recommandé d'inclure un module entier à moins d'être sûr que les données qu'il enregistre seront en sécurité. {docLink} Continuer ?",
+      "menuHasNoHidden": "Ce menu n’a aucun paramètre caché à inclure.",
+      "noHiddenTooltip": "Aucun paramètre caché à inclure"
     },
     "_settings": {
-      "bbmmFlags_name": "Drapeaux BGGM",
-      "bbmmFlags_hint": "Drapeaux cachés BGGM",
+      "bbmmFlags_name": "Indicateurs BGGM",
+      "bbmmFlags_hint": "Indicateurs cachés BGGM",
       "userExclusions_name": "BGGM : Exclusions d'utilisateur",
       "userExclusions_hint": "Modules ou paramètres à ignorer lors de l'importation/exportation les préréglages de BGGM.",
       "userInclusions_name": "BGGM : Inclusions d'utilisateur",
@@ -330,6 +334,50 @@
       "softLockRevMap_controls_hint": "Se souvient de la dernière valeur de verrouillage non imposée a été appliquée aux contrôles",
       "moduleNotes_name": "Notes du module BGGM",
       "moduleNotes_hint": "Notes ajoutées aux modules."
+    },
+    "macro": {
+      "columnName": "Nom",
+      "columnHint": "Indice",
+      "columnNamespace": "Espace de noms",
+      "columnAction": "Action",
+      "columnKeys": "Clés",
+      "columnRestricted": "Limité",
+      "columnEditable": "Modifiable",
+      "columnUneditable": "Non modifiable",
+      "columnMods": "Modificateurs",
+      "labelLoading": "Chargement…",
+      "key": "Clé",
+      "value": "Valeur",
+      "type": "Type",
+      "copy": "Copier",
+      "settings": "Paramètres",
+      "search": "Rechercher…",
+      "of": "de",
+      "btnInspect": "Inspecter",
+      "visibility": "Visibilité",
+      "copiedValToClipboard": "Valeur copiée dans le presse-papiers.",
+      "failedCopyToClipboard": "Échec de la copie dans le presse-papiers. Sélectionnez le texte et appuyez sur Ctrl+C.",
+      "titleLoading": "BGGM — Chargement",
+      "noEntriesFound": "Aucune entrée trouvée ou chargement annulé.",
+      "titleInspectSettings": "BGGM - Inspecter les paramètres et les indicateurs",
+      "titleLoadingSettings": "BGGM - chargement des paramètres",
+      "labelLoadingNumSettings": "Chargement de {ns} paramètres…",
+      "failedOpenSettingsInspector": "Échec de l'ouverture de l'inspecteur des paramètres (voir console).",
+      "titleLoadingFlagsMe": "BGGM - Chargement des indicateurs (moi)",
+      "labelLoadingNumFlags": "Chargement de '{ns}' indicateurs…",
+      "titleLoadingFlagsAll": "BGGM - Chargement des indicateurs (tous les utilisateurs)",
+      "flagsUserMe": "Indicateurs d'utilisateur (moi)",
+      "flagsUserAll": "Indicateurs d'utilisateur (tous les utilisateurs)",
+      "titleInspectPreset": "BGGM - Inspecter les paramètres prédéfinis",
+      "inspectSettingsPresetName": "BGGM - Inspecter les paramètres prédéfinis : {name}",
+      "presetFilterPlaceholder": "Rechercher un espace de noms, une clé, une portée, une visibilité, une valeur…",
+      "settingsPresetNoneFound": "Aucun préréglage de paramètres BGGM trouvé.",
+      "presetMalformed": "Le préréglage est mal formé ou ne contient aucun élément.",
+      "failedOpenPresetInspector": "Échec de l'ouverture de l'inspecteur de préréglages (voir console).",
+      "failedOpenKeybindInspector": "Échec de l'ouverture de l'inspecteur de raccourcis clavier (voir console).",
+      "titleKeybindInspecor": "BGGM - Inspecter les raccourcis clavier",
+      "keybindFilterPlaceholder": "Rechercher un espace de noms, une action, un nom, un indice, des clés…",
+      "selectPreset": "Sélectionnez un préréglage de paramètres."
     }
   }
 }
