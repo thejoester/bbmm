@@ -610,6 +610,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		} catch (e) {
 			DL(2, "module-management | failed to patch static SearchFilter", e);
 		}
+
 		// Find the root element
 		const root = (rootEl instanceof HTMLElement) ? rootEl : (app?.element ?? null);
 		if (!root) {
@@ -619,6 +620,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		root.classList.add("bbmm-modmgmt");
 
 		DL("module-management | renderModuleManagement(): initiated");
+
 		// Find the <menu> or .package-list container
 		const list =
 			root.querySelector("menu.package-list.scrollable") ||
@@ -643,16 +645,36 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		DL(`module-management | found ${items.length} list items`);
 
 		let built = 0;
+
+		// overall stopwatch for the build
+		const tBuild0 = performance.now();
+
 		for (const li of items) {
 			if (li.dataset.bbmmTransformed === "1") continue;
+
+			// per-item stopwatch
+			const t0 = performance.now();
+
 			const row = _bbmmBuildModRow(li);
-			if (row) {
-				grid.appendChild(row);
-				li.dataset.bbmmTransformed = "1";
-				li.classList.add("bbmm-hidden-source");	// visually hide but keep display semantics
-				built++;
-			}
+			if (!row) continue;
+
+			grid.appendChild(row);
+			li.dataset.bbmmTransformed = "1";
+			built++;
+
+			const t1 = performance.now();
+			const pkgId =
+				row?.dataset?.packageId ||
+				li.getAttribute("data-module-id") ||
+				li.getAttribute("data-package-id") ||
+				"";
+
+			DL(`module-management | build item ${pkgId}: ${(t1 - t0).toFixed(1)}ms`);
 		}
+
+		// overall timing
+		const tBuild1 = performance.now();
+		DL(`module-management | built ${built}/${items.length} rows in ${(tBuild1 - tBuild0).toFixed(1)}ms`);
 
 		if (!built) {
 			DL(2, "module-management | nothing transformed (selectors may need tuning)");
@@ -676,6 +698,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				: root.querySelector(".bbmm-modlist");
 			if (!menuEl || !grid) throw new Error("missing menu/grid");
 
+			// Build fresh maps each pass (fast) — avoid stale references
 			const buildMaps = () => {
 				const liById = new Map();
 				for (const li of menuEl.querySelectorAll(':scope > li.package')) {
@@ -690,68 +713,118 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				return { liById, rowById };
 			};
 
+			// Fast visibility test — avoid getComputedStyle in the hot path
 			const isNativeShown = (li) => {
-				if (li.hidden) return false;
-				if (li.classList.contains("hidden")) return false;
-				const cs = getComputedStyle(li);
-				if (cs.display === "none" || cs.visibility === "hidden") return false;
-				return true;
+				try {
+					if (li.hidden) return false;
+					if (li.classList.contains("hidden")) return false;
+					if (li.offsetParent === null) return false; // covers display:none up the tree
+					return true;
+				} catch {
+					return true; // fail-open
+				}
 			};
 
 			const mirrorOnce = () => {
+				const t0 = performance.now();
+
 				const { liById, rowById } = buildMaps();
 				let shown = 0, hidden = 0, firstShownId = null;
+
 				for (const [id, li] of liById) {
 					const row = rowById.get(id);
 					if (!row) continue;
 					const show = isNativeShown(li);
-					row.style.display = show ? "grid" : "none";
-					if (show && !firstShownId) firstShownId = id;
-					show ? shown++ : hidden++;
+					// Use display toggle; grid CSS handles layout
+					if (show) {
+						if (row.style.display === "none") row.style.display = "grid";
+						if (!firstShownId) firstShownId = id;
+						shown++;
+					} else {
+						if (row.style.display !== "none") row.style.display = "none";
+						hidden++;
+					}
 				}
+
+				// Safety: ensure our grid isn't accidentally hidden by theme rules
 				const cs = getComputedStyle(grid);
 				if (cs.display === "none") grid.classList.add("bbmm-force-visible");
+
+				const dt = (performance.now() - t0).toFixed(1);
 				DL(`module-management | mirror(filter): shown=${shown}, hidden=${hidden}` +
 					(firstShownId ? `, first=${firstShownId}` : ``) +
-					`, gridDisplay=${getComputedStyle(grid).display}`);
+					`, took=${dt}ms, gridDisplay=${getComputedStyle(grid).display}`);
 			};
-			// Try to patch the app's SearchFilter.filter() method to catch searches
+
+			// Coalesce mirrors to once per frame across all triggers
+			let __bbmmMirrorScheduled = false;
+			let __bbmmMirrorReqs = 0;	// how many times scheduleMirror was asked for
+			const scheduleMirror = () => {
+				__bbmmMirrorReqs++;
+				if (__bbmmMirrorScheduled) return;
+				__bbmmMirrorScheduled = true;
+				requestAnimationFrame(() => {
+					__bbmmMirrorScheduled = false;
+					mirrorOnce();
+				});
+			};
+
+			// Every second, report how many requests we coalesced
+			if (!window.__bbmmMirrorPulse) {
+				window.__bbmmMirrorPulse = setInterval(() => {
+					if (__bbmmMirrorReqs > 0) {
+						DL(`module-management | mirror requests in last 1s: ${__bbmmMirrorReqs}`);
+						__bbmmMirrorReqs = 0;
+					}
+				}, 1000);
+			}
+
+			// Patch the app's SearchFilter.filter() so searches schedule one mirror
 			const tryPatchSearchFilter = () => {
 				const sf = app?.searchFilter;
 				if (!sf || sf.__bbmmMirrorPatched) return false;
 				const origFilter = sf.filter.bind(sf);
 				sf.filter = (query, ...args) => {
 					const r = origFilter(query, ...args);
-					queueMicrotask(mirrorOnce);
+					scheduleMirror();
 					return r;
 				};
 				sf.__bbmmMirrorPatched = true;
 				DL("module-management | patched app.searchFilter.filter() to mirror results");
 				return true;
 			};
+
 			// Try once now, then poll a few times in case the SearchFilter isn't ready yet
 			if (!tryPatchSearchFilter()) {
 				let attempts = 0;
 				const t = setInterval(() => { if (tryPatchSearchFilter() || ++attempts >= 10) clearInterval(t); }, 50);
 			}
-			
+
+			// Delegate typing on the native search box (once-per-frame mirror)
 			if (!root.__bbmmDelegatedMirror) {
-				const schedule = () => requestAnimationFrame(() => requestAnimationFrame(mirrorOnce));
 				const onKeyOrInput = (ev) => {
 					const target = ev.target;
 					if (!(target instanceof HTMLInputElement)) return;
 					if (target.name !== "search") return;
-					schedule();
+					scheduleMirror();
 				};
 				root.addEventListener("input", onKeyOrInput, true);
 				root.addEventListener("keyup", onKeyOrInput, true);
 				root.__bbmmDelegatedMirror = true;
 				DL("module-management | delegated mirror bound on window root");
 			}
-			// Observe the native menu for any attribute/child changes that might affect visibility
-			const mo = new MutationObserver(() => requestAnimationFrame(mirrorOnce));
-			mo.observe(menuEl, { attributes: true, attributeFilter: ["class","style","hidden"], subtree: true, childList: true });
-			requestAnimationFrame(mirrorOnce);
+
+			// Observe the native menu for changes that affect visibility — avoid subtree floods
+			const mo = new MutationObserver(() => scheduleMirror());
+			mo.observe(menuEl, {
+				attributes: true,
+				attributeFilter: ["class","style","hidden"],
+				childList: true,
+				subtree: false
+			});
+
+			// First mirror after initial paint
+			scheduleMirror();
 
 			// Bulk button integration: mirror core actions to BBMM clones
 			try {
@@ -846,6 +919,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		} catch (e) {
 			DL(2, "module-management | mirror patch failed", e);
 		}
+
 		DL(`module-management | injected compact grid with ${built} rows`);
 	} catch (err) {
 		DL(3, "module-management | renderModuleManagement(): error", err);
