@@ -652,9 +652,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		for (const li of items) {
 			if (li.dataset.bbmmTransformed === "1") continue;
 
-			// per-item stopwatch
-			const t0 = performance.now();
-
+			const t0 = performance.now(); // per-item stopwatch
 			const row = _bbmmBuildModRow(li);
 			if (!row) continue;
 
@@ -698,7 +696,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				: root.querySelector(".bbmm-modlist");
 			if (!menuEl || !grid) throw new Error("missing menu/grid");
 
-			// Build fresh maps each pass (fast) — avoid stale references
+			// Build fresh maps each pass — fast and avoids stale refs
 			const buildMaps = () => {
 				const liById = new Map();
 				for (const li of menuEl.querySelectorAll(':scope > li.package')) {
@@ -713,18 +711,30 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				return { liById, rowById };
 			};
 
-			// Fast visibility test — avoid getComputedStyle in the hot path
+			// Fast visibility test — avoid getComputedStyle in hot path
 			const isNativeShown = (li) => {
 				try {
 					if (li.hidden) return false;
 					if (li.classList.contains("hidden")) return false;
-					if (li.offsetParent === null) return false; // covers display:none up the tree
+					if (li.offsetParent === null) return false;
 					return true;
 				} catch {
-					return true; // fail-open
+					return true;
 				}
 			};
 
+			// One-per-frame scheduler for mirror runs
+			let __bbmmMirrorScheduled = false;
+			const scheduleMirror = () => {
+				if (__bbmmMirrorScheduled) return;
+				__bbmmMirrorScheduled = true;
+				requestAnimationFrame(() => {
+					__bbmmMirrorScheduled = false;
+					mirrorOnce();
+				});
+			};
+
+			// The mirror pass
 			const mirrorOnce = () => {
 				const t0 = performance.now();
 
@@ -735,18 +745,19 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 					const row = rowById.get(id);
 					if (!row) continue;
 					const show = isNativeShown(li);
-					// Use display toggle; grid CSS handles layout
+
 					if (show) {
-						if (row.style.display === "none") row.style.display = "grid";
+						if (row.hidden) row.hidden = false;
+						if (row.style.display === "none") row.style.display = "";
 						if (!firstShownId) firstShownId = id;
 						shown++;
 					} else {
+						if (!row.hidden) row.hidden = true;
 						if (row.style.display !== "none") row.style.display = "none";
 						hidden++;
 					}
 				}
 
-				// Safety: ensure our grid isn't accidentally hidden by theme rules
 				const cs = getComputedStyle(grid);
 				if (cs.display === "none") grid.classList.add("bbmm-force-visible");
 
@@ -756,30 +767,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 					`, took=${dt}ms, gridDisplay=${getComputedStyle(grid).display}`);
 			};
 
-			// Coalesce mirrors to once per frame across all triggers
-			let __bbmmMirrorScheduled = false;
-			let __bbmmMirrorReqs = 0;	// how many times scheduleMirror was asked for
-			const scheduleMirror = () => {
-				__bbmmMirrorReqs++;
-				if (__bbmmMirrorScheduled) return;
-				__bbmmMirrorScheduled = true;
-				requestAnimationFrame(() => {
-					__bbmmMirrorScheduled = false;
-					mirrorOnce();
-				});
-			};
-
-			// Every second, report how many requests we coalesced
-			if (!window.__bbmmMirrorPulse) {
-				window.__bbmmMirrorPulse = setInterval(() => {
-					if (__bbmmMirrorReqs > 0) {
-						DL(`module-management | mirror requests in last 1s: ${__bbmmMirrorReqs}`);
-						__bbmmMirrorReqs = 0;
-					}
-				}, 1000);
-			}
-
-			// Patch the app's SearchFilter.filter() so searches schedule one mirror
+			// Patch the app's SearchFilter.filter() so searches schedule a mirror
 			const tryPatchSearchFilter = () => {
 				const sf = app?.searchFilter;
 				if (!sf || sf.__bbmmMirrorPatched) return false;
@@ -794,13 +782,12 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				return true;
 			};
 
-			// Try once now, then poll a few times in case the SearchFilter isn't ready yet
 			if (!tryPatchSearchFilter()) {
 				let attempts = 0;
 				const t = setInterval(() => { if (tryPatchSearchFilter() || ++attempts >= 10) clearInterval(t); }, 50);
 			}
 
-			// Delegate typing on the native search box (once-per-frame mirror)
+			// Delegate typing on the native search box
 			if (!root.__bbmmDelegatedMirror) {
 				const onKeyOrInput = (ev) => {
 					const target = ev.target;
@@ -814,108 +801,38 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				DL("module-management | delegated mirror bound on window root");
 			}
 
-			// Observe the native menu for changes that affect visibility — avoid subtree floods
-			const mo = new MutationObserver(() => scheduleMirror());
-			mo.observe(menuEl, {
-				attributes: true,
-				attributeFilter: ["class","style","hidden"],
-				childList: true,
-				subtree: false
+			// Observers: list rebuilds + per-<li> attributes
+			const moList = new MutationObserver((muts) => {
+				let needBind = false;
+				for (const m of muts) {
+					if (m.type === "childList" && (m.addedNodes?.length || m.removedNodes?.length)) {
+						needBind = true;
+						break;
+					}
+				}
+				if (needBind) bindLiAttributeObservers();
+				scheduleMirror();
 			});
+			moList.observe(menuEl, { childList: true, subtree: false });
 
-			// First mirror after initial paint
+			function bindLiAttributeObservers() {
+				for (const li of menuEl.querySelectorAll(':scope > li.package')) {
+					if (li.__bbmmAttrMo) continue;
+					const moAttr = new MutationObserver(() => scheduleMirror());
+					moAttr.observe(li, {
+						attributes: true,
+						attributeFilter: ["class", "style", "hidden"],
+						subtree: false
+					});
+					li.__bbmmAttrMo = moAttr;
+				}
+				DL("module-management | bound attribute observers on native li items");
+			}
+
+			// initial bind + first mirror
+			bindLiAttributeObservers();
 			scheduleMirror();
 
-			// Bulk button integration: mirror core actions to BBMM clones
-			try {
-				if (!root.dataset.bbmmBulkBound) {
-					const handler = (ev) => {
-						const btn = ev.target.closest("button");
-						if (!btn) return;
-
-						// Prefer data-action if Foundry exposes it
-						const act = (btn.dataset?.action || "").toLowerCase();
-						// Fallback to label text (English)
-						const label = (btn.textContent || btn.ariaLabel || "").trim().toLowerCase();
-
-						let isBulk = false;
-						if (act === "activateall" || act === "deactivateall") isBulk = true;
-						else if ((/(^|\b)activate all\b/.test(label)) || (/(\b)deactivate all\b/.test(label))) isBulk = true;
-
-						if (!isBulk) return;
-
-						// Let core flip NATIVE checkboxes silently; then mirror NATIVE → BBMM clones.
-						queueMicrotask(() => _bbmmSyncClonesFromNative(root));
-						setTimeout(() => _bbmmSyncClonesFromNative(root), 60);
-						setTimeout(() => _bbmmSyncClonesFromNative(root), 200);
-
-						DL("module-management | bulk detected (activate/deactivate all) — mirrored clones from natives without dispatch");
-					};
-
-					// Capture so this still works if footer buttons get re-rendered
-					root.addEventListener("click", handler, true);
-					root.dataset.bbmmBulkBound = "1";
-				}
-			} catch (e) {
-				DL(2, "module-management | bulk button wiring failed", e);
-			}
-
-			// Observe the native menu for changes that might affect checkbox states
-			try {
-				// Observe native menu for any attribute/child changes
-				if (!menuEl.__bbmmSyncMo) {
-					const mo2 = new MutationObserver(() => {
-						requestAnimationFrame(() => _bbmmSyncClonesFromNative(root));
-					});
-					mo2.observe(menuEl, { attributes: true, subtree: true, childList: true });
-					menuEl.__bbmmSyncMo = mo2;
-					DL("module-management | mutation observer bound for native→BBMM sync");
-				}
-
-				// After ANY DialogV2 renders or closes, resync 
-				if (!window.__bbmmDialogSyncBound) {
-					try {
-						Hooks.on?.("closeDialogV2", () => {
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 100);
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 200);
-						});
-						Hooks.on?.("renderDialogV2", (dlgApp, el) => {
-							// Also catch button presses inside the dialog
-							el.addEventListener("click", (ev) => {
-								if (ev.target.closest('button,[type="submit"]')) {
-									setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
-									setTimeout(() => _bbmmSyncClonesFromNative(root), 100);
-								}
-							}, true);
-						});
-					} catch {}
-
-					// Fallback: capture clicks within any V2 dialog container
-					document.addEventListener("click", (ev) => {
-						const dlg = ev.target.closest('.app-v2[data-application="dialogv2"], .dialog-v2, .dialog');
-						if (!dlg) return;
-						if (ev.target.closest('button,[type="submit"]')) {
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 120);
-						}
-					}, true);
-
-					window.__bbmmDialogSyncBound = true;
-					DL("module-management | dialog sync bound (DialogV2 close/render/click)");
-				}
-
-				// Also resync when the form element fires change 
-				const formEl = root.querySelector('form.package-list') || root.querySelector('form[method="post"]');
-				if (formEl && !formEl.__bbmmChangeSync) {
-					formEl.addEventListener("change", () => {
-						queueMicrotask(() => _bbmmSyncClonesFromNative(root));
-					});
-					formEl.__bbmmChangeSync = "1";
-				}
-			} catch (e) {
-				DL(2, "module-management | dependency resync wiring failed", e);
-			}
 		} catch (e) {
 			DL(2, "module-management | mirror patch failed", e);
 		}
@@ -925,6 +842,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		DL(3, "module-management | renderModuleManagement(): error", err);
 	}
 });
+
 
 Hooks.on("setup", () => DL("module-management.js | setup fired"));
 Hooks.on("ready", () => DL("module-management.js | ready fired"));
