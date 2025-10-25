@@ -382,6 +382,36 @@
 			"titleKeybindInspecor": "BBMM — Inspect Keybindings",
 			"keybindFilterPlaceholder": "Search namespace, action, name, hint, keys…",
 			"selectPreset":"Select a settings preset."
+		},
+		"moduleManagement": {
+			"modListWindowTitle": "BBMM — Module Manager",
+			"filterModules": "Filter Modules",
+			"allModules": "All Modules",
+			"activeModules": "Active Modules",
+			"inactiveModules": "Inactive Modules",
+			"enable": "Enable",
+			"disable": "Disable",
+			"enabled": "Enabled",
+			"disabled": "Disabled",
+			"changed": "Changed",
+			"noResults": "No matching modules.",
+			"dependencies": "Dependencies",
+			"conflicts": "Conflicts",
+			"deactivateAll": "Deactivate All Modules",
+			"activateAll": "Activate All Modules",
+			"findTheCulprit": "Find the Culprit!",
+			"saveModuleSettings": "Save Module Settings",
+			"summary": "Planned Changes",
+			"theseWillBeAppliedOnSave": "These changes will be applied when we wire the core save:",
+			"noChanges": "No changes to apply.",
+			"depsTitle": "Enable Required Dependencies",
+			"depsPrompt": "The module you enabled requires the following module(s). Enable them as well?",
+			"reloadRequiredTitle": "Reload Required",
+			"reloadMessage": "Module configuration was updated. Reload now to apply?",
+			"reloadNow": "Reload Now",
+			"reloadLater": "Reload Later",
+			"reloadLaterNotice": "BBMM: Changes saved. Reload to apply.",
+			"saveFailed": "BBMM: Failed to save module configuration."
 		}
 	}
 }

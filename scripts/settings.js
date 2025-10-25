@@ -414,7 +414,15 @@ Hooks.once("init", () => {
 				type: Object,
 				default: {}
 			});
-		
+
+			// temp config store
+			game.settings.register(BBMM_ID, "tempModConfig", {
+				scope: "world",
+				config: false,
+				type: Object,
+				default: {}
+			});
+
 		// ===== SETTINGS ITEMS =====
 		// These DO need to be localized
 
