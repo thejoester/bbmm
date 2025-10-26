@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9-test.4] - 2025-10-26
+### Changed
+- **Module Management:** Complete overhaul of the Module Management window. 
+  - Improved performance! 
+  - Rebuilt as a separate ApplicationV2 window. 
+  - Header shows enabled/disabled counts.
+  - Activate All modules option. 
+  - Shows count of Dependencies and Conflicts from module.json for each module when expanded.
+  - Smart Dependency & Safety Logic:
+    - Enabling modules:
+      - Prompts you if the module requires dependencies not yet enabled.
+      - Lets you confirm enabling all dependencies at once.
+      - Immediately marks those deps active in the temp config & UI.
+    - Disabling modules:
+      - Detects and lists dependent modules that rely on the one being disabled, prompts to disable them too.
+      - Detects orphaned requires (modules now unused by anything else), offers to disable those as well for a clean load order.
+  - Find The Culprit! Support.
+
 ## [0.5.9-test.3] - 2025-10-23
 ###
 - **Module Management:**

@@ -1822,70 +1822,59 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		try {
 			const rows = this._getFiltered();
 			if (!rows.length) {
-				return `<div class="bbmm-mm-empty">${LT.moduleManagement?.noResults()}</div>`;
+			return `<div class="bbmm-mm-empty">${LT.moduleManagement?.noResults()}</div>`;
 			}
 
 			return rows.map((m) => {
-				const planned = !!this._getTempActive(m.id);              // from temp plan
-				const changed = planned !== !!this._coreSnap?.[m.id];      // compare against core snapshot
+			const planned = !!this._getTempActive(m.id);
+			const changed = planned !== !!this._coreSnap?.[m.id];
+			const verTxt  = m.version ? String(m.version) : "";
 
-				const verTxt = m.version ? String(m.version) : "";
-				const depBadge = (m.requires?.length)
-					? `<span class="tag dep" title="${hlp_esc(m.requires.join(", "))}">${LT.moduleManagement.dependencies()}: ${m.requires.length}</span>`
-					: "";
-				const conBadge = (m.conflicts?.length)
-					? `<span class="tag con" title="${hlp_esc(m.conflicts.join(", "))}">${LT.moduleManagement?.conflicts()}: ${m.conflicts.length}</span>`
-					: "";
+			// get the REAL Module object for the tag strip
+			const modObj = game.modules.get(m.id);
 
-				// Right-side actions: keep original-style edit button; status uses icons (no text labels)
-				const statusTitle = planned
-					? (LT.moduleManagement.enabled())
-					: (LT.moduleManagement.disabled());
+			// ONLY deps/conf moved into notes header
+			const depBadge = (m.requires?.length)
+				? `<span class="tag dep" title="${hlp_esc(m.requires.join(", "))}">${LT.moduleManagement.dependencies()}: ${m.requires.length}</span>`
+				: "";
+			const conBadge = (m.conflicts?.length)
+				? `<span class="tag con" title="${hlp_esc(m.conflicts.join(", "))}">${LT.moduleManagement.conflicts()}: ${m.conflicts.length}</span>`
+				: "";
 
-				const changedIcon = changed
-					? `<i class="fa-solid fa-circle-exclamation chg" title="${LT.moduleManagement.changed()}"></i>`
-					: "";
+			return `
+				<div class="row ${planned ? "on" : ""} ${changed ? "chg" : ""}" data-id="${hlp_esc(m.id)}">
+				<label class="toggle" onclick="event.stopPropagation()">
+					<input type="checkbox" ${planned ? "checked" : ""}>
+				</label>
 
-				const modObj = game.modules.get(m.id);           // Full Module instance
-				const tagsHTML = modObj ? this._buildTagsFor(modObj) : "";  // Build real tag strip
+				<div class="main">
+					<div class="title" title="${hlp_esc(m.title)}">${hlp_esc(m.title)}</div>
+				</div>
 
-				return `
-					<div class="row ${planned ? "on" : ""} ${changed ? "chg" : ""}" data-id="${hlp_esc(m.id)}">
-						<label class="toggle" onclick="event.stopPropagation()">
-							<input type="checkbox" ${planned ? "checked" : ""}>
-						</label>
-
-						<div class="main">
-							<div class="title" title="${hlp_esc(m.title)}">${hlp_esc(m.title)}</div>
-							<div class="meta">
-								<span class="id">${hlp_esc(m.id)}</span>
-								${verTxt ? `<span class="ver-text">v${hlp_esc(verTxt)}</span>` : ""}
-								${depBadge}${conBadge}
-							</div>
-						</div>
-
-						<div class="actions">
-							<div class="tags">
-								${tagsHTML}
-								${m.version ? `<span class="ver-text">v${hlp_esc(m.version)}</span>` : ``}
-							</div>
-							<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
-								<i class="fa-solid fa-pen-to-square fa-fw"></i>
-							</button>
-							</div>
-
-						<!-- expandable notes/description area; filled on demand -->
-						<div class="notes">
-							<div class="html"></div>
-						</div>
+				<div class="actions">
+					<div class="tags">
+					${this._buildTagsFor(modObj)}
+					${verTxt ? `<span class="ver-text">v${hlp_esc(verTxt)}</span>` : ``}
 					</div>
-				`;
+					<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
+					<i class="fa-solid fa-pen-to-square fa-fw"></i>
+					</button>
+				</div>
+
+				<div class="notes">
+					<div class="notes-head">
+					${depBadge}${conBadge}
+					</div>
+					<div class="html"></div>
+				</div>
+				</div>
+			`;
 			}).join("");
 		} catch (e) {
 			DL(2, "BBMMModuleManagerApp::_renderRowsHTML(): error", e);
 			return `<div class="bbmm-mm-empty">Error rendering list.</div>`;
 		}
-	}
+		}
 
 	async _renderHTML() {
 		return (
