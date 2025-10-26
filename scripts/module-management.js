@@ -5,7 +5,7 @@
 		• Whole row visually selectable (does not toggle enable/disable yet)
 		• Keep this purely presentational (no core behavior changes)
 ============================================================================== */
-import { DL } from "./settings.js";
+import { DL, injectBBMMHeaderButton, openBBMMLauncher } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 import { hlp_esc } from "./helpers.js";
 
@@ -1202,15 +1202,13 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		});
 	}
 
+	/* Current totals from the planned (temp) state */
 	_diffCounts() {
 		try {
 			let enable = 0, disable = 0;
-			const core = this._coreSnap || (game.settings.get("core", "moduleConfiguration") || {});
-			for (const m of (this._mods ?? [])) {
-				const cur = !!core[m.id];                 // from core snapshot
-				const next = !!this._getTempActive(m.id); // from temp
-				if (next && !cur) enable++;
-				if (!next && cur) disable++;
+			for (const m of this._mods ?? []) {
+				if (this._getTempActive(m.id)) enable++;
+				else disable++;
 			}
 			return { enable, disable };
 		} catch (e) {
@@ -1271,6 +1269,159 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		} catch (e) {
 			DL(2, "BBMMModuleManagerApp::_collectRequired(): error", e);
 			return new Set();
+		}
+	}
+
+	/* Return a Set of module ids that (transitively) depend on the given module.
+	   Only includes modules that are currently planned ON (temp) to avoid noise. */
+	_collectDependents(moduleId) {
+		try {
+			const dependents = new Set();
+			const queue = [moduleId];
+			const seen = new Set(queue);
+
+			// Build a quick index: id -> Set(ids it requires)
+			const requiresOf = new Map();
+			for (const mod of game.modules) {
+				const id = String(mod.id);
+				const req = [...(mod.relationships?.requires ?? [])].map(r => r.id).filter(Boolean);
+				requiresOf.set(id, new Set(req));
+			}
+
+			while (queue.length) {
+				const target = queue.pop();
+				for (const mod of game.modules) {
+					const id = String(mod.id);
+					if (seen.has(id)) continue;
+					const reqs = requiresOf.get(id);
+					if (!reqs || !reqs.has(target)) continue;
+
+					// Only consider “planned ON” modules
+					if (!this._getTempActive(id)) continue;
+
+					dependents.add(id);
+					seen.add(id);
+					queue.push(id); // transitive dependents
+				}
+			}
+			return dependents;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_collectDependents(): error", e);
+			return new Set();
+		}
+	}
+
+	/* Of the modules that THIS module requires, return the ones that are not required
+	   by any OTHER planned-ON module (so they can be safely turned off when disabling this). */
+	_collectOrphanedRequires(moduleId) {
+		try {
+			// Direct requires of the module being disabled
+			const req = this._getModuleRequires(game.modules.get(moduleId));
+			if (!req.length) return new Set();
+
+			// Which of those are still needed by some other planned-ON module?
+			const stillNeeded = new Set();
+			for (const m of game.modules) {
+				const id = String(m.id);
+				if (id === moduleId) continue;
+				if (!this._getTempActive(id)) continue;
+				const r = this._getModuleRequires(m);
+				for (const dep of r) {
+					if (req.includes(dep)) stillNeeded.add(dep);
+				}
+			}
+
+			// Orphans = requires that are not “still needed”
+			const out = new Set();
+			for (const dep of req) if (!stillNeeded.has(dep)) out.add(dep);
+			return out;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_collectOrphanedRequires(): error", e);
+			return new Set();
+		}
+	}
+
+	/* When a module is toggled OFF, confirm disabling its dependents and (optionally) its orphaned requires. */
+	async _ensureSafeDisable(moduleId) {
+		try {
+			// 1) Dependents of this module (modules that will break if we disable it)
+			const dependents = this._collectDependents(moduleId);
+			if (dependents.size) {
+				const list = [...dependents].sort((a, b) => a.localeCompare(b)).map(id => {
+					const t = game.modules.get(id)?.title ?? id;
+					return `<li><code>${hlp_esc(id)}</code> — ${hlp_esc(t)}</li>`;
+				}).join("");
+				const content = document.createElement("div"); // DialogV2: no attributes on root
+				const p = document.createElement("p");
+				p.textContent = LT.moduleManagement?.disableDependentsPrompt?.() ?? "The module you are disabling is required by the following module(s). Disable them as well?";
+				const ul = document.createElement("ul"); ul.innerHTML = list;
+				content.appendChild(p); content.appendChild(ul);
+
+				let accepted = false;
+				await new Promise(resolve => {
+					const safeResolve = () => { try { resolve(); } catch {} };
+					new foundry.applications.api.DialogV2({
+						id: "bbmm-mm-disable-dependents",
+						modal: true,
+						window: { title: LT.moduleManagement?.disableDependentsTitle?.() ?? "Disable Dependent Modules" },
+						content,
+						buttons: [
+							{ action: "ok", label: LT.moduleManagement?.disable?.() ?? "Disable", icon: "fa-solid fa-check", default: true,
+								callback: () => { accepted = true; safeResolve(); } },
+							{ action: "cancel", label: LT.buttons?.cancel?.() ?? "Cancel", icon: "fa-solid fa-xmark",
+								callback: () => { accepted = false; safeResolve(); } }
+						],
+						close: safeResolve
+					}).render(true);
+				});
+				if (!accepted) {
+					DL(`BBMMModuleManagerApp::_ensureSafeDisable(${moduleId}): user canceled dependents`);
+					return false;
+				}
+				// Turn off the dependents in temp
+				await this._setTempActiveBulk([], [...dependents]);
+			}
+
+			// 2) Orphaned requires (things this module needed that nothing else still needs)
+			const orphans = this._collectOrphanedRequires(moduleId);
+			if (orphans.size) {
+				const list = [...orphans].sort((a, b) => a.localeCompare(b)).map(id => {
+					const t = game.modules.get(id)?.title ?? id;
+					return `<li><code>${hlp_esc(id)}</code> — ${hlp_esc(t)}</li>`;
+				}).join("");
+				const content = document.createElement("div");
+				const p = document.createElement("p");
+				p.textContent = LT.moduleManagement?.disableOrphansPrompt?.() ?? "The module you are disabling has required module(s) that are no longer needed by anything else. Disable them too?";
+				const ul = document.createElement("ul"); ul.innerHTML = list;
+				content.appendChild(p); content.appendChild(ul);
+
+				let accepted = false;
+				await new Promise(resolve => {
+					const safeResolve = () => { try { resolve(); } catch {} };
+					new foundry.applications.api.DialogV2({
+						id: "bbmm-mm-disable-orphans",
+						modal: true,
+						window: { title: LT.moduleManagement?.disableOrphansTitle?.() ?? "Disable Unneeded Dependencies" },
+						content,
+						buttons: [
+							{ action: "ok", label: LT.moduleManagement?.disable?.() ?? "Disable", icon: "fa-solid fa-check", default: true,
+								callback: () => { accepted = true; safeResolve(); } },
+							{ action: "cancel", label: LT.buttons?.cancel?.() ?? "Cancel", icon: "fa-solid fa-xmark",
+								callback: () => { accepted = false; safeResolve(); } }
+						],
+						close: safeResolve
+					}).render(true);
+				});
+				if (accepted) {
+					await this._setTempActiveBulk([], [...orphans]);
+				}
+			}
+
+			// If we get here, it’s safe to disable the original module
+			return true;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_ensureSafeDisable(): error", e);
+			return false;
 		}
 	}
 
@@ -1447,6 +1598,194 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		}
 	}
 
+	/* Clone the native icon/tag strip from the core <li>, and optionally strip its version chip */
+	_bbmmCloneCoreTags(modId, { stripVersion = true } = {}) {
+		try {
+			const li =
+				document.querySelector(`li.package[data-module-id="${CSS.escape(modId)}"]`) ||
+				document.querySelector(`li.package[data-package-id="${CSS.escape(modId)}"]`);
+			if (!li) return "";
+
+			const src = li.querySelector(".package-overview");
+			if (!src) return "";
+
+			// Clone only the tag strip
+			const tags = src.querySelectorAll(".tag");
+			if (!tags.length) return "";
+
+			const frag = document.createDocumentFragment();
+			for (const t of tags) {
+				// Optionally remove core's version chip (we will render our own neutral text)
+				if (stripVersion && (t.classList.contains("version") || /v\d/i.test(t.textContent || ""))) continue;
+				const clone = t.cloneNode(true);
+				clone.classList.add("bbmm-tag"); // harmless marker; keeps native sizing
+				frag.appendChild(clone);
+			}
+
+			// Ensure we still have something after stripping
+			if (!frag.childNodes.length) return "";
+
+			const wrap = document.createElement("div");
+			wrap.appendChild(frag);
+			return wrap.innerHTML;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_bbmmCloneCoreTags(): failed", e);
+			return "";
+		}
+	}
+
+	/* Build a core-style tag strip from module metadata (no version pill). */
+	_buildTagsFor(mod) {
+		try {
+			const parts = [];
+
+			// Settings gear (same size as native via "tag flexrow")
+			if (_bbmmModuleHasConfigSettings(mod.id)) {
+				parts.push(
+					`<button type="button" class="tag flexrow" data-bbmm-action="open-settings" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(LT.openSettings?.() ?? "Open Settings")}">` +
+						`<i class="fa-solid fa-gear fa-fw"></i>` +
+					`</button>`
+				);
+			}
+
+			// URL
+			const url = mod.url || mod.manifest || "";
+			if (url) {
+				parts.push(
+					`<a class="tag flexrow" href="${hlp_esc(url)}" target="_blank" rel="noopener" title="${hlp_esc(url)}">` +
+						`<i class="fa-solid fa-link fa-fw"></i>` +
+					`</a>`
+				);
+			}
+
+			// Author(s)
+			const authors = Array.from(mod.authors ?? []);
+			if (authors.length) {
+				parts.push(`<span class="tag flexrow" title="${hlp_esc(authors.map(a => a.name).join(", "))}"><i class="fa-solid fa-user fa-fw"></i></span>`);
+			}
+
+			// Compendium packs
+			const packs = Array.from(mod.packs ?? []);
+			if (packs.length) {
+				parts.push(`<span class="tag flexrow" title="Compendia: ${packs.length}"><i class="fa-solid fa-box-archive fa-fw"></i></span>`);
+			}
+
+			// Localization files
+			const langs = Array.from(mod.languages ?? []);
+			if (langs.length) {
+				parts.push(`<span class="tag flexrow" title="Localization"><i class="fa-solid fa-language fa-fw"></i></span>`);
+			}
+
+			// Compatibility badges
+			try {
+				const comp = mod.compatibility ?? mod.manifest?.compatibility ?? {};
+				const verified = comp?.verified;
+				const min = comp?.minimum;
+				const max = comp?.maximum;
+				if (verified) {
+					parts.push(`<span class="tag flexrow" title="Verified"><i class="fa-solid fa-circle-check fa-fw"></i></span>`);
+				} else if (min || max) {
+					parts.push(`<span class="tag flexrow" title="Compatibility not verified"><i class="fa-solid fa-triangle-exclamation fa-fw"></i></span>`);
+				}
+			} catch {}
+
+			return parts.join("");
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_buildTagsFor(): failed", e);
+			return "";
+		}
+	}
+
+	/* Fallback: synthesize a core-like tag strip when native <li> is not available */
+	_bbmmBuildTagStripFallback(mod) {
+		try {
+			const parts = [];
+
+			// settings gear (native sizing: .tag.flexrow)
+			if (_bbmmModuleHasConfigSettings(mod.id)) {
+                parts.push(
+					`<button type="button" class="tag flexrow" data-bbmm-action="open-settings" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(LT.openSettings?.() ?? "Open Settings")}">` +
+						`<i class="fa-solid fa-gear fa-fw"></i>` +
+					`</button>`
+				);
+			}
+
+			// URL
+			const url = mod.url ?? mod.manifest ?? "";
+			if (url) {
+				parts.push(
+					`<a class="tag flexrow" href="${hlp_esc(url)}" target="_blank" rel="noopener" title="${hlp_esc(url)}">` +
+						`<i class="fa-solid fa-link fa-fw"></i>` +
+					`</a>`
+				);
+			}
+
+			// Authors
+			const authors = Array.from(mod.authors ?? []);
+			if (authors.length) {
+				parts.push(`<span class="tag flexrow" title="${hlp_esc(authors.map(a => a.name).join(", "))}"><i class="fa-solid fa-user fa-fw"></i></span>`);
+			}
+
+			// Compendium packs
+			const packs = Array.from(mod.packs ?? []);
+			if (packs.length) {
+				parts.push(`<span class="tag flexrow" title="Compendia: ${packs.length}"><i class="fa-solid fa-box-archive fa-fw"></i></span>`);
+			}
+
+			// Localization files
+			const langs = Array.from(mod.languages ?? []);
+			if (langs.length) {
+				parts.push(`<span class="tag flexrow" title="Localization"><i class="fa-solid fa-language fa-fw"></i></span>`);
+			}
+
+			// Compatibility badges
+			try {
+				const comp = mod.compatibility ?? mod.manifest?.compatibility ?? {};
+				const verified = comp?.verified;
+				const min = comp?.minimum;
+				const max = comp?.maximum;
+
+				if (verified) {
+					parts.push(`<span class="tag flexrow" title="Verified"><i class="fa-solid fa-circle-check fa-fw"></i></span>`);
+				} else if (min || max) {
+					parts.push(`<span class="tag flexrow" title="Compatibility not verified"><i class="fa-solid fa-triangle-exclamation fa-fw"></i></span>`);
+				}
+			} catch {}
+
+			// Return combined
+			return parts.join("");
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_bbmmBuildTagStripFallback(): failed", e);
+			return "";
+		}
+	}
+
+	_renderNativeTagsHTML(modId) {
+		try {
+			// Look for the native Module Management <li> for this id and clone its .tag elements.
+			const li =
+				document.querySelector(`li.package[data-module-id="${CSS.escape(modId)}"]`) ||
+				document.querySelector(`li.package[data-package-id="${CSS.escape(modId)}"]`);
+			if (!li) return "";
+
+			const tags = li.querySelectorAll(".package-overview .tag");
+			if (!tags?.length) return "";
+
+			const frag = document.createDocumentFragment();
+			for (const t of tags) {
+				const clone = t.cloneNode(true);
+				clone.classList.add("bbmm-tag"); // harmless class so bbmm.css can tweak spacing if desired
+				frag.appendChild(clone);
+			}
+			const div = document.createElement("div");
+			div.appendChild(frag);
+			return div.innerHTML;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_renderNativeTagsHTML(): failed", e);
+			return "";
+		}
+	}
+
 	_renderHeaderHTML() {
 		const { enable, disable } = this._diffCounts();
 		const filterLabel = LT.moduleManagement.filterModules();
@@ -1459,8 +1798,8 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					<button type="button" data-scope="inactive" class="${this.scope==="inactive"?"on":""}">${LT.moduleManagement.inactiveModules()}</button>
 				</div>
 				<div class="bbmm-mm-diff">
-					<span class="ena">${LT.moduleManagement.enable()}: <b id="bbmm-mm-cnt-enable">${enable}</b></span>
-					<span class="dis">${LT.moduleManagement.disable()}: <b id="bbmm-mm-cnt-disable">${disable}</b></span>
+					<span class="ena">${LT.moduleManagement.enabled()}: <b id="bbmm-mm-cnt-enable">${enable}</b></span>
+					<span class="dis">${LT.moduleManagement.disabled()}: <b id="bbmm-mm-cnt-disable">${disable}</b></span>
 				</div>
 			</div>
 		`;
@@ -1473,7 +1812,8 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				<button type="button" id="bbmm-mm-save">${LT.moduleManagement.saveModuleSettings()}</button>
 				<button type="button" id="bbmm-mm-deactivate-all">${LT.moduleManagement.deactivateAll()}</button>
 				<button type="button" id="bbmm-mm-activate-all">${LT.moduleManagement.activateAll()}</button>
-				${hasCulprit ? `<button type="button" id="bbmm-mm-culprit">${LT.moduleManagement.findTheCulprit()}</button>` : ``}
+				${hasCulprit ? `<button type="button" id="bbmm-mm-culprit"><i class="fa-solid fa-search"></i> ${LT.moduleManagement.findTheCulprit()}</button>`: ``}
+				
 			</div>
 		`;
 	}
@@ -1506,6 +1846,9 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					? `<i class="fa-solid fa-circle-exclamation chg" title="${LT.moduleManagement.changed()}"></i>`
 					: "";
 
+				const modObj = game.modules.get(m.id);           // Full Module instance
+				const tagsHTML = modObj ? this._buildTagsFor(modObj) : "";  // Build real tag strip
+
 				return `
 					<div class="row ${planned ? "on" : ""} ${changed ? "chg" : ""}" data-id="${hlp_esc(m.id)}">
 						<label class="toggle" onclick="event.stopPropagation()">
@@ -1516,20 +1859,20 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 							<div class="title" title="${hlp_esc(m.title)}">${hlp_esc(m.title)}</div>
 							<div class="meta">
 								<span class="id">${hlp_esc(m.id)}</span>
-								${verTxt ? `<span class="ver">v${hlp_esc(verTxt)}</span>` : ""}
+								${verTxt ? `<span class="ver-text">v${hlp_esc(verTxt)}</span>` : ""}
 								${depBadge}${conBadge}
 							</div>
 						</div>
 
 						<div class="actions">
-							<span class="icons">
-								<i class="fa-solid fa-plug${planned ? "" : " muted"}" title="${hlp_esc(statusTitle)}"></i>
-								${changedIcon}
-							</span>
-							<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${LT.modListEditNotes()}">
+							<div class="tags">
+								${tagsHTML}
+								${m.version ? `<span class="ver-text">v${hlp_esc(m.version)}</span>` : ``}
+							</div>
+							<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
 								<i class="fa-solid fa-pen-to-square fa-fw"></i>
 							</button>
-						</div>
+							</div>
 
 						<!-- expandable notes/description area; filled on demand -->
 						<div class="notes">
@@ -1564,6 +1907,10 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		content.style.minHeight = "0";
 		content.innerHTML = result;
 		this._root = content;
+
+		// add the standard BBMM header button 
+		try { injectBBMMHeaderButton(this.element); } catch (e) { DL(2, "BBMM MM | header btn inject failed", e); }
+
 		// Reset temp from core on first open of this window
 		await this._resetTempFromCore();
 
@@ -1610,9 +1957,9 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 			// open module settings (gear)
 			this._root.addEventListener("click", (ev) => {
-				const btn = ev.target.closest?.(".btn-gear");
+				const btn = ev.target.closest?.('[data-bbmm-action="open-settings"]');
 				if (!btn) return;
-				const id = btn.getAttribute("data-id");
+				const id = btn.getAttribute("data-mod-id");
 				if (!id) return;
 				ev.stopPropagation();
 				try {
@@ -1696,6 +2043,12 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					if (!ok) { ev.target.checked = cur; return; }
 				}
 
+				// If disabling, ensure we handle dependents + orphaned requires
+				if (!next) {
+					const ok = await this._ensureSafeDisable(id);
+					if (!ok) { ev.target.checked = cur; return; }
+				}
+
 				await this._setTempActive(id, next);
 				this._rerender({ keepFocus: true });
 			}, true);
@@ -1746,10 +2099,22 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 			// footer: Find the Culprit (best-effort)
 			this._root.addEventListener("click", (ev) => {
-				if (ev.target?.id !== "bbmm-mm-culprit") return;
-				const api = game.modules.get("find-the-culprit")?.api;
-				if (api?.open) api.open();
-				else ui.notifications.warn("Find the Culprit module is enabled but no API entry was found.");
+				const btn = ev.target?.closest?.("#bbmm-mm-culprit");
+				if (!btn) return;
+
+				try {
+					const FTC = CONFIG.ui?.ftc; // set by FTC on init: CONFIG.ui.ftc = FindTheCulprit
+					if (typeof FTC === "function") {
+						DL("BBMMModuleManagerApp | launching FindTheCulprit via CONFIG.ui.ftc");
+						new FTC().render(true); // singleton ctor; safe to call multiple times
+						return;
+					}
+					ui.notifications.warn("Find the Culprit module is enabled but not initialized yet.");
+					DL(2, "BBMMModuleManagerApp | CONFIG.ui.ftc is not a function (FTC not initialized?)", { ftc: FTC });
+				} catch (e) {
+					DL(2, "BBMMModuleManagerApp | failed to open FindTheCulprit", e);
+					ui.notifications.error("BBMM: Failed to open Find the Culprit.");
+				}
 			}, true);
 		}
 	}
@@ -1789,6 +2154,62 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		}
 	}
 }
+
+// --- Rewire Settings sidebar "Manage Modules" to open BBMMModuleManagerApp ---
+Hooks.on("renderSettings", (_app, rootEl) => {
+	try {
+	const root = rootEl instanceof HTMLElement ? rootEl : (rootEl?.[0] ?? null);
+	if (!root) return;
+
+	// Already wired?
+	if (root.dataset.bbmmManageModulesBound === "1") return;
+
+	const candidates = [
+		...root.querySelectorAll('button[data-action="moduleManagement"]'),
+		...root.querySelectorAll('button[data-action="manage-modules"]'),
+		...root.querySelectorAll('button, a')
+	];
+
+	const manageBtn = candidates.find(b => {
+		const label = (b.textContent || b.ariaLabel || "").trim().toLowerCase();
+		return (
+		b.matches('button[data-action="moduleManagement"], button[data-action="manage-modules"]') ||
+		/manage modules/.test(label)
+		);
+	});
+
+	if (!manageBtn) return;
+
+	// Mark once
+	manageBtn.dataset.bbmmRewired = "1";
+	root.dataset.bbmmManageModulesBound = "1";
+
+	// Click handler: Shift-click opens core; normal click opens BBMM.
+	manageBtn.addEventListener("click", (ev) => {
+		try {
+		if (ev.shiftKey) return; // allow core behavior when Shift is held
+		ev.preventDefault();
+		ev.stopPropagation();
+		new BBMMModuleManagerApp().render(true);
+		} catch (e) {
+		// if anything goes wrong, fall back to core behavior
+		console.error("BBMM | failed to open BBMMModuleManagerApp, falling back to core:", e);
+		}
+	}, true);
+	} catch (e) {
+	console.error("BBMM | renderSettings rewire failed:", e);
+	}
+});
+
+/* Tooltip to advise shift+click will open core manage modules */
+Hooks.on("renderSettings", (_app, rootEl) => {
+  const root = rootEl instanceof HTMLElement ? rootEl : (rootEl?.[0] ?? null);
+  if (!root) return;
+  const btn = root.querySelector('button[data-bbmm-rewired="1"]') || root.querySelector('button[data-action="moduleManagement"]');
+  if (!btn) return;
+  btn.title = "Opens BBMM Module Manager (Shift-click for core)";
+  btn.setAttribute("data-tooltip", "Opens BBMM Module Manager (Shift-click for core)");
+});
 
 Hooks.on("ready", () => {
 	try {

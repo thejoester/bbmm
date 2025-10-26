@@ -389,8 +389,6 @@
 			"allModules": "All Modules",
 			"activeModules": "Active Modules",
 			"inactiveModules": "Inactive Modules",
-			"enable": "Enable",
-			"disable": "Disable",
 			"enabled": "Enabled",
 			"disabled": "Disabled",
 			"changed": "Changed",
@@ -406,12 +404,17 @@
 			"noChanges": "No changes to apply.",
 			"depsTitle": "Enable Required Dependencies",
 			"depsPrompt": "The module you enabled requires the following module(s). Enable them as well?",
+			"disableDependentsTitle": "Disable Dependent Modules",
+			"disableDependentsPrompt": "The module you are disabling is required by the following module(s). Disable them as well?",
+			"disableOrphansTitle": "Disable Unneeded Dependencies",
+			"disableOrphansPrompt": "The module you are disabling has required module(s) that are no longer needed by anything else. Disable them too?",
 			"reloadRequiredTitle": "Reload Required",
 			"reloadMessage": "Module configuration was updated. Reload now to apply?",
 			"reloadNow": "Reload Now",
 			"reloadLater": "Reload Later",
 			"reloadLaterNotice": "BBMM: Changes saved. Reload to apply.",
-			"saveFailed": "BBMM: Failed to save module configuration."
+			"saveFailed": "BBMM: Failed to save module configuration.",
+			"settingBtnToolTip": "Opens BBMM Module Manager (Shift-click for core)"
 		}
 	}
 }

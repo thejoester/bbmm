@@ -159,7 +159,7 @@ export function DL(intLogType, stringLogMsg, objObject = null) {
 }
 
 //  Inject BBMM button into a Foundry window header
-function injectBBMMHeaderButton(root) {
+export function injectBBMMHeaderButton(root) {
 	
 	//Only run as GM for now - until we migrate
 	// if (!game.user.isGM) return;
@@ -297,6 +297,7 @@ Hooks.once("init", () => {
 				type: Object,
 				default: {}	
 			});
+
 		// ====== HIDDEN VARIABLES ===== 
 		// These do not need to be localized
 			// User Exclusions 

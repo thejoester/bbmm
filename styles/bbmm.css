@@ -631,7 +631,6 @@
 }
 
 
-
 /* ==========================================================================
 	BBMM: Module Manager Appv2 window
 =========================================================================== */
@@ -656,25 +655,16 @@
 	align-items: center;
 }
 
-#bbmm-module-manager .bbmm-mm-toolbar input {
-	flex: 1;
-}
+#bbmm-module-manager .bbmm-mm-toolbar input { flex: 1; }
 
-#bbmm-module-manager .bbmm-mm-scopes {
-	display: flex;
-	gap: .25rem;
-}
-
-#bbmm-module-manager .bbmm-mm-scopes button.on {
-	background: var(--color-border, #555);
-}
+#bbmm-module-manager .bbmm-mm-scopes { display: flex; gap: .25rem; }
+#bbmm-module-manager .bbmm-mm-scopes button.on { background: var(--color-border, #555); }
 
 #bbmm-module-manager .bbmm-mm-diff {
 	margin-left: auto;
 	display: flex;
 	gap: .75rem;
 }
-
 #bbmm-module-manager .bbmm-mm-diff .ena { color: var(--color-positive, #5cb85c); }
 #bbmm-module-manager .bbmm-mm-diff .dis { color: var(--color-negative, #d9534f); }
 
@@ -710,7 +700,6 @@
 	gap: .5rem;
 	font-size: .9em;
 }
-
 #bbmm-module-manager .bbmm-mm-body .row .main .meta .tag {
 	border: 1px solid var(--color-border, #555);
 	border-radius: .35rem;
@@ -719,28 +708,81 @@
 #bbmm-module-manager .bbmm-mm-body .row .main .meta .tag.dep { border-color: #777; }
 #bbmm-module-manager .bbmm-mm-body .row .main .meta .tag.con { border-color: #a55; }
 
-#bbmm-module-manager .bbmm-mm-body .row.on {
-	background: rgba(120, 200, 120, .06);
-}
+#bbmm-module-manager .bbmm-mm-body .row.on { background: rgba(120, 200, 120, .06); }
 
 /* actions on the right */
 #bbmm-module-manager .bbmm-mm-body .row .actions {
 	display: flex;
 	align-items: center;
-	gap: .35rem;
+	gap: .5rem;
 }
 
-#bbmm-module-manager .bbmm-mm-body .row .actions .ver {
-	opacity: .8;
-	font-size: .9em;
-	margin: 0 .25rem;
+/* TAG STRIP — neutral, no borders (except gear/edit), icons ~15% smaller */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags {
+	display: flex;
+	align-items: center;
+	gap: .25rem;
 }
 
-#bbmm-module-manager .bbmm-mm-body .row .actions button {
-	border: 1px solid var(--color-border, #555);
-	background: rgba(255, 255, 255, .05);
+/* base tag appearance */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 18px;
+	min-width: 18px;
+	padding: 0 .25rem;
+	border: none !important;
+	background: transparent !important;
+	border-radius: .35rem;
+	font-size: .8rem; /* ~15% smaller overall */
+	line-height: 1;
+	box-shadow: none !important;
+}
+
+/* icons inside tags */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag i {
+	font-size: .80rem; /* shrink icon a bit */
+	line-height: 1;
+}
+
+/* plain version text */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .ver-text {
+	margin-left: .4rem;
+	font-size: .95rem;
+	font-weight: 600;
+	color: var(--color-text-light, #ddd);
+	opacity: .95;
+	background: transparent !important;
+	border: 0 !important;
+	padding: 0 !important;
+}
+
+/* kill any theme’s “version pill” look just in case */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .version,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag.version {
+	background: transparent !important;
+	border: 0 !important;
+	color: inherit !important;
+	padding: 0 !important;
+}
+
+/* keep borders ONLY on settings gear + edit buttons */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"],
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit {
+	border: 1px solid var(--color-border, #555) !important;
+	background: rgba(255, 255, 255, .05) !important;
 	border-radius: .35rem;
 	padding: .15rem .4rem;
+}
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:hover,
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:hover {
+	background: rgba(255, 255, 255, .10) !important;
+}
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:focus-visible,
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:focus-visible {
+	outline: 1px solid var(--color-border, #777);
+	outline-offset: 1px;
 }
 
 /* expandable notes panel */
@@ -752,11 +794,7 @@
 	padding-top: .35rem;
 }
 #bbmm-module-manager .bbmm-mm-body .row.expanded .notes { display: block; }
-
-#bbmm-module-manager .bbmm-mm-body .row .notes .html {
-	max-height: 40vh;
-	overflow: auto;
-}
+#bbmm-module-manager .bbmm-mm-body .row .notes .html { max-height: 40vh; overflow: auto; }
 
 /* empty + footer */
 #bbmm-module-manager .bbmm-mm-empty { padding: 1rem; opacity: .8; }
