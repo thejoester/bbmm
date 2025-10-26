@@ -389,6 +389,8 @@
 			"allModules": "All Modules",
 			"activeModules": "Active Modules",
 			"inactiveModules": "Inactive Modules",
+			"enable": "Enable",
+			"disable": "Disable",
 			"enabled": "Enabled",
 			"disabled": "Disabled",
 			"changed": "Changed",
