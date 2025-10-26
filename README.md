@@ -8,8 +8,7 @@ This module was inspired by [Module Management+](https://github.com/mouse0270/mo
 > Please [report any issues or feature requests here](https://github.com/thejoester/bbmm/issues)!
 
 <br/><br/>
-<a href='
-https://ko-fi.com/thejoester/tip' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+<a href='https://ko-fi.com/thejoester/tip' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 ### For documentation please see [the Wiki](https://github.com/thejoester/bbmm/wiki)
 
