@@ -2073,17 +2073,19 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			}, true);
 
 			// footer: Deactivate All
-			this._root.addEventListener("click", (ev) => {
-				if (ev.target?.id !== "bbmm-mm-deactivate-all") return;
-				for (const m of this._mods ?? []) this.plan.set(m.id, false);
-				this._rerender({ keepFocus: true });
+			this._root.addEventListener("click", async (ev) => {
+			if (ev.target?.id !== "bbmm-mm-deactivate-all") return;
+			const ids = (this._mods ?? []).map(m => m.id);
+			await this._setTempActiveBulk([], ids);   // set all OFF in temp
+			this._rerender({ keepFocus: true });
 			}, true);
 
 			// footer: Activate All
-			this._root.addEventListener("click", (ev) => {
-				if (ev.target?.id !== "bbmm-mm-activate-all") return;
-				for (const m of this._mods ?? []) this.plan.set(m.id, true);
-				this._rerender({ keepFocus: true });
+			this._root.addEventListener("click", async (ev) => {
+			if (ev.target?.id !== "bbmm-mm-activate-all") return;
+			const ids = (this._mods ?? []).map(m => m.id);
+			await this._setTempActiveBulk(ids, []);   // set all ON in temp
+			this._rerender({ keepFocus: true });
 			}, true);
 
 			// footer: Find the Culprit (best-effort)
