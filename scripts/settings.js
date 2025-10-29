@@ -609,7 +609,8 @@ Hooks.once("init", () => {
 				config: true,
 				type: Boolean,
 				default: true,
-				restricted: true
+				restricted: true,
+				requiresReload: true,
 			});
 
 			// Enable/disable BBMM Controls Sync

@@ -73,25 +73,6 @@ async function _bbmmOpenModuleSettingsTab(modId) {
 	}
 }
 
-/* Create the small gear button for a module row. */
-/*
-function _bbmmCreateSettingsGear(modId) {
-	const btn = document.createElement("button");
-	btn.type = "button";
-	btn.className = "bbmm-settings tag flexrow";
-	btn.setAttribute("aria-label", LT.openSettings());
-	btn.setAttribute("data-bbmm-action", "open-settings");
-	btn.setAttribute("data-mod-id", modId);
-	btn.innerHTML = `<i class="fa-solid fa-gear fa-fw"></i>`;
-	btn.addEventListener("click", (ev) => {
-		ev.preventDefault();
-		ev.stopPropagation();
-		_bbmmOpenModuleSettingsTab(modId);
-	});
-	return btn;
-}
-*/
-
 /* Render saved notes HTML for display in the expanded panel */
 async function _bbmmRenderSavedNotesHTML(moduleId) {
 	try {
@@ -165,25 +146,6 @@ function _bbmmExtractEditorContent(html) {
         return tmp.innerHTML.trim();
     } catch { return html || ""; }
 }
-
-/* copy native checkbox states -> BBMM clones */
-/*
-function _bbmmSyncClonesFromNative(root) {
-	try {
-		const natives = root.querySelectorAll('label.package-title input[type="checkbox"]');
-		let n = 0;
-		for (const cb of natives) {
-			const clone = cb.bbmmClone;
-			if (!clone) continue;
-			clone.checked = cb.checked;
-			n++;
-		}
-		DL(`module-management | _bbmmSyncClonesFromNative: synced ${n} clone(s)`);
-	} catch (e) {
-		DL(2, "module-management | _bbmmSyncClonesFromNative failed", e);
-	}
-}
-*/
 
 /* Determine if the given HTML is effectively empty (no visible content) */
 function _bbmmIsEmptyNoteHTML(html) {
@@ -428,622 +390,6 @@ async function _bbmmOpenNotesDialog(moduleId) {
     }
 }
 
-/*	build one compact row from an existing <li> */
-/*
-function _bbmmBuildModRow(li, root) {
-	try {
-		// Resolve a safe root to use for native->BBMM sync calls
-		const __bbmmResolveRoot = () => (
-			root ||
-			(li instanceof HTMLElement ? li.closest(".bbmm-modmgmt") : null) ||
-			document
-		);
-		const pkgId = li.getAttribute("data-module-id") || li.getAttribute("data-package-id") || "";
-		const nameEl = li.querySelector(".package-overview .title");
-		const cb = li.querySelector('label.package-title input[type="checkbox"]');
-
-		const name = (nameEl?.textContent ?? pkgId).trim();
-		
-
-        // build a lowercased "search blob" from the original LI's text + id
-		const searchBlob =
-			((li.textContent ?? "") + " " + pkgId)
-				.replace(/\s+/g, " ")
-				.toLowerCase()
-				.trim();
-
-		const row = document.createElement("div");
-		row.className = "bbmm-modrow";
-		row.dataset.packageId = pkgId;
-
-        row.dataset.search = searchBlob; // used by filter
-
-		// left: checkbox (clone)
-		const colLeft = document.createElement("div");
-		colLeft.className = "bbmm-col-left";
-		if (cb) {
-			// Create a visual clone for BBMM; do not submit it with the form
-			const cloneCb = cb.cloneNode(true);
-			cloneCb.classList.add("bbmm-toggle");
-			cloneCb.removeAttribute("id");    // avoid duplicate IDs
-			cloneCb.removeAttribute("name");  // prevent duplicate submission
-			cloneCb.checked = cb.checked;
-
-			// Cross-link for fast syncing in either direction
-			cloneCb.bbmmNative = cb;
-			cb.bbmmClone = cloneCb;
-
-			// BBMM -> native (user clicks our checkbox)
-			cloneCb.addEventListener("change", () => {
-			try {
-				cb.checked = cloneCb.checked;
-				cb.dispatchEvent(new Event("change", { bubbles: true }));
-				DL(`module-management | mirror BBMM->native ${pkgId}: ${cloneCb.checked}`);
-
-				// Dependency dialog flips native checkboxes asynchronously.
-				// Burst resync so BBMM clones match after dialog actions.
-				const hostRoot = __bbmmResolveRoot();
-				queueMicrotask(() => _bbmmSyncClonesFromNative(hostRoot));
-				setTimeout(() => _bbmmSyncClonesFromNative(hostRoot), 60);
-				setTimeout(() => _bbmmSyncClonesFromNative(hostRoot), 200);
-			} catch (e) {
-				DL(2, `module-management | mirror BBMM->native failed ${pkgId}`, e);
-			}
-		}, { passive: true });
-
-			// native -> BBMM (covers any native toggles that DO fire change)
-			if (!cb.dataset.bbmmMirrorBound) {
-				cb.addEventListener("change", () => {
-					try {
-						if (cb.bbmmClone) cb.bbmmClone.checked = cb.checked;
-						DL(`module-management | mirror native->BBMM ${pkgId}: ${cb.checked}`);
-					} catch (e) {
-						DL(2, `module-management | mirror native->BBMM failed ${pkgId}`, e);
-					}
-				}, { passive: true });
-				cb.dataset.bbmmMirrorBound = "1";
-			}
-
-			colLeft.appendChild(cloneCb);
-		}
-		row.appendChild(colLeft);
-
-		// middle
-        const colMid = document.createElement("div");
-        colMid.className = "bbmm-col-middle";
-
-        const elName = document.createElement("div");
-        elName.className = "bbmm-name";
-        elName.textContent = name;
-
-        colMid.appendChild(elName);
-        row.appendChild(colMid);
-
-		// right: tags + edit button
-		const colRight = document.createElement("div");
-		colRight.className = "bbmm-col-right";
-		const tags = li.querySelectorAll(".package-overview .tag");
-		if (tags.length) {
-			const frag = document.createDocumentFragment();
-			for (const t of tags) {
-				const clone = t.cloneNode(true);
-				clone.classList.add("bbmm-tag");
-				frag.appendChild(clone);
-			}
-			colRight.appendChild(frag);
-		}
-		// settings gear (if applicable)
-		try {
-			if (_bbmmModuleHasConfigSettings(pkgId)) {
-				const gearBtn = _bbmmCreateSettingsGear(pkgId);
-				colRight.prepend(gearBtn); // ensure left-most
-				DL(`module-management | settings gear added for ${pkgId}`);
-			} else {
-				DL(`module-management | no config settings for ${pkgId}`);
-			}
-		} catch (e) {
-			DL(2, `module-management | settings gear inject failed for ${pkgId}`, e);
-		}
-		// Edit notes button
-		const editBtn = document.createElement("button");
-		editBtn.type = "button";
-		editBtn.className = "bbmm-edit tag flexrow";
-		editBtn.setAttribute("aria-label", LT.modListEditNotes());
-		editBtn.innerHTML = `<i class="fa-solid fa-pen-to-square fa-fw"></i>`;
-		editBtn.addEventListener("click", (ev) => {
-			ev.stopPropagation();
-			_bbmmOpenNotesDialog(pkgId);
-		});
-		colRight.appendChild(editBtn);
-
-		row.appendChild(colRight);
-
-		// notes panel (initially collapsed)
-		const notesPanel = document.createElement("div");
-		notesPanel.className = "bbmm-notes-panel";
-		notesPanel.innerHTML = `<div class="bbmm-notes-empty"></div>`;
-		row.appendChild(notesPanel);
-
-		// expand/collapse on row click 
-		row.addEventListener("click", async (ev) => {
-			
-            // ignore clicks on interactive controls and inside notes panel
-            if (ev.target.closest("button, a, input, label, .bbmm-col-right, .bbmm-notes-panel")) return;
-
-			const isOpen = row.classList.toggle("bbmm-open");
-			if (!isOpen) {
-				DL(`module-management | collapsed ${pkgId}`);
-				return;
-			}
-
-			// expand: load notes from settings each time (fresh)
-			try {
-				const html = await _bbmmRenderSavedNotesHTML(pkgId);
-				notesPanel.innerHTML = html
-					? `<div class="bbmm-notes-html">${html}</div>`
-					: `<div class="bbmm-notes-empty"></div>`;
-				DL(`module-management | expanded ${pkgId} (notes length: ${html?.length || 0})`);
-			} catch (e) {
-				DL(2, "module-management | expand failed", e);
-			}
-		});
-
-		return row;
-	} catch (err) {
-		DL(3, "module-management | _bbmmBuildModRow(): failed", err);
-		return null;
-	}
-}
-*/
-
-/*	render hook */
-/*
-Hooks.on("renderModuleManagement", (app, rootEl) => {
-	try {
-
-		// Check if enabled
-		if (!game.settings.get("bbmm", "enableModuleManagement")) {
-			DL("module-management | enhancements disabled (world setting)");
-			return;
-		}
-
-		// Patch static SearchFilter methods to be more robust
-		try {
-			if (!SearchFilter.__bbmmPatched) {
-				const origClean = SearchFilter.cleanQuery;
-				SearchFilter.cleanQuery = function (q) {
-					if (q == null) return "";
-					if (typeof q !== "string") q = String(q);
-					try { return origClean.call(this, q); }
-					catch { return (q ?? "").trim?.() ?? ""; }
-				};
-				const origTest = SearchFilter.testQuery;
-				SearchFilter.testQuery = function (query, ...rest) {
-					if (query == null) {
-						try { query = this?.input?.value ?? ""; } catch { query = ""; }
-					}
-					try { return origTest.call(this, query, ...rest); }
-					catch (e) { DL(2, "module-management | guarded SearchFilter.testQuery error", e); return true; }
-				};
-				SearchFilter.__bbmmPatched = true;
-				DL("module-management | patched static SearchFilter.cleanQuery/testQuery");
-			}
-		} catch (e) {
-			DL(2, "module-management | failed to patch static SearchFilter", e);
-		}
-
-		// Find the root element
-		const root = (rootEl instanceof HTMLElement) ? rootEl : (app?.element ?? null);
-		if (!root) {
-			DL(2, "module-management | renderModuleManagement(): root element missing");
-			return;
-		}
-		root.classList.add("bbmm-modmgmt");
-
-		// Ensure our hidden class exists (once) for fast show/hide with no layout thrash
-		if (!document.getElementById("bbmm-hidden-style")) {
-			const st = document.createElement("style");
-			st.id = "bbmm-hidden-style";
-			st.textContent = `.bbmm-modrow.bbmm-hidden{display:none !important}`;
-			document.head.appendChild(st);
-		}
-
-		DL("module-management | renderModuleManagement(): initiated");
-
-		// Find the <menu> or .package-list container
-		const list =
-			root.querySelector("menu.package-list.scrollable") ||
-			root.querySelector("menu.package-list") ||
-			root.querySelector(".package-list");
-
-		if (!list) {
-			DL(2, "module-management | package list not found");
-			return;
-		}
-
-		// clean any old grids from previous renders
-		for (const old of list.querySelectorAll(".bbmm-modlist")) old.remove();
-
-		list.classList.add("bbmm-compact");
-
-		const grid = document.createElement("div");
-		grid.className = "bbmm-modlist";
-
-		// Only direct module rows
-		const items = list.querySelectorAll(":scope > li.package");
-		DL(`module-management | found ${items.length} list items`);
-
-		let built = 0;
-
-		// overall stopwatch for the build
-		const tBuild0 = performance.now();
-
-		for (const li of items) {
-			if (li.dataset.bbmmTransformed === "1") continue;
-
-			// per-item stopwatch
-			const t0 = performance.now();
-
-			// NOTE: pass root so click -> dependency dialog resync can use it
-			const row = _bbmmBuildModRow(li, root);
-			if (!row) continue;
-
-			grid.appendChild(row);
-			li.dataset.bbmmTransformed = "1";
-			built++;
-
-			const t1 = performance.now();
-			const pkgId =
-				row?.dataset?.packageId ||
-				li.getAttribute("data-module-id") ||
-				li.getAttribute("data-package-id") ||
-				"";
-
-			DL(`module-management | build item ${pkgId}: ${(t1 - t0).toFixed(1)}ms`);
-		}
-
-		// overall timing
-		const tBuild1 = performance.now();
-		DL(`module-management | built ${built}/${items.length} rows in ${(tBuild1 - tBuild0).toFixed(1)}ms`);
-
-		if (!built) {
-			DL(2, "module-management | nothing transformed (selectors may need tuning)");
-			return;
-		}
-
-		// put BBMM grid as a SIBLING after the native <menu>
-		list.insertAdjacentElement("afterend", grid);
-
-		// push the native menu off-screen so core search still operates but theme rules won't hide our grid
-		list.classList.add("bbmm-source-offscreen");
-
-		// initial clone ← native sync so the BBMM grid shows correct state on open
-		_bbmmSyncClonesFromNative(root);
-
-		// Mirror the native filter's visibility onto BBMM rows
-		try {
-			const menuEl = root.querySelector("menu.package-list") || root.querySelector(".package-list");
-			const grid = menuEl?.nextElementSibling?.classList?.contains("bbmm-modlist")
-				? menuEl.nextElementSibling
-				: root.querySelector(".bbmm-modlist");
-			if (!menuEl || !grid) throw new Error("missing menu/grid");
-
-			// menu-scoped squelch to suppress MO storms during native filter bulk flips
-			menuEl.__bbmmSquelchMo = false;
-
-			// Read current query text (lowercased, trimmed). Fall back safely.
-			const getQuery = () => {
-				try {
-					const q =
-						app?.searchFilter?.input?.value ??
-						menuEl.querySelector('input[name="search"]')?.value ??
-						"";
-					return String(q ?? "").toLowerCase().trim();
-				} catch { return ""; }
-			};
-
-			// Strict substring match against the row's cached search blob (dataset.search).
-			const bbmmMatchesQuery = (row, q) => {
-				if (!q) return true;
-				try {
-					const blob = row?.dataset?.search ?? "";
-					return blob.includes(q);
-				} catch { return true; }
-			};
-
-			// Build fresh maps each pass (fast) — avoid stale references
-			const buildMaps = () => {
-				const liById = new Map();
-				for (const li of menuEl.querySelectorAll(':scope > li.package')) {
-					const id = li.getAttribute("data-module-id") || li.getAttribute("data-package-id") || "";
-					if (id) liById.set(id, li);
-				}
-				const rowById = new Map();
-				for (const row of grid.querySelectorAll(".bbmm-modrow")) {
-					const id = row.dataset.packageId || "";
-					if (id) rowById.set(id, row);
-				}
-				return { liById, rowById };
-			};
-
-			// Fast visibility test — no heavy style reads, but detect when core hides inner content
-			const isNativeShown = (li) => {
-				try {
-					// Core ways it hides the <li> itself
-					if (li.hidden) return false;
-					if (li.classList.contains("hidden")) return false;
-					if (li.style && li.style.display === "none") return false;
-
-					// Check a stable inner container for actual visibility.
-					const inner =
-						li.querySelector(".package-overview") ||
-						li.firstElementChild ||
-						li;
-					// clientWidth/Height==0 is a cheap visibility proxy (read-phase only).
-					if ((inner.clientWidth === 0 && inner.clientHeight === 0)) return false;
-
-					return true;
-				} catch {
-					// Fail-open to avoid hiding good rows on errors
-					return true;
-				}
-			};
-
-			const mirrorOnce = () => {
-				const t0 = performance.now();
-
-				// Snapshot query once per pass
-				const q = getQuery();
-
-				// map builder
-				const { liById, rowById } = buildMaps();
-
-				// READ PHASE: compute desired visibility (native result AND BBMM text match)
-				const decisions = [];
-				let shown = 0, hidden = 0, firstShownId = null;
-
-				for (const [id, li] of liById) {
-					const row = rowById.get(id);
-					if (!row) continue;
-
-					// native visibility
-					let show = isNativeShown(li);
-					try {
-						if (li.hidden) show = false;
-						else if (li.classList.contains("hidden")) show = false;
-						else if (li.style && li.style.display === "none") show = false;
-						else {
-							// Some themes hide only inner content; treat 0x0 as hidden.
-							const inner = li.querySelector(".package-overview") || li.firstElementChild || li;
-							if (inner && inner.clientWidth === 0 && inner.clientHeight === 0) show = false;
-						}
-					} catch {}
-
-					// BBMM strict substring filter on the module's cached search text
-					if (show && q) show = bbmmMatchesQuery(row, q);
-
-					if (show) { shown++; if (!firstShownId) firstShownId = id; }
-					else { hidden++; }
-
-					decisions.push({ row, show });
-				}
-				const tRead = performance.now();
-
-				// WRITE PHASE: toggle a class + hidden boolean only if needed
-				for (const d of decisions) {
-					const shouldHide = !d.show;
-					if (d.row.classList.contains("bbmm-hidden") !== shouldHide) {
-						d.row.classList.toggle("bbmm-hidden", shouldHide);
-					}
-					if (!!d.row.hidden !== shouldHide) d.row.hidden = shouldHide;
-				}
-				const tWrite = performance.now();
-
-				DL(`module-management | mirror(filter): shown=${shown}, hidden=${hidden}` +
-					(firstShownId ? `, first=${firstShownId}` : ``) +
-					`, read=${(tRead - t0).toFixed(1)}ms, write=${(tWrite - tRead).toFixed(1)}ms, total=${(tWrite - t0).toFixed(1)}ms`);
-			};
-
-			// Once-per-frame scheduler (no duplicate identifier)
-			const scheduleMirror = (() => {
-				let scheduled = false;
-				return () => {
-					if (scheduled) return;
-					scheduled = true;
-					requestAnimationFrame(() => {
-						scheduled = false;
-						mirrorOnce();
-					});
-				};
-			})();
-
-			// Prefer libWrapper; otherwise patch the instance filter
-			const tryPatchSearchFilter = () => {
-				const sf = app?.searchFilter;
-
-				if (globalThis.libWrapper) {
-					try {
-						if (!SearchFilter.__bbmmFilterWrapped) {
-							libWrapper.register("bbmm", "SearchFilter.prototype.filter", function (wrapped, query, ...args) {
-								menuEl.__bbmmSquelchMo = true; // suppress MO during bulk flips
-								let out;
-								try {
-									out = wrapped.call(this, query, ...args);
-									// immediate single mirror for snappy UI
-									mirrorOnce();
-								} catch (e) {
-									DL(3, "module-management | SearchFilter.filter (libWrapper) error", e);
-								} finally {
-									// re-enable MO next frame (no second mirror)
-									requestAnimationFrame(() => { menuEl.__bbmmSquelchMo = false; });
-								}
-								return out;
-							}, "WRAPPER");
-							SearchFilter.__bbmmFilterWrapped = true;
-							DL("module-management | libWrapper: wrapped SearchFilter.prototype.filter (squelch MOs)");
-						}
-						return true;
-					} catch (e) {
-						DL(2, "module-management | libWrapper wrap failed, falling back to instance patch", e);
-					}
-				}
-
-				// Instance-level fallback
-				if (!sf || sf.__bbmmMirrorPatched) return false;
-				const origFilter = sf.filter.bind(sf);
-				sf.filter = (query, ...args) => {
-					menuEl.__bbmmSquelchMo = true;
-					let out;
-					try {
-						out = origFilter(query, ...args);
-						mirrorOnce(); // single immediate pass
-					} catch (e) {
-						DL(3, "module-management | SearchFilter.filter (instance) error", e);
-					} finally {
-						requestAnimationFrame(() => { menuEl.__bbmmSquelchMo = false; });
-					}
-					return out;
-				};
-				sf.__bbmmMirrorPatched = true;
-				DL("module-management | patched app.searchFilter.filter() (squelch MOs)");
-				return true;
-			};
-
-			// Try once now, then poll a few times in case the SearchFilter isn't ready yet
-			if (!tryPatchSearchFilter()) {
-				let attempts = 0;
-				const t = setInterval(() => { if (tryPatchSearchFilter() || ++attempts >= 10) clearInterval(t); }, 50);
-			}
-
-			// Delegate typing on the native search box (once-per-frame mirror)
-			if (!root.__bbmmDelegatedMirror) {
-				const onKeyOrInput = (ev) => {
-					const target = ev.target;
-					if (!(target instanceof HTMLInputElement)) return;
-					if (target.name !== "search") return;
-					scheduleMirror();
-				};
-				root.addEventListener("input", onKeyOrInput, true);
-				root.addEventListener("keyup", onKeyOrInput, true);
-				root.__bbmmDelegatedMirror = true;
-				DL("module-management | delegated mirror bound on window root");
-			}
-
-			// Observe the native menu for changes that affect visibility — avoid subtree floods
-			const mo = new MutationObserver(() => {
-				if (menuEl.__bbmmSquelchMo) return;
-				scheduleMirror();
-			});
-			mo.observe(menuEl, {
-				attributes: true,
-				attributeFilter: ["class","style","hidden"],
-				childList: true,
-				subtree: false
-			});
-
-			// First mirror after initial paint
-			scheduleMirror();
-
-			// Bulk button integration: mirror core actions to BBMM clones
-			try {
-				if (!root.dataset.bbmmBulkBound) {
-					const handler = (ev) => {
-						const btn = ev.target.closest("button");
-						if (!btn) return;
-
-						// Prefer data-action if Foundry exposes it
-						const act = (btn.dataset?.action || "").toLowerCase();
-						// Fallback to label text (English)
-						const label = (btn.textContent || btn.ariaLabel || "").trim().toLowerCase();
-
-						let isBulk = false;
-						if (act === "activateall" || act === "deactivateall") isBulk = true;
-						else if ((/(^|\b)activate all\b/.test(label)) || (/(\b)deactivate all\b/.test(label))) isBulk = true;
-
-						if (!isBulk) return;
-
-						// Let core flip NATIVE checkboxes silently; then mirror NATIVE -> BBMM clones.
-						queueMicrotask(() => _bbmmSyncClonesFromNative(root));
-						setTimeout(() => _bbmmSyncClonesFromNative(root), 60);
-						setTimeout(() => _bbmmSyncClonesFromNative(root), 200);
-
-						DL("module-management | bulk detected (activate/deactivate all) — mirrored clones from natives without dispatch");
-					};
-
-					// Capture so this still works if footer buttons get re-rendered
-					root.addEventListener("click", handler, true);
-					root.dataset.bbmmBulkBound = "1";
-				}
-			} catch (e) {
-				DL(2, "module-management | bulk button wiring failed", e);
-			}
-
-			// Observe the native menu for changes that might affect checkbox states
-			try {
-				// Observe native menu for any attribute/child changes (for state sync only)
-				if (!menuEl.__bbmmSyncMo) {
-					const mo2 = new MutationObserver(() => {
-						requestAnimationFrame(() => _bbmmSyncClonesFromNative(root));
-					});
-					mo2.observe(menuEl, { attributes: true, subtree: true, childList: true });
-					menuEl.__bbmmSyncMo = mo2;
-					DL("module-management | mutation observer bound for native->BBMM sync");
-				}
-
-				// After ANY DialogV2 renders or closes, resync 
-				if (!window.__bbmmDialogSyncBound) {
-					try {
-						Hooks.on?.("closeDialogV2", () => {
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 100);
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 200);
-						});
-						Hooks.on?.("renderDialogV2", (dlgApp, el) => {
-							// Also catch button presses inside the dialog
-							el.addEventListener("click", (ev) => {
-								if (ev.target.closest('button,[type="submit"]')) {
-									setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
-									setTimeout(() => _bbmmSyncClonesFromNative(root), 100);
-								}
-							}, true);
-						});
-					} catch {}
-
-					// Fallback: capture clicks within any V2 dialog container
-					document.addEventListener("click", (ev) => {
-						const dlg = ev.target.closest('.app-v2[data-application="dialogv2"], .dialog-v2, .dialog');
-						if (!dlg) return;
-						if (ev.target.closest('button,[type="submit"]')) {
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 0);
-							setTimeout(() => _bbmmSyncClonesFromNative(root), 120);
-						}
-					}, true);
-
-					window.__bbmmDialogSyncBound = true;
-					DL("module-management | dialog sync bound (DialogV2 close/render/click)");
-				}
-
-				// Also resync when the form element fires change 
-				const formEl = root.querySelector('form.package-list') || root.querySelector('form[method="post"]');
-				if (formEl && !formEl.__bbmmChangeSync) {
-					formEl.addEventListener("change", () => {
-						queueMicrotask(() => _bbmmSyncClonesFromNative(root));
-					});
-					formEl.__bbmmChangeSync = "1";
-				}
-			} catch (e) {
-				DL(2, "module-management | dependency resync wiring failed", e);
-			}
-		} catch (e) {
-			DL(2, "module-management | mirror patch failed", e);
-		}
-
-		DL(`module-management | injected compact grid with ${built} rows`);
-	} catch (err) {
-		DL(3, "module-management | renderModuleManagement(): error", err);
-	}
-});
-*/
 /* ============================================================================
 	BBMM: Stand-alone Module Manager (ApplicationV2) — launchable from a macro
 	V13-only. No core patching. Purely client-side planning of enable/disable.
@@ -1058,12 +404,12 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			resizable: true
 		});
 
-		// working set (planned states), by module id -> boolean
+		// working set, by module id -> boolean
 		this.plan = new Map();
 		// filter state
 		this.query = "";
-		this.scope = "all"; // "all" | "active" | "inactive"
-		/* runtime lock state (module id -> locked). Non-persistent by design. */
+		this.scope = "all"; 
+		/* runtime lock state */
 		this.locks = new Set();
 
 		this._minW = 760;
@@ -1141,7 +487,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			if (this._locksSaveT) clearTimeout(this._locksSaveT);
 			this._locksSaveT = setTimeout(async () => {
 				this._locksSaveT = null;
-				await this._saveLocks(); // your existing method that writes the world setting
+				await this._saveLocks(); // write the world setting
 			}, 200);
 		} catch (e) {
 			DL(2, "BBMMModuleManagerApp::_queueSaveLocks(): error", e);
@@ -1179,10 +525,13 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				const id = String(mod.id);
 				const title = String(mod.title ?? id);
 				const version = String(mod.version ?? mod?.manifest?.version ?? "");
+
+				/* collect requires */
 				const req = (mod?.relationships?.requires ?? []);
 				const requires = [];
 				for (const r of req) if (r?.id && (r.type ?? "module") === "module") requires.push(r.id);
 
+				/* collect conflicts */
 				const conflicts = (mod?.relationships?.conflicts ?? []);
 				const confIds = [];
 				for (const c of conflicts) if (c?.id && (c.type ?? "module") === "module") confIds.push(c.id);
@@ -1286,7 +635,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		}
 	}
 
-	/* Return a Set of module ids that (transitively) depend on the given module.
+	/* Return a Set of module ids that depend on the given module.
 	   Only includes modules that are currently planned ON (temp) to avoid noise. */
 	_collectDependents(moduleId) {
 		try {
@@ -1358,14 +707,14 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	/* When a module is toggled OFF, confirm disabling its dependents and (optionally) its orphaned requires. */
 	async _ensureSafeDisable(moduleId) {
 		try {
-			// 1) Dependents of this module (modules that will break if we disable it)
+			// Dependents of this module (modules that will break if we disable it)
 			const dependents = this._collectDependents(moduleId);
 			if (dependents.size) {
 				const list = [...dependents].sort((a, b) => a.localeCompare(b)).map(id => {
 					const t = game.modules.get(id)?.title ?? id;
 					return `<li><code>${hlp_esc(id)}</code> — ${hlp_esc(t)}</li>`;
 				}).join("");
-				const content = document.createElement("div"); // DialogV2: no attributes on root
+				const content = document.createElement("div"); 
 				const p = document.createElement("p");
 				p.textContent = LT.moduleManagement?.disableDependentsPrompt?.() ?? "The module you are disabling is required by the following module(s). Disable them as well?";
 				const ul = document.createElement("ul"); ul.innerHTML = list;
@@ -1396,7 +745,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				await this._setTempActiveBulk([], [...dependents]);
 			}
 
-			// 2) Orphaned requires (things this module needed that nothing else still needs)
+			// Orphaned requires (things this module needed that nothing else still needs)
 			const orphans = this._collectOrphanedRequires(moduleId);
 			if (orphans.size) {
 				const list = [...orphans].sort((a, b) => a.localeCompare(b)).map(id => {
@@ -1443,7 +792,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	and offer to also enable optional dependencies (checkbox, default ON). */
 	async _ensureDependenciesForEnable(moduleId) {
 		try {
-			// Required (transitive)
+			// Required 
 			const need = this._collectRequired(moduleId);
 			const toEnable = [];
 			for (const dep of need) {
@@ -1452,7 +801,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				if (!planned) toEnable.push(dep);
 			}
 
-			// Recommended (direct only)
+			// Recommended
 			const mod = game.modules.get(moduleId);
 			const recommended = [];
 			try {
@@ -1474,9 +823,8 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 			DL(`_ensureDependenciesForEnable(): discovered deps for ${moduleId}`, { required: toEnable, recommended });
 
-			// IMPORTANT: DialogV2 requires content root to have NO attributes.
 			// Create an attribute-less root, and a styled inner container for layout.
-			const content = document.createElement("div"); // NO attributes on this element
+			const content = document.createElement("div"); 
 			const container = document.createElement("div");
 			container.style.display = "flex";
 			container.style.flexDirection = "column";
@@ -1572,7 +920,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					id: "bbmm-mm-enable-deps",
 					modal: true,
 					window: { title: LT.moduleManagement.depsTitle() },
-					content, // root has NO attributes
+					content, 
 					buttons: [
 						{
 							action: "ok",
@@ -1710,7 +1058,6 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	/* Build a core-style tag strip from module metadata (no version pill). */
 	_buildTagsFor(mod) {
 		
-
 		try {
 			const parts = [];
 
@@ -1835,32 +1182,6 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		}
 	}
 
-	_renderNativeTagsHTML(modId) {
-		try {
-			// Look for the native Module Management <li> for this id and clone its .tag elements.
-			const li =
-				document.querySelector(`li.package[data-module-id="${CSS.escape(modId)}"]`) ||
-				document.querySelector(`li.package[data-package-id="${CSS.escape(modId)}"]`);
-			if (!li) return "";
-
-			const tags = li.querySelectorAll(".package-overview .tag");
-			if (!tags?.length) return "";
-
-			const frag = document.createDocumentFragment();
-			for (const t of tags) {
-				const clone = t.cloneNode(true);
-				clone.classList.add("bbmm-tag"); // harmless class so bbmm.css can tweak spacing if desired
-				frag.appendChild(clone);
-			}
-			const div = document.createElement("div");
-			div.appendChild(frag);
-			return div.innerHTML;
-		} catch (e) {
-			DL(2, "BBMMModuleManagerApp::_renderNativeTagsHTML(): failed", e);
-			return "";
-		}
-	}
-
 	_renderHeaderHTML() {
 		const { enable, disable } = this._diffCounts();
 		const filterLabel = LT.moduleManagement.filterModules();
@@ -1927,7 +1248,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 					// Green when minimum or verified matches (exact) OR is major-only equal to core's major (e.g., "13" vs "13.x")
 					const green = targets.some((t) => isExactMatch(t) || isMajorMatch(t));
-					// Yellow when (not green) and any target is higher than core
+					// Yellow when any target is higher than core
 					const yellow = !green && targets.some((t) => isHigherThanCore(t));
 
 					if (green) {
@@ -1937,7 +1258,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 						verColor = "#d97706"; // amber
 						verTitle = `${LT.moduleManagement.compatModuleExpects1()} ${targets.join(" / ")}; ${LT.moduleManagement.compatModuleExpects2()} ${core}`;
 					} else {
-						verColor = "#c7ca00ff"; // your yellow
+						verColor = "#c7ca00ff"; // yellow
 						verTitle = `${LT.moduleManagement.compatMinVer()}: ${targets.join(" / ") || "—"} • ${LT.moduleManagement.compatibility()}: ${core}`;
 					}
 				} catch (e) {
@@ -1945,8 +1266,6 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					verColor = "";
 					verTitle = "";
 				}
-
-				
 
 				// ONLY deps/conf moved into notes header
 				const depBadge = (m.requires?.length)
@@ -2035,11 +1354,11 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 		// Expose the live instance for debugging
 		try {
-			this.element.__bbmmApp = this;           // DOM → instance
-			window.BBMM_MM = this;                   // global quick access
+			this.element.__bbmmApp = this;
+			window.BBMM_MM = this;
 		} catch (e) { DL(2, "BBMM | failed to expose app instance", e); }
 
-		// Explicit centering (some themes offset V2 windows on first paint)
+		// Explicit centering
 		const _centerNow = () => {
 			try {
 				const el = this.element;
@@ -2091,11 +1410,11 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					// Instant, surgical UI update for this row only
 					const row = btn.closest?.(".row");
 					if (row) {
-						// 1) toggle the checkbox disabled
+						// toggle the checkbox disabled
 						const chk = row.querySelector('label.toggle input[type="checkbox"]');
 						if (chk) chk.disabled = nowLocked;
 
-						// 2) flip the icon + color inline
+						// flip the icon + color inline
 						const ico = btn.querySelector("i.fa-solid");
 						if (ico) {
 							ico.classList.remove("fa-lock", "fa-lock-open");
@@ -2107,15 +1426,13 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 							}
 						}
 
-						// 3) optional: mark the row with a class for any dimming you already do
+						// mark the row with a class for any dimming you already do
 						if (nowLocked) row.classList.add("bbmm-locked");
 						else row.classList.remove("bbmm-locked");
 					}
 
-					// Debounced save — do not await (avoid UI stall)
+					// Debounced save 
 					this._queueSaveLocks();
-
-					// No _rerender() here — avoids rebuilding the entire list and causing the 1s lag
 				} catch (e) {
 					DL(2, "BBMMModuleManagerApp | toggle lock failed", e);
 				}
@@ -2286,7 +1603,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					const FTC = CONFIG.ui?.ftc; // set by FTC on init: CONFIG.ui.ftc = FindTheCulprit
 					if (typeof FTC === "function") {
 						DL("BBMMModuleManagerApp | launching FindTheCulprit via CONFIG.ui.ftc");
-						new FTC().render(true); // singleton ctor; safe to call multiple times
+						new FTC().render(true); 
 						return;
 					}
 					ui.notifications.warn("Find the Culprit module is enabled but not initialized yet.");
@@ -2335,8 +1652,9 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	}
 }
 
-// --- Rewire Settings sidebar "Manage Modules" to open BBMMModuleManagerApp ---
+// Rewire Settings sidebar "Manage Modules" to open BBMMModuleManagerApp
 Hooks.on("renderSettings", (_app, rootEl) => {
+	if (!game.settings.get("bbmm", "enableModuleManagement")) return;
 	try {
 		const root = rootEl instanceof HTMLElement ? rootEl : (rootEl?.[0] ?? null);
 		if (!root) return;
