@@ -5,8 +5,9 @@
 		• Whole row visually selectable (does not toggle enable/disable yet)
 		• Keep this purely presentational (no core behavior changes)
 ============================================================================== */
-import { DL } from "./settings.js";
+import { DL, injectBBMMHeaderButton } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
+import { hlp_esc } from "./helpers.js";
 
 /* Return true if the module has at least one configurable setting (config === true). */
 function _bbmmModuleHasConfigSettings(modId) {
@@ -73,6 +74,7 @@ async function _bbmmOpenModuleSettingsTab(modId) {
 }
 
 /* Create the small gear button for a module row. */
+/*
 function _bbmmCreateSettingsGear(modId) {
 	const btn = document.createElement("button");
 	btn.type = "button";
@@ -88,6 +90,7 @@ function _bbmmCreateSettingsGear(modId) {
 	});
 	return btn;
 }
+*/
 
 /* Render saved notes HTML for display in the expanded panel */
 async function _bbmmRenderSavedNotesHTML(moduleId) {
@@ -163,7 +166,8 @@ function _bbmmExtractEditorContent(html) {
     } catch { return html || ""; }
 }
 
-/* copy native checkbox states → BBMM clones */
+/* copy native checkbox states -> BBMM clones */
+/*
 function _bbmmSyncClonesFromNative(root) {
 	try {
 		const natives = root.querySelectorAll('label.package-title input[type="checkbox"]');
@@ -179,6 +183,7 @@ function _bbmmSyncClonesFromNative(root) {
 		DL(2, "module-management | _bbmmSyncClonesFromNative failed", e);
 	}
 }
+*/
 
 /* Determine if the given HTML is effectively empty (no visible content) */
 function _bbmmIsEmptyNoteHTML(html) {
@@ -374,7 +379,7 @@ async function _bbmmOpenNotesDialog(moduleId) {
 						// Remove trailing empty <p>/<div> blocks
 						html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
 
-						// If effectively empty (including ProseMirror-trailingBreak cases) → delete entry
+						// If effectively empty (including ProseMirror-trailingBreak cases) -> delete entry
 						const notes = foundry.utils.duplicate(game.settings.get(BBMM_ID, KEY) || {});
 						if (_bbmmIsEmptyNoteHTML(html)) {
 							if (moduleId in notes) delete notes[moduleId];
@@ -386,12 +391,12 @@ async function _bbmmOpenNotesDialog(moduleId) {
 								await game.settings.set(BBMM_ID, KEY, notes);
 							}
 
-							ui.notifications.info(LT.modListNotesDeleted?.() ?? "Note cleared.");
+							ui.notifications.info(LT.modListNotesDeleted());
 							DL(`module-management | cleared empty note for ${moduleId}`);
 							return;
 						}
 
-						// Non-empty → save/update
+						// Non-empty -> save/update
 						notes[moduleId] = html;
 						await game.settings.set(BBMM_ID, KEY, notes);
 
@@ -424,8 +429,15 @@ async function _bbmmOpenNotesDialog(moduleId) {
 }
 
 /*	build one compact row from an existing <li> */
-function _bbmmBuildModRow(li) {
+/*
+function _bbmmBuildModRow(li, root) {
 	try {
+		// Resolve a safe root to use for native->BBMM sync calls
+		const __bbmmResolveRoot = () => (
+			root ||
+			(li instanceof HTMLElement ? li.closest(".bbmm-modmgmt") : null) ||
+			document
+		);
 		const pkgId = li.getAttribute("data-module-id") || li.getAttribute("data-package-id") || "";
 		const nameEl = li.querySelector(".package-overview .title");
 		const cb = li.querySelector('label.package-title input[type="checkbox"]');
@@ -446,7 +458,7 @@ function _bbmmBuildModRow(li) {
 
         row.dataset.search = searchBlob; // used by filter
 
-		// left: checkbox (clone; KEEP native where it is so core can see it)
+		// left: checkbox (clone)
 		const colLeft = document.createElement("div");
 		colLeft.className = "bbmm-col-left";
 		if (cb) {
@@ -463,23 +475,30 @@ function _bbmmBuildModRow(li) {
 
 			// BBMM -> native (user clicks our checkbox)
 			cloneCb.addEventListener("change", () => {
-				try {
-					cb.checked = cloneCb.checked;
-					cb.dispatchEvent(new Event("change", { bubbles: true }));
-					DL(`module-management | mirror BBMM→native ${pkgId}: ${cloneCb.checked}`);
-				} catch (e) {
-					DL(2, `module-management | mirror BBMM→native failed ${pkgId}`, e);
-				}
-			}, { passive: true });
+			try {
+				cb.checked = cloneCb.checked;
+				cb.dispatchEvent(new Event("change", { bubbles: true }));
+				DL(`module-management | mirror BBMM->native ${pkgId}: ${cloneCb.checked}`);
+
+				// Dependency dialog flips native checkboxes asynchronously.
+				// Burst resync so BBMM clones match after dialog actions.
+				const hostRoot = __bbmmResolveRoot();
+				queueMicrotask(() => _bbmmSyncClonesFromNative(hostRoot));
+				setTimeout(() => _bbmmSyncClonesFromNative(hostRoot), 60);
+				setTimeout(() => _bbmmSyncClonesFromNative(hostRoot), 200);
+			} catch (e) {
+				DL(2, `module-management | mirror BBMM->native failed ${pkgId}`, e);
+			}
+		}, { passive: true });
 
 			// native -> BBMM (covers any native toggles that DO fire change)
 			if (!cb.dataset.bbmmMirrorBound) {
 				cb.addEventListener("change", () => {
 					try {
 						if (cb.bbmmClone) cb.bbmmClone.checked = cb.checked;
-						DL(`module-management | mirror native→BBMM ${pkgId}: ${cb.checked}`);
+						DL(`module-management | mirror native->BBMM ${pkgId}: ${cb.checked}`);
 					} catch (e) {
-						DL(2, `module-management | mirror native→BBMM failed ${pkgId}`, e);
+						DL(2, `module-management | mirror native->BBMM failed ${pkgId}`, e);
 					}
 				}, { passive: true });
 				cb.dataset.bbmmMirrorBound = "1";
@@ -575,8 +594,10 @@ function _bbmmBuildModRow(li) {
 		return null;
 	}
 }
+*/
 
 /*	render hook */
+/*
 Hooks.on("renderModuleManagement", (app, rootEl) => {
 	try {
 
@@ -610,6 +631,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		} catch (e) {
 			DL(2, "module-management | failed to patch static SearchFilter", e);
 		}
+
 		// Find the root element
 		const root = (rootEl instanceof HTMLElement) ? rootEl : (app?.element ?? null);
 		if (!root) {
@@ -618,7 +640,16 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		}
 		root.classList.add("bbmm-modmgmt");
 
+		// Ensure our hidden class exists (once) for fast show/hide with no layout thrash
+		if (!document.getElementById("bbmm-hidden-style")) {
+			const st = document.createElement("style");
+			st.id = "bbmm-hidden-style";
+			st.textContent = `.bbmm-modrow.bbmm-hidden{display:none !important}`;
+			document.head.appendChild(st);
+		}
+
 		DL("module-management | renderModuleManagement(): initiated");
+
 		// Find the <menu> or .package-list container
 		const list =
 			root.querySelector("menu.package-list.scrollable") ||
@@ -643,16 +674,37 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		DL(`module-management | found ${items.length} list items`);
 
 		let built = 0;
+
+		// overall stopwatch for the build
+		const tBuild0 = performance.now();
+
 		for (const li of items) {
 			if (li.dataset.bbmmTransformed === "1") continue;
-			const row = _bbmmBuildModRow(li);
-			if (row) {
-				grid.appendChild(row);
-				li.dataset.bbmmTransformed = "1";
-				li.classList.add("bbmm-hidden-source");	// visually hide but keep display semantics
-				built++;
-			}
+
+			// per-item stopwatch
+			const t0 = performance.now();
+
+			// NOTE: pass root so click -> dependency dialog resync can use it
+			const row = _bbmmBuildModRow(li, root);
+			if (!row) continue;
+
+			grid.appendChild(row);
+			li.dataset.bbmmTransformed = "1";
+			built++;
+
+			const t1 = performance.now();
+			const pkgId =
+				row?.dataset?.packageId ||
+				li.getAttribute("data-module-id") ||
+				li.getAttribute("data-package-id") ||
+				"";
+
+			DL(`module-management | build item ${pkgId}: ${(t1 - t0).toFixed(1)}ms`);
 		}
+
+		// overall timing
+		const tBuild1 = performance.now();
+		DL(`module-management | built ${built}/${items.length} rows in ${(tBuild1 - tBuild0).toFixed(1)}ms`);
 
 		if (!built) {
 			DL(2, "module-management | nothing transformed (selectors may need tuning)");
@@ -676,6 +728,30 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				: root.querySelector(".bbmm-modlist");
 			if (!menuEl || !grid) throw new Error("missing menu/grid");
 
+			// menu-scoped squelch to suppress MO storms during native filter bulk flips
+			menuEl.__bbmmSquelchMo = false;
+
+			// Read current query text (lowercased, trimmed). Fall back safely.
+			const getQuery = () => {
+				try {
+					const q =
+						app?.searchFilter?.input?.value ??
+						menuEl.querySelector('input[name="search"]')?.value ??
+						"";
+					return String(q ?? "").toLowerCase().trim();
+				} catch { return ""; }
+			};
+
+			// Strict substring match against the row's cached search blob (dataset.search).
+			const bbmmMatchesQuery = (row, q) => {
+				if (!q) return true;
+				try {
+					const blob = row?.dataset?.search ?? "";
+					return blob.includes(q);
+				} catch { return true; }
+			};
+
+			// Build fresh maps each pass (fast) — avoid stale references
 			const buildMaps = () => {
 				const liById = new Map();
 				for (const li of menuEl.querySelectorAll(':scope > li.package')) {
@@ -690,68 +766,183 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 				return { liById, rowById };
 			};
 
+			// Fast visibility test — no heavy style reads, but detect when core hides inner content
 			const isNativeShown = (li) => {
-				if (li.hidden) return false;
-				if (li.classList.contains("hidden")) return false;
-				const cs = getComputedStyle(li);
-				if (cs.display === "none" || cs.visibility === "hidden") return false;
-				return true;
+				try {
+					// Core ways it hides the <li> itself
+					if (li.hidden) return false;
+					if (li.classList.contains("hidden")) return false;
+					if (li.style && li.style.display === "none") return false;
+
+					// Check a stable inner container for actual visibility.
+					const inner =
+						li.querySelector(".package-overview") ||
+						li.firstElementChild ||
+						li;
+					// clientWidth/Height==0 is a cheap visibility proxy (read-phase only).
+					if ((inner.clientWidth === 0 && inner.clientHeight === 0)) return false;
+
+					return true;
+				} catch {
+					// Fail-open to avoid hiding good rows on errors
+					return true;
+				}
 			};
 
 			const mirrorOnce = () => {
+				const t0 = performance.now();
+
+				// Snapshot query once per pass
+				const q = getQuery();
+
+				// map builder
 				const { liById, rowById } = buildMaps();
+
+				// READ PHASE: compute desired visibility (native result AND BBMM text match)
+				const decisions = [];
 				let shown = 0, hidden = 0, firstShownId = null;
+
 				for (const [id, li] of liById) {
 					const row = rowById.get(id);
 					if (!row) continue;
-					const show = isNativeShown(li);
-					row.style.display = show ? "grid" : "none";
-					if (show && !firstShownId) firstShownId = id;
-					show ? shown++ : hidden++;
+
+					// native visibility
+					let show = isNativeShown(li);
+					try {
+						if (li.hidden) show = false;
+						else if (li.classList.contains("hidden")) show = false;
+						else if (li.style && li.style.display === "none") show = false;
+						else {
+							// Some themes hide only inner content; treat 0x0 as hidden.
+							const inner = li.querySelector(".package-overview") || li.firstElementChild || li;
+							if (inner && inner.clientWidth === 0 && inner.clientHeight === 0) show = false;
+						}
+					} catch {}
+
+					// BBMM strict substring filter on the module's cached search text
+					if (show && q) show = bbmmMatchesQuery(row, q);
+
+					if (show) { shown++; if (!firstShownId) firstShownId = id; }
+					else { hidden++; }
+
+					decisions.push({ row, show });
 				}
-				const cs = getComputedStyle(grid);
-				if (cs.display === "none") grid.classList.add("bbmm-force-visible");
+				const tRead = performance.now();
+
+				// WRITE PHASE: toggle a class + hidden boolean only if needed
+				for (const d of decisions) {
+					const shouldHide = !d.show;
+					if (d.row.classList.contains("bbmm-hidden") !== shouldHide) {
+						d.row.classList.toggle("bbmm-hidden", shouldHide);
+					}
+					if (!!d.row.hidden !== shouldHide) d.row.hidden = shouldHide;
+				}
+				const tWrite = performance.now();
+
 				DL(`module-management | mirror(filter): shown=${shown}, hidden=${hidden}` +
 					(firstShownId ? `, first=${firstShownId}` : ``) +
-					`, gridDisplay=${getComputedStyle(grid).display}`);
+					`, read=${(tRead - t0).toFixed(1)}ms, write=${(tWrite - tRead).toFixed(1)}ms, total=${(tWrite - t0).toFixed(1)}ms`);
 			};
-			// Try to patch the app's SearchFilter.filter() method to catch searches
+
+			// Once-per-frame scheduler (no duplicate identifier)
+			const scheduleMirror = (() => {
+				let scheduled = false;
+				return () => {
+					if (scheduled) return;
+					scheduled = true;
+					requestAnimationFrame(() => {
+						scheduled = false;
+						mirrorOnce();
+					});
+				};
+			})();
+
+			// Prefer libWrapper; otherwise patch the instance filter
 			const tryPatchSearchFilter = () => {
 				const sf = app?.searchFilter;
+
+				if (globalThis.libWrapper) {
+					try {
+						if (!SearchFilter.__bbmmFilterWrapped) {
+							libWrapper.register("bbmm", "SearchFilter.prototype.filter", function (wrapped, query, ...args) {
+								menuEl.__bbmmSquelchMo = true; // suppress MO during bulk flips
+								let out;
+								try {
+									out = wrapped.call(this, query, ...args);
+									// immediate single mirror for snappy UI
+									mirrorOnce();
+								} catch (e) {
+									DL(3, "module-management | SearchFilter.filter (libWrapper) error", e);
+								} finally {
+									// re-enable MO next frame (no second mirror)
+									requestAnimationFrame(() => { menuEl.__bbmmSquelchMo = false; });
+								}
+								return out;
+							}, "WRAPPER");
+							SearchFilter.__bbmmFilterWrapped = true;
+							DL("module-management | libWrapper: wrapped SearchFilter.prototype.filter (squelch MOs)");
+						}
+						return true;
+					} catch (e) {
+						DL(2, "module-management | libWrapper wrap failed, falling back to instance patch", e);
+					}
+				}
+
+				// Instance-level fallback
 				if (!sf || sf.__bbmmMirrorPatched) return false;
 				const origFilter = sf.filter.bind(sf);
 				sf.filter = (query, ...args) => {
-					const r = origFilter(query, ...args);
-					queueMicrotask(mirrorOnce);
-					return r;
+					menuEl.__bbmmSquelchMo = true;
+					let out;
+					try {
+						out = origFilter(query, ...args);
+						mirrorOnce(); // single immediate pass
+					} catch (e) {
+						DL(3, "module-management | SearchFilter.filter (instance) error", e);
+					} finally {
+						requestAnimationFrame(() => { menuEl.__bbmmSquelchMo = false; });
+					}
+					return out;
 				};
 				sf.__bbmmMirrorPatched = true;
-				DL("module-management | patched app.searchFilter.filter() to mirror results");
+				DL("module-management | patched app.searchFilter.filter() (squelch MOs)");
 				return true;
 			};
+
 			// Try once now, then poll a few times in case the SearchFilter isn't ready yet
 			if (!tryPatchSearchFilter()) {
 				let attempts = 0;
 				const t = setInterval(() => { if (tryPatchSearchFilter() || ++attempts >= 10) clearInterval(t); }, 50);
 			}
-			
+
+			// Delegate typing on the native search box (once-per-frame mirror)
 			if (!root.__bbmmDelegatedMirror) {
-				const schedule = () => requestAnimationFrame(() => requestAnimationFrame(mirrorOnce));
 				const onKeyOrInput = (ev) => {
 					const target = ev.target;
 					if (!(target instanceof HTMLInputElement)) return;
 					if (target.name !== "search") return;
-					schedule();
+					scheduleMirror();
 				};
 				root.addEventListener("input", onKeyOrInput, true);
 				root.addEventListener("keyup", onKeyOrInput, true);
 				root.__bbmmDelegatedMirror = true;
 				DL("module-management | delegated mirror bound on window root");
 			}
-			// Observe the native menu for any attribute/child changes that might affect visibility
-			const mo = new MutationObserver(() => requestAnimationFrame(mirrorOnce));
-			mo.observe(menuEl, { attributes: true, attributeFilter: ["class","style","hidden"], subtree: true, childList: true });
-			requestAnimationFrame(mirrorOnce);
+
+			// Observe the native menu for changes that affect visibility — avoid subtree floods
+			const mo = new MutationObserver(() => {
+				if (menuEl.__bbmmSquelchMo) return;
+				scheduleMirror();
+			});
+			mo.observe(menuEl, {
+				attributes: true,
+				attributeFilter: ["class","style","hidden"],
+				childList: true,
+				subtree: false
+			});
+
+			// First mirror after initial paint
+			scheduleMirror();
 
 			// Bulk button integration: mirror core actions to BBMM clones
 			try {
@@ -771,7 +962,7 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 
 						if (!isBulk) return;
 
-						// Let core flip NATIVE checkboxes silently; then mirror NATIVE → BBMM clones.
+						// Let core flip NATIVE checkboxes silently; then mirror NATIVE -> BBMM clones.
 						queueMicrotask(() => _bbmmSyncClonesFromNative(root));
 						setTimeout(() => _bbmmSyncClonesFromNative(root), 60);
 						setTimeout(() => _bbmmSyncClonesFromNative(root), 200);
@@ -789,14 +980,14 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 
 			// Observe the native menu for changes that might affect checkbox states
 			try {
-				// Observe native menu for any attribute/child changes
+				// Observe native menu for any attribute/child changes (for state sync only)
 				if (!menuEl.__bbmmSyncMo) {
 					const mo2 = new MutationObserver(() => {
 						requestAnimationFrame(() => _bbmmSyncClonesFromNative(root));
 					});
 					mo2.observe(menuEl, { attributes: true, subtree: true, childList: true });
 					menuEl.__bbmmSyncMo = mo2;
-					DL("module-management | mutation observer bound for native→BBMM sync");
+					DL("module-management | mutation observer bound for native->BBMM sync");
 				}
 
 				// After ANY DialogV2 renders or closes, resync 
@@ -846,12 +1037,1401 @@ Hooks.on("renderModuleManagement", (app, rootEl) => {
 		} catch (e) {
 			DL(2, "module-management | mirror patch failed", e);
 		}
+
 		DL(`module-management | injected compact grid with ${built} rows`);
 	} catch (err) {
 		DL(3, "module-management | renderModuleManagement(): error", err);
 	}
 });
+*/
+/* ============================================================================
+	BBMM: Stand-alone Module Manager (ApplicationV2) — launchable from a macro
+	V13-only. No core patching. Purely client-side planning of enable/disable.
+============================================================================ */
+class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
+	constructor() {
+		super({
+			id: "bbmm-module-manager",
+			window: { title: LT.moduleManagement.modListWindowTitle() },
+			width: 1000,
+			height: 640,
+			resizable: true
+		});
+
+		// working set (planned states), by module id -> boolean
+		this.plan = new Map();
+		// filter state
+		this.query = "";
+		this.scope = "all"; // "all" | "active" | "inactive"
+		/* runtime lock state (module id -> locked). Non-persistent by design. */
+		this.locks = new Set();
+
+		this._minW = 760;
+		this._maxW = 1400;
+		this._minH = 480;
+		this._maxH = 900;
+
+		// snapshot modules once on open
+		this._refreshDataset();
+
+		this._temp = null;       // working copy (object: id -> boolean)
+		this._coreSnap = null;   // snapshot of core at open time (object: id -> boolean)
+	}
+
+	/* Seed/reset temp from core at open */
+	async _resetTempFromCore() {
+		try {
+			const core = foundry.utils.duplicate(game.settings.get("core", "moduleConfiguration") || {});
+			await game.settings.set(BBMM_ID, "tempModConfig", core);
+			this._coreSnap = core;                 // snapshot for diff counts
+			this._temp = foundry.utils.duplicate(core);
+			DL("BBMMModuleManagerApp::_resetTempFromCore(): temp reset from core");
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_resetTempFromCore(): error", e);
+			this._coreSnap = {};
+			this._temp = {};
+		}
+	}
+
+	/* Read “planned” state: prefer temp, else current active */
+	_getTempActive(id) {
+		const t = this._temp || {};
+		return Object.prototype.hasOwnProperty.call(t, id) ? !!t[id] : !!game.modules.get(id)?.active;
+	}
+
+	/* Set planned state in temp (in-mem + persisted) */
+	async _setTempActive(id, on) {
+		try {
+			const cur = foundry.utils.duplicate(game.settings.get(BBMM_ID, "tempModConfig") || {});
+			cur[id] = !!on;
+			await game.settings.set(BBMM_ID, "tempModConfig", cur);
+			this._temp = cur;
+			DL(`BBMMModuleManagerApp::_setTempActive(): ${id} = ${!!on}`);
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_setTempActive(): error", e);
+		}
+	}	
+
+	// Load module locks data
+	async _loadLocks() {
+		try {
+			const raw = await game.settings.get(BBMM_ID, "moduleLocks");
+			const arr = Array.isArray(raw) ? raw : [];
+			this.locks = new Set(arr);
+			DL("_loadLocks(): loaded", { count: this.locks.size });
+		} catch (e) {
+			this.locks = new Set();
+			DL(2, "_loadLocks(): error", e);
+		}
+	}
+
+	// Save module locks data
+	async _saveLocks() {
+		try {
+			await game.settings.set(BBMM_ID, "moduleLocks", Array.from(this.locks));
+			DL("_saveLocks(): saved", { count: this.locks.size });
+		} catch (e) {
+			DL(2, "_saveLocks(): error", e);
+		}
+	}
+
+	/* Debounced saver for moduleLocks */
+	_queueSaveLocks() {
+		try {
+			if (this._locksSaveT) clearTimeout(this._locksSaveT);
+			this._locksSaveT = setTimeout(async () => {
+				this._locksSaveT = null;
+				await this._saveLocks(); // your existing method that writes the world setting
+			}, 200);
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_queueSaveLocks(): error", e);
+		}
+	}
+
+	async _setTempActiveBulk(onIds = [], offIds = []) {
+		try {
+			const cur = foundry.utils.duplicate(game.settings.get(BBMM_ID, "tempModConfig") || {});
+
+			// Do not touch locked modules (safety)
+			const enableIds = (onIds ?? []).filter(id => !this.locks.has(id));
+			const disableIds = (offIds ?? []).filter(id => !this.locks.has(id));
+			const skippedEnable = (onIds ?? []).filter(id => this.locks.has(id));
+			const skippedDisable = (offIds ?? []).filter(id => this.locks.has(id));
+			if (skippedEnable.length || skippedDisable.length) {
+				DL("BBMMModuleManagerApp::_setTempActiveBulk(): locked modules filtered out", { skippedEnable, skippedDisable });
+			}
+
+			for (const id of enableIds) cur[id] = true;
+			for (const id of disableIds) cur[id] = false;
+
+			await game.settings.set(BBMM_ID, "tempModConfig", cur);
+			this._temp = cur;
+			DL("BBMMModuleManagerApp::_setTempActiveBulk()", { onIds: enableIds, offIds: disableIds });
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_setTempActiveBulk(): error", e);
+		}
+	}
+
+	_refreshDataset() {
+		try {
+			const data = [];
+			for (const mod of game.modules) {
+				const id = String(mod.id);
+				const title = String(mod.title ?? id);
+				const version = String(mod.version ?? mod?.manifest?.version ?? "");
+				const req = (mod?.relationships?.requires ?? []);
+				const requires = [];
+				for (const r of req) if (r?.id && (r.type ?? "module") === "module") requires.push(r.id);
+
+				const conflicts = (mod?.relationships?.conflicts ?? []);
+				const confIds = [];
+				for (const c of conflicts) if (c?.id && (c.type ?? "module") === "module") confIds.push(c.id);
+
+				/* collect recommends */
+				const rec = (mod?.relationships?.recommends ?? []);
+				const recIds = [];
+				for (const o of rec) if (o?.id && (o.type ?? "module") === "module") recIds.push(o.id);
+
+				data.push({ id, title, version, requires, recommends: recIds, conflicts: confIds });
+			}
+			data.sort((a, b) => a.title.localeCompare(b.title));
+			this._mods = data;
+			DL(`BBMMModuleManagerApp::_refreshDataset(): loaded ${data.length} modules`);
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_refreshDataset(): error", e);
+			this._mods = [];
+		}
+	}
+
+	_getFiltered() {
+		const q = (this.query ?? "").toLowerCase().trim();
+		const scope = this.scope;
+		return (this._mods ?? []).filter(m => {
+			const planned = !!this._getTempActive(m.id);
+			if (scope === "active" && !planned)   return false;
+			if (scope === "inactive" && planned)  return false;
+			if (!q) return true;
+			const blob = (m.title + " " + m.id + " " + (m.version || "")).toLowerCase();
+			return blob.includes(q);
+		});
+	}
+
+	/* Current totals from the planned (temp) state */
+	_diffCounts() {
+		try {
+			let enable = 0, disable = 0;
+			for (const m of this._mods ?? []) {
+				if (this._getTempActive(m.id)) enable++;
+				else disable++;
+			}
+			return { enable, disable };
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_diffCounts(): error", e);
+			return { enable: 0, disable: 0 };
+		}
+	}
+
+	/* Return required MODULE ids from relationships.requires */
+	_getModuleRequires(mod) {
+		try {
+			if (!mod) return [];
+			const reqs = mod?.relationships?.requires;
+			if (!reqs || typeof reqs[Symbol.iterator] !== "function") return [];
+
+			const ids = [];
+			for (const r of reqs) {
+				if (!r?.id) continue;
+				if ((r.type ?? "module") !== "module") continue;
+				if (!game.modules.has(r.id)) continue;
+				ids.push(r.id);
+			}
+			const uniq = Array.from(new Set(ids));
+			DL(`BBMMModuleManagerApp::_getModuleRequires(${mod.id})`, { requires: uniq });
+			return uniq;
+		} catch (err) {
+			DL(2, "BBMMModuleManagerApp::_getModuleRequires(): error", err);
+			return [];
+		}
+	}
+
+	/* Collect all transitive required module IDs for a given module id. */
+	_collectRequired(moduleId) {
+		try {
+			const out = new Set();
+			const seen = new Set();
+			const q = [moduleId];
+
+			while (q.length) {
+				const cur = q.pop();
+				if (seen.has(cur)) continue;
+				seen.add(cur);
+
+				const mod = game.modules.get(cur);
+				if (!mod) continue;
+
+				for (const rid of this._getModuleRequires(mod)) {
+					if (rid === moduleId) continue; // guard cycle to root
+					if (!out.has(rid)) {
+						out.add(rid);
+						q.push(rid);
+					}
+				}
+			}
+			const deps = Array.from(out);
+			DL(`BBMMModuleManagerApp::_collectRequired(${moduleId})`, { deps });
+			return out;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_collectRequired(): error", e);
+			return new Set();
+		}
+	}
+
+	/* Return a Set of module ids that (transitively) depend on the given module.
+	   Only includes modules that are currently planned ON (temp) to avoid noise. */
+	_collectDependents(moduleId) {
+		try {
+			const dependents = new Set();
+			const queue = [moduleId];
+			const seen = new Set(queue);
+
+			// Build a quick index: id -> Set(ids it requires)
+			const requiresOf = new Map();
+			for (const mod of game.modules) {
+				const id = String(mod.id);
+				const req = [...(mod.relationships?.requires ?? [])].map(r => r.id).filter(Boolean);
+				requiresOf.set(id, new Set(req));
+			}
+
+			while (queue.length) {
+				const target = queue.pop();
+				for (const mod of game.modules) {
+					const id = String(mod.id);
+					if (seen.has(id)) continue;
+					const reqs = requiresOf.get(id);
+					if (!reqs || !reqs.has(target)) continue;
+
+					// Only consider “planned ON” modules
+					if (!this._getTempActive(id)) continue;
+
+					dependents.add(id);
+					seen.add(id);
+					queue.push(id); // transitive dependents
+				}
+			}
+			return dependents;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_collectDependents(): error", e);
+			return new Set();
+		}
+	}
+
+	/* Of the modules that THIS module requires, return the ones that are not required
+	   by any OTHER planned-ON module (so they can be safely turned off when disabling this). */
+	_collectOrphanedRequires(moduleId) {
+		try {
+			// Direct requires of the module being disabled
+			const req = this._getModuleRequires(game.modules.get(moduleId));
+			if (!req.length) return new Set();
+
+			// Which of those are still needed by some other planned-ON module?
+			const stillNeeded = new Set();
+			for (const m of game.modules) {
+				const id = String(m.id);
+				if (id === moduleId) continue;
+				if (!this._getTempActive(id)) continue;
+				const r = this._getModuleRequires(m);
+				for (const dep of r) {
+					if (req.includes(dep)) stillNeeded.add(dep);
+				}
+			}
+
+			// Orphans = requires that are not “still needed”
+			const out = new Set();
+			for (const dep of req) if (!stillNeeded.has(dep)) out.add(dep);
+			return out;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_collectOrphanedRequires(): error", e);
+			return new Set();
+		}
+	}
+
+	/* When a module is toggled OFF, confirm disabling its dependents and (optionally) its orphaned requires. */
+	async _ensureSafeDisable(moduleId) {
+		try {
+			// 1) Dependents of this module (modules that will break if we disable it)
+			const dependents = this._collectDependents(moduleId);
+			if (dependents.size) {
+				const list = [...dependents].sort((a, b) => a.localeCompare(b)).map(id => {
+					const t = game.modules.get(id)?.title ?? id;
+					return `<li><code>${hlp_esc(id)}</code> — ${hlp_esc(t)}</li>`;
+				}).join("");
+				const content = document.createElement("div"); // DialogV2: no attributes on root
+				const p = document.createElement("p");
+				p.textContent = LT.moduleManagement?.disableDependentsPrompt?.() ?? "The module you are disabling is required by the following module(s). Disable them as well?";
+				const ul = document.createElement("ul"); ul.innerHTML = list;
+				content.appendChild(p); content.appendChild(ul);
+
+				let accepted = false;
+				await new Promise(resolve => {
+					const safeResolve = () => { try { resolve(); } catch {} };
+					new foundry.applications.api.DialogV2({
+						id: "bbmm-mm-disable-dependents",
+						modal: true,
+						window: { title: LT.moduleManagement?.disableDependentsTitle?.() ?? "Disable Dependent Modules" },
+						content,
+						buttons: [
+							{ action: "ok", label: LT.moduleManagement?.disable?.() ?? "Disable", icon: "fa-solid fa-check", default: true,
+								callback: () => { accepted = true; safeResolve(); } },
+							{ action: "cancel", label: LT.buttons?.cancel?.() ?? "Cancel", icon: "fa-solid fa-xmark",
+								callback: () => { accepted = false; safeResolve(); } }
+						],
+						close: safeResolve
+					}).render(true);
+				});
+				if (!accepted) {
+					DL(`BBMMModuleManagerApp::_ensureSafeDisable(${moduleId}): user canceled dependents`);
+					return false;
+				}
+				// Turn off the dependents in temp
+				await this._setTempActiveBulk([], [...dependents]);
+			}
+
+			// 2) Orphaned requires (things this module needed that nothing else still needs)
+			const orphans = this._collectOrphanedRequires(moduleId);
+			if (orphans.size) {
+				const list = [...orphans].sort((a, b) => a.localeCompare(b)).map(id => {
+					const t = game.modules.get(id)?.title ?? id;
+					return `<li><code>${hlp_esc(id)}</code> — ${hlp_esc(t)}</li>`;
+				}).join("");
+				const content = document.createElement("div");
+				const p = document.createElement("p");
+				p.textContent = LT.moduleManagement?.disableOrphansPrompt?.() ?? "The module you are disabling has required module(s) that are no longer needed by anything else. Disable them too?";
+				const ul = document.createElement("ul"); ul.innerHTML = list;
+				content.appendChild(p); content.appendChild(ul);
+
+				let accepted = false;
+				await new Promise(resolve => {
+					const safeResolve = () => { try { resolve(); } catch {} };
+					new foundry.applications.api.DialogV2({
+						id: "bbmm-mm-disable-orphans",
+						modal: true,
+						window: { title: LT.moduleManagement?.disableOrphansTitle?.() ?? "Disable Unneeded Dependencies" },
+						content,
+						buttons: [
+							{ action: "ok", label: LT.moduleManagement?.disable?.() ?? "Disable", icon: "fa-solid fa-check", default: true,
+								callback: () => { accepted = true; safeResolve(); } },
+							{ action: "cancel", label: LT.buttons?.cancel?.() ?? "Cancel", icon: "fa-solid fa-xmark",
+								callback: () => { accepted = false; safeResolve(); } }
+						],
+						close: safeResolve
+					}).render(true);
+				});
+				if (accepted) {
+					await this._setTempActiveBulk([], [...orphans]);
+				}
+			}
+
+			// If we get here, it’s safe to disable the original module
+			return true;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_ensureSafeDisable(): error", e);
+			return false;
+		}
+	}
+
+	/* When a module is toggled ON, ensure required deps are also toggled ON (with confirmation),
+	and offer to also enable optional dependencies (checkbox, default ON). */
+	async _ensureDependenciesForEnable(moduleId) {
+		try {
+			// Required (transitive)
+			const need = this._collectRequired(moduleId);
+			const toEnable = [];
+			for (const dep of need) {
+				const curActive = !!game.modules.get(dep)?.active;
+				const planned = this.plan.has(dep) ? !!this.plan.get(dep) : curActive;
+				if (!planned) toEnable.push(dep);
+			}
+
+			// Recommended (direct only)
+			const mod = game.modules.get(moduleId);
+			const recommended = [];
+			try {
+				const rec = (mod?.relationships?.recommends ?? []);
+				for (const o of rec) {
+					if (!o?.id) continue;
+					if ((o.type ?? "module") !== "module") continue;
+					if (!game.modules.has(o.id)) continue; // only offer installed modules
+					const curActive = !!game.modules.get(o.id)?.active;
+					const planned = this.plan.has(o.id) ? !!this.plan.get(o.id) : curActive;
+					if (!planned) recommended.push(o.id);
+				}
+			} catch (e) {
+				DL(2, `BBMMModuleManagerApp::_ensureDependenciesForEnable(${moduleId}): recommends scan failed`, e);
+			}
+
+			// Nothing to do
+			if (!toEnable.length && !recommended.length) return true;
+
+			DL(`_ensureDependenciesForEnable(): discovered deps for ${moduleId}`, { required: toEnable, recommended });
+
+			// IMPORTANT: DialogV2 requires content root to have NO attributes.
+			// Create an attribute-less root, and a styled inner container for layout.
+			const content = document.createElement("div"); // NO attributes on this element
+			const container = document.createElement("div");
+			container.style.display = "flex";
+			container.style.flexDirection = "column";
+			container.style.gap = ".5rem";
+			content.appendChild(container);
+
+			const reqTitle = LT.moduleManagement.dependencies();
+			const recTitle = LT.moduleManagement.recommendations();
+
+			// Required list (informational)
+			if (toEnable.length) {
+				const p = document.createElement("p");
+				p.textContent = LT.moduleManagement.depsPrompt();
+				container.appendChild(p);
+
+				const wrap = document.createElement("div");
+				wrap.style.maxHeight = "200px";
+				wrap.style.overflow = "auto";
+				wrap.style.border = "1px solid var(--color-border, #888)";
+				wrap.style.borderRadius = ".35rem";
+				wrap.style.padding = ".5rem";
+
+				const h = document.createElement("div");
+				h.style.fontWeight = "bold";
+				h.textContent = `${reqTitle} (${toEnable.length})`;
+				wrap.appendChild(h);
+
+				const ul = document.createElement("ul");
+				for (const id of toEnable) {
+					const li = document.createElement("li");
+					const t = game.modules.get(id)?.title ?? id;
+					li.innerHTML = `<code>${hlp_esc(id)}</code> — ${hlp_esc(t)}`;
+					ul.appendChild(li);
+				}
+				wrap.appendChild(ul);
+				container.appendChild(wrap);
+			}
+
+			// Recommended with per-item checkboxes (default checked)
+			if (recommended.length) {
+				const wrap = document.createElement("div");
+				wrap.style.maxHeight = "200px";
+				wrap.style.overflow = "auto";
+				wrap.style.border = "1px solid var(--color-border, #888)";
+				wrap.style.borderRadius = ".35rem";
+				wrap.style.padding = ".5rem";
+
+				const h = document.createElement("div");
+				h.style.fontWeight = "bold";
+				h.textContent = `${recTitle} (${recommended.length})`;
+				wrap.appendChild(h);
+
+				const list = document.createElement("div");
+				list.style.display = "grid";
+				list.style.gridTemplateColumns = "1fr";
+				list.style.rowGap = ".25rem";
+
+				for (const id of recommended) {
+					const modTitle = game.modules.get(id)?.title ?? id;
+
+					const row = document.createElement("label");
+					row.style.display = "flex";
+					row.style.alignItems = "center";
+					row.style.gap = ".5rem";
+
+					const chk = document.createElement("input");
+					chk.type = "checkbox";
+					chk.defaultChecked = true;	
+					chk.checked = true;
+					chk.name = "bbmm-rec";
+					chk.value = id;
+
+					const span = document.createElement("span");
+					span.innerHTML = `<code>${hlp_esc(id)}</code> — ${hlp_esc(modTitle)}`;
+
+					row.appendChild(chk);
+					row.appendChild(span);
+					list.appendChild(row);
+				}
+
+				wrap.appendChild(list);
+				container.appendChild(wrap);
+			}
+
+			// Dialog
+			let accepted = false;
+			let selectedRecs = [];
+			await new Promise((resolve) => {
+				let resolved = false;
+				const safeResolve = (v) => { if (!resolved) { resolved = true; resolve(v); } };
+
+				const dlg = new foundry.applications.api.DialogV2({
+					id: "bbmm-mm-enable-deps",
+					modal: true,
+					window: { title: LT.moduleManagement.depsTitle() },
+					content, // root has NO attributes
+					buttons: [
+						{
+							action: "ok",
+							label: LT.moduleManagement.enable(),
+							icon: "fa-solid fa-check",
+							default: true,
+							callback: () => {
+								accepted = true;
+								selectedRecs = Array.from(content.querySelectorAll('input[name="bbmm-rec"]:checked')).map(el => el.value);
+								DL(`_ensureDependenciesForEnable(): accepted for ${moduleId}`, { selectedRecs });
+								safeResolve(true);
+							}
+						},
+						{
+							action: "cancel",
+							label: LT.buttons.cancel(),
+							icon: "fa-solid fa-xmark",
+							callback: () => { accepted = false; safeResolve(false); }
+						}
+					],
+					close: () => safeResolve(false)
+				});
+				dlg.render(true);
+			});
+
+			if (!accepted) return false;
+
+			// Apply: required + selected recommended + the target module
+			const allToEnable = new Set([moduleId]);
+			for (const id of toEnable) allToEnable.add(id);
+			for (const id of selectedRecs) allToEnable.add(id);
+
+			await this._setTempActiveBulk([...allToEnable], []);
+			this._rerender({ keepFocus: true });
+			DL("_ensureDependenciesForEnable(): applied", { required: toEnable, recommended: selectedRecs });
+			return true;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_ensureDependenciesForEnable(): error", e);
+			return true; // fail-open
+		}
+	}
+
+	/* Persist via core.moduleConfiguration, then reload. */
+	async _saveViaCoreSettings() {
+		try {
+			
+			// Live core as base
+			const current = foundry.utils.duplicate(game.settings.get("core", "moduleConfiguration") || {});
+			const next = { ...current };
+
+			let touched = 0;
+			for (const m of (this._mods ?? [])) {
+				const planned = !!this._getTempActive(m.id); // read from temp
+				if (next[m.id] !== planned) {
+					next[m.id] = planned;
+					touched++;
+				}
+			}
+
+			if (!touched) {
+				ui.notifications.info(LT.moduleManagement?.noChanges());
+				DL("BBMMModuleManagerApp::_saveViaCoreSettings(): no changes");
+				return;
+			}
+
+			DL(`BBMMModuleManagerApp::_saveViaCoreSettings(): writing ${touched} change(s) to core.moduleConfiguration`);
+			await game.settings.set("core", "moduleConfiguration", next);
+
+			// Reload dialog (left button default)
+			let doReload = true;
+			const content = document.createElement("div");
+			const p = document.createElement("p");
+			p.textContent = LT.moduleManagement.reloadMessage();
+			content.appendChild(p);
+
+			await new Promise(resolve => {
+				let done = false;
+				const safe = () => { if (!done) { done = true; resolve(); } };
+				new foundry.applications.api.DialogV2({
+					id: "bbmm-mm-reload",
+					modal: true,
+					window: { title: LT.moduleManagement?.reloadRequiredTitle() },
+					content,
+					buttons: [
+						{
+							action: "ok",
+							label: LT.moduleManagement.reloadNow(),
+							icon: "fa-solid fa-rotate-right",
+							default: true,
+							callback: () => {
+								doReload = true;
+								DL("BBMMModuleManagerApp::_saveViaCoreSettings(): Reload Now clicked");
+								safe();
+							}
+						},
+						{
+							action: "cancel",
+							label: LT.moduleManagement.reloadLater(),
+							icon: "fa-solid fa-xmark",
+							callback: () => { doReload = false; safe(); }
+						}
+					],
+					close: safe
+				}).render(true);
+			});
+
+			if (doReload) {
+				// Broadcast reload to ALL clients before reloading self
+				try {
+					if (game.user.isGM) {
+						const channel = `module.${BBMM_ID}`;
+						const payload = { cmd: "bbmm:reload", ts: Date.now() };
+						DL("BBMM broadcast: sending reload to all clients", { channel, payload });
+						game.socket.emit(channel, payload);
+						// Small flush delay helps ensure delivery before this tab reloads
+						await new Promise(r => setTimeout(r, 100));
+					}
+				} catch (e) {
+					DL(2, "BBMM broadcast: emit failed", e);
+				}
+
+				// Reload this client
+				try { (foundry.utils?.debouncedReload?.() || window.location.reload)(); }
+				catch (e) { DL(3, "BBMMModuleManagerApp::_saveViaCoreSettings(): reload failed", e); }
+			} else {
+				ui.notifications.info(LT.moduleManagement.reloadLaterNotice());
+			}
+
+		} catch (e) {
+			DL(3, "BBMMModuleManagerApp::_saveViaCoreSettings(): error", e);
+			ui.notifications.error(LT.moduleManagement.saveFailed());
+		}
+	}
+
+	/* Build a core-style tag strip from module metadata (no version pill). */
+	_buildTagsFor(mod) {
+		
+
+		try {
+			const parts = [];
+
+			/* Lock toggle tag */
+			try {
+				const isLocked = this.locks?.has?.(mod.id) === true;
+				parts.push(
+					`<button type="button" class="tag flexrow" data-bbmm-action="toggle-lock" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(isLocked ? LT.moduleManagement.lockUnlock() : LT.moduleManagement.lockLock())}">` +
+						/* When locked: closed lock + inline orange so it’s instantly visible */
+						`<i class="fa-solid ${isLocked ? "fa-lock" : "fa-lock-open"} fa-fw"${isLocked ? ' style="color: orange;"' : ""}></i>` +
+					`</button>`
+				);
+			} catch (e) { DL(2, "BBMMModuleManagerApp::_buildTagsFor(): lock tag failed", e); }
+
+			// Settings gear (same size as native via "tag flexrow")
+			try{
+				if (_bbmmModuleHasConfigSettings(mod.id)) {
+					parts.push(
+						`<button type="button" class="tag flexrow" data-bbmm-action="open-settings" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(LT.openSettings())}">` +
+							`<i class="fa-solid fa-gear fa-fw"></i>` +
+						`</button>`
+					);
+				}
+			} catch (e) { DL(2, "BBMMModuleManagerApp::_buildTagsFor(): settings tag failed", e); }
+
+			// URL
+			const url = mod.url || mod.manifest || "";
+			if (url) {
+				parts.push(
+					`<a class="tag flexrow" href="${hlp_esc(url)}" target="_blank" rel="noopener" title="${hlp_esc(url)}">` +
+						`<i class="fa-solid fa-link fa-fw"></i>` +
+					`</a>`
+				);
+			}
+
+			// Author(s)
+			const authors = Array.from(mod.authors ?? []);
+			if (authors.length) {
+				parts.push(`<span class="tag flexrow" title="${hlp_esc(authors.map(a => a.name).join(", "))}"><i class="fa-solid fa-user fa-fw"></i></span>`);
+			}
+
+			// Compendium packs
+			const packs = Array.from(mod.packs ?? []);
+			if (packs.length) {
+				parts.push(`<span class="tag flexrow" title="${LT.moduleManagement.tagCompendia()}: ${packs.length}"><i class="fa-solid fa-box-archive fa-fw"></i></span>`);
+			}
+
+			// Localization files
+			const langs = Array.from(mod.languages ?? []);
+			if (langs.length) {
+				parts.push(`<span class="tag flexrow" title="${LT.moduleManagement.tagLocalization()}"><i class="fa-solid fa-language fa-fw"></i></span>`);
+			}
+
+			return parts.join("");
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_buildTagsFor(): failed", e);
+			return "";
+		}
+	}
+
+	/* Fallback: synthesize a core-like tag strip when native <li> is not available */
+	_bbmmBuildTagStripFallback(mod) {
+		try {
+			const parts = [];
+
+			// settings gear (native sizing: .tag.flexrow)
+			if (_bbmmModuleHasConfigSettings(mod.id)) {
+                parts.push(
+					`<button type="button" class="tag flexrow" data-bbmm-action="open-settings" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(LT.openSettings?.() ?? "Open Settings")}">` +
+						`<i class="fa-solid fa-gear fa-fw"></i>` +
+					`</button>`
+				);
+			}
+
+			// URL
+			const url = mod.url ?? mod.manifest ?? "";
+			if (url) {
+				parts.push(
+					`<a class="tag flexrow" href="${hlp_esc(url)}" target="_blank" rel="noopener" title="${hlp_esc(url)}">` +
+						`<i class="fa-solid fa-link fa-fw"></i>` +
+					`</a>`
+				);
+			}
+
+			// Authors
+			const authors = Array.from(mod.authors ?? []);
+			if (authors.length) {
+				parts.push(`<span class="tag flexrow" title="${hlp_esc(authors.map(a => a.name).join(", "))}"><i class="fa-solid fa-user fa-fw"></i></span>`);
+			}
+
+			// Compendium packs
+			const packs = Array.from(mod.packs ?? []);
+			if (packs.length) {
+				parts.push(`<span class="tag flexrow" title="Compendia: ${packs.length}"><i class="fa-solid fa-box-archive fa-fw"></i></span>`);
+			}
+
+			// Localization files
+			const langs = Array.from(mod.languages ?? []);
+			if (langs.length) {
+				parts.push(`<span class="tag flexrow" title="Localization"><i class="fa-solid fa-language fa-fw"></i></span>`);
+			}
+
+			// Compatibility badges
+			try {
+				const comp = mod.compatibility ?? mod.manifest?.compatibility ?? {};
+				const verified = comp?.verified;
+				const min = comp?.minimum;
+				const max = comp?.maximum;
+
+				if (verified) {
+					parts.push(`<span class="tag flexrow" title="Verified"><i class="fa-solid fa-circle-check fa-fw"></i></span>`);
+				} else if (min || max) {
+					parts.push(`<span class="tag flexrow" title="Compatibility not verified"><i class="fa-solid fa-triangle-exclamation fa-fw"></i></span>`);
+				}
+			} catch {}
+
+			// Return combined
+			return parts.join("");
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_bbmmBuildTagStripFallback(): failed", e);
+			return "";
+		}
+	}
+
+	_renderNativeTagsHTML(modId) {
+		try {
+			// Look for the native Module Management <li> for this id and clone its .tag elements.
+			const li =
+				document.querySelector(`li.package[data-module-id="${CSS.escape(modId)}"]`) ||
+				document.querySelector(`li.package[data-package-id="${CSS.escape(modId)}"]`);
+			if (!li) return "";
+
+			const tags = li.querySelectorAll(".package-overview .tag");
+			if (!tags?.length) return "";
+
+			const frag = document.createDocumentFragment();
+			for (const t of tags) {
+				const clone = t.cloneNode(true);
+				clone.classList.add("bbmm-tag"); // harmless class so bbmm.css can tweak spacing if desired
+				frag.appendChild(clone);
+			}
+			const div = document.createElement("div");
+			div.appendChild(frag);
+			return div.innerHTML;
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_renderNativeTagsHTML(): failed", e);
+			return "";
+		}
+	}
+
+	_renderHeaderHTML() {
+		const { enable, disable } = this._diffCounts();
+		const filterLabel = LT.moduleManagement.filterModules();
+		return `
+			<div class="bbmm-mm-toolbar" id="bbmm-mm-toolbar">
+				<input id="bbmm-mm-q" type="text" placeholder="${hlp_esc(filterLabel)}" value="${hlp_esc(this.query)}" />
+				<div class="bbmm-mm-scopes">
+					<button type="button" data-scope="all" class="${this.scope==="all"?"on":""}">${LT.moduleManagement.allModules()}</button>
+					<button type="button" data-scope="active" class="${this.scope==="active"?"on":""}">${LT.moduleManagement.activeModules()}</button>
+					<button type="button" data-scope="inactive" class="${this.scope==="inactive"?"on":""}">${LT.moduleManagement.inactiveModules()}</button>
+				</div>
+				<div class="bbmm-mm-diff">
+					<span class="ena">${LT.moduleManagement.enabled()}: <b id="bbmm-mm-cnt-enable">${enable}</b></span>
+					<span class="dis">${LT.moduleManagement.disabled()}: <b id="bbmm-mm-cnt-disable">${disable}</b></span>
+				</div>
+			</div>
+		`;
+	}
+
+	_renderFooterHTML() {
+		const hasCulprit = !!game.modules.get("find-the-culprit")?.active;
+		return `
+			<div class="bbmm-mm-footer">
+				<button type="button" id="bbmm-mm-save">${LT.moduleManagement.saveModuleSettings()}</button>
+				<button type="button" id="bbmm-mm-deactivate-all">${LT.moduleManagement.deactivateAll()}</button>
+				<button type="button" id="bbmm-mm-activate-all">${LT.moduleManagement.activateAll()}</button>
+				${hasCulprit ? `<button type="button" id="bbmm-mm-culprit"><i class="fa-solid fa-search"></i> ${LT.moduleManagement.findTheCulprit()}</button>`: ``}
+				
+			</div>
+		`;
+	}
+
+	_renderRowsHTML() {
+		try {
+			const rows = this._getFiltered();
+			if (!rows.length) {
+				return `<div class="bbmm-mm-empty">${LT.moduleManagement?.noResults()}</div>`;
+			}
+
+			return rows.map((m) => {
+				const planned = !!this._getTempActive(m.id);
+				const changed = planned !== !!this._coreSnap?.[m.id];
+				const verTxt  = m.version ? String(m.version) : "";
+				// get the REAL Module object for the tag strip
+				const modObj = game.modules.get(m.id);
+				
+				// Compatibility color/tooltip applied to version tag
+				let verColor = "";
+				let verTitle = "";
+				try {
+					const compat = modObj?.compatibility ?? {};
+					const core = game?.release?.version ?? game?.version ?? "0.0.0";
+					const coreMajor = String(core).split(".")[0] ?? "";
+					const targets = [compat.minimum, compat.verified].filter(Boolean).map(String);
+
+					const isNewer = (a, b) => { try { return foundry.utils.isNewerVersion(a, b); } catch { return false; } };
+					const isExactMatch = (t) => t === core;
+					const isMajorOnly = (t) => /^\d+$/.test(t);
+					const isMajorMatch = (t) => isMajorOnly(t) && t === coreMajor;
+					const isHigherThanCore = (t) => {
+						if (isMajorOnly(t)) return Number(t) > Number(coreMajor);
+						return isNewer(t, core); // t > core
+					};
+
+					// Green when minimum or verified matches (exact) OR is major-only equal to core's major (e.g., "13" vs "13.x")
+					const green = targets.some((t) => isExactMatch(t) || isMajorMatch(t));
+					// Yellow when (not green) and any target is higher than core
+					const yellow = !green && targets.some((t) => isHigherThanCore(t));
+
+					if (green) {
+						verColor = "#16a34a"; // green
+						verTitle = `${LT.moduleManagement.compatMatchesCore()} ${core}`;
+					} else if (yellow) {
+						verColor = "#d97706"; // amber
+						verTitle = `${LT.moduleManagement.compatModuleExpects1()} ${targets.join(" / ")}; ${LT.moduleManagement.compatModuleExpects2()} ${core}`;
+					} else {
+						verColor = "#c7ca00ff"; // your yellow
+						verTitle = `${LT.moduleManagement.compatMinVer()}: ${targets.join(" / ") || "—"} • ${LT.moduleManagement.compatibility()}: ${core}`;
+					}
+				} catch (e) {
+					DL(2, "BBMMModuleManagerApp::renderRowsHTML(): compat styling error", e);
+					verColor = "";
+					verTitle = "";
+				}
+
+				
+
+				// ONLY deps/conf moved into notes header
+				const depBadge = (m.requires?.length)
+					? `<span class="tag dep" title="${hlp_esc(m.requires.join(", "))}">${LT.moduleManagement.dependencies()}: ${m.requires.length}</span>`
+					: "";
+				const conBadge = (m.conflicts?.length)
+					? `<span class="tag con" title="${hlp_esc(m.conflicts.join(", "))}">${LT.moduleManagement.conflicts()}: ${m.conflicts.length}</span>`
+					: "";
+				
+				/* recommended relationships badge */
+				const recBadge = (m.recommends?.length)
+					? `<span class="tag rec" title="${hlp_esc(m.recommends.join(", "))}">${LT.moduleManagement.recommendations()}: ${m.recommends.length}</span>`
+					: "";
+
+				return `
+					<div class="row ${planned ? "on" : "off"} ${changed ? "chg" : ""} ${this.locks.has(m.id) ? "bbmm-locked" : ""}" data-id="${hlp_esc(m.id)}">
+					<label class="toggle" onclick="event.stopPropagation()">
+						<input type="checkbox" ${planned ? "checked" : ""} ${this.locks.has(m.id) ? "disabled" : ""}>
+					</label>
+
+					<div class="main">
+						<div class="title" title="${hlp_esc(m.title)}">${hlp_esc(m.title)}</div>
+					</div>
+
+					<div class="actions">
+						<div class="tags">
+						${this._buildTagsFor(modObj)}
+						${verTxt ? `<span class="ver-text" title="${hlp_esc(verTitle)}" style="${verColor ? `color:${verColor}` : ""}">v${hlp_esc(verTxt)}</span>` : ``}
+						</div>
+						<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
+						<i class="fa-solid fa-pen-to-square fa-fw"></i>
+						</button>
+					</div>
+
+					<div class="notes">
+						<div class="notes-head">
+						${depBadge}${recBadge}${conBadge}
+						</div>
+						<div class="html"></div>
+					</div>
+					</div>
+				`;
+			}).join("");
+		} catch (e) {
+			DL(2, "BBMMModuleManagerApp::_renderRowsHTML(): error", e);
+			return `<div class="bbmm-mm-empty">Error rendering list.</div>`;
+		}
+	}
+
+	async _renderHTML() {
+		return (
+			`<div class="bbmm-mm-root">
+				${this._renderHeaderHTML()}
+				<div class="bbmm-mm-body" id="bbmm-mm-body">
+					${this._renderRowsHTML()}
+				</div>
+				${this._renderFooterHTML()}
+			</div>`
+		);
+	}
+
+	async _replaceHTML(result, _options) {
+		// ensure locks are loaded
+		if (!this._locksLoadedOnce) {
+			this._locksLoadedOnce = true;
+			if (!this.locks) this.locks = new Set();
+			await this._loadLocks();
+		}
+		const content = this.element.querySelector(".window-content") || this.element;
+		content.style.display = "flex";
+		content.style.flexDirection = "column";
+		content.style.height = "100%";
+		content.style.minHeight = "0";
+		content.innerHTML = result;
+		this._root = content;
+
+		// add the standard BBMM header button 
+		try { injectBBMMHeaderButton(this.element); } catch (e) { DL(2, "BBMM MM | header btn inject failed", e); }
+
+		// Reset temp from core on first open of this window
+		await this._resetTempFromCore();
+
+		// build dataset & draw using temp
+		this._refreshDataset();
+		this._rerender();
+
+		// Expose the live instance for debugging
+		try {
+			this.element.__bbmmApp = this;           // DOM → instance
+			window.BBMM_MM = this;                   // global quick access
+		} catch (e) { DL(2, "BBMM | failed to expose app instance", e); }
+
+		// Explicit centering (some themes offset V2 windows on first paint)
+		const _centerNow = () => {
+			try {
+				const el = this.element;
+				const W = el.offsetWidth || 1000;
+				const H = el.offsetHeight || 640;
+				const left = Math.max((window.innerWidth  - W) / 2, 0);
+				const top  = Math.max((window.innerHeight - H) / 2, 0);
+				this.setPosition({ left, top, width: W, height: H });
+			} catch (e) { DL(2, "BBMMModuleManagerApp::_centerNow(): failed", e); }
+		};
+		_centerNow();
+		requestAnimationFrame(_centerNow); // center again after first paint/measure
+
+		// size clamps
+		try {
+			const winEl = this.element;
+			winEl.style.minWidth = this._minW + "px";
+			winEl.style.maxWidth = this._maxW + "px";
+			winEl.style.minHeight = this._minH + "px";
+			winEl.style.maxHeight = this._maxH + "px";
+		} catch {}
+
+		// ensure dataset is live then draw
+		this._refreshDataset();
+		this._rerender();
+
+		// wire events once
+		if (!this._bound) {
+			this._bound = true;
+
+			// Lock toggle (button in the row's actions/tags)
+			this._root.addEventListener("click", (ev) => {
+				const btn = ev.target.closest?.('[data-bbmm-action="toggle-lock"]');
+				if (!btn) return;
+				const id = btn.getAttribute("data-mod-id");
+				if (!id) return;
+				ev.stopPropagation();
+
+				try {
+					const nowLocked = !this.locks.has(id);
+					if (nowLocked) {
+						this.locks.add(id);
+						DL(`BBMMModuleManagerApp | locked ${id}`);
+					} else {
+						this.locks.delete(id);
+						DL(`BBMMModuleManagerApp | unlocked ${id}`);
+					}
+
+					// Instant, surgical UI update for this row only
+					const row = btn.closest?.(".row");
+					if (row) {
+						// 1) toggle the checkbox disabled
+						const chk = row.querySelector('label.toggle input[type="checkbox"]');
+						if (chk) chk.disabled = nowLocked;
+
+						// 2) flip the icon + color inline
+						const ico = btn.querySelector("i.fa-solid");
+						if (ico) {
+							ico.classList.remove("fa-lock", "fa-lock-open");
+							ico.classList.add(nowLocked ? "fa-lock" : "fa-lock-open");
+							if (nowLocked) {
+								ico.style.color = "orange";
+							} else {
+								ico.style.color = ""; // remove inline color
+							}
+						}
+
+						// 3) optional: mark the row with a class for any dimming you already do
+						if (nowLocked) row.classList.add("bbmm-locked");
+						else row.classList.remove("bbmm-locked");
+					}
+
+					// Debounced save — do not await (avoid UI stall)
+					this._queueSaveLocks();
+
+					// No _rerender() here — avoids rebuilding the entire list and causing the 1s lag
+				} catch (e) {
+					DL(2, "BBMMModuleManagerApp | toggle lock failed", e);
+				}
+			}, true);
+
+			// open module settings (gear)
+			this._root.addEventListener("click", (ev) => {
+				const btn = ev.target.closest?.('[data-bbmm-action="open-settings"]');
+				if (!btn) return;
+				const id = btn.getAttribute("data-mod-id");
+				if (!id) return;
+				ev.stopPropagation();
+				try {
+					_bbmmOpenModuleSettingsTab(id);
+					DL(`BBMMModuleManagerApp | open settings for ${id}`);
+				} catch (e) { DL(2, "BBMMModuleManagerApp | open settings failed", e); }
+			}, true);
+
+			// edit notes (pencil)
+			this._root.addEventListener("click", (ev) => {
+				const btn = ev.target.closest?.(".btn-edit");
+				if (!btn) return;
+				const id = btn.getAttribute("data-id");
+				if (!id) return;
+				ev.stopPropagation();
+				try {
+					_bbmmOpenNotesDialog(id);
+					DL(`BBMMModuleManagerApp | open notes editor for ${id}`);
+				} catch (e) { DL(2, "BBMMModuleManagerApp | open notes failed", e); }
+			}, true);
+
+			// expand/collapse row to show notes/description
+			this._root.addEventListener("click", async (ev) => {
+				const row = ev.target.closest?.(".row");
+				if (!row) return;
+
+				// ignore clicks on controls inside the row
+				if (ev.target.closest?.("button, a, input, label")) return;
+
+				const id = row.getAttribute("data-id");
+				if (!id) return;
+
+				// toggle class
+				const willOpen = !row.classList.contains("expanded");
+				row.classList.toggle("expanded", willOpen);
+
+				if (!willOpen) return;
+
+				// load note (or fallback to module description)
+				try {
+					const html = (typeof _bbmmRenderSavedNotesHTML === "function")
+						? (await _bbmmRenderSavedNotesHTML(id))
+						: "";
+					const host = row.querySelector(".notes .html");
+					if (host) host.innerHTML = html ? `<div class="bbmm-notes-html">${html}</div>` : `<div class="bbmm-notes-empty"></div>`;
+					DL(`BBMMModuleManagerApp | expanded ${id} (notes length: ${html?.length || 0})`);
+				} catch (e) {
+					DL(2, "BBMMModuleManagerApp | expand failed", e);
+				}
+			}, true);
+			
+			// filter query (do NOT rebuild the toolbar DOM; keep focus intact)
+			this._root.addEventListener("input", (ev) => {
+				if (ev.target?.id !== "bbmm-mm-q") return;
+				this.query = String(ev.target.value ?? "");
+				this._rerender({ keepFocus: true });
+			}, true);
+
+			// scope buttons
+			this._root.addEventListener("click", (ev) => {
+				const btn = ev.target.closest?.(".bbmm-mm-scopes button");
+				if (!btn) return;
+				this.scope = btn.dataset.scope || "all";
+				this._rerender({ keepFocus: true });
+			}, true);
+
+			// row toggle
+			this._root.addEventListener("change", async (ev) => {
+				const row = ev.target.closest?.(".row");
+				if (!row) return;
+				const id = row.getAttribute("data-id");
+				if (!id) return;
+
+				// If locked, revert and bail
+				if (this.locks.has(id)) {
+					try { ev.target.checked = !!this._getTempActive(id); } catch {}
+					ui.notifications?.warn(LT.moduleManagement.lockBlocked());
+					DL(`BBMMModuleManagerApp | toggle blocked by lock for ${id}`);
+					return;
+				}
+
+				const cur = this._getTempActive(id);
+				const next = !!ev.target.checked;
+				if (cur === next) return;
+
+				// If enabling, ensure deps first
+				if (next) {
+					const ok = await this._ensureDependenciesForEnable(id);
+					if (!ok) { ev.target.checked = cur; return; }
+				}
+
+				// If disabling, ensure we handle dependents + orphaned requires
+				if (!next) {
+					const ok = await this._ensureSafeDisable(id);
+					if (!ok) { ev.target.checked = cur; return; }
+				}
+
+				await this._setTempActive(id, next);
+				this._rerender({ keepFocus: true });
+			}, true);
+
+			// footer: Save -> write core.moduleConfiguration and reload
+			this._root.addEventListener("click", async (ev) => {
+				if (ev.target?.id !== "bbmm-mm-save") return;
+
+				// Compare CORE snapshot vs TEMP (not this.plan)
+				try {
+					// Use the in-memory snapshots if present; fall back to settings to be safe
+					const coreSnap = this._coreSnap ?? foundry.utils.duplicate(game.settings.get("core", "moduleConfiguration") || {});
+					const tempSnap = this._temp ?? foundry.utils.duplicate(game.settings.get(BBMM_ID, "tempModConfig") || {});
+
+					let touched = 0;
+					const allIds = new Set([...Object.keys(coreSnap), ...Object.keys(tempSnap)]);
+					for (const id of allIds) {
+						if (Boolean(coreSnap[id]) !== Boolean(tempSnap[id])) { touched++; break; }
+					}
+
+					if (!touched) {
+						ui.notifications.info(LT.moduleManagement.noChanges());
+						DL("BBMMModuleManagerApp::_saveViaCoreSettings(): no changes (coreSnap vs tempSnap matched)");
+						return;
+					}
+				} catch (e) {
+					// If the quick diff itself fails, just proceed to saving — the saver will diff again.
+					DL(2, "BBMMModuleManagerApp | pre-save diff failed; proceeding to save", e);
+				}
+
+				DL("BBMMModuleManagerApp | applying changes via core.moduleConfiguration (from temp)");
+				await this._saveViaCoreSettings();
+			}, true);
+
+			// footer: Deactivate All
+			this._root.addEventListener("click", async (ev) => {
+				if (ev.target?.id !== "bbmm-mm-deactivate-all") return;
+				const ids = (this._mods ?? []).map(m => m.id).filter(id => !this.locks.has(id));
+				const skipped = (this._mods ?? []).map(m => m.id).filter(id => this.locks.has(id));
+				if (skipped.length) DL("BBMMModuleManagerApp | Deactivate All skipped locked modules", { skipped });
+				await this._setTempActiveBulk([], ids);   // set OFF in temp
+				this._rerender({ keepFocus: true });
+			}, true);
+
+			// footer: Activate All
+			this._root.addEventListener("click", async (ev) => {
+				if (ev.target?.id !== "bbmm-mm-activate-all") return;
+				const ids = (this._mods ?? []).map(m => m.id).filter(id => !this.locks.has(id));
+				const skipped = (this._mods ?? []).map(m => m.id).filter(id => this.locks.has(id));
+				if (skipped.length) DL("BBMMModuleManagerApp | Activate All skipped locked modules", { skipped });
+				await this._setTempActiveBulk(ids, []);   // set ON in temp
+				this._rerender({ keepFocus: true });
+			}, true);
+
+			// footer: Find the Culprit (best-effort)
+			this._root.addEventListener("click", (ev) => {
+				const btn = ev.target?.closest?.("#bbmm-mm-culprit");
+				if (!btn) return;
+
+				try {
+					const FTC = CONFIG.ui?.ftc; // set by FTC on init: CONFIG.ui.ftc = FindTheCulprit
+					if (typeof FTC === "function") {
+						DL("BBMMModuleManagerApp | launching FindTheCulprit via CONFIG.ui.ftc");
+						new FTC().render(true); // singleton ctor; safe to call multiple times
+						return;
+					}
+					ui.notifications.warn("Find the Culprit module is enabled but not initialized yet.");
+					DL(2, "BBMMModuleManagerApp | CONFIG.ui.ftc is not a function (FTC not initialized?)", { ftc: FTC });
+				} catch (e) {
+					DL(2, "BBMMModuleManagerApp | failed to open FindTheCulprit", e);
+					ui.notifications.error("BBMM: Failed to open Find the Culprit.");
+				}
+			}, true);
+		}
+	}
+
+	_rerender({ keepFocus = false } = {}) {
+		const root = this._root;
+		if (!root) return;
+
+		// update counts + scope button states without replacing the whole toolbar
+		try {
+			const { enable, disable } = this._diffCounts();
+			const cntE = root.querySelector("#bbmm-mm-cnt-enable");
+			const cntD = root.querySelector("#bbmm-mm-cnt-disable");
+			if (cntE) cntE.textContent = String(enable);
+			if (cntD) cntD.textContent = String(disable);
+
+			const scopes = root.querySelectorAll(".bbmm-mm-scopes button");
+			for (const b of scopes) {
+                const on = (b.dataset.scope === this.scope);
+                if (on) b.classList.add("on"); else b.classList.remove("on");
+			}
+		} catch {}
+
+		// body list
+		const body = root.querySelector("#bbmm-mm-body");
+		if (body) {
+			// preserve scroll if possible
+			const top = body.scrollTop;
+			body.innerHTML = this._renderRowsHTML();
+			body.scrollTop = top;
+		}
+
+		// keep input focus/value when typing
+		if (keepFocus) {
+			const qEl = root.querySelector("#bbmm-mm-q");
+			if (qEl && document.activeElement !== qEl) qEl.focus();
+		}
+	}
+}
+
+// --- Rewire Settings sidebar "Manage Modules" to open BBMMModuleManagerApp ---
+Hooks.on("renderSettings", (_app, rootEl) => {
+	try {
+		const root = rootEl instanceof HTMLElement ? rootEl : (rootEl?.[0] ?? null);
+		if (!root) return;
+
+		// Already wired?
+		if (root.dataset.bbmmManageModulesBound === "1") return;
+
+		const candidates = [
+			...root.querySelectorAll('button[data-action="moduleManagement"]'),
+			...root.querySelectorAll('button[data-action="manage-modules"]'),
+			...root.querySelectorAll('button, a')
+		];
+
+		const manageBtn = candidates.find(b => {
+			const label = (b.textContent || b.ariaLabel || "").trim().toLowerCase();
+			return (
+				b.matches('button[data-action="moduleManagement"], button[data-action="manage-modules"]') ||
+				/manage modules/.test(label)
+			);
+		});
+
+		if (!manageBtn) return;
+
+		// Mark once
+		manageBtn.dataset.bbmmRewired = "1";
+		root.dataset.bbmmManageModulesBound = "1";
+
+		// Click handler: Shift-click opens core; normal click opens BBMM.
+		manageBtn.addEventListener("click", (ev) => {
+			try {
+				if (ev.shiftKey) return; // allow core behavior when Shift is held
+				ev.preventDefault();
+				ev.stopPropagation();
+				new BBMMModuleManagerApp().render(true);
+			} catch (e) {
+				// if anything goes wrong, fall back to core behavior
+				console.error("BBMM | failed to open BBMMModuleManagerApp, falling back to core:", e);
+			}
+		}, true);
+	} catch (e) {
+		console.error("BBMM | renderSettings rewire failed:", e);
+	}
+});
+
+/* Tooltip to advise shift+click will open core manage modules */
+Hooks.on("renderSettings", (_app, rootEl) => {
+	const root = rootEl instanceof HTMLElement ? rootEl : (rootEl?.[0] ?? null);
+	if (!root) return;
+	const btn = root.querySelector('button[data-bbmm-rewired="1"]') || root.querySelector('button[data-action="moduleManagement"]');
+	if (!btn) return;
+	btn.title = "Opens BBMM Module Manager (Shift-click for core)";
+	btn.setAttribute("data-tooltip", "Opens BBMM Module Manager (Shift-click for core)");
+});
+
+Hooks.on("ready", () => {
+	try {
+		// Safely register the app class on the module API once the game is ready
+		const MODID = (typeof BBMM_ID === "string" && BBMM_ID) ? BBMM_ID : "bbmm";
+		const mod = game?.modules?.get?.(MODID);
+		if (!mod) {
+			DL(2, `module-management.js | API registration: module not found for id="${MODID}"`);
+			return;
+		}
+		if (!mod.api) mod.api = {};
+		mod.api.BBMMModuleManagerApp = BBMMModuleManagerApp;
+		DL("module-management.js | BBMMModuleManagerApp registered on module API");
+	} catch (e) {
+		DL(3, "module-management.js | API registration failed", e);
+	}
+
+	// Reload listener
+	try {
+		const channel = `module.${BBMM_ID}`;
+		// Avoid double-binding if hot reloaded
+		if (game.bbmmReloadHookBound) return;
+		game.bbmmReloadHookBound = true;
+
+		game.socket.on(channel, (msg) => {
+			try {
+				if (!msg || msg.cmd !== "bbmm:reload") return;
+				// If this client initiated it, we will also reload; harmless.
+				DL("BBMM socket: reload received", msg);
+				// Use core helper if present, else hard reload
+				(foundry.utils?.debouncedReload?.() || window.location.reload)();
+			} catch (e) {
+				DL(2, "BBMM socket: reload handler error", e);
+			}
+		});
+		DL("BBMM socket: reload listener bound", { channel });
+	} catch (e) {
+		DL(2, "BBMM socket: failed to bind reload listener", e);
+	}
+
+	DL("module-management.js | ready fired")
+});
 
 Hooks.on("setup", () => DL("module-management.js | setup fired"));
-Hooks.on("ready", () => DL("module-management.js | ready fired"));
 Hooks.once("init", () => {DL("module-management.js | init hook — file loaded");});

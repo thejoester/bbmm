@@ -159,7 +159,7 @@ export function DL(intLogType, stringLogMsg, objObject = null) {
 }
 
 //  Inject BBMM button into a Foundry window header
-function injectBBMMHeaderButton(root) {
+export function injectBBMMHeaderButton(root) {
 	
 	//Only run as GM for now - until we migrate
 	// if (!game.user.isGM) return;
@@ -297,6 +297,7 @@ Hooks.once("init", () => {
 				type: Object,
 				default: {}	
 			});
+
 		// ====== HIDDEN VARIABLES ===== 
 		// These do not need to be localized
 			// User Exclusions 
@@ -414,7 +415,31 @@ Hooks.once("init", () => {
 				type: Object,
 				default: {}
 			});
-		
+
+			// temp config store
+			game.settings.register(BBMM_ID, "tempModConfig", {
+				scope: "world",
+				config: false,
+				type: Object,
+				default: {}
+			});
+
+			game.settings.register(BBMM_ID, "moduleLocks", {
+				name: game.i18n.localize("bbmm.settings.moduleLocksName"),
+				hint: game.i18n.localize("bbmm.settings.moduleLocksHint"),
+				scope: "world",
+				config: true,
+				type: Object,			
+				default: [],			
+				onChange: (value) => {
+					try {
+						DL("settings: moduleLocks changed", { count: Array.isArray(value) ? value.length : 0 });
+					} catch (e) {
+						// keep quiet
+					}
+				}
+			});
+
 		// ===== SETTINGS ITEMS =====
 		// These DO need to be localized
 

@@ -2214,26 +2214,6 @@ import { LT, BBMM_ID } from "./localization.js";
 		}
 	}
 
-	/*  GM: push current bindings for a control to selected users (instant) ======= 
-	async function _bbmmCtrlSyncToUsers({ ns, action, userIds }) {
-		try {
-			// snapshot current GM bindings for this action
-			const value = _bbmmCtrlBindings(ns, action);
-
-			// emit one-time push to players (optionally targeted)
-			game.socket?.emit?.(BBMM_SYNC_CH, {
-				t: "bbmm-ctrl-push",
-				namespace: ns,
-				action,
-				value,                 // array of {key, modifiers[]}
-				targets: Array.isArray(userIds) && userIds.length ? userIds : null
-			});
-			ui.notifications?.info?.(LT.infoQueuedSync?.({ module: `${ns}.${action}`, count: (userIds?.length ?? 0) }) || `Synced ${ns}.${action} to ${userIds?.length ?? 0} users`);
-		} catch (err) {
-			DL(2, "ctrlSyncToUsers() failed", { ns, action, err });
-		}
-	}*/
-
 	/*  Wire Control Config UI ======================================================
 		Decorate Controls Configuration window with Sync/Lock icons.
 		- Attach icons next to labels or controls.

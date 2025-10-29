@@ -629,3 +629,268 @@
 .window-app:has(#bbmm-notes-*) .window-content {
 	padding-bottom: 6px;
 }
+
+
+/* ==========================================================================
+	BBMM: Module Manager Appv2 window
+=========================================================================== */
+#bbmm-module-manager .window-content {
+	display: flex;
+	flex-direction: column;
+	padding: .5rem !important;
+	min-height: 0;
+}
+
+/* app root & toolbar */
+#bbmm-module-manager .bbmm-mm-root {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+#bbmm-module-manager .bbmm-mm-toolbar {
+	display: flex;
+	gap: .5rem;
+	align-items: center;
+}
+
+#bbmm-module-manager .bbmm-mm-toolbar input { flex: 1; }
+
+#bbmm-module-manager .bbmm-mm-scopes { display: flex; gap: .25rem; }
+#bbmm-module-manager .bbmm-mm-scopes button.on { background: var(--color-border, #555); }
+
+#bbmm-module-manager .bbmm-mm-diff {
+	margin-left: auto;
+	display: flex;
+	gap: .75rem;
+}
+#bbmm-module-manager .bbmm-mm-diff .ena { color: var(--color-positive, #5cb85c); }
+#bbmm-module-manager .bbmm-mm-diff .dis { color: var(--color-negative, #d9534f); }
+
+/* list body */
+#bbmm-module-manager .bbmm-mm-body {
+	display: block;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	border: 1px solid var(--color-border, #444);
+	border-radius: .5rem;
+	margin-top: .5rem;
+}
+
+#bbmm-module-manager .bbmm-mm-body .row {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: .5rem;
+	padding: .4rem .6rem;
+	border-bottom: 1px solid #333;
+	cursor: pointer;
+}
+
+#bbmm-module-manager .bbmm-mm-body .row .toggle { cursor: default; }
+#bbmm-module-manager .bbmm-mm-body .row .toggle input { transform: scale(1.2); }
+
+#bbmm-module-manager .bbmm-mm-body .row .main .title { font-weight: 600; }
+
+#bbmm-module-manager .bbmm-mm-body .row .main .meta {
+	opacity: .8;
+	display: flex;
+	gap: .5rem;
+	font-size: .9em;
+}
+#bbmm-module-manager .bbmm-mm-body .row .main .meta .tag {
+	border: 1px solid var(--color-border, #555);
+	border-radius: .35rem;
+	padding: .05rem .35rem;
+}
+#bbmm-module-manager .bbmm-mm-body .row .main .meta .tag.dep { border-color: #777; }
+#bbmm-module-manager .bbmm-mm-body .row .main .meta .tag.con { border-color: #a55; }
+
+#bbmm-module-manager .bbmm-mm-body .row.on { background: rgba(120, 200, 120, .06); }
+
+/* actions on the right */
+#bbmm-module-manager .bbmm-mm-body .row .actions {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+
+/* TAG STRIP — neutral, no borders (except gear/edit), icons ~15% smaller */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags {
+	display: flex;
+	align-items: center;
+	gap: .25rem;
+}
+
+/* base tag appearance */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 18px;
+	min-width: 18px;
+	padding: 0 .25rem;
+	border: none !important;
+	background: transparent !important;
+	border-radius: .35rem;
+	font-size: .8rem; /* ~15% smaller overall */
+	line-height: 1;
+	box-shadow: none !important;
+}
+
+/* icons inside tags */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag i {
+	font-size: .80rem; /* shrink icon a bit */
+	line-height: 1;
+}
+
+/* plain version text */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .ver-text {
+	margin-left: .4rem;
+	font-size: .95rem;
+	font-weight: 600;
+	color: var(--color-text-light, #ddd);
+	opacity: .95;
+	background: transparent !important;
+	border: 0 !important;
+	padding: 0 !important;
+}
+
+/* kill any theme’s “version pill” look just in case */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .version,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag.version {
+	background: transparent !important;
+	border: 0 !important;
+	color: inherit !important;
+	padding: 0 !important;
+}
+
+/* keep borders ONLY on settings gear + edit buttons */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"],
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit {
+	border: 1px solid var(--color-border, #555) !important;
+	background: rgba(255, 255, 255, .05) !important;
+	border-radius: .35rem;
+	padding: .15rem .4rem;
+}
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:hover,
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:hover {
+	background: rgba(255, 255, 255, .10) !important;
+}
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:focus-visible,
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:focus-visible {
+	outline: 1px solid var(--color-border, #777);
+	outline-offset: 1px;
+}
+
+/* expandable notes panel */
+#bbmm-module-manager .bbmm-mm-body .row .notes {
+	grid-column: 1 / 4;
+	display: none;
+	margin: .25rem 0 0 2.0rem;
+	border-top: 1px dotted #444;
+	padding-top: .35rem;
+}
+#bbmm-module-manager .bbmm-mm-body .row.expanded .notes { display: block; }
+#bbmm-module-manager .bbmm-mm-body .row .notes .html { max-height: 40vh; overflow: auto; }
+
+/* empty + footer */
+#bbmm-module-manager .bbmm-mm-empty { padding: 1rem; opacity: .8; }
+
+#bbmm-module-manager .bbmm-mm-footer {
+	display: flex;
+	gap: .5rem;
+	justify-content: flex-start;
+	margin-top: .5rem;
+}
+
+/* Notes header (chips above description) */
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	margin-bottom: .35rem;
+	opacity: .95;
+}
+
+/* chips inside notes header */
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag {
+	border: 1px solid var(--color-border, #555);
+	border-radius: .35rem;
+	padding: .05rem .35rem;
+	font-size: .9em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+	 Dependencies badges
+   ───────────────────────────────────────────────────────────── */
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.dep { border-color: #777; }
+.bbmm .tag.dep {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #777;           
+	border-color: #777;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.con { border-color: #a55; }
+.bbmm .tag.con {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #a55;           
+	border-color: #a55;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.rec { border-color: #38bdf8; }
+.bbmm .tag.rec {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #38bdf8;           
+	border-color: #38bdf8;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
+/* Locked rows */
+.bbmm .bbmm-locked { opacity: .8; }
+.bbmm .bbmm-lock-active { color: orange; }
+
+/* Compatibility badge colors */
+.bbmm .tag.compat.ok { color: #16a34a; border-color: currentColor; }     /* green */
+.bbmm .tag.compat.warn { color: #d97706; border-color: currentColor; }   /* amber */
+.bbmm .tag.compat.bad { color: #dc2626; border-color: currentColor; }    /* red */
