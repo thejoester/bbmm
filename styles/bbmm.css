@@ -823,6 +823,74 @@
 	font-size: .9em;
 }
 
-/* keep the same subtle accent colors you already use */
+/* ─────────────────────────────────────────────────────────────
+	 Dependencies badges
+   ───────────────────────────────────────────────────────────── */
 #bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.dep { border-color: #777; }
+.bbmm .tag.dep {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #777;           
+	border-color: #777;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
 #bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.con { border-color: #a55; }
+.bbmm .tag.con {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #a55;           
+	border-color: #a55;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.rec { border-color: #38bdf8; }
+.bbmm .tag.rec {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #38bdf8;           
+	border-color: #38bdf8;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
+/* Locked rows */
+.bbmm .bbmm-locked { opacity: .8; }
+.bbmm .bbmm-lock-active { color: orange; }
+
+/* Compatibility badge colors */
+.bbmm .tag.compat.ok { color: #16a34a; border-color: currentColor; }     /* green */
+.bbmm .tag.compat.warn { color: #d97706; border-color: currentColor; }   /* amber */
+.bbmm .tag.compat.bad { color: #dc2626; border-color: currentColor; }    /* red */

@@ -424,6 +424,22 @@ Hooks.once("init", () => {
 				default: {}
 			});
 
+			game.settings.register(BBMM_ID, "moduleLocks", {
+				name: game.i18n.localize("bbmm.settings.moduleLocksName"),
+				hint: game.i18n.localize("bbmm.settings.moduleLocksHint"),
+				scope: "world",
+				config: true,
+				type: Object,			
+				default: [],			
+				onChange: (value) => {
+					try {
+						DL("settings: moduleLocks changed", { count: Array.isArray(value) ? value.length : 0 });
+					} catch (e) {
+						// keep quiet
+					}
+				}
+			});
+
 		// ===== SETTINGS ITEMS =====
 		// These DO need to be localized
 

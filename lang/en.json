@@ -334,7 +334,9 @@
 			"softLockRevMap_controls_name": "BBMM Control Sync Rev Map",
 			"softLockRevMap_controls_hint": "Remembers which controls soft lock value was last applied",
 			"moduleNotes_name": "BBMM Module Notes",
-			"moduleNotes_hint": "Notes added to modules."
+			"moduleNotes_hint": "Notes added to modules.",
+			"moduleLocksName": "Locked Modules",
+			"moduleLocksHint": "Modules listed here are locked in BBMM and cannot be enabled or disabled (manually or via bulk actions)."
 		},
 		"macro": {
 			"columnName": "Name",
@@ -397,6 +399,7 @@
 			"noResults": "No matching modules.",
 			"dependencies": "Dependencies",
 			"conflicts": "Conflicts",
+			"recommendations": "Recommended",
 			"deactivateAll": "Deactivate All Modules",
 			"activateAll": "Activate All Modules",
 			"findTheCulprit": "Find the Culprit!",
@@ -416,7 +419,22 @@
 			"reloadLater": "Reload Later",
 			"reloadLaterNotice": "BBMM: Changes saved. Reload to apply.",
 			"saveFailed": "BBMM: Failed to save module configuration.",
-			"settingBtnToolTip": "Opens BBMM Module Manager (Shift-click for core)"
+			"settingBtnToolTip": "Opens BBMM Module Manager (Shift-click for core)",
+			"lockLock": "Lock module",
+			"lockUnlock": "Unlock module",
+			"lockBlocked": "This module is locked and cannot be changed.",
+			"tagCompendia": "Compendia",
+			"tagLocalization": "Localization",
+			"compatVerified": "Verified",
+			"compatCompatible": "Compatible",
+			"compatIncompatible": "Incompatible",
+			"compatUnknown": "Unknown",
+			"compatMatchesCore": "Matches core",
+			"compatModuleExpects1": "Module expects ≥",
+			"compatModuleExpects2": "core is",
+			"compatMinVer": "Minimum/Verified",
+			"compatCore": "Core",
+			"compatibility": "Compatibility"
 		}
 	}
 }
