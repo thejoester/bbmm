@@ -427,7 +427,10 @@
       "compatModuleExpects1": "Le module attend ≥",
       "compatModuleExpects2": "Le noyau est",
       "compatMinVer": "Minimum/Vérifié",
-      "compatibility": "Compatibilité"
+      "compatibility": "Compatibilité",
+      "disableDependentsPromptMulti": "Désactiver les modules suivants qui dépendent de celui-ci ? Décochez ceux que vous souhaitez conserver activés :",
+      "disableOrphansPromptMulti": "Ces modules ne sont plus nécessaires. Voulez-vous également les désactiver ? Décochez ceux que vous souhaitez conserver activés :",
+      "filterClear": "Effacer le filtrage"
     }
   }
 }
