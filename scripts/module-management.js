@@ -716,7 +716,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				}).join("");
 				const content = document.createElement("div"); 
 				const p = document.createElement("p");
-				p.textContent = LT.moduleManagement?.disableDependentsPrompt?.() ?? "The module you are disabling is required by the following module(s). Disable them as well?";
+				p.textContent = LT.moduleManagement.disableDependentsPrompt();
 				const ul = document.createElement("ul"); ul.innerHTML = list;
 				content.appendChild(p); content.appendChild(ul);
 
@@ -726,12 +726,12 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					new foundry.applications.api.DialogV2({
 						id: "bbmm-mm-disable-dependents",
 						modal: true,
-						window: { title: LT.moduleManagement?.disableDependentsTitle?.() ?? "Disable Dependent Modules" },
+						window: { title: LT.moduleManagement.disableDependentsTitle() },
 						content,
 						buttons: [
-							{ action: "ok", label: LT.moduleManagement?.disable?.() ?? "Disable", icon: "fa-solid fa-check", default: true,
+							{ action: "ok", label: LT.moduleManagement.disable(), icon: "fa-solid fa-check", default: true,
 								callback: () => { accepted = true; safeResolve(); } },
-							{ action: "cancel", label: LT.buttons?.cancel?.() ?? "Cancel", icon: "fa-solid fa-xmark",
+							{ action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark",
 								callback: () => { accepted = false; safeResolve(); } }
 						],
 						close: safeResolve
@@ -754,7 +754,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				}).join("");
 				const content = document.createElement("div");
 				const p = document.createElement("p");
-				p.textContent = LT.moduleManagement?.disableOrphansPrompt?.() ?? "The module you are disabling has required module(s) that are no longer needed by anything else. Disable them too?";
+				p.textContent = LT.moduleManagement.disableOrphansPrompt();
 				const ul = document.createElement("ul"); ul.innerHTML = list;
 				content.appendChild(p); content.appendChild(ul);
 
@@ -764,12 +764,12 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					new foundry.applications.api.DialogV2({
 						id: "bbmm-mm-disable-orphans",
 						modal: true,
-						window: { title: LT.moduleManagement?.disableOrphansTitle?.() ?? "Disable Unneeded Dependencies" },
+						window: { title: LT.moduleManagement.disableOrphansTitle() },
 						content,
 						buttons: [
-							{ action: "ok", label: LT.moduleManagement?.disable?.() ?? "Disable", icon: "fa-solid fa-check", default: true,
+							{ action: "ok", label: LT.moduleManagement.disable(), icon: "fa-solid fa-check", default: true,
 								callback: () => { accepted = true; safeResolve(); } },
-							{ action: "cancel", label: LT.buttons?.cancel?.() ?? "Cancel", icon: "fa-solid fa-xmark",
+							{ action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark",
 								callback: () => { accepted = false; safeResolve(); } }
 						],
 						close: safeResolve
@@ -981,7 +981,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			}
 
 			if (!touched) {
-				ui.notifications.info(LT.moduleManagement?.noChanges());
+				ui.notifications.info(LT.moduleManagement.noChanges());
 				DL("BBMMModuleManagerApp::_saveViaCoreSettings(): no changes");
 				return;
 			}
@@ -1002,7 +1002,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				new foundry.applications.api.DialogV2({
 					id: "bbmm-mm-reload",
 					modal: true,
-					window: { title: LT.moduleManagement?.reloadRequiredTitle() },
+					window: { title: LT.moduleManagement.reloadRequiredTitle() },
 					content,
 					buttons: [
 						{
@@ -1126,7 +1126,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			// settings gear (native sizing: .tag.flexrow)
 			if (_bbmmModuleHasConfigSettings(mod.id)) {
                 parts.push(
-					`<button type="button" class="tag flexrow" data-bbmm-action="open-settings" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(LT.openSettings?.() ?? "Open Settings")}">` +
+					`<button type="button" class="tag flexrow" data-bbmm-action="open-settings" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(LT.openSettings())}">` +
 						`<i class="fa-solid fa-gear fa-fw"></i>` +
 					`</button>`
 				);
@@ -1168,9 +1168,9 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				const max = comp?.maximum;
 
 				if (verified) {
-					parts.push(`<span class="tag flexrow" title="Verified"><i class="fa-solid fa-circle-check fa-fw"></i></span>`);
+					parts.push(`<span class="tag flexrow" title="${LT.moduleManagement.compatVerified()}"><i class="fa-solid fa-circle-check fa-fw"></i></span>`);
 				} else if (min || max) {
-					parts.push(`<span class="tag flexrow" title="Compatibility not verified"><i class="fa-solid fa-triangle-exclamation fa-fw"></i></span>`);
+					parts.push(`<span class="tag flexrow" title="${LT.moduleManagement.compatNotVerified()}"><i class="fa-solid fa-triangle-exclamation fa-fw"></i></span>`);
 				}
 			} catch {}
 
@@ -1218,7 +1218,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		try {
 			const rows = this._getFiltered();
 			if (!rows.length) {
-				return `<div class="bbmm-mm-empty">${LT.moduleManagement?.noResults()}</div>`;
+				return `<div class="bbmm-mm-empty">${LT.moduleManagement.noResults()}</div>`;
 			}
 
 			return rows.map((m) => {
@@ -1705,8 +1705,8 @@ Hooks.on("renderSettings", (_app, rootEl) => {
 	if (!root) return;
 	const btn = root.querySelector('button[data-bbmm-rewired="1"]') || root.querySelector('button[data-action="moduleManagement"]');
 	if (!btn) return;
-	btn.title = "Opens BBMM Module Manager (Shift-click for core)";
-	btn.setAttribute("data-tooltip", "Opens BBMM Module Manager (Shift-click for core)");
+	btn.title = LT.moduleManagement.settingBtnToolTip();
+	btn.setAttribute("data-tooltip", LT.moduleManagement.settingBtnToolTip());
 });
 
 Hooks.on("ready", () => {

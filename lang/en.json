@@ -395,7 +395,6 @@
 			"disable": "Disable",
 			"enabled": "Enabled",
 			"disabled": "Disabled",
-			"changed": "Changed",
 			"noResults": "No matching modules.",
 			"dependencies": "Dependencies",
 			"conflicts": "Conflicts",
@@ -404,8 +403,6 @@
 			"activateAll": "Activate All Modules",
 			"findTheCulprit": "Find the Culprit!",
 			"saveModuleSettings": "Save Module Settings",
-			"summary": "Planned Changes",
-			"theseWillBeAppliedOnSave": "These changes will be applied when we wire the core save:",
 			"noChanges": "No changes to apply.",
 			"depsTitle": "Enable Required Dependencies",
 			"depsPrompt": "The module you enabled requires the following module(s). Enable them as well?",
@@ -426,14 +423,11 @@
 			"tagCompendia": "Compendia",
 			"tagLocalization": "Localization",
 			"compatVerified": "Verified",
-			"compatCompatible": "Compatible",
-			"compatIncompatible": "Incompatible",
-			"compatUnknown": "Unknown",
+			"compatNotVerified": "Not Verified",
 			"compatMatchesCore": "Matches core",
 			"compatModuleExpects1": "Module expects ≥",
 			"compatModuleExpects2": "core is",
 			"compatMinVer": "Minimum/Verified",
-			"compatCore": "Core",
 			"compatibility": "Compatibility"
 		}
 	}
