@@ -707,14 +707,18 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	/* When a module is toggled OFF, confirm disabling its dependents and (optionally) its orphaned requires. */
 	async _ensureSafeDisable(moduleId) {
 		try {
-			// handle dependents (modules that rely on this one)
+			/*
+				STEP 1: Dependents (modules that rely on this one).
+				User can uncheck any they want to KEEP enabled.
+				If they cancel this dialog entirely, we abort the disable.
+			*/
 			const dependents = this._collectDependents(moduleId);
 			if (dependents.size) {
-				// Build checkbox dialog content
-				const content = document.createElement("div"); 
+
+				// Build dialog body (detached DOM)
+				const content = document.createElement("div"); // root MUST have no attributes for DialogV2
 
 				const p = document.createElement("p");
-				// "These modules depend on X. Disable them as well? Uncheck any you want to keep enabled"
 				p.textContent = LT.moduleManagement.disableDependentsPromptMulti();
 				content.appendChild(p);
 
@@ -726,15 +730,12 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				listWrap.style.gap = "4px";
 				content.appendChild(listWrap);
 
-				// make a predictable, sorted array of {id,title}
 				const depList = [...dependents]
 					.sort((a, b) => a.localeCompare(b))
-					.map(id => {
-						return {
-							id,
-							title: game.modules.get(id)?.title ?? id
-						};
-					});
+					.map(id => ({
+						id,
+						title: game.modules.get(id)?.title ?? id
+					}));
 
 				for (const dep of depList) {
 					const row = document.createElement("label");
@@ -744,6 +745,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 					const cb = document.createElement("input");
 					cb.type = "checkbox";
+					cb.classList.add("bbmm-disable-check");
 					cb.setAttribute("checked", "checked");
 					cb.checked = true;
 					cb.dataset.modId = dep.id;
@@ -756,11 +758,13 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					listWrap.appendChild(row);
 				}
 
-				let approvedIds = null; // null = user cancelled
+				let accepted = false;
+				let approvedIds = [];
 
 				await new Promise(resolve => {
 					const safeResolve = () => { try { resolve(); } catch {} };
-					new foundry.applications.api.DialogV2({
+
+					const dlg = new foundry.applications.api.DialogV2({
 						id: "bbmm-mm-disable-dependents",
 						modal: true,
 						window: { title: LT.moduleManagement.disableDependentsTitle() },
@@ -768,15 +772,21 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 						buttons: [
 							{
 								action: "ok",
-								label: LT.moduleManagement.disable(), 
+								label: LT.moduleManagement.disable(),
 								icon: "fa-solid fa-check",
 								default: true,
 								callback: () => {
-									// collect only those still checked
+									accepted = true;
+
+									// Get live checkboxes from the rendered dialog DOM
+									const rootEl = document.getElementById("bbmm-mm-disable-dependents");
 									const chosen = [];
-									for (const cb of listWrap.querySelectorAll("input[type='checkbox']")) {
-										if (cb.checked) chosen.push(cb.dataset.modId);
+									if (rootEl) {
+										for (const cb of rootEl.querySelectorAll(".bbmm-disable-check")) {
+											if (cb.checked) chosen.push(cb.dataset.modId);
+										}
 									}
+
 									approvedIds = chosen;
 									safeResolve();
 								}
@@ -786,39 +796,43 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 								label: LT.buttons.cancel(),
 								icon: "fa-solid fa-xmark",
 								callback: () => {
-									approvedIds = null;
+									accepted = false;
 									safeResolve();
 								}
 							}
 						],
 						close: () => {
-							// treat closing like cancel
-							if (approvedIds === null) approvedIds = null;
+							if (!accepted) accepted = false;
 							safeResolve();
 						}
-					}).render(true);
+					});
+
+					dlg.render(true);
 				});
 
-				// user cancelled -> block the disable
-				if (approvedIds === null) {
+				// User canceled dependents dialog
+				if (!accepted) {
 					DL(`BBMMModuleManagerApp::_ensureSafeDisable(${moduleId}): user canceled dependents`);
 					return false;
 				}
 
-				// Only disable the ones the user left checked
+				// Disable ONLY the dependents that remained checked
 				if (approvedIds.length) {
 					await this._setTempActiveBulk([], approvedIds);
 				}
 			}
 
-			// handle orphaned requires
-			// (things this module needed, that now become "orphaned" because nothing else uses them)
+			/*
+				STEP 2: Orphaned requires.
+				User can uncheck any they want to KEEP enabled.
+				If they cancel here, we do NOT block the disable of the original module.
+			*/
 			const orphans = this._collectOrphanedRequires(moduleId);
 			if (orphans.size) {
-				const content = document.createElement("div"); 
+
+				const content = document.createElement("div"); // root MUST have no attributes
 
 				const p = document.createElement("p");
-				// "These modules are no longer required. Disable them as well? Uncheck any you want to keep enabled:"
 				p.textContent = LT.moduleManagement.disableOrphansPromptMulti();
 				content.appendChild(p);
 
@@ -832,12 +846,10 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 				const orphanList = [...orphans]
 					.sort((a, b) => a.localeCompare(b))
-					.map(id => {
-						return {
-							id,
-							title: game.modules.get(id)?.title ?? id
-						};
-					});
+					.map(id => ({
+						id,
+						title: game.modules.get(id)?.title ?? id
+					}));
 
 				for (const dep of orphanList) {
 					const row = document.createElement("label");
@@ -847,7 +859,8 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 					const cb = document.createElement("input");
 					cb.type = "checkbox";
-					cb.setAttribute("checked", "checked"); 
+					cb.classList.add("bbmm-disable-check");
+					cb.setAttribute("checked", "checked");
 					cb.checked = true;
 					cb.dataset.modId = dep.id;
 
@@ -859,12 +872,13 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					listWrap.appendChild(row);
 				}
 
-				let approvedIds = []; // we will fill this, null if cancelled
-				let canceled = false;
+				let okOrphans = false;
+				let approvedOrphans = [];
 
 				await new Promise(resolve => {
 					const safeResolve = () => { try { resolve(); } catch {} };
-					new foundry.applications.api.DialogV2({
+
+					const dlg = new foundry.applications.api.DialogV2({
 						id: "bbmm-mm-disable-orphans",
 						modal: true,
 						window: { title: LT.moduleManagement.disableOrphansTitle() },
@@ -876,12 +890,18 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 								icon: "fa-solid fa-check",
 								default: true,
 								callback: () => {
+									okOrphans = true;
+
+									// read from live dialog DOM
+									const rootEl = document.getElementById("bbmm-mm-disable-orphans");
 									const chosen = [];
-									for (const cb of listWrap.querySelectorAll("input[type='checkbox']")) {
-										if (cb.checked) chosen.push(cb.dataset.modId);
+									if (rootEl) {
+										for (const cb of rootEl.querySelectorAll(".bbmm-disable-check")) {
+											if (cb.checked) chosen.push(cb.dataset.modId);
+										}
 									}
-									approvedIds = chosen;
-									canceled = false;
+
+									approvedOrphans = chosen;
 									safeResolve();
 								}
 							},
@@ -890,29 +910,32 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 								label: LT.buttons.cancel(),
 								icon: "fa-solid fa-xmark",
 								callback: () => {
-									canceled = true;
+									okOrphans = false;
 									safeResolve();
 								}
 							}
 						],
 						close: () => { safeResolve(); }
-					}).render(true);
+					});
+
+					dlg.render(true);
 				});
 
-				// If they canceled at this stage, we do NOT block the main disable.
-				// We just skip disabling orphans.
-				if (!canceled && approvedIds.length) {
-					await this._setTempActiveBulk([], approvedIds);
+				// If they cancel or close here, we just don't disable orphans (but we still proceed with disabling the root module).
+				if (okOrphans && approvedOrphans.length) {
+					await this._setTempActiveBulk([], approvedOrphans);
 				}
 			}
 
-			//If we get here, it's okay to disable the original module
+			// STEP 3: We’re good to disable the requested module itself
 			return true;
+
 		} catch (e) {
 			DL(2, "BBMMModuleManagerApp::_ensureSafeDisable(): error", e);
 			return false;
 		}
 	}
+
 
 	/* When a module is toggled ON, ensure required deps are also toggled ON (with confirmation),
 	and offer to also enable optional dependencies (checkbox, default ON). */
