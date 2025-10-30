@@ -394,7 +394,6 @@
       "disable": "Désactiver",
       "enabled": "Activé",
       "disabled": "Désactivé",
-      "changed": "Modifié",
       "noResults": "Aucun module correspondant.",
       "dependencies": "Dépendances",
       "conflicts": "Conflits",
@@ -403,8 +402,6 @@
       "activateAll": "Activer tous les modules",
       "findTheCulprit": "Trouvez le coupable !",
       "saveModuleSettings": "Enregistrer les paramètres du module",
-      "summary": "Changements prévus",
-      "theseWillBeAppliedOnSave": "Ces modifications seront appliquées lors de la sauvegarde du noyau principal :",
       "noChanges": "Aucune modification à appliquer.",
       "depsTitle": "Activer les dépendances requises",
       "depsPrompt": "Le module que vous avez activé requiert le(s) module(s) suivant(s). Voulez-vous également les activer ?",
@@ -425,14 +422,11 @@
       "tagCompendia": "Compendium",
       "tagLocalization": "Localisation",
       "compatVerified": "Vérifié",
-      "compatCompatible": "Compatible",
-      "compatIncompatible": "Incompatible",
-      "compatUnknown": "Inconnu",
+      "compatNotVerified": "Non vérifié",
       "compatMatchesCore": "Correspond au noyau",
       "compatModuleExpects1": "Le module attend ≥",
       "compatModuleExpects2": "Le noyau est",
       "compatMinVer": "Minimum/Vérifié",
-      "compatCore": "Noyau",
       "compatibility": "Compatibilité"
     }
   }
