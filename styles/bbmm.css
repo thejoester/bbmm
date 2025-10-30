@@ -630,7 +630,6 @@
 	padding-bottom: 6px;
 }
 
-
 /* ==========================================================================
 	BBMM: Module Manager Appv2 window
 =========================================================================== */
@@ -823,9 +822,9 @@
 	font-size: .9em;
 }
 
-/* ─────────────────────────────────────────────────────────────
-	 Dependencies badges
-   ───────────────────────────────────────────────────────────── */
+/* ==========================================================================
+	Dependencies badges
+=========================================================================== */
 #bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.dep { border-color: #777; }
 .bbmm .tag.dep {
 	display: inline-flex;
@@ -894,3 +893,54 @@
 .bbmm .tag.compat.ok { color: #16a34a; border-color: currentColor; }     /* green */
 .bbmm .tag.compat.warn { color: #d97706; border-color: currentColor; }   /* amber */
 .bbmm .tag.compat.bad { color: #dc2626; border-color: currentColor; }    /* red */
+
+/* ==========================================================================
+	Search Filter
+=========================================================================== */
+
+/* Wrapper to absolutely-position the clear button inside the filter field */
+.bbmm-mm-toolbar .bbmm-filter-wrap {
+	position: relative;
+	display: inline-block;
+}
+
+/* Make room on the right for the X so text doesn't sit under it */
+.bbmm-mm-toolbar .bbmm-filter-wrap > #bbmm-mm-q {
+	padding-right: 1.5rem;
+}
+
+/* The clear button ("X") */
+.bbmm-mm-toolbar .bbmm-filter-clear {
+	position: absolute;
+	top: 0;
+	right: 0;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	padding: 0 0.4rem;
+	background: transparent;
+	border: 0;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+
+	opacity: 0;
+	transition: opacity 100ms linear;
+}
+
+/* Only show the X when hovering over the filter area */
+.bbmm-mm-toolbar .bbmm-filter-wrap:hover .bbmm-filter-clear {
+	opacity: 0.8;
+}
+
+/* Slight highlight on direct hover of the X */
+.bbmm-mm-toolbar .bbmm-filter-clear:hover {
+	opacity: 1;
+}
+
+/* Make sure the icon itself doesn't eat the click */
+.bbmm-mm-toolbar .bbmm-filter-clear i.fa-solid {
+	pointer-events: none;
+}
