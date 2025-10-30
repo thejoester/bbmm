@@ -707,20 +707,57 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	/* When a module is toggled OFF, confirm disabling its dependents and (optionally) its orphaned requires. */
 	async _ensureSafeDisable(moduleId) {
 		try {
-			// Dependents of this module (modules that will break if we disable it)
+			// handle dependents (modules that rely on this one)
 			const dependents = this._collectDependents(moduleId);
 			if (dependents.size) {
-				const list = [...dependents].sort((a, b) => a.localeCompare(b)).map(id => {
-					const t = game.modules.get(id)?.title ?? id;
-					return `<li><code>${hlp_esc(id)}</code> — ${hlp_esc(t)}</li>`;
-				}).join("");
+				// Build checkbox dialog content
 				const content = document.createElement("div"); 
-				const p = document.createElement("p");
-				p.textContent = LT.moduleManagement.disableDependentsPrompt();
-				const ul = document.createElement("ul"); ul.innerHTML = list;
-				content.appendChild(p); content.appendChild(ul);
 
-				let accepted = false;
+				const p = document.createElement("p");
+				// "These modules depend on X. Disable them as well? Uncheck any you want to keep enabled"
+				p.textContent = LT.moduleManagement.disableDependentsPromptMulti();
+				content.appendChild(p);
+
+				const listWrap = document.createElement("div");
+				listWrap.style.maxHeight = "200px";
+				listWrap.style.overflowY = "auto";
+				listWrap.style.display = "flex";
+				listWrap.style.flexDirection = "column";
+				listWrap.style.gap = "4px";
+				content.appendChild(listWrap);
+
+				// make a predictable, sorted array of {id,title}
+				const depList = [...dependents]
+					.sort((a, b) => a.localeCompare(b))
+					.map(id => {
+						return {
+							id,
+							title: game.modules.get(id)?.title ?? id
+						};
+					});
+
+				for (const dep of depList) {
+					const row = document.createElement("label");
+					row.style.display = "flex";
+					row.style.alignItems = "center";
+					row.style.gap = "6px";
+
+					const cb = document.createElement("input");
+					cb.type = "checkbox";
+					cb.setAttribute("checked", "checked");
+					cb.checked = true;
+					cb.dataset.modId = dep.id;
+
+					const span = document.createElement("span");
+					span.textContent = `${dep.id} — ${dep.title}`;
+
+					row.appendChild(cb);
+					row.appendChild(span);
+					listWrap.appendChild(row);
+				}
+
+				let approvedIds = null; // null = user cancelled
+
 				await new Promise(resolve => {
 					const safeResolve = () => { try { resolve(); } catch {} };
 					new foundry.applications.api.DialogV2({
@@ -729,36 +766,102 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 						window: { title: LT.moduleManagement.disableDependentsTitle() },
 						content,
 						buttons: [
-							{ action: "ok", label: LT.moduleManagement.disable(), icon: "fa-solid fa-check", default: true,
-								callback: () => { accepted = true; safeResolve(); } },
-							{ action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark",
-								callback: () => { accepted = false; safeResolve(); } }
+							{
+								action: "ok",
+								label: LT.moduleManagement.disable(), 
+								icon: "fa-solid fa-check",
+								default: true,
+								callback: () => {
+									// collect only those still checked
+									const chosen = [];
+									for (const cb of listWrap.querySelectorAll("input[type='checkbox']")) {
+										if (cb.checked) chosen.push(cb.dataset.modId);
+									}
+									approvedIds = chosen;
+									safeResolve();
+								}
+							},
+							{
+								action: "cancel",
+								label: LT.buttons.cancel(),
+								icon: "fa-solid fa-xmark",
+								callback: () => {
+									approvedIds = null;
+									safeResolve();
+								}
+							}
 						],
-						close: safeResolve
+						close: () => {
+							// treat closing like cancel
+							if (approvedIds === null) approvedIds = null;
+							safeResolve();
+						}
 					}).render(true);
 				});
-				if (!accepted) {
+
+				// user cancelled -> block the disable
+				if (approvedIds === null) {
 					DL(`BBMMModuleManagerApp::_ensureSafeDisable(${moduleId}): user canceled dependents`);
 					return false;
 				}
-				// Turn off the dependents in temp
-				await this._setTempActiveBulk([], [...dependents]);
+
+				// Only disable the ones the user left checked
+				if (approvedIds.length) {
+					await this._setTempActiveBulk([], approvedIds);
+				}
 			}
 
-			// Orphaned requires (things this module needed that nothing else still needs)
+			// handle orphaned requires
+			// (things this module needed, that now become "orphaned" because nothing else uses them)
 			const orphans = this._collectOrphanedRequires(moduleId);
 			if (orphans.size) {
-				const list = [...orphans].sort((a, b) => a.localeCompare(b)).map(id => {
-					const t = game.modules.get(id)?.title ?? id;
-					return `<li><code>${hlp_esc(id)}</code> — ${hlp_esc(t)}</li>`;
-				}).join("");
-				const content = document.createElement("div");
-				const p = document.createElement("p");
-				p.textContent = LT.moduleManagement.disableOrphansPrompt();
-				const ul = document.createElement("ul"); ul.innerHTML = list;
-				content.appendChild(p); content.appendChild(ul);
+				const content = document.createElement("div"); 
 
-				let accepted = false;
+				const p = document.createElement("p");
+				// "These modules are no longer required. Disable them as well? Uncheck any you want to keep enabled:"
+				p.textContent = LT.moduleManagement.disableOrphansPromptMulti();
+				content.appendChild(p);
+
+				const listWrap = document.createElement("div");
+				listWrap.style.maxHeight = "200px";
+				listWrap.style.overflowY = "auto";
+				listWrap.style.display = "flex";
+				listWrap.style.flexDirection = "column";
+				listWrap.style.gap = "4px";
+				content.appendChild(listWrap);
+
+				const orphanList = [...orphans]
+					.sort((a, b) => a.localeCompare(b))
+					.map(id => {
+						return {
+							id,
+							title: game.modules.get(id)?.title ?? id
+						};
+					});
+
+				for (const dep of orphanList) {
+					const row = document.createElement("label");
+					row.style.display = "flex";
+					row.style.alignItems = "center";
+					row.style.gap = "6px";
+
+					const cb = document.createElement("input");
+					cb.type = "checkbox";
+					cb.setAttribute("checked", "checked"); 
+					cb.checked = true;
+					cb.dataset.modId = dep.id;
+
+					const span = document.createElement("span");
+					span.textContent = `${dep.id} — ${dep.title}`;
+
+					row.appendChild(cb);
+					row.appendChild(span);
+					listWrap.appendChild(row);
+				}
+
+				let approvedIds = []; // we will fill this, null if cancelled
+				let canceled = false;
+
 				await new Promise(resolve => {
 					const safeResolve = () => { try { resolve(); } catch {} };
 					new foundry.applications.api.DialogV2({
@@ -767,20 +870,43 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 						window: { title: LT.moduleManagement.disableOrphansTitle() },
 						content,
 						buttons: [
-							{ action: "ok", label: LT.moduleManagement.disable(), icon: "fa-solid fa-check", default: true,
-								callback: () => { accepted = true; safeResolve(); } },
-							{ action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark",
-								callback: () => { accepted = false; safeResolve(); } }
+							{
+								action: "ok",
+								label: LT.moduleManagement.disable(),
+								icon: "fa-solid fa-check",
+								default: true,
+								callback: () => {
+									const chosen = [];
+									for (const cb of listWrap.querySelectorAll("input[type='checkbox']")) {
+										if (cb.checked) chosen.push(cb.dataset.modId);
+									}
+									approvedIds = chosen;
+									canceled = false;
+									safeResolve();
+								}
+							},
+							{
+								action: "cancel",
+								label: LT.buttons.cancel(),
+								icon: "fa-solid fa-xmark",
+								callback: () => {
+									canceled = true;
+									safeResolve();
+								}
+							}
 						],
-						close: safeResolve
+						close: () => { safeResolve(); }
 					}).render(true);
 				});
-				if (accepted) {
-					await this._setTempActiveBulk([], [...orphans]);
+
+				// If they canceled at this stage, we do NOT block the main disable.
+				// We just skip disabling orphans.
+				if (!canceled && approvedIds.length) {
+					await this._setTempActiveBulk([], approvedIds);
 				}
 			}
 
-			// If we get here, it’s safe to disable the original module
+			//If we get here, it's okay to disable the original module
 			return true;
 		} catch (e) {
 			DL(2, "BBMMModuleManagerApp::_ensureSafeDisable(): error", e);
@@ -1187,7 +1313,12 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		const filterLabel = LT.moduleManagement.filterModules();
 		return `
 			<div class="bbmm-mm-toolbar" id="bbmm-mm-toolbar">
-				<input id="bbmm-mm-q" type="text" placeholder="${hlp_esc(filterLabel)}" value="${hlp_esc(this.query)}" />
+				<div class="bbmm-filter-wrap">
+					<input id="bbmm-mm-q" type="text" placeholder="${hlp_esc(filterLabel)}" value="${hlp_esc(this.query)}" />
+					<button type="button" class="bbmm-filter-clear" title="${hlp_esc(LT.moduleManagement.filterClear())}">
+						<i class="fa-solid fa-xmark fa-fw"></i>
+					</button>
+				</div>
 				<div class="bbmm-mm-scopes">
 					<button type="button" data-scope="all" class="${this.scope==="all"?"on":""}">${LT.moduleManagement.allModules()}</button>
 					<button type="button" data-scope="active" class="${this.scope==="active"?"on":""}">${LT.moduleManagement.activeModules()}</button>
@@ -1498,6 +1629,22 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			this._root.addEventListener("input", (ev) => {
 				if (ev.target?.id !== "bbmm-mm-q") return;
 				this.query = String(ev.target.value ?? "");
+				this._rerender({ keepFocus: true });
+			}, true);
+
+			// Clear filter (X button)
+			this._root.addEventListener("click", (ev) => {
+				const btn = ev.target.closest?.(".bbmm-filter-clear");
+				if (!btn) return;
+
+				// Reset internal query
+				this.query = "";
+
+				// Reset the input's visible value
+				const input = this._root.querySelector("#bbmm-mm-q");
+				if (input) input.value = "";
+
+				// Rerender list with empty filter
 				this._rerender({ keepFocus: true });
 			}, true);
 

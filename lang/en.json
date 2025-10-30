@@ -428,7 +428,10 @@
 			"compatModuleExpects1": "Module expects ≥",
 			"compatModuleExpects2": "core is",
 			"compatMinVer": "Minimum/Verified",
-			"compatibility": "Compatibility"
+			"compatibility": "Compatibility",
+			"disableDependentsPromptMulti": "Disable the following modules that depend on this one? Uncheck any you want to keep enabled:",
+			"disableOrphansPromptMulti": "These modules are no longer required. Disable them as well? Uncheck any you want to keep enabled:",
+			"filterClear": "Clear filter"
 		}
 	}
 }
