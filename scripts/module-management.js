@@ -1832,9 +1832,12 @@ Hooks.on("renderSettings", (_app, rootEl) => {
 		// Already wired?
 		if (root.dataset.bbmmManageModulesBound === "1") return;
 
+		// Collect likely candidates across locales and core variants
 		const candidates = [
 			...root.querySelectorAll('button[data-action="moduleManagement"]'),
 			...root.querySelectorAll('button[data-action="manage-modules"]'),
+			// Locale-agnostic: Foundry v13 Settings menu uses data-app="modules"
+			...root.querySelectorAll('button[data-app="modules"], a[data-app="modules"]'),
 			...root.querySelectorAll('button, a')
 		];
 
@@ -1842,11 +1845,15 @@ Hooks.on("renderSettings", (_app, rootEl) => {
 			const label = (b.textContent || b.ariaLabel || "").trim().toLowerCase();
 			return (
 				b.matches('button[data-action="moduleManagement"], button[data-action="manage-modules"]') ||
-				/manage modules/.test(label)
+				b.matches('[data-app="modules"]') ||
+				/manage modules|gérer les modules|gestionar módulos|gestire moduli|module verwalten/.test(label)
 			);
 		});
 
-		if (!manageBtn) return;
+		if (!manageBtn) {
+			DL(2, 'renderSettings(): Manage Modules button not found (no selector matched).');
+			return;
+		}
 
 		// Mark once
 		manageBtn.dataset.bbmmRewired = "1";
@@ -1873,8 +1880,14 @@ Hooks.on("renderSettings", (_app, rootEl) => {
 Hooks.on("renderSettings", (_app, rootEl) => {
 	const root = rootEl instanceof HTMLElement ? rootEl : (rootEl?.[0] ?? null);
 	if (!root) return;
-	const btn = root.querySelector('button[data-bbmm-rewired="1"]') || root.querySelector('button[data-action="moduleManagement"]');
-	if (!btn) return;
+	const btn =
+		root.querySelector('button[data-bbmm-rewired="1"]') ||
+		root.querySelector('button[data-action="moduleManagement"]') ||
+		root.querySelector('[data-app="modules"]');
+	if (!btn) {
+		DL(2, 'renderSettings(tooltip): Manage Modules button not found for tooltip.');
+		return;
+	}
 	btn.title = LT.moduleManagement.settingBtnToolTip();
 	btn.setAttribute("data-tooltip", LT.moduleManagement.settingBtnToolTip());
 });
