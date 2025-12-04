@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.16] - 2025-12-04
+### Changed
+- **Changelog Report:**
+  - [#66](https://github.com/thejoester/bbmm/issues/66): When marking changelog entry as seen, will move to next unread entry.
+### Fixed
+- **Module Management:**
+  - [#69](https://github.com/thejoester/bbmm/issues/69)(nice): Fixed CSS style for "All Modules" button so it shows properly in light and dark modes. 
+
 ## [0.5.15] - 2025-11-19
 ### Changed
 - **Localization:**
