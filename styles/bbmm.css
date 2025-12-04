@@ -657,7 +657,6 @@
 #bbmm-module-manager .bbmm-mm-toolbar input { flex: 1; }
 
 #bbmm-module-manager .bbmm-mm-scopes { display: flex; gap: .25rem; }
-#bbmm-module-manager .bbmm-mm-scopes button.on { background: var(--color-border, #555); }
 
 #bbmm-module-manager .bbmm-mm-diff {
 	margin-left: auto;
