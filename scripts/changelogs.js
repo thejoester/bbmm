@@ -743,8 +743,42 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 								await _bbmmMarkChangelogSeen(entry.id, entry.version);
 								this._markedSeen.add(entry.id);
 								this._pendingOnClose.delete(entry.id);
-								ui.notifications?.info(LT.changelog.marked_seen_single({ title: entry.title || entry.id, version: entry.version }));
+								ui.notifications?.info(
+									LT.changelog.marked_seen_single({
+										title: entry.title || entry.id,
+										version: entry.version
+									})
+								);
+
+								// After marking current as read, move to the next unread entry (if any).
+								let nextIndex = -1;
+
+								// First, look forward from the current index
+								for (let i = this.index + 1; i < this.entries.length; i++) {
+									const e = this.entries[i];
+									if (e && !this._markedSeen.has(e.id)) {
+										nextIndex = i;
+										break;
+									}
+								}
+
+								// If none ahead, wrap around and look from the start up to the current index
+								if (nextIndex === -1) {
+									for (let i = 0; i < this.index; i++) {
+										const e = this.entries[i];
+										if (e && !this._markedSeen.has(e.id)) {
+											nextIndex = i;
+											break;
+										}
+									}
+								}
+
+								// Only move if there is at least one unread entry
+								if (nextIndex !== -1) {
+									this.index = nextIndex;
+								}
 							}
+
 							this._captureNavScroll(root);
 							this.render();
 							return;
