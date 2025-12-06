@@ -184,16 +184,24 @@
 	margin: 0.4em 0;
 }
 
-/* Code blocks */
-.bbmm-changelog-body code,
-.bbmm-changelog-body pre {
-	background: #0c0c0c;
-	border: 1px solid #444;
-	border-radius: 6px;
+/* Inline code */
+.bbmm-changelog-body code {
+	background: rgba(127, 127, 127, 0.18);
+	color: inherit; 
+	border: 1px solid rgba(127, 127, 127, 0.45);
+	border-radius: 4px;
+	padding: 0 4px;
+	white-space: normal !important;
 }
 
+/* Code blocks (<pre>) */
 .bbmm-changelog-body pre {
+	background: #0c0c0c; 
+	color: #e6e6e6;
+	border: 1px solid #444;
+	border-radius: 6px;
 	padding: 0.5em;
+	white-space: pre !important;
 	overflow: auto;
 }
 
@@ -312,14 +320,6 @@
 	white-space: normal !important;
 	overflow-wrap: anywhere;
 	word-break: break-word;
-}
-
-/* Preserve code formatting; scroll instead of expanding */
-.bbmm-changelog-journal .bbmm-changelog-body pre,
-.bbmm-changelog-journal .bbmm-changelog-body code {
-	white-space: pre;
-	max-width: 100%;
-	overflow: auto;
 }
 
 /* keep wide tables usable without pushing the pane */

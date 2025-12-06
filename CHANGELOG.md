@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.17] - 2025-12-06
+### Changed
+- **Localization:** 
+  - [#71](https://github.com/thejoester/bbmm/issues/71): Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+### Fixed
+- **Changelog Report:**
+  - Fixed bug causing inline text to be unreadable in light mode. 
+
 ## [0.5.16] - 2025-12-04
 ### Changed
 - **Changelog Report:**
@@ -32,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Added Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
 
 ## [0.5.11] - 2025-10-31
+### Changed
 - **Module Management:**
   - Added "Clear" in filter field. 
   - When disabling a module, if there are dependencies or orphaned dependencies it will allow to decide which modules if any to disable. 
