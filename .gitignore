@@ -12,3 +12,6 @@ package-lock.json
 
 # BBMM persistent preset storage (world-generated)
 storage/presets/*.json
+
+#markdownlint
+.markdownlint.json
