@@ -696,9 +696,32 @@ function toPresetItems(preset) {
 	return out;
 }
 
-// Retrieve all user-defined settings presets
-function getAllSettingsPresets() {
-	return game.settings.get(BBMM_ID, "settingsPresetsUser") || {};
+// Retrieve all user-defined settings presets (persistent storage JSON)
+async function getAllSettingsPresets() {
+	const url = `modules/${BBMM_ID}/storage/presets/settings-presets.json`;
+
+	try {
+		const res = await fetch(url, { cache: "no-store" });
+
+		// Missing file is valid on first run
+		if (res.status === 404) {
+			DL("macros.js | getAllSettingsPresets(): settings-presets.json not found (404), returning empty object");
+			return {};
+		}
+
+		if (!res.ok) {
+			DL(2, "macros.js | getAllSettingsPresets(): fetch failed", { url, status: res.status, statusText: res.statusText });
+			return {};
+		}
+
+		const data = await res.json();
+		if (!data || typeof data !== "object") return {};
+
+		return data;
+	} catch (err) {
+		DL(2, "macros.js | getAllSettingsPresets(): fetch threw, returning empty object", { url, err });
+		return {};
+	}
 }
 
 class BBMMPresetInspector extends foundry.applications.api.ApplicationV2 {
@@ -1196,9 +1219,9 @@ export function openNamespaceInspector() {
 		ui.notifications.error(LT.macro.failedOpenSettingsInspector());
 	}
 }
-export function openPresetInspector() {
+export async function openPresetInspector() {
 	try {
-		const presetsMap = getAllSettingsPresets();
+		const presetsMap = await getAllSettingsPresets();
 		const names = Object.keys(presetsMap).sort((a,b)=>a.localeCompare(b));
 		if (!names.length) { ui.notifications.warn(LT.macro.settingsPresetNoneFound()); return; }
 		const options = names.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`).join("");

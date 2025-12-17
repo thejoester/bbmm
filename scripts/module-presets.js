@@ -2,9 +2,218 @@ import { DL } from './settings.js';
 import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName } from './helpers.js';
 import { LT, BBMM_ID } from "./localization.js";
 const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  enabled module ids
+const MODULE_PRESETS_MIGRATION_FLAG = "modulePresetsPersistentStorageMigration";
 
 /*	=====	HELPERS =====
 */
+
+const MODULE_PRESETS_STORAGE_DIR = "presets";
+const MODULE_PRESETS_STORAGE_FILE = "module-presets.json";
+let _presetCache = null;
+
+// Sanitize a { [name]: string[] } preset map
+function hlp_sanitizePresetMap(raw) {
+	const out = {};
+	if (!raw || typeof raw !== "object") return out;
+
+	for (const [k, v] of Object.entries(raw)) {
+		if (typeof k !== "string" || !k.trim()) continue;
+		if (!Array.isArray(v)) continue;
+
+		const clean = [...new Set(v.filter(id => typeof id === "string" && id.trim()))];
+		out[k] = clean;
+	}
+
+	return out;
+}
+
+async function hlp_fetchJSON(url) {
+	const res = await fetch(url, { cache: "no-store" });
+	if (!res.ok) return null;
+
+	try {
+		return await res.json();
+	} catch (err) {
+		DL("module-presets.js | hlp_fetchJSON(): Failed to parse JSON", { url, err });
+		return null;
+	}
+}
+
+async function hlp_readPresetsFromStorage() {
+	try {
+		const dir = `modules/${BBMM_ID}/storage/presets`;
+		const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
+
+		const match = (browse?.files || []).find(f => String(f).endsWith("/module-presets.json"));
+		if (match) {
+			const data = await hlp_fetchJSON(match);
+			return hlp_sanitizePresetMap(data);
+		}
+	} catch (err) {
+		const msg = String(err?.message ?? err ?? "");
+		if (msg.includes("does not exist") || msg.includes("not accessible")) {
+			DL("module-presets.js | hlp_readPresetsFromStorage(): presets folder not found yet, will try fallback");
+		} else {
+			DL(2, "module-presets.js | hlp_readPresetsFromStorage(): browse failed unexpectedly", err);
+		}
+	}
+
+	// Fallback fetch (this is where that local `url` string comes from)
+	try {
+		const dir = `modules/${BBMM_ID}/storage/presets`;
+		const url = `${dir}/module-presets.json`;
+		const data = await hlp_fetchJSON(url);
+		return hlp_sanitizePresetMap(data);
+	} catch (err) {
+		DL(2, "module-presets.js | hlp_readPresetsFromStorage(): fallback fetch failed", err);
+	}
+
+	return null;
+}
+
+async function hlp_writePresetsToStorage(presets) {
+	const ok = await hlp_verifyPresetsDir();
+	if (!ok) {
+		DL(3, "module-presets.js | hlp_writePresetsToStorage(): presets directory not available, aborting write");
+		return false;
+	}
+
+	const payload = JSON.stringify(presets ?? {}, null, 2);
+	const file = new File([payload], "module-presets.json", { type: "application/json" });
+
+	try {
+		const res = await FilePicker.uploadPersistent(
+			BBMM_ID,
+			"presets/module-presets.json",
+			file,
+			{},
+			{ notify: false }
+		);
+
+		if (!res || (!res.path && !res.url)) {
+			DL(3, "module-presets.js | hlp_writePresetsToStorage(): upload returned no path/url", res);
+			return false;
+		}
+
+		DL("module-presets.js | hlp_writePresetsToStorage(): presets written", res);
+		return true;
+	} catch (err) {
+		DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent failed", err);
+		return false;
+	}
+}
+
+async function hlp_verifyPresetsDir() {
+	const dir = `modules/${BBMM_ID}/storage/presets`;
+
+	try {
+		await FilePicker.browse("data", dir, {});
+		DL("module-presets.js | hlp_verifyPresetsDir(): presets directory verified", dir);
+		return true;
+	} catch (err) {
+		DL(3, "module-presets.js | hlp_verifyPresetsDir(): presets directory missing or inaccessible", {
+			dir,
+			err
+		});
+		return false;
+	}
+}
+
+async function hlp_loadPresets() {
+	if (_presetCache !== null) return _presetCache;
+
+	// If the flag is set, log it once and do the normal load path.
+	if (hlp_hasFlag(MODULE_PRESETS_MIGRATION_FLAG)) {
+		DL("module-presets.js | hlp_loadPresets(): migration flag already set, skipping legacy migration");
+	}
+
+	// Try storage file first
+	const fromStorage = await hlp_readPresetsFromStorage();
+	if (fromStorage && Object.keys(fromStorage).length) {
+		_presetCache = fromStorage;
+
+		// If file exists but flag is missing (older version or manual file restore), fix the flag.
+		if (!hlp_hasFlag(MODULE_PRESETS_MIGRATION_FLAG) && game.user.isGM) {
+			await hlp_setFlag(MODULE_PRESETS_MIGRATION_FLAG, true);
+			DL("module-presets.js | hlp_loadPresets(): storage file found, migration flag was missing and is now set");
+		}
+
+		DL("module-presets.js | hlp_loadPresets(): loaded presets from persistent storage", { count: Object.keys(_presetCache).length });
+		return _presetCache;
+	}
+
+	// If migration already happened (flag set) but file is missing/empty, don't re-migrate automatically.
+	if (hlp_hasFlag(MODULE_PRESETS_MIGRATION_FLAG)) {
+		const legacy = foundry.utils.duplicate(game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS) || {});
+		const legacyClean = hlp_sanitizePresetMap(legacy);
+
+		if (Object.keys(legacyClean).length && game.user.isGM) {
+			DL(2, "module-presets.js | hlp_loadPresets(): migration flag set but storage file missing. Attempting repair migration from legacy presets.", {
+				count: Object.keys(legacyClean).length
+			});
+
+			const ok = await hlp_writePresetsToStorage(legacyClean);
+			if (ok) {
+				DL("module-presets.js | hlp_loadPresets(): repair migration succeeded, continuing with repaired presets");
+				_presetCache = legacyClean;
+				return _presetCache;
+			}
+
+			DL(3, "module-presets.js | hlp_loadPresets(): repair migration failed. Leaving presets empty.");
+			_presetCache = {};
+			return _presetCache;
+		}
+
+		DL(2, "module-presets.js | hlp_loadPresets(): migration flag set but storage file missing/empty and no legacy presets available. Presets empty.");
+		_presetCache = {};
+		return _presetCache;
+	}
+
+	// Migration path: read legacy setting and write to storage (GM only for writing + flagging)
+	const legacy = foundry.utils.duplicate(game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS) || {});
+	const legacyClean = hlp_sanitizePresetMap(legacy);
+
+	_presetCache = legacyClean;
+
+	if (!Object.keys(legacyClean).length) {
+		DL("module-presets.js | hlp_loadPresets(): no legacy presets found, setting migration flag to avoid repeated checks");
+		if (game.user.isGM) await hlp_setFlag(MODULE_PRESETS_MIGRATION_FLAG, true);
+		return _presetCache;
+	}
+
+	if (!game.user.isGM) {
+		DL(2, "module-presets.js | hlp_loadPresets(): legacy presets exist but user is not GM, cannot migrate/write storage");
+		return _presetCache;
+	}
+
+	DL("module-presets.js | hlp_loadPresets(): migrating legacy presets to persistent storage", { count: Object.keys(legacyClean).length });
+
+	const ok = await hlp_writePresetsToStorage(legacyClean);
+	if (ok) {
+		await hlp_setFlag(MODULE_PRESETS_MIGRATION_FLAG, true);
+		DL("module-presets.js | hlp_loadPresets(): migration complete, flag set");
+	} else {
+		DL(3, "module-presets.js | hlp_loadPresets(): migration failed, leaving flag unset");
+	}
+
+	return _presetCache;
+}
+
+function hlp_getFlags() {
+	const obj = game.settings.get(BBMM_ID, "bbmmFlags");
+	return obj && typeof obj === "object" ? { ...obj } : {};
+}
+
+function hlp_hasFlag(key) {
+	const flags = hlp_getFlags();
+	return Boolean(flags[key]);
+}
+
+async function hlp_setFlag(key, value) {
+	const flags = hlp_getFlags();
+	flags[key] = value;
+	await game.settings.set(BBMM_ID, "bbmmFlags", flags);
+}
 
 // Validate Module Preset JSON structure	
 function hlp_validateModulePresetJSON(data) {
@@ -78,14 +287,25 @@ function hlp_getRequiredIds(mod) {
 	return ids;
 }
 
-// read preset map 
+// read preset map
 function hlp_getPresets() {
-	return foundry.utils.duplicate(game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS) || {});
+	if (_presetCache === null) {
+		DL("module-presets.js | hlp_getPresets(): cache not loaded yet, returning empty map");
+		return {};
+	}
+	return foundry.utils.duplicate(_presetCache || {});
 }
 
 // set preset map
 async function hlp_setPresets(presets) {
-	await game.settings.set(BBMM_ID, MODULE_SETTING_PRESETS, presets);
+	const clean = hlp_sanitizePresetMap(presets);
+	_presetCache = clean;
+
+	// Persist to module /storage/
+	const ok = await hlp_writePresetsToStorage(clean);
+	if (!ok) {
+		ui.notifications.warn(LT.errors?.failedToWritePresets?.() ?? "Failed to write presets to storage.");
+	}
 }
 
 // Save Preset checking if it exists and prompting to overwrite or rename
@@ -423,6 +643,9 @@ export async function openPresetManager() {
 	// Start
 	DL("module-presets.js | openPresetManager: start");
 
+	// load presets into cache
+	await hlp_loadPresets();
+
 	// Load existing presets and build the select options
 	const presets = hlp_getPresets();
 	DL("module-presets.js | openPresetManager: presets loaded", presets);
@@ -628,7 +851,10 @@ export async function openPresetManager() {
 	dlg.render(true);
 }
 
-Hooks.once("ready", () => {
+Hooks.once("ready", async () => {
+	// load presets into cache
+	await hlp_loadPresets();
+
 	window.openPresetManager = openPresetManager; 
 	const mod = game.modules.get("bbmm");
 	if (!mod) return;
@@ -639,4 +865,3 @@ Hooks.once("ready", () => {
 
 Hooks.on("setup", () => DL("module-presets.js | setup fired"));
 Hooks.once("ready", () => DL("module-presets.js | ready fired"));
-

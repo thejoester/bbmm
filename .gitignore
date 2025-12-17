@@ -9,3 +9,6 @@ package-lock.json
 
 # LevelDB junk
 /packs/*/lost/
+
+# BBMM persistent preset storage (world-generated)
+storage/presets/*.json

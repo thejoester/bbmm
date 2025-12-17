@@ -28,6 +28,7 @@
         "scripts/macros.js"
     ],
     "socket": true,
+    "persistentStorage": true,
     "packs": [
         {
             "name": "bbmm-macros",
