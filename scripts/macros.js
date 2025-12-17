@@ -1219,12 +1219,80 @@ export function openNamespaceInspector() {
 		ui.notifications.error(LT.macro.failedOpenSettingsInspector());
 	}
 }
+
 export async function openPresetInspector() {
 	try {
-		const presetsMap = await getAllSettingsPresets();
-		const names = Object.keys(presetsMap).sort((a,b)=>a.localeCompare(b));
-		if (!names.length) { ui.notifications.warn(LT.macro.settingsPresetNoneFound()); return; }
-		const options = names.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`).join("");
+		const presetsRoot = await getAllSettingsPresets();
+
+		// Support both schemas:
+		// 1) New: { worlds: { [worldId]: { [presetName]: presetObj } } }
+		// 2) Old: { [presetName]: presetObj }
+		const worlds = (presetsRoot?.worlds && typeof presetsRoot.worlds === "object")
+			? presetsRoot.worlds
+			: null;
+
+		/** @type {Array<{ id: string, name: string, displayName: string, worldId: string, preset: object, isCurrentWorld: boolean }>} */
+		const list = [];
+
+		const currentWorldId = game.world?.id || "unknownWorld";
+
+		if (worlds) {
+			for (const [worldId, presetsObj] of Object.entries(worlds)) {
+				if (!presetsObj || typeof presetsObj !== "object") continue;
+
+				for (const [name, preset] of Object.entries(presetsObj)) {
+					list.push({
+						id: `${worldId}::${name}`,
+						name,
+						displayName: name, // possibly updated below
+						worldId,
+						preset: (preset && typeof preset === "object") ? preset : {},
+						isCurrentWorld: worldId === currentWorldId
+					});
+				}
+			}
+		} else {
+			// Flat legacy map
+			for (const [name, preset] of Object.entries(presetsRoot || {})) {
+				list.push({
+					id: `__legacy__::${name}`,
+					name,
+					displayName: name,
+					worldId: "__legacy__",
+					preset: (preset && typeof preset === "object") ? preset : {},
+					isCurrentWorld: true
+				});
+			}
+		}
+
+		if (!list.length) {
+			ui.notifications.warn(LT.macro.settingsPresetNoneFound());
+			return;
+		}
+
+		// Disambiguate duplicates by name across worlds
+		const counts = {};
+		for (const p of list) counts[p.name] = (counts[p.name] || 0) + 1;
+		for (const p of list) {
+			if (counts[p.name] > 1) p.displayName = `${p.name} (${p.worldId})`;
+		}
+
+		// Sort: current world first, then name, then worldId
+		list.sort((a, b) => {
+			if (a.isCurrentWorld !== b.isCurrentWorld) return a.isCurrentWorld ? -1 : 1;
+			const an = a.name.toLowerCase();
+			const bn = b.name.toLowerCase();
+			if (an !== bn) return an.localeCompare(bn);
+			return a.worldId.localeCompare(b.worldId);
+		});
+
+		// Build index for lookups on click
+		const presetIndex = {};
+		for (const p of list) presetIndex[p.id] = p;
+
+		const options = list
+			.map(p => `<option value="${hlp_esc(p.id)}">${hlp_esc(p.displayName)}</option>`)
+			.join("");
 
 		const content = `
 			<div style="min-width:420px;display:flex;flex-direction:column;gap:.75rem;">
@@ -1236,8 +1304,10 @@ export async function openPresetInspector() {
 		`;
 
 		const dlg = new foundry.applications.api.DialogV2({
-			window: { title: LT.macro.titleInspectPreset(), resizable: true },
-			position: { width: 1200, height: "auto" },
+			window: {
+				title: LT.macro.titleInspectPreset(),
+				icon: "fas fa-magnifying-glass"
+			},
 			content,
 			buttons: [
 				{ action: "inspect", label: LT.macro.btnInspect(), default: true },
@@ -1252,6 +1322,7 @@ export async function openPresetInspector() {
 
 			try {
 				const el = app.element;
+
 				el.style.minWidth = "420px";
 				el.style.maxWidth = "600px";
 				el.style.maxHeight = "600px";
@@ -1270,26 +1341,38 @@ export async function openPresetInspector() {
 			form.addEventListener("click", (ev) => {
 				const btn = ev.target.closest?.("button");
 				if (!(btn instanceof HTMLButtonElement)) return;
+
 				const action = btn.dataset.action || "";
-				if (!["inspect","cancel"].includes(action)) return;
+				if (!["inspect", "cancel"].includes(action)) return;
+
 				ev.preventDefault();
-				if (action === "cancel") { app.close(); return; }
+
+				if (action === "cancel") {
+					app.close();
+					return;
+				}
 
 				const sel = /** @type {HTMLSelectElement} */ (form.elements.namedItem("presetName"));
-				const presetName = sel?.value;
-				if (!presetName) { ui.notifications.warn(LT.macro.selectPreset()); return; }
+				const presetId = sel?.value;
+				if (!presetId) {
+					ui.notifications.warn(LT.macro.selectPreset());
+					return;
+				}
 
-				const preset = presetsMap[presetName] ?? {};
+				const picked = presetIndex[presetId];
+				const preset = picked?.preset ?? {};
 				const items = toPresetItems(preset);
+
 				if (!items.length) {
 					ui.notifications.error(LT.macro.presetMalformed());
 					return;
 				}
 
 				app.close();
-				new BBMMPresetInspector({ name: presetName, items }).render(true);
+				new BBMMPresetInspector({ name: picked.displayName, items }).render(true);
 			});
 		};
+
 		Hooks.on("renderDialogV2", onRender);
 
 		dlg.render(true);
@@ -1298,6 +1381,7 @@ export async function openPresetInspector() {
 		ui.notifications.error(LT.macro.failedOpenPresetInspector());
 	}
 }
+
 export function openKeybindInspector() {
 	try {
 		DL("macros.js | openKeybindInspector(): launching");
