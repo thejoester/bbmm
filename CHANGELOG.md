@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+
+## [0.6.0-test2] - 2025-12-17
+### Changed
+- **Settings Preset Manager:**
+  - If preset with same name exists when loading a world for the first time after this update, will append "(world-name)" to the name so it does not overwrite. 
+- **Module Preset Manager:**
+  - Module presets available to load in all worlds, but can only update or delete in the world they originate in. 
+
 ## [0.6.0-test1] - 2025-12-17
 ### Changed
 - **Settings Preset Manager:**
