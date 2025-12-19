@@ -15,12 +15,12 @@ export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
 	["bbmm", new Set(["settingsPresetsUser", "modulePresetsUser"])],
-		// "userSettingSync", "softLockLedger", "softLockRevMap"
 	["core", new Set(["moduleConfiguration", "compendiumConfiguration", "time"])],	
 	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
 
 // Check folder migration 
+// !!! REMOVE  after version 0.7.0 !!!
 async function checkFolderMigration(){
 	if (!game.user.isGM) return; // GM only
 
@@ -74,6 +74,197 @@ async function checkFolderMigration(){
 	} catch (err) {
 		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
 	}
+}
+
+// Preset Storage Migration =====================================================
+async function hlp_loadPresets() {
+	if (!game.user.isGM) return; // GM Only	
+
+	// constants
+	const FLAG_MOD = "modulePresetsPersistentStorageMigration";
+	const FLAG_SET = "settingsPresetsPersistentStorageMigration";
+	const worldTitleRaw = String(game.world?.title || "Unknown World").trim();
+	const worldTitle = worldTitleRaw || "Unknown World";
+	const suffix = ` (${worldTitle})`;
+
+	/* ==================================================================
+		HELPERS
+	================================================================== */
+
+		// Get all flags object
+		function getFlags() {
+			const obj = game.settings.get(BBMM_ID, "bbmmFlags");
+			return obj && typeof obj === "object" ? { ...obj } : {};
+		}
+
+		// Check a flag; falsy if missing.
+		function hasFlag(key) {
+			return Boolean(getFlags()[key]);
+		}
+
+		// Set/merge a single flag without clobbering others.
+		async function setFlag(key, value) {
+			const current = getFlags();
+			current[key] = value;
+			await game.settings.set(BBMM_ID, "bbmmFlags", current);
+		}
+
+		// Sanitize a flat map of { [name]: value } where value is either an object or array of strings
+		function sanitizeFlatMap(raw, valueIsArray = false) {
+			const out = {};
+			if (!raw || typeof raw !== "object") return out;
+
+			for (const [k, v] of Object.entries(raw)) {
+				const name = String(k || "").trim();
+				if (!name) continue;
+
+				if (valueIsArray) {
+					if (!Array.isArray(v)) continue;
+					out[name] = v.filter(x => typeof x === "string");
+				} else {
+					if (!v || typeof v !== "object") continue;
+					out[name] = v;
+				}
+			}
+
+			return out;
+		}
+
+		// Generate a unique name in targetMap based on baseName
+		function makeUniqueName(targetMap, baseName) {
+			if (!targetMap[baseName]) return baseName;
+
+			let n = 2;
+			while (targetMap[`${baseName} ${n}`]) n++;
+			return `${baseName} ${n}`;
+		}
+
+		// Read flat map from storage file
+		async function readStorageFlat(filename) {
+			const url = `modules/${BBMM_ID}/storage/presets/${filename}`;
+
+			try {
+				const res = await fetch(url, { cache: "no-store" });
+				if (!res.ok) return {};
+				const data = await res.json();
+				return data && typeof data === "object" ? data : {};
+			} catch {
+				return {};
+			}
+		}
+
+		// Write flat map to storage file
+		async function writeStorageFlat(filename, obj) {
+			const payload = JSON.stringify(obj ?? {}, null, 2);
+			const file = new File([payload], filename, { type: "application/json" });
+
+			const res = await FilePicker.uploadPersistent(BBMM_ID, "presets", file, {}, { notify: false });
+			if (!res || (!res.path && !res.url)) return false;
+			return true;
+		}
+
+		// Check if storage file exists (fetchable)
+		async function storageFileExists(filename) {
+			const url = `modules/${BBMM_ID}/storage/presets/${filename}`;
+
+			try {
+				const res = await fetch(url, { cache: "no-store" });
+				return res.ok;
+			} catch {
+				return false;
+			}
+		}
+
+		// Ensure a storage file exists (create empty {} if missing)
+		async function ensureStorageFile(filename) {
+			const exists = await storageFileExists(filename);
+			if (exists) return true;
+
+			const ok = await writeStorageFlat(filename, {});
+			if (ok) {
+				DL(`settings.js | hlp_loadPresets(): created missing storage file "${filename}"`);
+			} else {
+				DL(3, `settings.js | hlp_loadPresets(): FAILED to create missing storage file "${filename}"`);
+			}
+			return ok;
+		}
+
+	/* ========================================================================= 
+		Module Presets Migration
+	========================================================================= */
+	if (!hasFlag(FLAG_MOD)) { // not yet migrated
+		const legacyRaw = game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS_U) || {};
+		const legacy = sanitizeFlatMap(legacyRaw, true);
+
+		if (Object.keys(legacy).length) {
+			const storageRaw = await readStorageFlat("module-presets.json");
+			const storage = sanitizeFlatMap(storageRaw, true);
+
+			let added = 0;
+
+			for (const [name, modules] of Object.entries(legacy)) {
+				const base = `${name}${suffix}`;
+				const unique = makeUniqueName(storage, base);
+				storage[unique] = modules;
+				added++;
+			}
+
+			const ok = await writeStorageFlat("module-presets.json", storage);
+			if (ok) {
+				await setFlag(FLAG_MOD, true);
+				DL("settings.js | hlp_loadPresets(): migrated module presets to storage (suffix applied)", { added });
+			} else {
+				DL(3, "settings.js | hlp_loadPresets(): FAILED migrating module presets to storage");
+			}
+		} else {
+			await setFlag(FLAG_MOD, true);
+			DL("settings.js | hlp_loadPresets(): no legacy module presets found, flag set");
+		}
+	} else {
+		DL("settings.js | hlp_loadPresets(): module presets migration flag already set, skipping");
+	}
+
+	// Always ensure the module presets storage file exists (even if empty)
+	await ensureStorageFile("module-presets.json");
+
+	/* ========================================================================= 
+		Settings Presets Migration
+	========================================================================= */
+	if (!hasFlag(FLAG_SET)) { // not yet migrated
+		const legacyRaw = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS_U) || {};
+		const legacy = sanitizeFlatMap(legacyRaw, false);
+
+		if (Object.keys(legacy).length) { // has legacy presets
+			const storageRaw = await readStorageFlat("settings-presets.json");
+			const storage = sanitizeFlatMap(storageRaw, false);
+
+			let added = 0;
+
+			for (const [name, presetObj] of Object.entries(legacy)) {
+				const base = `${name}${suffix}`;
+				const unique = makeUniqueName(storage, base);
+				storage[unique] = presetObj;
+				added++;
+			}
+
+			const ok = await writeStorageFlat("settings-presets.json", storage);
+			if (ok) {
+				await setFlag(FLAG_SET, true);
+				DL("settings.js | hlp_loadPresets(): migrated settings presets to storage (suffix applied)", { added });
+			} else {
+				DL(3, "settings.js | hlp_loadPresets(): FAILED migrating settings presets to storage");
+			}
+		} else {
+			await setFlag(FLAG_SET, true);
+			DL("settings.js | hlp_loadPresets(): no legacy settings presets found, flag set");
+		}
+	} else {
+		DL("settings.js | hlp_loadPresets(): settings presets migration flag already set, skipping");
+	}
+
+	// Always ensure the settings presets storage file exists (even if empty)
+	await ensureStorageFile("settings-presets.json");
+
 }
 
 //	Function for debugging - Prints out colored and tagged debug lines
@@ -725,9 +916,12 @@ Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
 	
-	//check folder migration
+	// check folder migration - Remove after version 0.7.0
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
 
+	// migrate presets to persistent storage - Remove after version 0.8.0
+	await hlp_loadPresets();
+	
 	// Hook into settings and manage modules window to add app button in header 
 	Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
 	Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));

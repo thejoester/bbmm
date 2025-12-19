@@ -383,7 +383,8 @@
 			"failedOpenKeybindInspector": "Failed to open Keybinding Inspector (see console).",
 			"titleKeybindInspecor": "BBMM — Inspect Keybindings",
 			"keybindFilterPlaceholder": "Search namespace, action, name, hint, keys…",
-			"selectPreset":"Select a settings preset."
+			"selectPreset":"Select a settings preset.",
+			"selectModuleToViewSettings": "Select a module to view settings."
 		},
 		"moduleManagement": {
 			"modListWindowTitle": "BBMM — Module Manager",

@@ -4,7 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
+## [0.6.0-test3] - 2025-12-19
+### Changed
+- **Settings Preset Manager:**
+  - Presets no longer attached to worlds, can update/delete in any world.
+  - On initial migration the preset name will have originating world name appended. 
+- **Module Preset Manager:**
+  - Presets no longer attached to worlds, can update/delete in any world.
+  - On initial migration the preset name will have originating world name appended. 
+- **Inclusions/Exclusions Managers:**
+  - When adding a setting inclusion/exclusion, will filter by module in drop down. 
+  - Reminder: Please read the [Wiki](https://github.com/thejoester/bbmm/wiki) regarding inclusions/exclusions and hidden Settings. 
 
 ## [0.6.0-test2] - 2025-12-17
 ### Changed

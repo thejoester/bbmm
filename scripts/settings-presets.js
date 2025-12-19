@@ -5,7 +5,6 @@ const SETTING_SETTINGS_PRESETS = "settingsPresetsUser";	// user-scoped store def
 const PRESET_MANAGER_ID = "bbmm-settings-preset-manager"; // stable window id
 const SETTINGS_PRESETS_STORAGE_DIR = "presets";
 const SETTINGS_PRESETS_STORAGE_FILE = "settings-presets.json";
-const SETTINGS_PRESETS_MIGRATION_FLAG = "settingsPresetsPersistentStorageMigration";
 let _settingsPresetCache = null;
 
 const BBMM_V2_WINDOWS = new Map();	// id -> app
@@ -19,39 +18,7 @@ if (!AppV2) {
 	{HELPERS}
 ======================================================================= */
 
-// Flag helpers for migration tracking ================================
-function hlp_worldId() {
-	return game.world?.id || "unknownWorld";
-}
-
-function hlp_sanitizeStorageRoot(raw) {
-	// Storage root should look like: { worlds: { [worldId]: { presetName: presetObj } } }
-	if (!raw || typeof raw !== "object") return { worlds: {} };
-
-	// Back-compat: if it looks like old flat presets object, wrap it under current world
-	if (!raw.worlds) {
-		const wid = hlp_worldId();
-		return { worlds: { [wid]: (raw && typeof raw === "object") ? raw : {} } };
-	}
-
-	if (!raw.worlds || typeof raw.worlds !== "object") raw.worlds = {};
-	return raw;
-}
-
-function hlp_getWorldPresets(storageRoot) {
-	const root = hlp_sanitizeStorageRoot(storageRoot);
-	const wid = hlp_worldId();
-	const worldPresets = root.worlds?.[wid];
-	return worldPresets && typeof worldPresets === "object" ? worldPresets : {};
-}
-
-function hlp_setWorldPresets(storageRoot, presetsForWorld) {
-	const root = hlp_sanitizeStorageRoot(storageRoot);
-	const wid = hlp_worldId();
-	root.worlds[wid] = presetsForWorld && typeof presetsForWorld === "object" ? presetsForWorld : {};
-	return root;
-}
-
+// Ensure storage root has expected shape
 function hlp_samePreset(a, b) {
 	// Cheap deterministic compare
 	try {
@@ -61,22 +28,7 @@ function hlp_samePreset(a, b) {
 	}
 }
 
-function hlp_getFlags() {
-	const obj = game.settings.get(BBMM_ID, "bbmmFlags");
-	return obj && typeof obj === "object" ? { ...obj } : {};
-}
-
-function hlp_hasFlag(key) {
-	const flags = hlp_getFlags();
-	return Boolean(flags[key]);
-}
-
-async function hlp_setFlag(key, value) {
-	const flags = hlp_getFlags();
-	flags[key] = value;
-	await game.settings.set(BBMM_ID, "bbmmFlags", flags);
-}
-
+// fetch JSON from URL with no-cache
 async function hlp_fetchJSON(url) {
 	const res = await fetch(url, { cache: "no-store" });
 	
@@ -142,44 +94,48 @@ async function hlp_readSettingsPresetsFromStorage() {
 	return null;
 }
 
-function hlp_getPresetWorldId(preset) {
-	if (!preset || typeof preset !== "object") return null;
-
-	// Prefer explicit meta if we have it
-	if (preset._bbmmMeta && typeof preset._bbmmMeta === "object") {
-		return preset._bbmmMeta.worldId || null;
-	}
-
-	// Back-compat if we ever used a flat field
-	if (preset._bbmmWorldId) return preset._bbmmWorldId;
-
-	return null;
-}
-
-function hlp_makeUniqueWorldName(baseName, worldId, allPresets) {
-	const safeWorld = String(worldId || "unknown").trim();
-	const base = String(baseName || "").trim();
-
-	let candidate = `${base} (${safeWorld})`;
-	if (!allPresets[candidate]) return candidate;
-
-	let n = 2;
-	while (allPresets[`${candidate} ${n}`]) n++;
-	return `${candidate} ${n}`;
-}
-
 // Write presets to persistent storage file ============================
 async function hlp_writeSettingsPresetsToStorage(obj) {
 	const okDir = await hlp_verifyPresetsDir();
 	if (!okDir) return false;
 
-	const payload = JSON.stringify(obj ?? {}, null, 2);
+	// Make a JSON-safe copy so Foundry types (ex: Color) don't stringify into {}
+	const safe = foundry.utils.deepClone(obj ?? {});
+
+	const coerce = (v) => {
+		if (v == null || typeof v !== "object") return v;
+
+		// Arrays: recurse
+		if (Array.isArray(v)) return v.map(coerce);
+
+		// Plain object: recurse keys
+		if (v.constructor === Object) {
+			for (const k of Object.keys(v)) v[k] = coerce(v[k]);
+			return v;
+		}
+
+		// Non-plain objects (Color, Set, Map, etc.): try to convert to something stable
+		try {
+			// Many Foundry objects give meaningful string output (Color -> "#rrggbb")
+			const s = String(v);
+			if (s && s !== "[object Object]") return s;
+		} catch {}
+
+		// Last resort: leave it alone (may stringify to {} but we've tried)
+		return v;
+	};
+
+	for (const presetName of Object.keys(safe)) {
+		safe[presetName] = coerce(safe[presetName]);
+	}
+
+	const payload = JSON.stringify(safe, null, 2);
 	const file = new File([payload], SETTINGS_PRESETS_STORAGE_FILE, { type: "application/json" });
 
 	try {
 		const res = await FilePicker.uploadPersistent(
 			BBMM_ID,
-			SETTINGS_PRESETS_STORAGE_DIR, 
+			SETTINGS_PRESETS_STORAGE_DIR,
 			file,
 			{},
 			{ notify: false }
@@ -197,96 +153,6 @@ async function hlp_writeSettingsPresetsToStorage(obj) {
 		return false;
 	}
 }
-
-// Load presets from store, with migration ============================
-async function svc_loadSettingsPresets() {
-	if (_settingsPresetCache !== null) return _settingsPresetCache;
-
-	// Non-GM stays on user-scoped store
-	if (!game.user.isGM) {
-		_settingsPresetCache = hlp_sanitizeSettingsPresets(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
-		DL("settings-presets.js | svc_loadSettingsPresets(): non-GM loaded from user setting store");
-		return _settingsPresetCache;
-	}
-
-	const wid = hlp_worldId();
-
-	// Read full storage file (all worlds)
-	const rawStorage = await hlp_readSettingsPresetsFromStorage();
-	const storageRoot = hlp_sanitizeStorageRoot(rawStorage);
-
-	// Pull only this world's presets
-	const storageWorld = hlp_getWorldPresets(storageRoot);
-	const storageCount = Object.keys(storageWorld).length;
-
-	// If storage has data for THIS world, use it
-	if (storageCount) {
-		_settingsPresetCache = storageWorld;
-		DL("settings-presets.js | svc_loadSettingsPresets(): loaded presets from persistent storage (world)", { world: wid, count: storageCount });
-
-		// Ensure flag is set if missing
-		if (!hlp_hasFlag(SETTINGS_PRESETS_MIGRATION_FLAG)) {
-			await hlp_setFlag(SETTINGS_PRESETS_MIGRATION_FLAG, true);
-			DL("settings-presets.js | svc_loadSettingsPresets(): storage present; migration flag was missing and is now set", { world: wid });
-		}
-
-		return _settingsPresetCache;
-	}
-
-	// No storage for this world yet
-	if (hlp_hasFlag(SETTINGS_PRESETS_MIGRATION_FLAG)) {
-		// Repair attempt: if legacy exists, write it into this world namespace
-		const legacy = hlp_sanitizeSettingsPresets(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
-		const legacyCount = Object.keys(legacy).length;
-
-		if (legacyCount) {
-			DL(2, "settings-presets.js | svc_loadSettingsPresets(): flag set but no storage for world; attempting repair from legacy", { world: wid, count: legacyCount });
-
-			const updatedRoot = hlp_setWorldPresets(storageRoot, legacy);
-			const ok = await hlp_writeSettingsPresetsToStorage(updatedRoot);
-
-			if (ok) {
-				_settingsPresetCache = legacy;
-				DL("settings-presets.js | svc_loadSettingsPresets(): repair write succeeded", { world: wid });
-				return _settingsPresetCache;
-			}
-
-			DL(3, "settings-presets.js | svc_loadSettingsPresets(): repair write failed; presets empty", { world: wid });
-		}
-
-		_settingsPresetCache = {};
-		DL(2, "settings-presets.js | svc_loadSettingsPresets(): migration flag set; no storage+no legacy; presets empty", { world: wid });
-		return _settingsPresetCache;
-	}
-
-	// First-run migration for this world (flag not set)
-	const legacy = hlp_sanitizeSettingsPresets(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
-	const legacyCount = Object.keys(legacy).length;
-
-	_settingsPresetCache = legacy;
-
-	if (!legacyCount) {
-		await hlp_setFlag(SETTINGS_PRESETS_MIGRATION_FLAG, true);
-		DL("settings-presets.js | svc_loadSettingsPresets(): no legacy presets; flag set", { world: wid });
-		return _settingsPresetCache;
-	}
-
-	DL("settings-presets.js | svc_loadSettingsPresets(): migrating legacy presets to persistent storage (world)", { world: wid, count: legacyCount });
-
-	// Merge into storage root (other worlds preserved)
-	const updatedRoot = hlp_setWorldPresets(storageRoot, legacy);
-	const ok = await hlp_writeSettingsPresetsToStorage(updatedRoot);
-
-	if (ok) {
-		await hlp_setFlag(SETTINGS_PRESETS_MIGRATION_FLAG, true);
-		DL("settings-presets.js | svc_loadSettingsPresets(): migration complete, flag set", { world: wid });
-	} else {
-		DL(3, "settings-presets.js | svc_loadSettingsPresets(): migration failed, leaving flag unset", { world: wid });
-	}
-
-	return _settingsPresetCache;
-}
-
 
 /* Deep equals for settings values =====================================*/
 function hlp_valuesEqual(a, b) {
@@ -532,70 +398,6 @@ function hlp_isRegisteredSetting(namespace, key) {
 /* =======================================================================
 	{SERVICES}
 ======================================================================= */
-
-/* Get all saved presets from settings store ============================ */
-function svc_getSettingsPresets() {
-	return foundry.utils.duplicate(_settingsPresetCache || {});
-}
-
-/* Save all presets to settings store ============================ */
-async function svc_setSettingsPresets(obj) {
-	const clean = hlp_sanitizeSettingsPresets(obj);
-	_settingsPresetCache = clean;
-
-	// Non-GM: keep existing user-scoped behavior
-	if (!game.user.isGM) {
-		try {
-			DL("settings-presets.js | svc_setSettingsPresets(): writing bbmm.settingsPresetsUser (non-GM path)");
-			await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, clean);
-			DL("settings-presets.js | svc_setSettingsPresets(): OK (non-GM path)");
-			return;
-		} catch (e) {
-			DL(3, "settings-presets.js | svc_setSettingsPresets(): FAILED (non-GM path)", {
-				name: e?.name,
-				message: e?.message,
-				stack: e?.stack,
-				key: `${BBMM_ID}.${SETTING_SETTINGS_PRESETS}`
-			});
-			throw e;
-		}
-	}
-
-	// GM: write to persistent storage file, world-namespaced
-	try {
-		const wid = hlp_worldId();
-
-		// read full file so we don't clobber other worlds
-		const rawStorage = await hlp_readSettingsPresetsFromStorage();
-		const root = hlp_sanitizeStorageRoot(rawStorage);
-
-		// Avoid pointless writes if identical
-		const currentWorld = hlp_getWorldPresets(root);
-		if (hlp_samePreset(currentWorld, clean)) {
-			DL("settings-presets.js | svc_setSettingsPresets(): no changes, skipping write", { world: wid });
-			return;
-		}
-
-		const updatedRoot = hlp_setWorldPresets(root, clean);
-		const ok = await hlp_writeSettingsPresetsToStorage(updatedRoot);
-
-		if (!ok) throw new Error("Failed to write world settings presets to persistent storage.");
-
-		// Ensure migration flag is set once we have a successful file write for this world
-		if (!hlp_hasFlag(SETTINGS_PRESETS_MIGRATION_FLAG)) {
-			await hlp_setFlag(SETTINGS_PRESETS_MIGRATION_FLAG, true);
-		}
-
-		DL("settings-presets.js | svc_setSettingsPresets(): OK (GM storage path)", { world: wid, count: Object.keys(clean).length });
-	} catch (e) {
-		DL(3, "settings-presets.js | svc_setSettingsPresets(): FAILED (GM storage path)", {
-			name: e?.name,
-			message: e?.message,
-			stack: e?.stack
-		});
-		throw e;
-	}
-}
 
 /* Collect all Settings - except excluded ================================
 	Collect module settings by scope, 
@@ -845,43 +647,17 @@ async function svc_saveSettingsPreset(name, payload) {
 	const all = svc_getSettingsPresets();
 	const existingKey = hlp_findExistingSettingsPresetKey(rawInput);
 
-	// Attach creation metadata so we can resolve cross-world collisions safely
-	const worldId = game.world?.id || "unknownWorld";
-	const storedPayload = {
-		...payload,
-		_bbmmMeta: {
-			worldId,
-			savedAt: Date.now()
-		}
-	};
-
+	// Store a copy of the original payload
+	const storedPayload = payload;
 	// If a preset with this name exists already, decide how to handle it.
 	if (existingKey) {
-		const existingPreset = all[existingKey];
-		const existingWorldId = hlp_getPresetWorldId(existingPreset);
-
-		// Cross-world (or unknown-origin) name collision: DO NOT OVERWRITE.
-		// Auto-create a unique world-suffixed name.
-		if (!existingWorldId || existingWorldId !== worldId) {
-			finalName = hlp_makeUniqueWorldName(rawInput, worldId, all);
-
-			DL("settings-presets.js | svc_saveSettingsPreset(): name collision across worlds, auto-renaming", {
-				input: rawInput,
-				existingKey,
-				existingWorldId,
-				thisWorldId: worldId,
-				finalName
-			});
-		} else {
-			// Same-world collision: keep existing prompt behavior
-			const choice = await svc_askSettingsPresetConflict(existingKey);
-			if (choice === "cancel") return { status: "cancel" };
-			if (choice === "overwrite") finalName = existingKey;
-			if (choice === "rename") {
-				const newName = await ui_promptRenamePreset(rawInput);
-				if (!newName) return { status: "cancel" };
-				finalName = newName;
-			}
+		const choice = await svc_askSettingsPresetConflict(existingKey);
+		if (choice === "cancel") return { status: "cancel" };
+		if (choice === "overwrite") finalName = existingKey;
+		if (choice === "rename") {
+			const newName = await ui_promptRenamePreset(rawInput);
+			if (!newName) return { status: "cancel" };
+			finalName = newName;
 		}
 	}
 
@@ -893,6 +669,44 @@ async function svc_saveSettingsPreset(name, payload) {
 	await svc_setSettingsPresets(all);
 
 	return { status: "saved", name: finalName };
+}
+
+/* Get all saved presets from settings store ============================ */
+function svc_getSettingsPresets() {
+	return (_settingsPresetCache && typeof _settingsPresetCache === "object") ? _settingsPresetCache : {};
+}
+
+/* Save all presets to settings store ============================ */
+async function svc_setSettingsPresets(obj) {
+	const clean = hlp_sanitizeSettingsPresets(obj);
+	_settingsPresetCache = clean;
+
+	// Non-GM: user-scoped store
+	if (!game.user.isGM) {
+		try {
+			DL("settings-presets.js | svc_setSettingsPresets(): writing bbmm.settingsPresetsUser (non-GM path)");
+			await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, clean);
+			DL("settings-presets.js | svc_setSettingsPresets(): OK (non-GM path)");
+			return;
+		} catch (e) {
+			DL(3, "settings-presets.js | svc_setSettingsPresets(): FAILED (non-GM path)", {
+				name: e?.name,
+				message: e?.message,
+				stack: e?.stack,
+				key: `${BBMM_ID}.${SETTING_SETTINGS_PRESETS}`
+			});
+			throw e;
+		}
+	}
+
+	// GM: persistent storage JSON only (NO flags, NO migration)
+	const ok = await hlp_writeSettingsPresetsToStorage(clean);
+	if (!ok) {
+		DL(3, "settings-presets.js | svc_setSettingsPresets(): FAILED (GM storage path)");
+		throw new Error("Failed to write settings presets to persistent storage.");
+	}
+
+	DL("settings-presets.js | svc_setSettingsPresets(): OK (GM storage path)");
 }
 
 /* plan settings changes ================================================= 
@@ -949,6 +763,43 @@ async function svc_planSettingsChanges(env) {
 	} catch (err) {
 		DL(3, "settings-presets.js | svc_planSettingsChanges(): error", err);
 		return rows;
+	}
+}
+
+// Load presets from store, with migration ============================
+async function svc_loadSettingsPresets() {
+	// Cache guard
+	if (_settingsPresetCache !== null) return _settingsPresetCache;
+
+	// Non-GM: user-scoped store
+	if (!game.user.isGM) {
+		try {
+			_settingsPresetCache = hlp_sanitizeSettingsPresets(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
+			DL("settings-presets.js | svc_loadSettingsPresets(): non-GM loaded from user setting store", {
+				count: Object.keys(_settingsPresetCache || {}).length
+			});
+			return _settingsPresetCache;
+		} catch (err) {
+			_settingsPresetCache = {};
+			DL(2, "settings-presets.js | svc_loadSettingsPresets(): non-GM failed to load user setting store", err);
+			return _settingsPresetCache;
+		}
+	}
+
+	// GM: load from persistent storage JSON ONLY
+	try {
+		const fromStorage = await hlp_readSettingsPresetsFromStorage();
+		_settingsPresetCache = hlp_sanitizeSettingsPresets(fromStorage);
+
+		DL("settings-presets.js | svc_loadSettingsPresets(): GM loaded from persistent storage", {
+			count: Object.keys(_settingsPresetCache || {}).length
+		});
+
+		return _settingsPresetCache;
+	} catch (err) {
+		_settingsPresetCache = {};
+		DL(2, "settings-presets.js | svc_loadSettingsPresets(): GM failed to load from persistent storage", err);
+		return _settingsPresetCache;
 	}
 }
 
@@ -1504,53 +1355,33 @@ export async function openSettingsPresetManager() {
 		catch (e) { DL(2, "settings-presets.js | openSettingsPresetManager(): failed to close existing instance", e); }
 	}
 
-	// Build list of presets across ALL worlds (display), but keep current-world cache for save/update
-	const wid = hlp_worldId();
-
-	const rawStorage = await hlp_readSettingsPresetsFromStorage();
-	const storageRoot = hlp_sanitizeStorageRoot(rawStorage);
-	const worlds = storageRoot.worlds && typeof storageRoot.worlds === "object" ? storageRoot.worlds : {};
-
+	// Build list from flat persistent storage map (global presets)
+	const map = svc_getSettingsPresets();
 	const list = [];
-	for (const [worldId, presetsObj] of Object.entries(worlds)) {
-		if (!presetsObj || typeof presetsObj !== "object") continue;
 
-		for (const [name, preset] of Object.entries(presetsObj)) {
-			list.push({
-				id: `${worldId}::${name}`,			// unique select value
-				name,								// raw preset name
-				worldId,
-				isCurrentWorld: worldId === wid,
-				preset: preset && typeof preset === "object" ? preset : {}
-			});
-		}
+	for (const [name, preset] of Object.entries(map)) {
+		if (!name) continue;
+
+		list.push({
+			id: name, // select value
+			name,
+			preset: preset && typeof preset === "object" ? preset : {}
+		});
 	}
 
-	// detect name collisions across worlds so we can disambiguate display text
-	const nameCounts = {};
-	for (const p of list) nameCounts[p.name] = (nameCounts[p.name] || 0) + 1;
-
-	// stable select options, current world first
-	list.sort((a, b) => {
-		if (a.isCurrentWorld !== b.isCurrentWorld) return a.isCurrentWorld ? -1 : 1;
-		const an = a.name.toLowerCase();
-		const bn = b.name.toLowerCase();
-		if (an !== bn) return an.localeCompare(bn);
-		return a.worldId.localeCompare(b.worldId);
-	});
+	// Sort alphabetically
+	list.sort((a, b) => a.name.localeCompare(b.name));
 
 	// Index for fast lookup on click actions
 	const presetIndex = {};
 	for (const p of list) presetIndex[p.id] = p;
 
 	const options = list.map(p => {
-		const label = nameCounts[p.name] > 1 ? `${p.name} (${p.worldId})` : p.name;
-		return `<option value="${hlp_esc(p.id)}">${hlp_esc(label)}</option>`;
+		return `<option value="${hlp_esc(p.id)}">${hlp_esc(p.name)}</option>`;
 	}).join("");
 
 	DL("settings-presets.js | openSettingsPresetManager(): merged presets list built", {
-		total: list.length,
-		world: wid
+		total: list.length
 	});
 
 	// Content markup (make central area scrollable to avoid off-screen growth)
@@ -1955,13 +1786,11 @@ Hooks.once("ready", async () => {
 	if (!game.user.isGM) return;
 
 	try {
-		DL("settings-presets.js | ready: starting settings presets load/migration");
-
-		// Load from storage if present, otherwise migrate legacy -> storage
+		// Load from storage if present
 		await svc_loadSettingsPresets();
 
-		DL("settings-presets.js | ready: settings presets load/migration complete");
+		DL("settings-presets.js | ready: settings presets loaded");
 	} catch (err) {
-		DL(3, "settings-presets.js | ready: settings presets migration failed", err);
+		DL(3, "settings-presets.js | ready: settings presets loading failed", err);
 	}
 });

@@ -1,350 +1,48 @@
 import { DL } from './settings.js';
-import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName } from './helpers.js';
+import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_normalizePresetName } from './helpers.js';
 import { LT, BBMM_ID } from "./localization.js";
 const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  enabled module ids
-const MODULE_PRESETS_MIGRATION_FLAG = "modulePresetsPersistentStorageMigration";
 
-/*	=====	HELPERS =====
-*/
+/*	===============================================
+	HELPERS 
+================================================ */
 
 const MODULE_PRESETS_STORAGE_DIR = "presets";
 const MODULE_PRESETS_STORAGE_FILE = "module-presets.json";
 let _presetCache = null;
 
-// Sanitize a { [name]: string[] } preset map
-function hlp_sanitizePresetMap(raw) {
-	const out = {};
-	if (!raw || typeof raw !== "object") return out;
-
-	for (const [k, v] of Object.entries(raw)) {
-		if (typeof k !== "string" || !k.trim()) continue;
-		if (!Array.isArray(v)) continue;
-
-		const clean = [...new Set(v.filter(id => typeof id === "string" && id.trim()))];
-		out[k] = clean;
-	}
-
-	return out;
-}
-
-function hlp_worldId() {
-	return game.world?.id || "unknownWorld";
-}
-
-function hlp_sanitizePresetsStorageRoot(raw) {
-	const wid = hlp_worldId();
-
-	// New schema
-	if (raw && typeof raw === "object" && raw.worlds && typeof raw.worlds === "object") {
-		const out = { worlds: {} };
-
-		for (const [worldId, presetsMap] of Object.entries(raw.worlds)) {
-			if (typeof worldId !== "string" || !worldId.trim()) continue;
-			out.worlds[worldId] = hlp_sanitizePresetMap(presetsMap);
-		}
-
-		return out;
-	}
-
-	// Legacy flat schema -> claim to current world
-	const legacyMap = hlp_sanitizePresetMap(raw);
-	return { worlds: { [wid]: legacyMap } };
-}
-
-function hlp_getWorldPresetsFromRoot(root, worldId) {
-	if (!root || typeof root !== "object") return {};
-	if (!root.worlds || typeof root.worlds !== "object") return {};
-	const map = root.worlds[worldId];
-	return hlp_sanitizePresetMap(map);
-}
-
-function hlp_setWorldPresetsOnRoot(root, worldId, presetsMap) {
-	const out = hlp_sanitizePresetsStorageRoot(root);
-	out.worlds[worldId] = hlp_sanitizePresetMap(presetsMap);
-	return out;
-}
-
-async function hlp_fetchJSON(url) {
-	const res = await fetch(url, { cache: "no-store" });
-	if (!res.ok) return null;
-
-	try {
-		return await res.json();
-	} catch (err) {
-		DL("module-presets.js | hlp_fetchJSON(): Failed to parse JSON", { url, err });
-		return null;
-	}
-}
-
-async function hlp_readPresetsFromStorage() {
-	try {
-		const dir = `modules/${BBMM_ID}/storage/presets`;
-		const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
-
-		const match = (browse?.files || []).find(f => String(f).endsWith("/module-presets.json"));
-		if (match) {
-			const data = await hlp_fetchJSON(match);
-			return hlp_sanitizePresetsStorageRoot(data);
-		}
-	} catch (err) {
-		const msg = String(err?.message ?? err);
-
-		if (msg.includes("does not exist") || msg.includes("not accessible")) {
-			DL("module-presets.js | hlp_readPresetsFromStorage(): presets folder not found yet, will try fallback");
-		} else {
-			DL(2, "module-presets.js | hlp_readPresetsFromStorage(): browse failed unexpectedly", err);
-		}
-	}
-
-	// Fallback direct fetch
-	try {
-		const url = `modules/${BBMM_ID}/storage/presets/module-presets.json`;
-		const data = await hlp_fetchJSON(url);
-		return hlp_sanitizePresetsStorageRoot(data);
-	} catch (err2) {
-		return { worlds: {} };
-	}
-}
-
-async function hlp_writePresetsToStorage(root) {
-	const cleanRoot = hlp_sanitizePresetsStorageRoot(root);
-
-	const payload = JSON.stringify(cleanRoot ?? { worlds: {} }, null, 2);
-	const file = new File([payload], MODULE_PRESETS_STORAGE_FILE, { type: "application/json" });
-
-	try {
-		// If you ship the folders in the release, this can stay as a verify-only helper.
-		// Keep as-is if you want, but do NOT try to mkdir() via FilePicker (it will ENOENT on some hosts).
-		// await hlp_ensurePresetsDir();
-
-		const res = await FilePicker.uploadPersistent(BBMM_ID, MODULE_PRESETS_STORAGE_DIR, file, {}, { notify: false });
-
-		if (!res || (!res.path && !res.url)) {
-			DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent returned no path/url", res);
-			return false;
-		}
-
-		DL("module-presets.js | hlp_writePresetsToStorage(): wrote presets to persistent storage", {
-			dir: MODULE_PRESETS_STORAGE_DIR,
-			path: res.path,
-			url: res.url
-		});
-
-		return true;
-	} catch (err) {
-		DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent failed", err);
-		return false;
-	}
-}
-
-
-async function hlp_verifyPresetsDir() {
-	const dir = `modules/${BBMM_ID}/storage/presets`;
-
-	try {
-		await FilePicker.browse("data", dir, {});
-		DL("module-presets.js | hlp_verifyPresetsDir(): presets directory verified", dir);
-		return true;
-	} catch (err) {
-		DL(3, "module-presets.js | hlp_verifyPresetsDir(): presets directory missing or inaccessible", {
-			dir,
-			err
-		});
-		return false;
-	}
-}
-
+// Load presets from persistent storage into _presetCache
 async function hlp_loadPresets() {
-	if (_presetCache !== null) return _presetCache;
+	try {
+		DL("module-presets.js | hlp_loadPresets(): loading presets from persistent storage");
 
-	const wid = hlp_worldId();
+		const data = await hlp_readPresetsFromStorage();
 
-	if (hlp_hasFlag(MODULE_PRESETS_MIGRATION_FLAG)) {
-		DL("module-presets.js | hlp_loadPresets(): migration flag already set, skipping legacy migration");
-	}
-
-	const root = await hlp_readPresetsFromStorage();
-	const worldMap = hlp_getWorldPresetsFromRoot(root, wid);
-
-	// If we already have current-world data in storage, use it
-	if (worldMap && Object.keys(worldMap).length) {
-		_presetCache = worldMap;
-
-		// If file exists but flag missing (manual restore / older version), fix flag
-		if (!hlp_hasFlag(MODULE_PRESETS_MIGRATION_FLAG) && game.user.isGM) {
-			await hlp_setFlag(MODULE_PRESETS_MIGRATION_FLAG, true);
-			DL("module-presets.js | hlp_loadPresets(): storage found, migration flag was missing and is now set");
+		if (!data || typeof data !== "object") {
+			_presetCache = {};
+			DL("module-presets.js | hlp_loadPresets(): no presets found, using empty cache");
+			return;
 		}
 
-		DL("module-presets.js | hlp_loadPresets(): loaded presets from persistent storage (current world)", {
-			world: wid,
-			count: Object.keys(worldMap).length
+		// Ensure flat map: { presetName: [moduleIds] }
+		const clean = {};
+		for (const [name, modules] of Object.entries(data)) {
+			if (!name || !Array.isArray(modules)) continue;
+			clean[name] = modules.filter(m => typeof m === "string");
+		}
+
+		_presetCache = clean;
+
+		DL("module-presets.js | hlp_loadPresets(): presets loaded", {
+			count: Object.keys(_presetCache).length
 		});
-
-		return _presetCache;
-	}
-
-	// If flag set but storage missing current-world map, attempt repair from legacy (GM only)
-	if (hlp_hasFlag(MODULE_PRESETS_MIGRATION_FLAG)) {
-		const legacy = foundry.utils.duplicate(game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS) || {});
-		const legacyClean = hlp_sanitizePresetMap(legacy);
-
-		_presetCache = legacyClean;
-
-		if (!Object.keys(legacyClean).length) {
-			DL(2, "module-presets.js | hlp_loadPresets(): migration flag set but storage file missing/empty and no legacy presets available. Presets empty.");
-			_presetCache = {};
-			return _presetCache;
-		}
-
-		if (game.user.isGM) {
-			DL(2, "module-presets.js | hlp_loadPresets(): migration flag set but storage missing/empty. Attempting repair write from legacy.", {
-				world: wid,
-				count: Object.keys(legacyClean).length
-			});
-
-			const repairedRoot = hlp_setWorldPresetsOnRoot(root, wid, legacyClean);
-			const ok = await hlp_writePresetsToStorage(repairedRoot);
-
-			if (ok) {
-				DL("module-presets.js | hlp_loadPresets(): repair migration succeeded, continuing with repaired presets");
-				_presetCache = legacyClean;
-				return _presetCache;
-			}
-
-			DL(3, "module-presets.js | hlp_loadPresets(): repair migration failed. Leaving presets empty.");
-			_presetCache = {};
-			return _presetCache;
-		}
-
-		DL(2, "module-presets.js | hlp_loadPresets(): migration flag set but storage missing/empty. Non-GM cannot repair. Presets empty.");
+	} catch (err) {
 		_presetCache = {};
-		return _presetCache;
+		DL(3, "module-presets.js | hlp_loadPresets(): FAILED, using empty cache", err);
 	}
-
-	// Migration path (per-world): take legacy *for this world* and write into root.worlds[wid]
-	const legacy = foundry.utils.duplicate(game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS) || {});
-	const legacyClean = hlp_sanitizePresetMap(legacy);
-
-	_presetCache = legacyClean;
-
-	if (!Object.keys(legacyClean).length) {
-		DL("module-presets.js | hlp_loadPresets(): no legacy presets found, setting migration flag to avoid repeated checks");
-		if (game.user.isGM) await hlp_setFlag(MODULE_PRESETS_MIGRATION_FLAG, true);
-		return _presetCache;
-	}
-
-	DL("module-presets.js | hlp_loadPresets(): migrating legacy presets to persistent storage (current world)", {
-		world: wid,
-		count: Object.keys(legacyClean).length
-	});
-
-	if (game.user.isGM) {
-		const nextRoot = hlp_setWorldPresetsOnRoot(root, wid, legacyClean);
-		const ok = await hlp_writePresetsToStorage(nextRoot);
-
-		if (ok) {
-			await hlp_setFlag(MODULE_PRESETS_MIGRATION_FLAG, true);
-			DL("module-presets.js | hlp_loadPresets(): migration complete, flag set");
-		} else {
-			DL(3, "module-presets.js | hlp_loadPresets(): migration failed, leaving flag unset");
-		}
-	} else {
-		DL(2, "module-presets.js | hlp_loadPresets(): non-GM cannot migrate, using legacy in-memory only");
-	}
-
-	return _presetCache;
 }
 
-function hlp_getFlags() {
-	const obj = game.settings.get(BBMM_ID, "bbmmFlags");
-	return obj && typeof obj === "object" ? { ...obj } : {};
-}
-
-function hlp_hasFlag(key) {
-	const flags = hlp_getFlags();
-	return Boolean(flags[key]);
-}
-
-async function hlp_setFlag(key, value) {
-	const flags = hlp_getFlags();
-	flags[key] = value;
-	await game.settings.set(BBMM_ID, "bbmmFlags", flags);
-}
-
-// Validate Module Preset JSON structure	
-function hlp_validateModulePresetJSON(data) {
-
-	// Accept ONLY our known payloads
-	// "bbmm-state": { type, name, created, modules[], versions{} }
-	if (data && typeof data === "object" && data.type === "bbmm-state" && Array.isArray(data.modules)) {
-		return { kind: "state", modules: [...new Set(data.modules.filter(x => typeof x === "string"))] };
-	}
-
-	// Everything else: reject
-	return null;
-}
-
-// Check if modules in preset are missing or have missing dependencies
-function hlp_validateModuleState(modIds) {
-	const unknown = [];			// { id, reason: "not installed" }
-	const depIssues = [];		// { id, depId, reason: "dependency missing" }
-
-	for (const id of modIds) {
-		if (!game.modules.has(id)) unknown.push({ id, reason: "not installed" });
-	}
-
-	for (const id of modIds) {
-		const mod = game.modules.get(id);
-		if (!mod) continue;
-		const requires = hlp_getRequiredIds(mod);
-		for (const depId of requires) {
-			if (!game.modules.has(depId)) {
-				depIssues.push({ id, depId, reason: "dependency missing" });
-			}
-		}
-	}
-
-	// Optional debug
-	if (!unknown.length && !depIssues.length) {
-		DL("module-presets.js | hlp_validateModuleState(): No missing modules or dependencies");
-	} else {
-		DL("module-presets.js | hlp_validateModuleState(): Missing modules or dependencies found!");
-	}
-
-	return { unknown, depIssues };
-}
-
-function hlp_slugify(s) {
-	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-function hlp_formatDateD_Mon_YYYY(d = new Date()) {
-	const dd = String(d.getDate()).padStart(2, "0");
-	const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
-	const yyyy = d.getFullYear();
-	return `${dd}-${MON}-${yyyy}`;
-}
-
-// Get required dependency ids declared by a module 
-function hlp_getRequiredIds(mod) {
-	// Supports both legacy and modern manifest styles
-	const data = mod?.manifest || mod?.data?.manifest || {};
-	const req = Array.isArray(data?.relationships?.requires)
-		? data.relationships.requires
-		: (Array.isArray(mod?.relationships?.requires) ? mod.relationships.requires : []);
-	const ids = [];
-	for (const r of req) {
-		// {id, type:'module'|'system', ...}
-		if (!r) continue;
-		if ((r.id || r.name) && (r.type === "module" || !r.type)) {
-			ids.push(r.id || r.name);
-		}
-	}
-	return ids;
-}
-
-// read preset map
+// get list of presets
 function hlp_getPresets() {
 	if (_presetCache === null) {
 		DL("module-presets.js | hlp_getPresets(): cache not loaded yet, returning empty map");
@@ -355,18 +53,12 @@ function hlp_getPresets() {
 
 // set preset map
 async function hlp_setPresets(presets) {
-	const wid = hlp_worldId();
 	const clean = hlp_sanitizePresetMap(presets);
-
 	_presetCache = clean;
 
-	// Persist ONLY this world's presets into the shared storage root
-	const root = await hlp_readPresetsFromStorage();
-	const nextRoot = hlp_setWorldPresetsOnRoot(root, wid, clean);
-
-	const ok = await hlp_writePresetsToStorage(nextRoot);
+	const ok = await hlp_writePresetsToStorage(clean);
 	if (!ok) {
-		ui.notifications.warn(LT.errors?.failedToWritePresets?.() ?? "Failed to write presets to storage.");
+		ui.notifications.warn("Failed to write module presets to persistent storage.");
 	}
 }
 
@@ -462,6 +154,169 @@ async function hlp_savePreset(name, modules) {
 	await hlp_setPresets(p);
 	DL(`module-presets.js | hlp_savePreset(): saved presets: `, p);
 	return { status: "saved", name: finalName };
+}
+
+// Sanitize a { [name]: string[] } preset map
+function hlp_sanitizePresetMap(raw) {
+	const out = {};
+	if (!raw || typeof raw !== "object") return out;
+
+	for (const [k, v] of Object.entries(raw)) {
+		if (typeof k !== "string" || !k.trim()) continue;
+		if (!Array.isArray(v)) continue;
+
+		const clean = [...new Set(v.filter(id => typeof id === "string" && id.trim()))];
+		out[k] = clean;
+	}
+
+	return out;
+}
+
+// fetch JSON from URL with no-cache
+async function hlp_fetchJSON(url) {
+	const res = await fetch(url, { cache: "no-store" });
+	if (!res.ok) return null;
+
+	try {
+		return await res.json();
+	} catch (err) {
+		DL("module-presets.js | hlp_fetchJSON(): Failed to parse JSON", { url, err });
+		return null;
+	}
+}
+
+// Ensure storage root has expected shape
+async function hlp_readPresetsFromStorage() {
+	// Try browse first (optional convenience)
+	try {
+		const dir = `modules/${BBMM_ID}/storage/presets`;
+		const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
+
+		const match = (browse?.files || []).find(f => String(f).endsWith(`/${MODULE_PRESETS_STORAGE_FILE}`));
+		if (match) {
+			const data = await hlp_fetchJSON(match);
+			return hlp_sanitizePresetMap(data);
+		}
+	} catch (err) {
+		const msg = String(err?.message ?? err);
+
+		// Folder missing is normal on first run if it wasn't shipped
+		if (msg.includes("does not exist") || msg.includes("not accessible")) {
+			DL("module-presets.js | hlp_readPresetsFromStorage(): presets folder not found yet, will try fallback");
+		} else {
+			DL(2, "module-presets.js | hlp_readPresetsFromStorage(): browse failed unexpectedly", err);
+		}
+	}
+
+	// Direct fetch fallback
+	try {
+		const url = `modules/${BBMM_ID}/storage/presets/${MODULE_PRESETS_STORAGE_FILE}`;
+		const data = await hlp_fetchJSON(url);
+		return hlp_sanitizePresetMap(data);
+	} catch (_err2) {
+		return {};
+	}
+}
+
+// Sanitize storage root shape
+async function hlp_writePresetsToStorage(presets) {
+	const clean = hlp_sanitizePresetMap(presets);
+
+	const payload = JSON.stringify(clean ?? {}, null, 2);
+	const file = new File([payload], MODULE_PRESETS_STORAGE_FILE, { type: "application/json" });
+
+	try {
+		const res = await FilePicker.uploadPersistent(BBMM_ID, MODULE_PRESETS_STORAGE_DIR, file, {}, { notify: false });
+
+		if (!res || (!res.path && !res.url)) {
+			DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent returned no path/url", res);
+			return false;
+		}
+
+		DL("module-presets.js | hlp_writePresetsToStorage(): wrote presets to persistent storage", {
+			dir: MODULE_PRESETS_STORAGE_DIR,
+			path: res.path,
+			url: res.url
+		});
+
+		return true;
+	} catch (err) {
+		DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent failed", err);
+		return false;
+	}
+}
+
+// Validate Module Preset JSON structure	
+function hlp_validateModulePresetJSON(data) {
+	// Accept ONLY our known payloads
+	// "bbmm-state": { type, name, created, modules[], versions{} }
+	if (data && typeof data === "object" && data.type === "bbmm-state" && Array.isArray(data.modules)) {
+		return { kind: "state", modules: [...new Set(data.modules.filter(x => typeof x === "string"))] };
+	}
+
+	// Everything else: reject
+	return null;
+}
+
+// Check if modules in preset are missing or have missing dependencies
+function hlp_validateModuleState(modIds) {
+	const unknown = [];			// { id, reason: "not installed" }
+	const depIssues = [];		// { id, depId, reason: "dependency missing" }
+
+	for (const id of modIds) {
+		if (!game.modules.has(id)) unknown.push({ id, reason: "not installed" });
+	}
+
+	for (const id of modIds) {
+		const mod = game.modules.get(id);
+		if (!mod) continue;
+		const requires = hlp_getRequiredIds(mod);
+		for (const depId of requires) {
+			if (!game.modules.has(depId)) {
+				depIssues.push({ id, depId, reason: "dependency missing" });
+			}
+		}
+	}
+
+	// Optional debug
+	if (!unknown.length && !depIssues.length) {
+		DL("module-presets.js | hlp_validateModuleState(): No missing modules or dependencies");
+	} else {
+		DL("module-presets.js | hlp_validateModuleState(): Missing modules or dependencies found!");
+	}
+
+	return { unknown, depIssues };
+}
+
+// Slugify string for filenames
+function hlp_slugify(s) {
+	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+// Format date as DD-Mon-YYYY
+function hlp_formatDateD_Mon_YYYY(d = new Date()) {
+	const dd = String(d.getDate()).padStart(2, "0");
+	const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+	const yyyy = d.getFullYear();
+	return `${dd}-${MON}-${yyyy}`;
+}
+
+// Get required dependency ids declared by a module 
+function hlp_getRequiredIds(mod) {
+	// Supports both legacy and modern manifest styles
+	const data = mod?.manifest || mod?.data?.manifest || {};
+	const req = Array.isArray(data?.relationships?.requires)
+		? data.relationships.requires
+		: (Array.isArray(mod?.relationships?.requires) ? mod.relationships.requires : []);
+	const ids = [];
+	for (const r of req) {
+		// {id, type:'module'|'system', ...}
+		if (!r) continue;
+		if ((r.id || r.name) && (r.type === "module" || !r.type)) {
+			ids.push(r.id || r.name);
+		}
+	}
+	return ids;
 }
 
 // Current enabled module ids (exclude core/system) 
@@ -603,66 +458,6 @@ async function exportCurrentModuleStateDialog() {
 	}).render(true);
 }
 
-// Import module preset json file, validate it, save as preset. 
-async function importModuleStateAsPreset(data) {
-	// validate file structure
-	const validated = hlp_validateModulePresetJSON(data);
-	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
-		DL(3, "module-presets.js | Not a BBMM export. Expected a file created by BBMM.");
-		await new foundry.applications.api.DialogV2({
-			window: { title: LT.errors.titleImportError() },
-			content: `<p>${LT.errors.notBBMMFile()}.</p>`,
-			buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
-			submit: () => "ok"
-		}).render(true);
-		return;
-	}
-	const modules = validated.modules;
-
-	// compute report now (so we can show it after save)
-	const report = hlp_validateModuleState(modules);
-
-	// ask for preset name and save
-	const dlgName = new foundry.applications.api.DialogV2({
-		window: { title: LT.titleImportPreset() },
-		content: `
-			<div style="display:flex;flex-direction:column;gap:.5rem;">
-				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:7rem;">${LT.presetName()}</label>
-					<input name="presetName" type="text" placeholder="e.g. staging" style="flex:1;">
-				</div>
-			</div>
-		`,
-		buttons: [
-			{ action: "ok", label: LT.buttons.import(), default: true,
-			  callback: (ev, button) => button.form.elements.presetName?.value?.trim() || "" },
-			{ action: "cancel", label: LT.buttons.cancel() }
-		],
-		submit: async (_result) => {
-			const baseName = _result;
-			if (!baseName) { ui.notifications.warn(`${LT.importNamePrompt()}.`); return; }
-
-			const res = await hlp_savePreset(`${baseName} (${hlp_formatDateD_Mon_YYYY()})`, modules);
-			if (res.status !== "saved") return res;
-
-			ui.notifications.info(`${LT.importedSummary({ name: res.name, count: modules.length })}.`);
-
-			// CLOSE the naming dialog *before* showing issues
-			try { await dlgName.close(); } catch {}
-
-			// Show issues once (if any)
-			if (report.unknown.length || report.depIssues.length) {
-				await showImportIssuesDialog(report); 
-			}
-
-			DL("module-presets.js | importModuleStateAsPreset() returning ", res);
-			return res;
-		},
-		rejectClose: false
-	});
-	dlgName.render(true);
-}
-
 // Apply a set of enabled ids -> update core.moduleConfiguration 
 async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 	const config = hlp_getModuleConfig();
@@ -702,50 +497,41 @@ async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 
 //	Open Dialog to manage presets 
 export async function openPresetManager() {
-	// Start
 	DL("module-presets.js | openPresetManager: start");
 
-	const wid = game.world?.id || "unknownWorld";
+	// Make sure the in-memory cache is populated before we build the list
+	await hlp_loadPresets();
 
-	async function hlp_buildMergedPresetList() {
-		const root = await hlp_readPresetsFromStorage();
-		const worlds = (root?.worlds && typeof root.worlds === "object") ? root.worlds : {};
+	// Build list and index of presets
+	async function hlp_buildPresetList() {
+		// This populates _presetCache but DOES NOT return the presets map.
+		await hlp_loadPresets();
 
-		/** @type {Array<{ id: string, name: string, displayName: string, worldId: string, isCurrentWorld: boolean, modules: string[] }>} */
+		// Always build from the cache
+		const map = hlp_getPresets();
+
+		/**	Build list of presets 
+		 * @type {Array<{ id: string, name: string, displayName: string, modules: string[] }>} 
+		*/
 		const list = [];
 
-		for (const [worldId, presetsObj] of Object.entries(worlds)) {
-			if (!presetsObj || typeof presetsObj !== "object") continue;
+		for (const [name, modules] of Object.entries(map)) {
+			if (!name || !Array.isArray(modules)) continue;
 
-			for (const [name, modules] of Object.entries(presetsObj)) {
-				list.push({
-					id: `${worldId}::${name}`,
-					name,
-					displayName: name,
-					worldId,
-					isCurrentWorld: worldId === wid,
-					modules: Array.isArray(modules) ? modules.filter(x => typeof x === "string") : []
-				});
-			}
+			list.push({
+				id: name,
+				name,
+				displayName: name,
+				modules: modules.filter(x => typeof x === "string")
+			});
 		}
 
-		// Disambiguate duplicate names across worlds by appending (worldId)
-		const counts = {};
-		for (const p of list) counts[p.name] = (counts[p.name] || 0) + 1;
+		// Sort alphabetically
+		list.sort((a, b) => a.name.localeCompare(b.name));
 
-		for (const p of list) {
-			if (counts[p.name] > 1) p.displayName = `${p.name} (${p.worldId})`;
-		}
-
-		// Sort: current world first, then name, then worldId
-		list.sort((a, b) => {
-			if (a.isCurrentWorld !== b.isCurrentWorld) return a.isCurrentWorld ? -1 : 1;
-			const an = a.name.toLowerCase();
-			const bn = b.name.toLowerCase();
-			if (an !== bn) return an.localeCompare(bn);
-			return a.worldId.localeCompare(b.worldId);
-		});
-
+		/** Build index of presets by id
+		 * @type {Record<string, { id: string, name: string, displayName: string, modules: string[] }>} 
+		*/
 		const index = {};
 		for (const p of list) index[p.id] = p;
 
@@ -753,21 +539,17 @@ export async function openPresetManager() {
 	}
 
 	(async () => {
-		const { list, index } = await hlp_buildMergedPresetList();
+		const { list, index } = await hlp_buildPresetList();
 
-		// Current-world presets are still maintained via hlp_getPresets()
-		// (so save/update/write paths remain world-separated).
-		const currentWorldPresets = hlp_getPresets();
-		DL("module-presets.js | openPresetManager: current world presets loaded", {
-			world: wid,
-			count: Object.keys(currentWorldPresets || {}).length
+		DL("module-presets.js | openPresetManager: presets loaded", {
+			count: list.length
 		});
 
 		const options = list
 			.map(p => `<option value="${hlp_esc(p.id)}">${hlp_esc(p.displayName)}</option>`)
 			.join("");
 
-		// Dialog content (adds "Update" button next to Load/Delete)
+		// Dialog content
 		const content = `
 			<div style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
 
@@ -796,34 +578,28 @@ export async function openPresetManager() {
 			</div>
 		`;
 
-		// Create the DialogV2
 		const dlg = new foundry.applications.api.DialogV2({
 			window: { title: LT.modulePresets() },
 			content,
 			buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
 		});
 
-		/*
-			Hook to wire up the click handlers once the dialog is rendered
-		*/
 		const onRender = (app) => {
 			if (app !== dlg) return;
 			Hooks.off("renderDialogV2", onRender);
-			DL("module-presets.js | renderDialogV2 fired for Preset Manager", { appId: app.appId });
+
+			DL("module-presets.js | renderDialogV2 fired for Preset Manager");
 
 			const form = app.element?.querySelector("form");
 			if (!form) { DL(2, "module-presets.js | openPresetManager(): form not found"); return; }
 
-			// Defensive: ensure buttons don’t submit the form
 			form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
 
-			// Single delegated click handler
 			form.addEventListener("click", async (ev) => {
 				const btn = ev.target;
 				if (!(btn instanceof HTMLButtonElement)) return;
-				const action = btn.dataset.action || "";
 
-				// Only handle our buttons; stop other listeners
+				const action = btn.dataset.action || "";
 				if (!["load", "update", "delete", "save-current", "bbmm-export-state", "bbmm-import-state"].includes(action)) return;
 
 				ev.preventDefault();
@@ -835,7 +611,6 @@ export async function openPresetManager() {
 					const selectedId = sel ? String(sel.value || "") : "";
 					const picked = selectedId ? index[selectedId] : null;
 
-					// Save current enabled modules as new preset (current world only)
 					if (action === "save-current") {
 						const raw = form.elements.namedItem("newName")?.value ?? "";
 						const newName = String(raw).trim();
@@ -844,24 +619,20 @@ export async function openPresetManager() {
 						const enabled = hlp_getEnabledModuleIds();
 						DL("module-presets.js | save-current: collected enabled module ids", { count: enabled.length });
 
-						// Uses your existing save logic (current world only)
 						const res = await hlp_savePreset(newName, enabled);
 						if (res?.status !== "saved") return;
 
 						ui.notifications.info(`${LT.savedSummary({ name: res.name, count: enabled.length })}.`);
-
-						// Refresh UI list
 						app.close();
 						openPresetManager();
 						return;
 					}
 
-					// Load preset (any world allowed)
 					if (action === "load") {
 						if (!picked) return ui.notifications.warn("Select a preset to load.");
 
 						const enabled = picked.modules || [];
-						DL("module-presets.js | load: applying preset", { name: picked.name, worldId: picked.worldId, count: enabled.length });
+						DL("module-presets.js | load: applying preset", { name: picked.name, count: enabled.length });
 
 						const proceed = await foundry.applications.api.DialogV2.confirm({
 							window: { title: LT.titleApplyModulePreset() },
@@ -872,7 +643,6 @@ export async function openPresetManager() {
 						if (!proceed) return;
 
 						await applyEnabledIds(enabled, { autoEnableDeps: true });
-						DL("module-presets.js | load: applied; prompting reload");
 
 						const reload = await foundry.applications.api.DialogV2.confirm({
 							window: { title: LT.titleReloadFoundry() },
@@ -883,19 +653,8 @@ export async function openPresetManager() {
 						return;
 					}
 
-					// Update preset (current world only)
 					if (action === "update") {
-						if (!picked) { ui.notifications.warn(`${LT.warnUpdatePreset()}.`); return; }
-
-						if (picked.worldId !== wid) {
-							ui.notifications.warn("That preset belongs to a different world. Switch to that world to update it.");
-							DL(2, "module-presets.js | update blocked (cross-world)", {
-								currentWorld: wid,
-								targetWorld: picked.worldId,
-								name: picked.name
-							});
-							return;
-						}
+						if (!picked) return ui.notifications.warn(`${LT.warnUpdatePreset()}.`);
 
 						const enabled = hlp_getEnabledModuleIds();
 						DL("module-presets.js | update: collected enabled module ids", { count: enabled.length, target: picked.name });
@@ -904,25 +663,13 @@ export async function openPresetManager() {
 						if (res?.status !== "saved") return;
 
 						ui.notifications.info(`${LT.updatedSummary({ name: picked.name, count: enabled.length })}.`);
-
 						app.close();
 						openPresetManager();
 						return;
 					}
 
-					// Delete preset (current world only)
 					if (action === "delete") {
 						if (!picked) return ui.notifications.warn(`${LT.warnSelectPresetDelete()}.`);
-
-						if (picked.worldId !== wid) {
-							ui.notifications.warn("That preset belongs to a different world. Switch to that world to delete it.");
-							DL(2, "module-presets.js | delete blocked (cross-world)", {
-								currentWorld: wid,
-								targetWorld: picked.worldId,
-								name: picked.name
-							});
-							return;
-						}
 
 						const ok = await foundry.applications.api.DialogV2.confirm({
 							window: { title: LT.titleDeleteModulePreset() },
@@ -941,14 +688,12 @@ export async function openPresetManager() {
 						return;
 					}
 
-					// Export current enabled modules to JSON file
 					if (action === "bbmm-export-state") {
 						DL("module-presets.js | export-current: starting");
 						exportCurrentModuleStateDialog();
 						return;
 					}
 
-					// Import module state JSON file
 					if (action === "bbmm-import-state") {
 						DL("module-presets.js | import-current: starting");
 						importModuleStateDialog();
@@ -962,9 +707,8 @@ export async function openPresetManager() {
 				}
 			});
 		};
-		Hooks.on("renderDialogV2", onRender);
 
-		// Render
+		Hooks.on("renderDialogV2", onRender);
 		dlg.render(true);
 	})();
 }
@@ -973,6 +717,7 @@ Hooks.once("ready", async () => {
 	// load presets into cache
 	await hlp_loadPresets();
 
+	// expose API
 	window.openPresetManager = openPresetManager; 
 	const mod = game.modules.get("bbmm");
 	if (!mod) return;

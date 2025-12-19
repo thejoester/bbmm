@@ -150,7 +150,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		content.innerHTML = result;
 
 		// add footer with cancel button
-		const footer = document.createElement("footer");
+		//const footer = document.createElement("footer");
 		footer.classList.add("form-footer");
 		footer.style.display = "flex";
 		footer.style.justifyContent = "flex-end";
@@ -170,18 +170,41 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		});
 
 		footer.appendChild(closeBtn);
-		content.appendChild(footer);
+		//content.appendChild(footer);
 
 		content.addEventListener("click", async (ev) => {
+
+			// Close button in the footer (closes this UI + reopens exclusions manager)
+			const closeBtn = ev.target.closest?.("#bbmm-as-close");
+			if (closeBtn) {
+				ev.preventDefault();
+				ev.stopPropagation();
+
+				DL("exclusions.js | AddSetting: close clicked, reopening manager");
+				try { this.close({ force: true }); } catch {}
+
+				setTimeout(() => {
+					try {
+						(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
+					} catch (e) {
+						DL(3, "exclusions.js | AddSetting: reopen manager failed", e);
+					}
+				}, 0);
+
+				return;
+			}
+
+			// Exclude button
 			const btn = ev.target.closest?.(".bbmm-exc-act");
 			if (btn instanceof HTMLButtonElement) {
 				const id = btn.dataset.id || "";
 				if (!id) return;
+
 				try {
 					btn.disabled = true;
 					await this._exclude(id);
 
-					// Keep dialog open; mark on success 
+					// Keep dialog open; mark on success
 					btn.classList.add("bbmm-exc-done");
 					btn.setAttribute("aria-label", "Excluded");
 					btn.innerHTML = "✓";
@@ -195,13 +218,14 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 				return;
 			}
 
-			// Footer "Cancel"/"Close" should just close
+			// Other cancel/close buttons should just close (no reopen)
 			const cancel = ev.target.closest?.('button[data-action="cancel"], [data-action="close"], .bbmm-close');
 			if (cancel) {
 				try { this.close({ force: true }); } catch {}
 				return;
 			}
 		});
+
 	}
 
 }
@@ -216,22 +240,288 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		super({
 			id: "bbmm-exclusions-add-setting",
 			window: { title: LT.titleAddSettingExclusion() },
-			width: 760,
-			height: 500,
+			width: 980,
+			height: 600,
 			resizable: true,
 			classes: ["bbmm-exclusions-app"]
 		});
-		this._minW = 420;
-		this._maxW = 1000;
-		this._minH = 320;
+
+		this._minW = 520;
+		this._maxW = 1200;
+		this._minH = 420;
 		this._maxH = 720;
 
 		this._rows = [];
+
+		// UI state
+		this._filterText = "";
+		this._moduleFilter = ""; // "" = none selected
+		this._matchRows = [];
+		this._delegated = false;
+
+		// If true, hide everything until module chosen
+		this._requireModuleSelection = true;
+
+		this._debounceMs = 250;
+		this._debounceT = null;
+
+		// Preview warming
+		this._warmTimer = null;
+		this._warmRunning = false;
 	}
 
 	/* ============================================================================
 		{DATA HELPERS}
 	============================================================================ */
+	_matchesFilter(r) {
+		const mod = String(this._moduleFilter ?? "").trim();
+
+		// Require module selection: show nothing until user picks one
+		if (this._requireModuleSelection && !mod) return false;
+
+		if (mod && r.namespace !== mod) return false;
+
+		const q = String(this._filterText ?? "").trim().toLowerCase();
+		if (!q) return true;
+
+		return (
+			String(r.modTitle ?? "").toLowerCase().includes(q) ||
+			String(r.namespace ?? "").toLowerCase().includes(q) ||
+			String(r.setTitle ?? "").toLowerCase().includes(q) ||
+			String(r.key ?? "").toLowerCase().includes(q) ||
+			String(r.scope ?? "").toLowerCase().includes(q) ||
+			String(r.__preview ?? "").toLowerCase().includes(q)
+		);
+	}
+
+	_applyFilterToDOM() {
+		const body = this.element?.querySelector?.("#bbmm-as-body");
+		if (!body) return;
+
+		const countEl = this.element.querySelector("#bbmm-as-count");
+		const totalEl = this.element.querySelector("#bbmm-as-total");
+
+		const mod = String(this._moduleFilter ?? "").trim();
+		const requireMod = !!this._requireModuleSelection;
+
+		let shown = 0;
+		let total = 0;
+
+		// Optional empty-state node (create once)
+		let emptyEl = body.querySelector(".bbmm-empty");
+		if (!emptyEl) {
+			emptyEl = document.createElement("div");
+			emptyEl.className = "bbmm-empty";
+			emptyEl.style.padding = "14px";
+			emptyEl.style.opacity = "0.8";
+			emptyEl.style.textAlign = "center";
+			emptyEl.style.display = "none";
+			emptyEl.textContent = LT.macro.selectModuleToViewSettings?.() ?? "Select a module to view settings.";
+			body.prepend(emptyEl);
+		}
+
+		// If module required and none selected, hide all rows and show empty message
+		if (requireMod && !mod) {
+			for (const rowEl of body.querySelectorAll(".row")) {
+				rowEl.style.display = "none";
+			}
+			emptyEl.style.display = "";
+			if (countEl) countEl.textContent = "0";
+			if (totalEl) totalEl.textContent = String((this._rows || []).length);
+			return;
+		}
+
+		emptyEl.style.display = "none";
+
+		for (const r of this._rows || []) {
+			total++;
+
+			const sel = `.row[data-ns="${CSS.escape(r.namespace)}"][data-key="${CSS.escape(r.key)}"]`;
+			const rowEl = body.querySelector(sel);
+			if (!rowEl) continue;
+
+			const ok = this._matchesFilter(r);
+			rowEl.style.display = ok ? "" : "none";
+			if (ok) shown++;
+		}
+
+		if (countEl) countEl.textContent = String(shown);
+		if (totalEl) totalEl.textContent = String(total);
+	}
+
+	_toPreview(v) {
+		try {
+			if (v === undefined) return "undefined";
+			if (v === null) return "null";
+			if (typeof v === "string") return v;
+			if (typeof v === "number" || typeof v === "boolean") return String(v);
+			return JSON.stringify(v);
+		} catch {
+			return String(v);
+		}
+	}
+
+	_toPretty(v) {
+		try {
+			if (typeof v === "string") {
+				try { return JSON.stringify(JSON.parse(v), null, 2); }
+				catch { return v; }
+			}
+			return JSON.stringify(v, null, 2);
+		} catch {
+			return String(v);
+		}
+	}
+
+	_warmVisiblePreviews(limitPerTick = 50) {
+		if (this._warmRunning) return;
+		const body = this.element?.querySelector?.("#bbmm-as-body");
+		if (!body) return;
+
+		const mod = String(this._moduleFilter ?? "").trim();
+		if (this._requireModuleSelection && !mod) return;
+
+		this._warmRunning = true;
+
+		// Gather visible rows that still need loading
+		const toLoad = [];
+		for (const r of this._rows || []) {
+			if (r.__isMenu) continue;
+			if (r.__valLoaded) continue;
+			if (!this._matchesFilter(r)) continue;
+
+			// Must be in selected module anyway
+			if (mod && r.namespace !== mod) continue;
+
+			toLoad.push(r);
+		}
+
+		if (!toLoad.length) {
+			this._warmRunning = false;
+			return;
+		}
+
+		DL(`exclusions.js | AddSetting._warmVisiblePreviews(): warming ${toLoad.length} previews`);
+
+		let idx = 0;
+
+		const tick = () => {
+			const end = Math.min(idx + limitPerTick, toLoad.length);
+
+			for (; idx < end; idx++) {
+				const r = toLoad[idx];
+
+				try {
+					const v = game.settings.get(r.namespace, r.key);
+					r.__value = v;
+					r.__preview = this._toPreview(v);
+					r.__pretty = this._toPretty(v);
+					r.__valLoaded = true;
+
+					// Update DOM preview if row exists
+					const sel = `.row[data-ns="${CSS.escape(r.namespace)}"][data-key="${CSS.escape(r.key)}"] .val-preview code`;
+					const codeEl = body.querySelector(sel);
+					if (codeEl) {
+						codeEl.textContent = r.__preview;
+						codeEl.title = r.__preview;
+					}
+				} catch (e) {
+					r.__value = undefined;
+					r.__preview = "error";
+					r.__pretty = "error";
+					r.__valLoaded = true;
+					DL(2, "exclusions.js | AddSetting._warmVisiblePreviews(): value read failed", { ns: r.namespace, key: r.key, err: e });
+				}
+			}
+
+			if (idx < toLoad.length) {
+				this._warmTimer = setTimeout(tick, 0);
+				return;
+			}
+
+			this._warmRunning = false;
+			this._warmTimer = null;
+			DL("exclusions.js | AddSetting._warmVisiblePreviews(): done");
+		};
+
+		tick();
+	}
+
+	_buildModuleList() {
+		const map = new Map();
+		for (const r of this._rows) {
+			if (!r?.namespace) continue;
+			if (!map.has(r.namespace)) map.set(r.namespace, r.modTitle || r.namespace);
+		}
+		return Array.from(map.entries())
+			.map(([ns, title]) => ({ ns, title }))
+			.sort((a, b) => a.title.localeCompare(b.title, game.i18n.lang || undefined, { sensitivity: "base" }));
+	}
+
+	_runFilter() {
+		const q = String(this._filterText ?? "").trim().toLowerCase();
+		const mod = String(this._moduleFilter ?? "").trim();
+
+		let list = this._rows;
+
+		if (mod) {
+			list = list.filter(r => r.namespace === mod);
+		}
+
+		if (q) {
+			list = list.filter(r =>
+				String(r.modTitle ?? "").toLowerCase().includes(q) ||
+				String(r.namespace ?? "").toLowerCase().includes(q) ||
+				String(r.setTitle ?? "").toLowerCase().includes(q) ||
+				String(r.key ?? "").toLowerCase().includes(q) ||
+				String(r.scope ?? "").toLowerCase().includes(q) ||
+				String(r.__preview ?? "").toLowerCase().includes(q)
+			);
+		}
+
+		this._matchRows = list;
+	}
+
+	_renderHeader() {
+		return (
+			`<div class="h c-mod">${LT.module()}</div>` +
+			`<div class="h c-key">${LT.setting()}</div>` +
+			`<div class="h c-scope">${LT.scope()}</div>` +
+			`<div class="h c-val">${LT.macro.value()}</div>` +
+			`<div class="h c-act"></div>`
+		);
+	}
+
+	_rowHTML(r) {
+		const ns = String(r.namespace ?? "");
+		const key = String(r.key ?? "");
+		const pairTitle = `${ns}.${key}`;
+		const preview = foundry.utils.escapeHTML(String(r.__preview ?? ""));
+
+		return `
+			<div class="row" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">
+				<div class="c-mod" title="${foundry.utils.escapeHTML(ns)}">${foundry.utils.escapeHTML(String(r.modTitle ?? ns))}</div>
+				<div class="c-key" title="${foundry.utils.escapeHTML(pairTitle)}">${foundry.utils.escapeHTML(String(r.setTitle ?? key))}</div>
+				<div class="c-scope" title="${foundry.utils.escapeHTML(String(r.scope ?? ""))}">${foundry.utils.escapeHTML(String(r.scope ?? ""))}</div>
+
+				<div class="c-val">
+					<div class="val-preview" title="${preview}"><code>${preview}</code></div>
+					<div class="val-expand">
+						<div class="val-toolbar">
+							<button type="button" class="btn-copy">${LT.macro.copy()}</button>
+							<button type="button" class="btn-collapse">${LT.macro.collapse()}</button>
+						</div>
+						<pre class="val-pre" data-loaded="0"></pre>
+					</div>
+				</div>
+
+				<div class="c-act">
+					<button type="button" class="bbmm-exc-act" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">${LT.buttons.exclude()}</button>
+				</div>
+			</div>
+		`;
+	}
+
 	_getExcludedPairsSet() {
 		const ex = game.settings.get("bbmm", "userExclusions") || {};
 		const arr = Array.isArray(ex.settings) ? ex.settings : [];
@@ -270,7 +560,34 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 						setTitle = key;
 					}
 
-					rows.push({ namespace: ns, key, modTitle, setTitle, scope });
+					let value = undefined;
+					let pretty = "";
+					let preview = "";
+
+					try {
+						if (!s?.__isMenu) {
+							value = game.settings.get(ns, key);
+						}
+					} catch (eVal) {
+						DL(2, "exclusions.js | AddSetting._collectSettings(): value read failed", { ns, key, err: eVal });
+					}
+
+					preview = this._toPreview(value);
+					pretty = this._toPretty(value);
+
+					rows.push({
+						namespace: ns,
+						key,
+						modTitle,
+						setTitle,
+						scope,
+
+						// Lazy-load value later (selected module only)
+						__value: undefined,
+						__preview: "",
+						__pretty: "",
+						__valLoaded: false
+					});
 				} catch (e1) {
 					DL(2, "AddSetting._collectSettings() item failed", e1);
 				}
@@ -306,7 +623,18 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 					const scope = menu?.restricted ? "world" : "client";
 
 					// Mark this as a menu row; exclusion will store a placeholder pair
-					rows.push({ namespace: ns, key, modTitle, setTitle, scope, __isMenu: true });
+					rows.push({
+						namespace: ns,
+						key,
+						modTitle,
+						setTitle,
+						scope,
+						__isMenu: true,
+						__value: null,
+						__preview: "[menu]",
+						__pretty: "[menu]",
+						__valLoaded: true
+					});
 				}
 				DL("exclusions.js | AddSetting._collectSettings(): menus appended", { count: rows.length });
 			} catch (e) {
@@ -356,101 +684,72 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 	async _renderHTML(_context, _options) {
 		this._collectSettings();
 
-		const rows = this._rows.map(r => `
-			<tr>
-				<td class="c-mod" title="${foundry.utils.escapeHTML(r.namespace)}">${foundry.utils.escapeHTML(r.modTitle)}</td>
-				<td class="c-setting" title="${foundry.utils.escapeHTML(`${r.namespace}.${r.key}`)}">${foundry.utils.escapeHTML(r.setTitle)}</td>
-				<td class="c-scope">${r.scope}</td>
-				<td class="c-act">
-					<button type="button" class="bbmm-exc-act" data-ns="${foundry.utils.escapeHTML(r.namespace)}" data-key="${foundry.utils.escapeHTML(r.key)}">${LT.buttons.exclude()}</button>
-				</td>
-			</tr>
-		`).join("");
+		const cols = "grid-template-columns: minmax(220px,1.2fr) minmax(240px,1.6fr) 90px minmax(320px,2fr) 96px;";
+		const css =
+			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important;overflow:hidden}` +
+			`.bbmm-as-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}` +
+			`.bbmm-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}` +
+			`.bbmm-toolbar select{width:260px;min-width:260px;max-width:260px}` +
+			`.bbmm-toolbar input[type="text"]{flex:1;min-width:260px}` +
 
-		const html = `
-			<style>
-				/* App layout */
-				#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
-				.bbmm-as-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
-				.bbmm-as-toolbar{display:flex;align-items:center;gap:8px}
-				.bbmm-as-count{opacity:.85;font-weight:600}
+			`.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}` +
+			`.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}` +
 
-				.bbmm-as-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
-				.bbmm-as-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:.95rem}
+			`.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}` +
+			`.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}` +
+			`.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}` +
 
-				/* Header */
-				.bbmm-as-table thead th{
-					position:sticky;top:0;z-index:1;
-					background:var(--color-bg-header,#1f1f1f);
-					border-bottom:2px solid var(--color-border-light-2);
-					padding:8px 10px;text-align:left
-				}
-				/* Column plan: Module (fixed), Setting (auto), Scope (fixed), Action (fixed, right) */
-				.bbmm-as-table thead th:first-child{width:30%}          	/* Module */
-				.bbmm-as-table thead th:nth-child(3){width:90px}        	/* Scope */
-				.bbmm-as-table thead th:last-child{width:96px;text-align:right} /* Action */
+			`.bbmm-grid-body .c-mod,.bbmm-grid-body .c-key{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}` +
+			`.bbmm-grid-body .c-scope{text-transform:capitalize;opacity:.85;white-space:nowrap}` +
 
-				/* Body */
-				.bbmm-as-table tbody td{padding:8px 10px;border-bottom:1px solid var(--color-border-light-2);vertical-align:middle}
-				.bbmm-as-table tbody tr:nth-child(odd){background:rgba(255,255,255,.03)}
+			`.bbmm-grid-body .c-val{cursor:pointer}` +
+			`.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}` +
+			`.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}` +
 
-				/* Cells */
-				.bbmm-as-table .c-mod{
-					width:30%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
-				}
-				.bbmm-as-table .c-setting{
-					width:auto;overflow:hidden;text-overflow:ellipsis
-				}
-				.bbmm-as-table .c-scope{
-					width:90px;text-transform:capitalize;opacity:.85
-				}
-				.bbmm-as-table .c-act{
-					width:96px;
-					display:flex;justify-content:flex-end;align-items:center;
-					padding-right:8px
-				}
+			`.bbmm-grid-body .row .val-expand{display:none;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}` +
+			`.bbmm-grid-body .row.expanded .val-expand{display:block}` +
+			`.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}` +
+			`.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}` +
 
-				/* Exclude button — larger click target */
-				.bbmm-as-table .bbmm-exc-act{
-					display:inline-flex;align-items:center;justify-content:center;
-					min-width:80px;			/* roomy for the word "Exclude" */
-					height:32px;			/* bigger tap/click area */
-					padding:0 12px;
-					font-size:0.95rem;
-					line-height:1;
-				}
+			`.bbmm-grid-body .c-act{display:flex;justify-content:flex-end;align-items:center;padding-right:8px}` +
+			`.bbmm-grid-body .bbmm-exc-act{display:inline-flex;align-items:center;justify-content:center;min-width:80px;height:32px;padding:0 12px;font-size:.95rem;line-height:1}` +
+			`.bbmm-grid-body .bbmm-exc-act.bbmm-exc-done{pointer-events:none;opacity:.75;font-weight:700}` +
 
-				/* Optional: clearer focus for keyboard users */
-				.bbmm-as-table .bbmm-exc-act:focus-visible{
-					outline:2px solid var(--color-border-highlight,#79c);
-					outline-offset:2px;
-				}
+			`.bbmm-as-footer{` +
+				`display:flex;` +
+				`justify-content:center;` +
+				`align-items:center;` +
+				`width:100%;` +
+				`padding:.5rem 0;` +
+				`margin-top:.25rem;` +
+				`border-top:1px solid var(--color-border,#444);` +
+			`}` +
+			`.bbmm-as-footer button{min-width:160px}`;
 
-				.bbmm-as-table .bbmm-exc-act.bbmm-exc-done{
-					pointer-events:none;
-					opacity:.75;
-					font-weight:700;
-				}
-			</style>
+		const moduleList = this._buildModuleList();
+		const moduleOpts = ['<option value=""></option>']
+			.concat(moduleList.map(m => `<option value="${foundry.utils.escapeHTML(m.ns)}"${this._moduleFilter===m.ns?" selected":""}>${foundry.utils.escapeHTML(m.title)}</option>`))
+			.join("");
 
-			<section class="bbmm-as-root">
-				<div class="bbmm-as-toolbar">
-					<h3 style="margin:0;flex:1;">${LT.addSettingExclusion()}</h3>
-					<div class="bbmm-as-count">${LT.available()}: ${this._rows.length}</div>
-				</div>
+		const head = `<div class="bbmm-grid-head" id="bbmm-as-head">${this._renderHeader()}</div>`;
+		const rowsHtml = (Array.isArray(this._rows) ? this._rows : []).map(r => this._rowHTML(r)).join("");
+		const body = `<div class="bbmm-grid-body" id="bbmm-as-body">${rowsHtml}</div>`;
 
-				<div class="bbmm-as-scroller">
-					<table class="bbmm-as-table">
-						<thead>
-							<tr><th>${LT.module()}</th><th>${LT.setting()}</th><th>${LT.scope()}</th><th></th></tr>
-						</thead>
-						<tbody>${rows || `<tr><td colspan="4" class="c-empty" style="text-align:center;opacity:.8;padding:18px 0">${LT.noEligSettingFound()}.</td></tr>`}</tbody>
-					</table>
-				</div>
-			</section>
-		`;
-
-		return html;
+		return (
+			`<style>${css}</style>` +
+			`<section class="bbmm-as-root">` +
+				`<div class="bbmm-toolbar">` +
+					`<select id="bbmm-as-module" title="${foundry.utils.escapeHTML(LT.module())}">${moduleOpts}</select>` +
+					`<input id="bbmm-as-filter" type="text" placeholder="${foundry.utils.escapeHTML(LT.macro.search())}" value="${foundry.utils.escapeHTML(this._filterText ?? "")}" />` +
+					`<span class="count" style="opacity:.85;font-weight:600">${LT.macro.showing()} <span id="bbmm-as-count">0</span> ${LT.macro.of()} <span id="bbmm-as-total">${(this._rows || []).length}</span></span>` +
+				`</div>` +
+				head +
+				body +
+				`<div class="bbmm-as-footer">` +
+					`<button type="button" id="bbmm-as-close">${foundry.utils.escapeHTML(LT.buttons.close())}</button>` +
+				`</div>` +
+			`</section>`
+		);
 	}
 
 	async _replaceHTML(result, _options) {
@@ -466,73 +765,174 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
 
-		// Append footer with Cancel that reopens manager
-		const footer = document.createElement("footer");
-		footer.classList.add("form-footer");
-		footer.style.display = "flex";
-		footer.style.justifyContent = "flex-end";
-		footer.style.marginTop = "0.75rem";
+		// Apply visibility immediately (blank until module selected)
+		this._applyFilterToDOM();
 
-		const closeBtn = document.createElement("button");
-		closeBtn.type = "button";
-		closeBtn.innerText = LT.buttons.close();
-		closeBtn.addEventListener("click", () => {
-			DL("exclusions.js | AddSetting.closeBtn(): reopen manager");
-			try { this.close({ force: true }); } catch {}
-			setTimeout(() => {
-				try {
-					(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
-				} catch (e) { DL(3, "exclusions.js | AddSetting.closeBtn(): reopen failed", e); }
-			}, 0);
-		});
+		// Warm previews on initial render only if module already selected
+		if (String(this._moduleFilter ?? "").trim()) {
+			this._warmVisiblePreviews(50);
+		}
 
-		footer.appendChild(closeBtn);
-		content.appendChild(footer);
-
-		// Delegated click: Exclude 
+		// Bind delegated listeners ONCE
 		if (this._delegated) return;
 		this._delegated = true;
 
-		content.addEventListener("click", async (ev) => {
-			const btn = ev.target.closest?.(".bbmm-exc-act");
-			if (btn instanceof HTMLButtonElement) {
-				ev.preventDefault();
-				ev.stopPropagation();
+		// Debounced text filter
+		this.element.addEventListener("input", (ev) => {
+			const t = ev.target;
+			if (!(t instanceof HTMLElement)) return;
+			if (t.id !== "bbmm-as-filter") return;
 
-				const ns  = btn.dataset.ns  || "";
-				const key = btn.dataset.key || "";
-				if (!ns || !key) return;
+			this._filterText = String(t.value ?? "");
+			if (this._debounceT) clearTimeout(this._debounceT);
 
-				try {
-					btn.disabled = true;
+			this._debounceT = setTimeout(() => {
+				DL("exclusions.js | AddSetting: applying text filter");
+				this._applyFilterToDOM();
+			}, this._debounceMs);
+		});
 
-					// menu or setting?
-					const row = this._rows?.find?.(r => r.namespace === ns && r.key === key);
-					if (row?.__isMenu) {
-						await this._excludeMenu(ns, key); // store placeholder
-					} else {
-						await this._exclude(ns, key); // store real setting
+		// Module dropdown change
+		this.element.addEventListener("change", (ev) => {
+			const t = ev.target;
+			if (!(t instanceof HTMLElement)) return;
+			if (t.id !== "bbmm-as-module") return;
+
+			this._moduleFilter = String(t.value ?? "");
+			DL(`exclusions.js | AddSetting: module filter changed to '${this._moduleFilter || "(none)"}'`);
+
+			this._applyFilterToDOM();
+			this._warmVisiblePreviews(50);
+		});
+
+		// Click handling: close + exclude + expand/collapse + copy
+		this.element.addEventListener("click", async (ev) => {
+			try {
+				const target = ev.target;
+				if (!(target instanceof HTMLElement)) return;
+
+				// Footer Close button (from _renderHTML): close + reopen manager
+				const footerClose = target.closest?.("#bbmm-as-close");
+				if (footerClose) {
+					ev.preventDefault();
+					ev.stopPropagation();
+
+					DL("exclusions.js | AddSetting: footer close clicked, reopening manager");
+					try { this.close({ force: true }); } catch {}
+
+					setTimeout(() => {
+						try {
+							(globalThis.bbmm?.openExclusionsManagerApp || globalThis.openExclusionsManagerApp)?.();
+						} catch (e) {
+							DL(3, "exclusions.js | AddSetting: reopen manager failed", e);
+						}
+					}, 0);
+
+					return;
+				}
+
+				const rowEl = target.closest(".row");
+
+				// Exclude button
+				const btn = target.closest?.(".bbmm-exc-act");
+				if (btn instanceof HTMLButtonElement) {
+					ev.preventDefault();
+					ev.stopPropagation();
+
+					const ns = btn.dataset.ns || "";
+					const key = btn.dataset.key || "";
+					if (!ns || !key) return;
+
+					try {
+						btn.disabled = true;
+
+						const row = this._rows?.find?.(r => r.namespace === ns && r.key === key);
+						if (row?.__isMenu) await this._excludeMenu(ns, key);
+						else await this._exclude(ns, key);
+
+						// Remove row from data + DOM immediately
+						this._rows = (this._rows || []).filter(r => !(r.namespace === ns && r.key === key));
+						rowEl?.remove?.();
+
+						DL(`exclusions.js | AddSetting: excluded ${ns}.${key} (removed from list)`);
+						this._applyFilterToDOM();
+					} catch (e) {
+						btn.disabled = false;
+						DL(3, "exclusions.js | AddSetting: exclude failed", e);
+						ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+					}
+					return;
+				}
+
+				// Expand/collapse value cell
+				if (rowEl && target.closest(".c-val")) {
+					const wasExpanded = rowEl.classList.contains("expanded");
+					rowEl.classList.toggle("expanded");
+
+					if (!wasExpanded) {
+						const pre = rowEl.querySelector(".val-pre");
+						if (pre && pre.dataset.loaded !== "1") {
+							const ns = rowEl.dataset.ns || "";
+							const key = rowEl.dataset.key || "";
+							const r = this._rows?.find?.(x => x.namespace === ns && x.key === key);
+
+							// Lazy load on expand if needed
+							if (r && !r.__valLoaded && !r.__isMenu) {
+								try {
+									const v = game.settings.get(r.namespace, r.key);
+									r.__value = v;
+									r.__preview = this._toPreview(v);
+									r.__pretty = this._toPretty(v);
+									r.__valLoaded = true;
+
+									const codeEl = rowEl.querySelector(".val-preview code");
+									if (codeEl) {
+										codeEl.textContent = r.__preview;
+										codeEl.title = r.__preview;
+									}
+								} catch (e) {
+									DL(2, "exclusions.js | AddSetting: expand value read failed", e);
+								}
+							}
+
+							pre.textContent = String(r?.__pretty ?? "");
+							pre.dataset.loaded = "1";
+						}
+					}
+					return;
+				}
+
+				// Copy / collapse
+				if (rowEl) {
+					const copyBtn = target.closest(".btn-copy");
+					if (copyBtn) {
+						const pre = rowEl.querySelector(".val-pre");
+						const txt = pre?.textContent ?? "";
+						try {
+							await navigator.clipboard.writeText(String(txt));
+							ui.notifications?.info(LT.macro.copiedValToClipboard());
+						} catch (e) {
+							DL(2, "exclusions.js | AddSetting: clipboard failed", e);
+							ui.notifications?.warn(LT.macro.failedCopyToClipboard());
+						}
+						return;
 					}
 
-					// Keep dialog open; mark on success
-					btn.classList.add("bbmm-exc-done");
-					btn.setAttribute("aria-label", "Excluded");
-					btn.innerHTML = "✓";
-					btn.disabled = true;
-					DL("exclusions.js | AddSetting: row marked as excluded");
-				} catch (e) {
-					btn.disabled = false;
-					DL(3, "exclusions.js | AddSetting.exclude failed", e);
-					ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
+					const collapseBtn = target.closest(".btn-collapse");
+					if (collapseBtn) {
+						rowEl.classList.remove("expanded");
+						return;
+					}
 				}
-				return;
-			}
 
-			// Footer "Cancel"/"Close" should close without reopening the manager
-			const cancel = ev.target.closest?.('button[data-action="cancel"], [data-action="close"], .bbmm-close');
-			if (cancel) {
-				try { this.close({ force: true }); } catch {}
-				return;
+				// Generic close buttons (just close)
+				const closeBtn = target.closest?.('button[data-action="cancel"], [data-action="close"], .bbmm-close');
+				if (closeBtn) {
+					try { this.close({ force: true }); } catch {}
+					return;
+				}
+			} catch (e) {
+				DL(2, "exclusions.js | AddSetting: click handler error", e);
 			}
 		});
 	}
@@ -849,88 +1249,89 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		content.innerHTML = result;
 
 		// avoid double-binding across re-renders
-		if (this._delegated) return;
+		if (!this._delegated) {
 		this._delegated = true;
 
-		content.addEventListener("click", async (ev) => {
-			// find the nearest button with either a data-action or the delete class
-			const btn = ev.target?.closest?.('button[data-action], button.bbmm-exc-del');
-			if (!btn) return;
+			content.addEventListener("click", async (ev) => {
+				// find the nearest button with either a data-action or the delete class
+				const btn = ev.target?.closest?.('button[data-action], button.bbmm-exc-del');
+				if (!btn) return;
 
-			ev.preventDefault();
-			ev.stopPropagation();
+				ev.preventDefault();
+				ev.stopPropagation();
 
-			const action = btn.dataset.action || "";
-			DL(`exclusions.js | Manager.click(): ${action || btn.className}`);
+				const action = btn.dataset.action || "";
+				DL(`exclusions.js | Manager.click(): ${action || btn.className}`);
 
-			// Close (bottom button) or header X
-			if (action === "close" || action === "cancel" || btn.classList.contains("bbmm-close")) {
-				try { this.close({ force: true }); } catch {}
-				return;
-			}
-
-			// Open Add Setting Exclusion
-			if (action === "add-setting") {
-				try { this.close({ force: true }); } catch {}
-				setTimeout(() => {
-					try { (globalThis.bbmm?.openAddSettingExclusionApp || globalThis.openAddSettingExclusionApp)?.(); }
-					catch (e) { DL(3, "exclusions.js | openAddSettingExclusionApp(): failed", e); }
-				}, 0);
-				return;
-			}
-
-			// Open Add Module Exclusion
-			if (action === "add-module") {
-				try { this.close({ force: true }); } catch {}
-				setTimeout(() => {
-					try { (globalThis.bbmm?.openAddModuleExclusionApp || globalThis.openAddModuleExclusionApp)?.(); }
-					catch (e) { DL(3, "exclusions.js | openAddModuleExclusionApp(): failed", e); }
-				}, 0);
-				return;
-			}
-
-			// Immediate delete — NO PROMPT
-			if (action === "delete" || btn.classList.contains("bbmm-exc-del")) {
-				const type = btn.dataset.type || "";
-				const ns   = btn.dataset.ns   || "";
-				const key  = btn.dataset.key  || "";
-
-				try {
-					btn.disabled = true;
-
-					const data = game.settings.get(BBMM_ID, "userExclusions") || {};
-
-					if (type === "module" && ns) {
-						const list = Array.isArray(data.modules) ? data.modules : [];
-						data.modules = list.filter(x => x !== ns);
-						await game.settings.set(BBMM_ID, "userExclusions", data);
-						try { Hooks.callAll("bbmmExclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
-						DL(`exclusions.js | delete(module): ${ns}`);
-						await this.render(true);
-						return;
-					}
-
-					if (type === "setting" && ns && key) {
-						const list = Array.isArray(data.settings) ? data.settings : [];
-						data.settings = list.filter(s => !(s?.namespace === ns && s?.key === key));
-						await game.settings.set(BBMM_ID, "userExclusions", data);
-						try { Hooks.callAll("bbmmExclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
-						DL(`exclusions.js | delete(setting): ${ns}.${key}`);
-						await this.render(true);
-						return;
-					}
-
-					// Fallback (missing ids)
-					btn.disabled = false;
-					DL(2, "exclusions.js | delete: unknown type or missing ids", { type, ns, key });
-				} catch (e) {
-					btn.disabled = false;
-					DL(3, "exclusions.js | delete: failed", e);
-					ui.notifications?.error("Failed to remove exclusion. See console.");
+				// Close (bottom button) or header X
+				if (action === "close" || action === "cancel" || btn.classList.contains("bbmm-close")) {
+					try { this.close({ force: true }); } catch {}
+					return;
 				}
-				return;
-			}
-		});
+
+				// Open Add Setting Exclusion
+				if (action === "add-setting") {
+					try { this.close({ force: true }); } catch {}
+					setTimeout(() => {
+						try { (globalThis.bbmm?.openAddSettingExclusionApp || globalThis.openAddSettingExclusionApp)?.(); }
+						catch (e) { DL(3, "exclusions.js | openAddSettingExclusionApp(): failed", e); }
+					}, 0);
+					return;
+				}
+
+				// Open Add Module Exclusion
+				if (action === "add-module") {
+					try { this.close({ force: true }); } catch {}
+					setTimeout(() => {
+						try { (globalThis.bbmm?.openAddModuleExclusionApp || globalThis.openAddModuleExclusionApp)?.(); }
+						catch (e) { DL(3, "exclusions.js | openAddModuleExclusionApp(): failed", e); }
+					}, 0);
+					return;
+				}
+
+				// Immediate delete — NO PROMPT
+				if (action === "delete" || btn.classList.contains("bbmm-exc-del")) {
+					const type = btn.dataset.type || "";
+					const ns   = btn.dataset.ns   || "";
+					const key  = btn.dataset.key  || "";
+
+					try {
+						btn.disabled = true;
+
+						const data = game.settings.get(BBMM_ID, "userExclusions") || {};
+
+						if (type === "module" && ns) {
+							const list = Array.isArray(data.modules) ? data.modules : [];
+							data.modules = list.filter(x => x !== ns);
+							await game.settings.set(BBMM_ID, "userExclusions", data);
+							try { Hooks.callAll("bbmmExclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
+							DL(`exclusions.js | delete(module): ${ns}`);
+							await this.render(true);
+							return;
+						}
+
+						if (type === "setting" && ns && key) {
+							const list = Array.isArray(data.settings) ? data.settings : [];
+							data.settings = list.filter(s => !(s?.namespace === ns && s?.key === key));
+							await game.settings.set(BBMM_ID, "userExclusions", data);
+							try { Hooks.callAll("bbmmExclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
+							DL(`exclusions.js | delete(setting): ${ns}.${key}`);
+							await this.render(true);
+							return;
+						}
+
+						// Fallback (missing ids)
+						btn.disabled = false;
+						DL(2, "exclusions.js | delete: unknown type or missing ids", { type, ns, key });
+					} catch (e) {
+						btn.disabled = false;
+						DL(3, "exclusions.js | delete: failed", e);
+						ui.notifications?.error("Failed to remove exclusion. See console.");
+					}
+					return;
+				}
+			});
+		}
 	}
 }
 
