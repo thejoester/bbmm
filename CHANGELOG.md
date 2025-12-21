@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-test4] - 2025-12-20
+### Changed
+- **Inclusions/Exclusions:**
+  - Inclusion/Exclusion lists are now stored in persistent storage, and accessible from all worlds. 
+  - Should migrate when loading a world for the first time. 
+  - Filtered '[menu]’ settings
+- **Settings-Sync:**
+  - Added setting to just force reload for players when setting requiring reload is locked/synced. 
+### Fixed
+- fixed localization issues.
+- fixed importing exclusions json.
+- fixed preview comparisons.
+
 ## [0.6.0-test3] - 2025-12-19
 ### Changed
 - **Settings Preset Manager:**

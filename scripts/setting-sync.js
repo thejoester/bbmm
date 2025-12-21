@@ -32,14 +32,23 @@ import { LT, BBMM_ID } from "./localization.js";
 		- Returns true if there is a 'lock' op for this id with userIds=[]
 	============================================================================== */
 	function _bbmmIsUnlockQueued(id) {
-	try {
-		return _bbmmPendingOps.some(op =>
-		op?.id === id && (
-			(op.op === "lock" && Array.isArray(op.userIds) && op.userIds.length === 0) ||
-			(op.op === "soft" && op.soft === false)
-		)
-		);
-	} catch { return false; }
+		try {
+			return _bbmmPendingOps.some(op =>
+			op?.id === id && (
+				(op.op === "lock" && Array.isArray(op.userIds) && op.userIds.length === 0) ||
+				(op.op === "soft" && op.soft === false)
+			)
+			);
+		} catch { return false; }
+	}
+
+	function hlp_shouldAutoForceReload() {
+		try {
+			return Boolean(game.settings.get(BBMM_ID, "autoForceReload"));
+		} catch (err) {
+			DL(2, "setting-sync.js | hlp_shouldAutoForceReload(): failed reading setting", err);
+			return false;
+		}
 	}
 
 	/* Update the lock icon =======================================================
@@ -1708,19 +1717,28 @@ import { LT, BBMM_ID } from "./localization.js";
 							}
 
 							if (requiresReload || cfg.requiresReload) {
-								try {
-									new foundry.applications.api.DialogV2({
-										window: { title: LT.sync.ReloadTitle(), modal: true },
-										content: `<p>${LT.sync.ReloadMsg()}</p>`,
-										buttons: [
-											{ action: "reload", label: LT.sync.ReloadNow(), icon: "fa-solid fa-arrows-rotate", default: true, callback: () => { try { location.reload(); } catch {} } },
-											{ action: "later",  label: LT.sync.ReloadLater(), icon: "fa-regular fa-clock", callback: () => {} }
-										],
-										submit: () => {},
-										rejectClose: false
-									}).render(true);
-								} catch {
-									ui.notifications?.warn?.(LT.sync.ReloadWarn());
+								if (hlp_shouldAutoForceReload()) {
+									DL(`setting-sync.js | client push: autoForceReload enabled, reloading now (${id})`);
+									try { ui.notifications?.warn?.(LT.sync.ReloadWarn()); } catch {}
+									setTimeout(() => {
+										try { location.reload(); } catch {}
+									}, 250);
+								} else {
+									try {
+										new foundry.applications.api.DialogV2({
+											window: { title: LT.sync.ReloadTitle(), modal: true },
+											content: `<p>${LT.sync.ReloadMsg()}</p>`,
+											buttons: [
+												{ action: "reload", label: LT.sync.ReloadNow(), icon: "fa-solid fa-arrows-rotate", default: true, callback: () => { try { location.reload(); } catch {} } },
+												{ action: "later",  label: LT.sync.ReloadLater(), icon: "fa-regular fa-clock", callback: () => {} }
+											],
+											submit: () => {},
+											rejectClose: false
+										}).render(true);
+									} catch (err) {
+										DL(2, "setting-sync.js | client push: could not show reload dialog", err);
+										ui.notifications?.warn?.(LT.sync.ReloadWarn());
+									}
 								}
 							} else {
 								ui.notifications?.info?.(LT.sync.Updated());
@@ -1758,19 +1776,28 @@ import { LT, BBMM_ID } from "./localization.js";
 						}
 
 						if (changed && needsReload) {
-							try {
-								new foundry.applications.api.DialogV2({
-									window: { title: LT.sync.ReloadTitle(), modal: true },
-									content: `<p>${LT.sync.ReloadMsg()}</p>`,
-									buttons: [
-										{ action: "reload", label: LT.sync.ReloadNow(), icon: "fa-solid fa-arrows-rotate", default: true, callback: () => { try { location.reload(); } catch {} } },
-										{ action: "later",  label: LT.sync.ReloadLater(), icon: "fa-regular fa-clock", callback: () => {} }
-									],
-									submit: () => {},
-									rejectClose: false
-								}).render(true);
-							} catch (err) {
-								ui.notifications?.warn?.(LT.sync.ReloadWarn());
+							if (hlp_shouldAutoForceReload()) {
+								DL("setting-sync.js | client refresh: autoForceReload enabled, reloading now");
+								try { ui.notifications?.warn?.(LT.sync.ReloadWarn()); } catch {}
+								setTimeout(() => {
+									try { location.reload(); } catch {}
+								}, 250);
+							} else {
+								try {
+									new foundry.applications.api.DialogV2({
+										window: { title: LT.sync.ReloadTitle(), modal: true },
+										content: `<p>${LT.sync.ReloadMsg()}</p>`,
+										buttons: [
+											{ action: "reload", label: LT.sync.ReloadNow(), icon: "fa-solid fa-arrows-rotate", default: true, callback: () => { try { location.reload(); } catch {} } },
+											{ action: "later",  label: LT.sync.ReloadLater(), icon: "fa-regular fa-clock", callback: () => {} }
+										],
+										submit: () => {},
+										rejectClose: false
+									}).render(true);
+								} catch (err) {
+									DL(2, "setting-sync.js | client refresh: could not show reload dialog", err);
+									ui.notifications?.warn?.(LT.sync.ReloadWarn());
+								}
 							}
 						} else if (changed) {
 							ui.notifications?.info?.(LT.sync.Updated());

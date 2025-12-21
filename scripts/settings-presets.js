@@ -18,16 +18,6 @@ if (!AppV2) {
 	{HELPERS}
 ======================================================================= */
 
-// Ensure storage root has expected shape
-function hlp_samePreset(a, b) {
-	// Cheap deterministic compare
-	try {
-		return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-	} catch (_e) {
-		return false;
-	}
-}
-
 // fetch JSON from URL with no-cache
 async function hlp_fetchJSON(url) {
 	const res = await fetch(url, { cache: "no-store" });
@@ -620,16 +610,18 @@ function svc_askSettingsPresetConflict(existingKey) {
 /* Export Preset to File ============================================== */
 async function svc_savePresetToSettings(presetName, selectedEntries) {
 	try {
-		const current = foundry.utils.duplicate(
-			game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS)
-		) || {};
+		// Ensure cache is loaded (GM: persistent storage, non-GM: user setting)
+		await svc_loadSettingsPresets();
+
+		const current = foundry.utils.duplicate(svc_getSettingsPresets()) || {};
 		const now = Date.now();
 
 		current[presetName] ??= { created: now, updated: now, items: [] };
 		current[presetName].updated = now;
 		current[presetName].items = selectedEntries;
 
-		await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, current);
+		// IMPORTANT: use the unified writer so GM goes to persistent storage JSON
+		await svc_setSettingsPresets(current);
 
 		DL(`settings-presets.js | svc_savePresetToSettings(): saved preset "${presetName}" with ${selectedEntries.length} entries`);
 		return current[presetName];
@@ -923,39 +915,124 @@ function ui_openPresetPreview(rows, presetName = "") {
 		const esc = (s) => (typeof hlp_esc === "function")
 			? hlp_esc(s)
 			: String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
-		const asText = (v) => {
-			if (typeof hlp_toPrettyJson === "function") return hlp_toPrettyJson(v);
-			try { return typeof v === "string" ? v : JSON.stringify(v, null, 2); } catch { return String(v); }
+
+		// Stable stringify so object key order doesn't create fake diffs
+		const stableStringify = (value, space = 2) => {
+			const seen = new WeakSet();
+
+			const sortDeep = (v) => {
+				if (v === null || v === undefined) return v;
+
+				// Preserve primitives
+				const t = typeof v;
+				if (t === "string" || t === "number" || t === "boolean") return v;
+
+				// Avoid circular explosions
+				if (t === "object") {
+					if (seen.has(v)) return "[Circular]";
+					seen.add(v);
+				}
+
+				// Arrays
+				if (Array.isArray(v)) return v.map(sortDeep);
+
+				// Sets -> arrays
+				if (v instanceof Set) return Array.from(v).map(sortDeep);
+
+				// Maps -> sorted object
+				if (v instanceof Map) {
+					const obj = {};
+					for (const [k, val] of Array.from(v.entries()).sort(([a], [b]) => String(a).localeCompare(String(b)))) {
+						obj[String(k)] = sortDeep(val);
+					}
+					return obj;
+				}
+
+				// Plain object
+				if (t === "object") {
+					const obj = {};
+					for (const key of Object.keys(v).sort((a, b) => a.localeCompare(b))) {
+						obj[key] = sortDeep(v[key]);
+					}
+					return obj;
+				}
+
+				// Fallback
+				return String(v);
+			};
+
+			try {
+				return JSON.stringify(sortDeep(value), null, space);
+			} catch (e) {
+				return String(value);
+			}
 		};
 
-		const body = (rows ?? []).map(r => `
+		// Turn any value into a canonical string for compare + display
+		const canonText = (v) => {
+			// Normalize simple cases
+			if (v === undefined) return "undefined";
+			if (v === null) return "null";
+
+			// If it's already a string, try to treat JSON strings as JSON
+			if (typeof v === "string") {
+				const s = v.trim();
+
+				// Avoid turning normal strings into weird per-char objects
+				// Only parse if it looks like JSON object/array
+				if ((s.startsWith("{") && s.endsWith("}")) || (s.startsWith("[") && s.endsWith("]"))) {
+					try {
+						const parsed = JSON.parse(s);
+						return stableStringify(parsed, 2);
+					} catch {
+						// Not valid JSON, display raw
+						return v;
+					}
+				}
+
+				return v;
+			}
+
+			// Numbers/bools
+			if (typeof v === "number" || typeof v === "boolean") return String(v);
+
+			// Objects/arrays: stable JSON
+			return stableStringify(v, 2);
+		};
+
+		// Only keep rows that actually differ after canonicalization
+		const normRows = (rows ?? []).map(r => {
+			const curText = canonText(r.current);
+			const nextText = canonText(r.next);
+			return { ...r, __curText: curText, __nextText: nextText };
+		}).filter(r => r.__curText !== r.__nextText);
+
+		const body = normRows.map(r => `
 			<tr>
-				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${hlp_esc(r.ns)}</td>
+				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${esc(r.ns)}</td>
 				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">
 					<span
-						data-tooltip="${hlp_esc(`${r.ns}.${r.key}`)}"
-						title="${hlp_esc(`${r.ns}.${r.key}`)}"
+						data-tooltip="${esc(`${r.ns}.${r.key}`)}"
+						title="${esc(`${r.ns}.${r.key}`)}"
 						style="cursor: help;"
-					>${hlp_esc(r.name || r.key)}</span>
+					>${esc(r.name || r.key)}</span>
 				</td>
 				<td style="padding:.25rem .5rem;vertical-align:top;">
-					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_esc(asText(r.current))}</pre>
+					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${esc(r.__curText)}</pre>
 				</td>
 				<td style="padding:.25rem .5rem;vertical-align:top;">
-					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_diffHighlight(r.current, r.next)}</pre>
+					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_diffHighlight(r.__curText, r.__nextText)}</pre>
 				</td>
 			</tr>
 		`).join("");
 
-		// KEY: a single, outer scroller that clamps to 70vh
 		const content = `
 			<div style="max-width:1200px;margin:0 auto;">
 				<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.5rem;">
-					<h3 style="margin:.25rem 0;">${hlp_esc(LT.titlePresetPreview?.() ?? "Preset changes preview")}</h3>
-					<div style="opacity:.8;">${hlp_esc(presetName)} — ${rows.length} change${rows.length===1?"":"s"}</div>
+					<h3 style="margin:.25rem 0;">${esc(LT.titlePresetPreview?.() ?? "Preset changes preview")}</h3>
+					<div style="opacity:.8;">${esc(presetName)} — ${normRows.length} change${normRows.length===1?"":"s"}</div>
 				</div>
 
-				<!-- SINGLE SCROLL CONTAINER -->
 				<div style="max-height:70vh;overflow:auto;border:1px solid var(--color-border);border-radius:6px;">
 					<table style="width:100%;border-collapse:collapse;font-size:12px;">
 						<thead style="position:sticky;top:0;background:var(--app-background);z-index:1;">
@@ -970,11 +1047,10 @@ function ui_openPresetPreview(rows, presetName = "") {
 					</table>
 				</div>
 
-				${rows.length === 0 ? `<p style="opacity:.75;margin:.5rem 0 0 0;">${hlp_esc(LT.noChangesDetected?.() ?? "No changes detected.")}</p>` : ""}
+				${normRows.length === 0 ? `<p style="opacity:.75;margin:.5rem 0 0 0;">${esc(LT.noChangesDetected?.() ?? "No changes detected.")}</p>` : ""}
 			</div>
 		`;
 
-		// Keep it simple: width only, no height, no resizable
 		new foundry.applications.api.DialogV2({
 			window: { title: LT.titlePresetPreview?.() ?? "Preset changes preview" },
 			position: { width: Math.min(1200, window.innerWidth - 100) },

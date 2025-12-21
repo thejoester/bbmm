@@ -16,7 +16,7 @@ export async function copyPlainText(text) {
 		ui.notifications.info(LT.macro.copiedValToClipboard());
 		return true;
 	} catch (e1) {
-		DL("macros.js | copyPlainText(): navigator.clipboard failed... trying failback", e1);
+		DL("macros.js | copyPlainText(): navigator.clipboard failed... trying fallback", e1);
 		try {
 			const ta = document.createElement("textarea");
 			ta.value = String(text ?? "");
@@ -72,7 +72,7 @@ function toPreview(v) {
 
 // pretty-printed (multi-line) JSON or string
 function toPretty(v) {
-    try {
+	try {
 		if (typeof v === "string") {
 			try { return JSON.stringify(JSON.parse(v), null, 2); }
 			catch { return v; }
@@ -190,6 +190,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		this._renderedCount = 0;
 	}
 
+	// settings namespaces
 	_listNamespacesForSettings() {
 		const set = new Set();
 		for (const [fullKey] of game.settings.settings.entries()) {
@@ -198,9 +199,13 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		}
 		return Array.from(set).sort((a,b)=>a.localeCompare(b));
 	}
+
+	// current user's flags
 	_listNamespacesForFlagsMe() {
 		return Object.keys(game.user?.flags || {}).sort((a,b)=>a.localeCompare(b));
 	}
+
+	// all users' flags
 	_listNamespacesForFlagsAll() {
 		const set = new Set();
 		for (const u of game.users.contents) {
@@ -209,6 +214,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		return Array.from(set).sort((a,b)=>a.localeCompare(b));
 	}
 
+	// collect settings for namespace
 	async _collectSettingsNamespace(ns) {
 		const out = [];
 		if (!ns) return out;
@@ -263,6 +269,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		return out;
 	}
 
+	// collect current user's flags for namespace
 	async _collectUserFlagsNamespaceMe(ns) {
 		const out = [];
 		const flags = game.user?.flags?.[ns];
@@ -299,6 +306,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		return out;
 	}
 
+	// collect all users' flags for namespace
 	async _collectUserFlagsNamespaceAll(ns) {
 		const out = [];
 		if (!game.user?.isGM) return out;
@@ -338,6 +346,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		return out;
 	}
 
+	// make a row object from an entry
 	_makeRow(e) {
 		return {
 			ns: e.namespace,
@@ -349,6 +358,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		};
 	}
 
+	// filter/sort items into _matchRows
 	_runFilter() {
 		const q = String(this.filter ?? "").trim().toLowerCase();
 		let list = this.items;
@@ -375,6 +385,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		this._renderedCount = 0;
 	}
 
+	// header HTML
 	_renderHeader() {
 		const arrow = (k) => this.sortKey !== k ? "" : (this.sortDir === "asc" ? " ▲" : " ▼");
 		return (
@@ -385,6 +396,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		);
 	}
 
+	// row HTML
 	_rowHTML(r) {
 		const id = `${r.ns}::${r.key}`;
 		const preview =hlp_esc(r.preview);
@@ -406,28 +418,26 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 			</div>`;
 	}
 
+	// render HTML
 	async _renderHTML() {
 		const cols = "grid-template-columns: minmax(220px,1.4fr) 0.8fr 0.8fr minmax(280px,2fr);";
-		const css =
-			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important}` +
-			`.bbmm-inspector-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}` +
-			`.bbmm-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}` +
-			`.bbmm-toolbar select{width:180px;min-width:180px;max-width:180px}` +
-			`.bbmm-toolbar #bbmm-namespace{width:220px;min-width:220px;max-width:220px}` +
-			`.bbmm-toolbar input[type="text"]{flex:1;min-width:260px}` +
-			`.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}` +
-			`.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}` +
-			`.bbmm-grid-head .sortable{cursor:pointer;user-select:none}` +
-			`.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}` +
-			`.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}` +
-			`.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}` +
-			`.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}` +
-			`.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}` +
-			`.bbmm-grid-body .c-val{cursor:pointer}` +
-			`.bbmm-grid-body .row .val-expand{display:none;grid-column:4 / 5;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}` +
-			`.bbmm-grid-body .row.expanded .val-expand{display:block}` +
-			`.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}` +
-			`.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}`;
+		const css = `
+			#${this.id} .window-content { display:flex; flex-direction:column; padding:.4rem !important; }
+			#${this.id} .bbmm-inspector-root { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:.4rem; }
+			#${this.id} .bbmm-toolbar { display:flex; gap:.4rem; align-items:center; flex-wrap:nowrap; }
+			#${this.id} .bbmm-grid-head { display:grid; grid-template-columns:minmax(220px,1.4fr) .8fr .8fr minmax(280px,2fr); border:1px solid var(--color-border,#444); border-radius:.4rem .4rem 0 0; background:var(--color-bg-header,#1e1e1e); }
+			#${this.id} .bbmm-grid-head .h { padding:.25rem .4rem; border-bottom:1px solid #444; font-weight:600; line-height:1.2; }
+			#${this.id} .bbmm-grid-body { display:block; flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--color-border,#444); border-top:0; border-radius:0 0 .4rem .4rem; }
+			#${this.id} .bbmm-grid-body .row { display:grid; grid-template-columns:minmax(220px,1.4fr) .8fr .8fr minmax(280px,2fr); border-bottom:1px solid #333; }
+			#${this.id} .bbmm-grid-body .row > div { padding:.2rem .4rem; min-width:0; line-height:1.2; }
+			#${this.id} .bbmm-grid-body .c-val { cursor:pointer; }
+			#${this.id} .bbmm-grid-body .c-val .val-preview { max-height:2.2em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+			#${this.id} .bbmm-grid-body .c-val .val-preview code { white-space:pre-wrap; word-break:break-word; }
+			#${this.id} .bbmm-grid-body .row .val-expand { display:none; grid-column:4 / 5; margin-top:.2rem; border-top:1px dotted #444; padding-top:.2rem; }
+			#${this.id} .bbmm-grid-body .row.expanded .val-expand { display:block; }
+			#${this.id} .bbmm-grid-body .val-toolbar { display:flex; gap:.4rem; margin-bottom:.2rem; }
+			#${this.id} .bbmm-grid-body .val-pre { max-height:40vh; overflow:auto; margin:0; background:rgba(255,255,255,.03); padding:.3rem; border-radius:.3rem; }
+			`;
 
 		const head = `<div class="bbmm-grid-head" id="bbmm-head">${this._renderHeader()}</div>`;
 		const body = `<div class="bbmm-grid-body" id="bbmm-body"></div>`;
@@ -451,6 +461,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		);
 	}
 
+	// render and setup interactivity
 	async _replaceHTML(result, _options) {
 		const content = this.element.querySelector(".window-content") || this.element;
 		Object.assign(content.style, { display:"flex", flexDirection:"column", height:"100%", minHeight:"0" });
@@ -827,31 +838,26 @@ class BBMMPresetInspector extends foundry.applications.api.ApplicationV2 {
 		const cols = "grid-template-columns: minmax(160px,1.1fr) minmax(200px,1.3fr) 0.6fr 0.7fr minmax(260px,1.8fr);";
 
 		const css =
-			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important}` +
-			`#${this.id} section.bbmm-preset-inspector{display:flex;flex:1 1 auto;min-height:0}` +
-			`.bbmm-inspector-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}` +
-			`.bbmm-toolbar{display:flex;gap:.5rem;align-items:center}` +
-			`.bbmm-toolbar input{flex:1}` +
-
-			`.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}` +
-			`.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}` +
-			`.bbmm-grid-head .sortable{cursor:pointer;user-select:none}` +
-
-			`.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}` +
-			`.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}` +
-			`.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}` +
-
-			`.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}` +
-			`.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}` +
-			`.bbmm-grid-body .c-val{cursor:pointer}` +
-
-			`.bbmm-grid-body .row .val-expand{display:none;grid-column:5 / 6;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}` +
-			`.bbmm-grid-body .row.expanded .val-expand{display:block}` +
-			`.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}` +
-			`.bbmm-grid-body .val-toolbar .btn-copy,.bbmm-grid-body .val-toolbar .btn-collapse{padding:.15rem .4rem;border:1px solid var(--color-border,#555);background:rgba(255,255,255,.05);border-radius:.35rem}` +
-			`.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}` +
-
-			`.bbmm-grid-body .row>div:not(.c-val){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`;
+			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important}
+			#${this.id} section.bbmm-preset-inspector{display:flex;flex:1 1 auto;min-height:0}
+			.bbmm-inspector-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}
+			.bbmm-toolbar{display:flex;gap:.5rem;align-items:center}
+			.bbmm-toolbar input{flex:1}
+			.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}
+			.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}
+			.bbmm-grid-head .sortable{cursor:pointer;user-select:none}
+			.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}
+			.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}
+			.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}
+			.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}
+			.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}
+			.bbmm-grid-body .c-val{cursor:pointer}
+			.bbmm-grid-body .row .val-expand{display:none;grid-column:5 / 6;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}
+			.bbmm-grid-body .row.expanded .val-expand{display:block}
+			.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}
+			.bbmm-grid-body .val-toolbar .btn-copy,.bbmm-grid-body .val-toolbar .btn-collapse{padding:.15rem .4rem;border:1px solid var(--color-border,#555);background:rgba(255,255,255,.05);border-radius:.35rem}
+			.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}
+			.bbmm-grid-body .row>div:not(.c-val){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`;
 
 		const head =
 			`<div class="bbmm-grid-head" id="bbmm-preset-head">` +
@@ -864,15 +870,15 @@ class BBMMPresetInspector extends foundry.applications.api.ApplicationV2 {
 			`</div>`;
 
 		return (
-			`<style>${css}</style>` +
-			`<div class="bbmm-inspector-root">` +
-				`<div class="bbmm-toolbar">` +
-					`<input id="bbmm-preset-filter" type="text" placeholder="${LT.macro.presetFilterPlaceholder()}" value="${hlp_esc(this.filter ?? "")}" />` +
-					`<span class="count">${LT.macro.showing()} <span id="bbmm-preset-count">${this.rows.length}</span> ${LT.macro.of()} ${this.itemsAll.length}</span>` +
-				`</div>` +
-				head +
-				body +
-			`</div>`
+			`<style>${css}</style>
+			<div class="bbmm-inspector-root">
+				<div class="bbmm-toolbar">
+					<input id="bbmm-preset-filter" type="text" placeholder="${LT.macro.presetFilterPlaceholder()}" value="${hlp_esc(this.filter ?? "")}" />
+					<span class="count">${LT.macro.showing()} <span id="bbmm-preset-count">${this.rows.length}</span> ${LT.macro.of()} ${this.itemsAll.length}</span>
+				</div>
+				${head} 
+				${body}
+			</div>`
 		);
 	}
 
@@ -1000,7 +1006,8 @@ class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
 		this._rows = [];
 	}
 
-		_collect() {
+	// Collect keybind actions from game.keybindings
+	_collect() {
 		const out = [];
 		try {
 			const isMap = (x) => x && typeof x === "object" && x instanceof Map;
@@ -1014,6 +1021,7 @@ class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
 				return out;
 			}
 
+			// localization helper
 			function localizeMaybe(val) {
 				if (val == null) return "";
 				if (typeof val !== "string") return String(val);
@@ -1022,6 +1030,8 @@ class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
 					return loc && loc !== val ? loc : val;
 				} catch { return val; }
 			}
+
+			// binding formatters
 			function normalizeBinding(b) {
 				if (!b) return null;
 				if (typeof b === "object" && "key" in b) {
@@ -1126,16 +1136,17 @@ class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
 
 		// Name, Hint, Namespace, Action, Keys, Restricted, Editable, Uneditable, Reserved Mods
 		const cols = "grid-template-columns: 1.2fr 1.4fr 1.0fr 1.0fr 1.2fr 0.7fr 1.1fr 1.1fr 1.0fr;";
-		const css =
-			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important}` +
-			`.bbmm-kb-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}` +
-			`.bbmm-toolbar{display:flex;gap:.5rem;align-items:center}` +
-			`.bbmm-toolbar input{flex:1}` +
-			`.grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}` +
-			`.grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600;user-select:none}` +
-			`.grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}` +
-			`.grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}` +
-			`.grid-body .row>div{padding:.3rem .5rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`;
+		const css = `
+			#${this.id} .window-content { display:flex; flex-direction:column; padding:.4rem !important; }
+			#${this.id} .bbmm-kb-root { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:.4rem; }
+			#${this.id} .bbmm-toolbar { display:flex; gap:.4rem; align-items:center; }
+			#${this.id} .bbmm-toolbar input { flex:1; }
+			#${this.id} .grid-head { display:grid; grid-template-columns:1.2fr 1.4fr 1fr 1fr 1.2fr .7fr 1.1fr 1.1fr 1fr; border:1px solid var(--color-border,#444); border-radius:.4rem .4rem 0 0; background:var(--color-bg-header,#1e1e1e); }
+			#${this.id} .grid-head .h { padding:.25rem .4rem; border-bottom:1px solid #444; font-weight:600; line-height:1.2; user-select:none; }
+			#${this.id} .grid-body { display:block; flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--color-border,#444); border-top:0; border-radius:0 0 .4rem .4rem; }
+			#${this.id} .grid-body .row { display:grid; grid-template-columns:1.2fr 1.4fr 1fr 1fr 1.2fr .7fr 1.1fr 1.1fr 1fr; border-bottom:1px solid #333; }
+			#${this.id} .grid-body .row > div { padding:.2rem .4rem; min-width:0; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+			`;
 
 		return (
 			`<style>${css}</style>` +

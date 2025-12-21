@@ -1,13 +1,16 @@
 /* BBMM Inclusions (Hidden Settings) =========================================
 	- Lets GM include specific *hidden* settings (config:false) in preset saves
 	- Mirrors the UX of exclusions manager but scoped to settings-only
-	- Storage key: game.settings.get("bbmm", "userInclusions") -> { settings: [{namespace,key}] }
+	- Persistent storage: modules/bbmm/storage/lists/user-inclusions.json
 ============================================================================ */
 
 import { DL } from './settings.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { getSkipMap, isExcludedWith } from './helpers.js';
+import { copyPlainText } from "./macros.js";
 
+
+// CONSTANTS / PLACEHOLDERS ===================================================
 /* Menu -> Setting expansion (so presets include real settings) */
 const MENU_TO_SETTINGS = {
 	"core.fonts": () => ["core.fonts"],
@@ -15,6 +18,108 @@ const MENU_TO_SETTINGS = {
 	"core.prototypeTokenOverrides": () => ["core.prototypeTokenOverrides"]
 };
 
+// Persistent storage (lists)
+const LISTS_SUBDIR = "lists";
+const FILE_USER_INCLUSIONS = "user-inclusions.json";
+
+let _incCache = null;
+let _incCacheLoaded = false;
+
+
+/* ============================================================================
+	{HELPERS}
+============================================================================ */
+
+// Sanitize inclusion object
+function _sanitizeInclusions(raw) {
+	const out = { settings: [], modules: [] };
+	if (!raw || typeof raw !== "object") return out;
+
+	if (Array.isArray(raw.settings)) {
+		out.settings = raw.settings
+			.filter(s => s && typeof s === "object")
+			.map(s => ({
+				namespace: String(s.namespace ?? "").trim(),
+				key: String(s.key ?? "").trim()
+			}))
+			.filter(s => s.namespace && s.key);
+	}
+
+	if (Array.isArray(raw.modules)) {
+		out.modules = raw.modules
+			.filter(x => typeof x === "string")
+			.map(x => x.trim())
+			.filter(Boolean);
+	}
+
+	return out;
+}
+
+// Get storage URL for user inclusions file
+function _inclusionsStorageUrl() {
+	return `modules/${BBMM_ID}/storage/${LISTS_SUBDIR}/${FILE_USER_INCLUSIONS}`;
+}
+
+// Read user inclusions from storage (with caching)
+async function hlp_readUserInclusions({ force = false } = {}) {
+	if (!force && _incCacheLoaded && _incCache) return _incCache;
+
+	const url = _inclusionsStorageUrl();
+
+	try {
+		const res = await fetch(url, { cache: "no-store" });
+		if (!res.ok) {
+			DL(2, `inclusions.js | hlp_readUserInclusions(): fetch not ok (${res.status})`, { url });
+			_incCache = _sanitizeInclusions(null);
+			_incCacheLoaded = true;
+			return _incCache;
+		}
+
+		const data = await res.json();
+		_incCache = _sanitizeInclusions(data);
+		_incCacheLoaded = true;
+
+		DL("inclusions.js | hlp_readUserInclusions(): loaded", {
+			settings: _incCache.settings.length,
+			modules: _incCache.modules.length
+		});
+
+		return _incCache;
+	} catch (err) {
+		DL(2, "inclusions.js | hlp_readUserInclusions(): failed, using empty", err);
+		_incCache = _sanitizeInclusions(null);
+		_incCacheLoaded = true;
+		return _incCache;
+	}
+}
+
+// Write user inclusions to storage
+async function hlp_writeUserInclusions(obj) {
+	const clean = _sanitizeInclusions(obj);
+	const payload = JSON.stringify(clean ?? { settings: [], modules: [] }, null, 2);
+	const file = new File([payload], FILE_USER_INCLUSIONS, { type: "application/json" });
+
+	try {
+		const res = await FilePicker.uploadPersistent(BBMM_ID, LISTS_SUBDIR, file, {}, { notify: false });
+		if (!res || (!res.path && !res.url)) {
+			DL(3, `inclusions.js | hlp_writeUserInclusions(): upload returned no path/url`, res);
+			return false;
+		}
+
+		_incCache = clean;
+		_incCacheLoaded = true;
+
+		DL("inclusions.js | hlp_writeUserInclusions(): wrote", {
+			settings: clean.settings.length,
+			modules: clean.modules.length
+		});
+
+		return true;
+	} catch (err) {
+		DL(3, "inclusions.js | hlp_writeUserInclusions(): uploadPersistent failed", err);
+		return false;
+	}
+}
 
 // Given a menu namespace+key, return an array of {namespace,key} pairs for real settings
 async function _resolveMenuIdsToPairs(menuNs, menuKey) {
@@ -27,142 +132,6 @@ async function _resolveMenuIdsToPairs(menuNs, menuKey) {
 		return { namespace: sid.slice(0, d), key: sid.slice(d + 1) };
 	});
 }
-
-// Does a namespace have any hidden settings (config:false) we could include?
-function _bbmmNamespaceHasHidden(ns) {
-	try {
-		for (const [id, entry] of game.settings.settings.entries()) {
-			if (!id.startsWith(`${ns}.`)) continue;
-			if (entry?.config === false) return true;
-		}
-	} catch (e) { DL(2, "inclusions.js | _bbmmNamespaceHasHidden() failed", e); }
-	return false;
-}
-
-// Collect all hidden settings in a namespace (respecting skip map)
-function _bbmmCollectHiddenPairsForNamespace(ns) {
-	try {
-		const pairs = [];
-		const skipMap = getSkipMap();
-		for (const [id, entry] of game.settings.settings.entries()) {
-			if (!id.startsWith(`${ns}.`)) continue;
-			if (entry?.config !== false) continue;
-			const dot = id.indexOf(".");
-			const key = entry?.key || id.slice(dot + 1);
-			if (isExcludedWith(skipMap, ns) || isExcludedWith(skipMap, ns, key)) continue;
-			pairs.push({ namespace: ns, key });
-		}
-		return pairs;
-	} catch (e) {
-		DL(2, "inclusions.js | _bbmmCollectHiddenPairsForNamespace() failed", e);
-		return [];
-	}
-}
-
-// Fallback prompt to include hidden settings in the same namespace as a menu
-async function _promptIncludeHiddenSettingsForMenu(menuNs, menuKey) {
-	try {
-		// Collect hidden settings in the same namespace
-		const entries = Array.from(game.settings.settings.entries());
-		const hiddenInNs = entries
-			.filter(([id, s]) => id.startsWith(`${menuNs}.`) && s?.config === false)
-			.map(([id, s]) => {
-				const dot = id.indexOf(".");
-				return {
-					id,
-					namespace: id.slice(0, dot),
-					key: id.slice(dot + 1),
-					name: s?.name ?? id,
-					hint: s?.hint ?? ""
-				};
-			})
-			.sort((a, b) => a.key.localeCompare(b.key));
-
-		if (!hiddenInNs.length) {
-			DL(2, `inclusions.js | _promptIncludeHiddenSettingsForMenu(): no hidden settings in namespace ${menuNs}`);
-			ui.notifications?.warn(LT.inclusions.noHiddenInNamespace?.({ ns: menuNs }) ?? `No hidden settings found in "${menuNs}".`);
-			return 0;
-		}
-
-		// Build simple checkbox form
-		const rows = hiddenInNs.map((r) => {
-			const safeName = foundry.utils.escapeHTML(String(r.name ?? r.id));
-			const safeHint = foundry.utils.escapeHTML(String(r.hint ?? ""));
-			return `
-				<tr>
-					<td class="name"><label for="bbmm-inc-${r.id}">${safeName}</label></td>
-					<td class="key"><code>${r.key}</code></td>
-					<td class="pick"><input id="bbmm-inc-${r.id}" type="checkbox" name="keys" value="${r.id}"></td>
-				</tr>`;
-		}).join("");
-
-		const content = `
-			<style>
-				.bbmm-inc-fallback { display:flex; flex-direction:column; gap:.5rem; }
-				.bbmm-inc-fallback table { width:100%; border-collapse:collapse; }
-				.bbmm-inc-fallback th, .bbmm-inc-fallback td { padding:.25rem .35rem; border-bottom:1px solid var(--color-border-light-2); }
-				.bbmm-inc-fallback td.key { opacity:.8; }
-				.bbmm-inc-fallback td.pick { text-align:center; width:64px; }
-			</style>
-			<div class="bbmm-inc-fallback">
-				<p>${LT.inclusions.selectHiddenPrompt?.({ ns: menuNs, menu: menuKey }) ?? `Select hidden settings from "${menuNs}" to include:`}</p>
-				<table>
-					<thead><tr><th>${LT.common?.name?.() ?? "Name"}</th><th>Key</th><th>${LT.common?.include?.() ?? "Include"}</th></tr></thead>
-					<tbody>${rows}</tbody>
-				</table>
-			</div>`;
-
-		const result = await foundry.applications.api.DialogV2.confirm({
-			window: { title: LT.inclusions.title?.() ?? "BBMM: Inclusions" },
-			yes: () => true,
-			no: () => false,
-			content,
-			modal: true,
-			rejectClose: false,
-			classes: ["bbmm-inclusions-app", "bbmm-inc-fallback-dialog"]
-		});
-
-		if (!result) return 0;
-
-		// Read selected
-		const html = document.querySelector(".bbmm-inc-fallback-dialog") ?? document.body;
-		const checked = Array.from(html.querySelectorAll('input[name="keys"]:checked')).map((el) => el.value);
-
-		if (!checked.length) return 0;
-
-		// Apply inclusions
-		const data = foundry.utils.duplicate(game.settings.get(BBMM_ID, "userInclusions") || {});
-		if (!Array.isArray(data.settings)) data.settings = [];
-
-		let added = 0;
-		for (const id of checked) {
-			const dot = id.indexOf(".");
-			const namespace = id.slice(0, dot);
-			const key = id.slice(dot + 1);
-			const exists = data.settings.some((s) => s?.namespace === namespace && s?.key === key);
-			if (!exists) {
-				data.settings.push({ namespace, key });
-				added++;
-				DL(`inclusions.js | fallback add: ${namespace}.${key} (from ${menuNs}.${menuKey})`);
-			}
-		}
-		if (added > 0) {
-			await game.settings.set(BBMM_ID, "userInclusions", data);
-			try { Hooks.callAll("bbmmInclusionsChanged", { type: "menu-fallback", id: `${menuNs}.${menuKey}`, added }); } catch {}
-		}
-		return added;
-	} catch (e) {
-		DL(2, "inclusions.js | _promptIncludeHiddenSettingsForMenu() failed", e);
-		return 0;
-	}
-}
-
-// Given a menu namespace+key, return true if we have a resolver function for it
-function _bbmmIsMenuResolvable(ns, key) {
-	const id = `${ns}.${key}`;
-	return typeof MENU_TO_SETTINGS[id] === "function";
-}
-
 
 /* BBMMAddSettingInclusionAppV2 ===============================================
 	Add Setting Inclusion (hidden settings only)
@@ -202,6 +171,7 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		{DATA HELPERS}
 	============================================================================ */
 
+	// Convert value to single-line preview
 	_toPreview(v) {
 		try {
 			if (v === undefined) return "undefined";
@@ -214,6 +184,7 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		}
 	}
 
+	// Pretty-print value
 	_toPretty(v) {
 		try {
 			if (typeof v === "string") {
@@ -226,6 +197,7 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		}
 	}
 
+	// Build list of modules present in current rows
 	_buildModuleList() {
 		const map = new Map();
 		for (const r of this._rows || []) {
@@ -237,6 +209,7 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 			.sort((a, b) => a.title.localeCompare(b.title, game.i18n.lang || undefined, { sensitivity: "base" }));
 	}
 
+	// Check if a row matches current filter state
 	_matchesFilter(r) {
 		const mod = String(this._moduleFilter ?? "").trim();
 
@@ -256,6 +229,7 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		);
 	}
 
+	// Apply current filter state to DOM
 	_applyFilterToDOM() {
 		const body = this.element?.querySelector?.("#bbmm-ai-body");
 		if (!body) return;
@@ -309,6 +283,7 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		if (totalEl) totalEl.textContent = String(total);
 	}
 
+	// Warm visible previews (CALL #2)
 	_warmVisiblePreviews(limitPerTick = 50) {
 		if (this._warmRunning) return;
 
@@ -379,16 +354,18 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		tick();
 	}
 
+	// Render header row
 	_renderHeader() {
 		return (
-			`<div class="h c-mod">${LT.module()}</div>` +
-			`<div class="h c-key">${LT.setting()}</div>` +
-			`<div class="h c-scope">${LT.scope()}</div>` +
-			`<div class="h c-val">${LT.value()}</div>` +
-			`<div class="h c-act"></div>`
+			`<div class="h c-mod">${LT.module()}</div>
+			<div class="h c-key">${LT.setting()}</div>
+			<div class="h c-scope">${LT.scope()}</div>
+			<div class="h c-val">${LT.macro.value()}</div>
+			<div class="h c-act"></div>`
 		);
 	}
 
+	// Render a single row
 	_rowHTML(r) {
 		const ns = String(r.ns ?? "");
 		const key = String(r.key ?? "");
@@ -405,8 +382,8 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 					<div class="val-preview" title="${preview}"><code>${preview}</code></div>
 					<div class="val-expand">
 						<div class="val-toolbar">
-							<button type="button" class="btn-copy">${LT.copy()}</button>
-							<button type="button" class="btn-collapse">${LT.collapse()}</button>
+							<button type="button" class="btn-copy">${LT.macro.copy()}</button>
+							<button type="button" class="btn-collapse">${LT.macro.collapse()}</button>
 						</div>
 						<pre class="val-pre" data-loaded="0"></pre>
 					</div>
@@ -419,19 +396,38 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		`;
 	}
 
-
+	// Get currently included setting pairs as a Set of "namespace::key" strings
 	_getIncludedPairsSet() {
-		const inc = game.settings.get(BBMM_ID, "userInclusions") || {};
+		const inc = this._incData || { settings: [] };
 		const arr = Array.isArray(inc.settings) ? inc.settings : [];
-		const set = new Set(arr.map(s => `${s?.namespace ?? ""}::${s?.key ?? ""}`));
-		return set;
+		return new Set(arr.map(s => `${s?.namespace ?? ""}::${s?.key ?? ""}`));
 	}
 
+	// Collect all hidden settings that are includable
 	_collectSettings() {
 		try {
-            const skipMap = getSkipMap();
+			const skipMap = getSkipMap();
 			const included = this._getIncludedPairsSet();
 			const rows = [];
+
+			// Diagnostics: tally reasons per namespace
+			const stats = new Map(); // ns -> { hiddenTotal, skippedSkipNs, skippedSkipKey, skippedIncluded, added }
+			const bump = (ns, k) => {
+				let s = stats.get(ns);
+				if (!s) {
+					s = { hiddenTotal: 0, skippedSkipNs: 0, skippedSkipKey: 0, skippedIncluded: 0, added: 0 };
+					stats.set(ns, s);
+				}
+				s[k] = (s[k] || 0) + 1;
+			};
+
+			// Optional: dump skipMap keys once (useful when you swear it isn't in the list)
+			try {
+				const keys = Array.from(skipMap?.keys?.() ?? []);
+				DL("inclusions.js | AddSetting._collectSettings(): skipMap namespaces", { count: keys.length, keys });
+			} catch (eDump) {
+				DL(2, "inclusions.js | AddSetting._collectSettings(): skipMap dump failed", eDump);
+			}
 
 			for (const [, entry] of game.settings.settings.entries()) {
 				try {
@@ -439,16 +435,34 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 					const key = String(entry?.key ?? "").trim();
 					if (!ns || !key) continue;
 
+					// Skip menu placeholders 
+					// Menus show up as "[menu]" and are not real setting values, 
+					// so they are excluded from the Add Setting UI.
+					if (entry?.__isMenu) continue;
+
 					// Only HIDDEN settings (config:false)
 					if (entry?.config !== false) continue;
 
-					if (isExcludedWith(skipMap, ns) || isExcludedWith(skipMap, ns, key)) {
-						DL(`inclusions.js | _collectSettings(): skipped by EXPORT_SKIP -> ${ns}.${key}`);
+					bump(ns, "hiddenTotal");
+
+					// Skip map checks
+					const skipNs = isExcludedWith(skipMap, ns);
+					if (skipNs) {
+						bump(ns, "skippedSkipNs");
+						continue;
+					}
+
+					const skipKey = isExcludedWith(skipMap, ns, key);
+					if (skipKey) {
+						bump(ns, "skippedSkipKey");
 						continue;
 					}
 
 					// Skip already included
-					if (included.has(`${ns}::${key}`)) continue;
+					if (included.has(`${ns}::${key}`)) {
+						bump(ns, "skippedIncluded");
+						continue;
+					}
 
 					// Labels
 					const mod = game.modules.get(ns);
@@ -470,46 +484,11 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 						__pretty: "",
 						__valLoaded: false
 					});
+
+					bump(ns, "added");
 				} catch (e1) {
 					DL(2, "inclusions.js | AddSetting._collectSettings(): item failed", e1);
 				}
-			}
-			
-			/* Also list registerMenu entries so users can include them =================== */
-			try {
-				for (const [menuId, menu] of game.settings.menus.entries()) {
-					const dot = menuId.indexOf(".");
-					if (dot <= 0) continue;
-					const ns  = menuId.slice(0, dot);
-					const key = menuId.slice(dot + 1);
-
-					// Skip if this menu was already added as a placeholder include
-					if (included.has(`${ns}::${key}`)) continue;
-
-					// Display row for a menu (we treat it as an include-able placeholder)
-					const mod     = game.modules.get(ns);
-					const nsLabel = String(mod?.title ?? ns);
-					const label   = menu?.name ? game.i18n.localize(String(menu.name)) : key;
-					const scope   = menu?.restricted ? "world" : "client";
-
-					rows.push({
-						ns,
-						key,
-						nsLabel,
-						label,
-						scope,
-						__isMenu: true,
-
-						__value: null,
-						__preview: "[menu]",
-						__pretty: "[menu]",
-						__valLoaded: true
-					});
-
-				}
-				DL("inclusions.js | _collectSettings(): menus appended to rows");
-			} catch (e) {
-				DL(2, "inclusions.js | _collectSettings(): menu enumeration failed", e);
 			}
 
 			// Sort by module label then setting label
@@ -520,6 +499,23 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 
 			this._rows = rows;
 			DL("inclusions.js | AddSetting._collectSettings(): built", { count: rows.length });
+
+			// Diagnostics: specifically report namespaces with hidden settings but zero added rows
+			try {
+				const interesting = [];
+				for (const [ns, s] of stats.entries()) {
+					if ((s.hiddenTotal || 0) > 0 && (s.added || 0) === 0) {
+						interesting.push({ ns, ...s });
+					}
+				}
+
+				// Log only problem namespaces 
+				if (interesting.length) {
+					DL("inclusions.js | AddSetting._collectSettings(): namespaces with hidden settings but nothing addable", interesting);
+				}
+			} catch (eStat) {
+				DL(2, "inclusions.js | AddSetting._collectSettings(): stats summary failed", eStat);
+			}
 		} catch (e) {
 			DL(3, "inclusions.js | AddSetting._collectSettings(): failed to enumerate settings", e);
 			this._rows = [];
@@ -538,10 +534,11 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 				return;
 			}
 
-			const data = foundry.utils.duplicate(game.settings.get(BBMM_ID, "userInclusions") || {});
+			const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 			if (!Array.isArray(data.settings)) data.settings = [];
 
 			let added = 0;
+
 			for (const { namespace, key } of pairs) {
 				const exists = data.settings.some(s => s?.namespace === namespace && s?.key === key);
 				if (!exists) {
@@ -552,22 +549,35 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 			}
 
 			if (added > 0) {
-				await game.settings.set(BBMM_ID, "userInclusions", data);
-				try { Hooks.callAll("bbmmInclusionsChanged", { type: "menu", id: `${menuNs}.${menuKey}`, added }); } catch {}
-				DL(`inclusions.js | _includeMenu(): committed ${added} setting(s) from ${menuNs}.${menuKey}`);
+				const ok = await hlp_writeUserInclusions(data);
+
+				if (ok) {
+					try { this._incData = data; } catch {}
+					try { Hooks.callAll("bbmmInclusionsChanged", { type: "menu", id: `${menuNs}.${menuKey}`, added }); } catch {}
+					DL(`inclusions.js | _includeMenu(): committed ${added} setting(s) from ${menuNs}.${menuKey}`);
+				} else {
+					DL(3, `inclusions.js | _includeMenu(): FAILED writing to persistent storage for ${menuNs}.${menuKey}`, { added });
+				}
+			} else {
+				DL(`inclusions.js | _includeMenu(): nothing to add from ${menuNs}.${menuKey}`);
 			}
 		} catch (e) {
 			DL(3, "inclusions.js | _includeMenu(): failed", e);
 		}
 	}
 
+	// Include single setting pair
 	async _include(namespace, key) {
-		const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 		if (!Array.isArray(data.settings)) data.settings = [];
 		const exists = data.settings.some(s => s?.namespace === namespace && s?.key === key);
 		if (!exists) data.settings.push({ namespace, key });
-		await game.settings.set(BBMM_ID, "userInclusions", data);
-		try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace, key }); } catch {}
+
+		const ok = await hlp_writeUserInclusions(data);
+		if (ok) {
+			this._incData = data;
+			try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace, key }); } catch {}
+		}
 	}
 
 	/* ============================================================================
@@ -575,6 +585,13 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 	============================================================================ */
 
 	async _renderHTML() {
+		try {
+			this._incData = await hlp_readUserInclusions();
+		} catch (e) {
+			DL(2, "inclusions.js | AddSetting._renderHTML(): failed to load inclusions cache", e);
+			this._incData = { settings: [], modules: [] };
+		}
+
 		try {
 			this._collectSettings();
 		} catch (e) {
@@ -584,46 +601,46 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 
 		const cols = "grid-template-columns: minmax(220px,1.2fr) minmax(240px,1.6fr) 90px minmax(320px,2fr) 96px;";
 		const css =
-			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important;overflow:hidden}` +
-			`.bbmm-ai-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}` +
-			`.bbmm-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}` +
-			`.bbmm-toolbar select{width:260px;min-width:260px;max-width:260px}` +
-			`.bbmm-toolbar input[type="text"]{flex:1;min-width:260px}` +
+			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important;overflow:hidden}
+			.bbmm-ai-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}
+			.bbmm-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}
+			.bbmm-toolbar select{width:260px;min-width:260px;max-width:260px}
+			.bbmm-toolbar input[type="text"]{flex:1;min-width:260px}
 
-			`.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}` +
-			`.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}` +
+			.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}
+			.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}
 
-			`.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}` +
-			`.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}` +
-			`.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}` +
+			.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}
+			.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}
+			.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}
 
-			`.bbmm-grid-body .c-mod,.bbmm-grid-body .c-key{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}` +
-			`.bbmm-grid-body .c-scope{text-transform:capitalize;opacity:.85;white-space:nowrap}` +
+			.bbmm-grid-body .c-mod,.bbmm-grid-body .c-key{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+			.bbmm-grid-body .c-scope{text-transform:capitalize;opacity:.85;white-space:nowrap}
 
-			`.bbmm-grid-body .c-val{cursor:pointer}` +
-			`.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}` +
-			`.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}` +
+			.bbmm-grid-body .c-val{cursor:pointer}
+			.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}
+			.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}
 
-			`.bbmm-grid-body .row .val-expand{display:none;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}` +
-			`.bbmm-grid-body .row.expanded .val-expand{display:block}` +
-			`.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}` +
-			`.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}` +
+			.bbmm-grid-body .row .val-expand{display:none;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}
+			.bbmm-grid-body .row.expanded .val-expand{display:block}
+			.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}
+			.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}
 
-			`.bbmm-grid-body .c-act{display:flex;justify-content:flex-end;align-items:center;padding-right:8px}` +
-			`.bbmm-grid-body .bbmm-inc-act{display:inline-flex;align-items:center;justify-content:center;min-width:80px;height:32px;padding:0 12px;font-size:.95rem;line-height:1}` +
-			`.bbmm-grid-body .bbmm-inc-act.bbmm-inc-done{pointer-events:none;opacity:.75;font-weight:700}` +
+			.bbmm-grid-body .c-act{display:flex;justify-content:flex-end;align-items:center;padding-right:8px}
+			.bbmm-grid-body .bbmm-inc-act{display:inline-flex;align-items:center;justify-content:center;min-width:80px;height:32px;padding:0 12px;font-size:.95rem;line-height:1}
+			.bbmm-grid-body .bbmm-inc-act.bbmm-inc-done{pointer-events:none;opacity:.75;font-weight:700}
 
 			/* FOOTER */
-			`.bbmm-add-footer{` +
-				`display:flex;` +
-				`justify-content:center;` +
-				`align-items:center;` +
-				`width:100%;` +
-				`padding:.5rem 0;` +
-				`margin-top:.25rem;` +
-				`border-top:1px solid var(--color-border,#444);` +
-			`}` +
-			`.bbmm-add-footer button{min-width:160px}`;
+			.bbmm-add-footer{
+				display:flex;
+				justify-content:center;
+				align-items:center;
+				width:100%;
+				padding:.5rem 0;
+				margin-top:.25rem;
+				border-top:1px solid var(--color-border,#444);
+			}
+			.bbmm-add-footer button{min-width:160px}`;
 
 		const moduleList = this._buildModuleList();
 		const moduleOpts = ['<option value=""></option>']
@@ -635,22 +652,21 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		const head = `<div class="bbmm-grid-head">${this._renderHeader()}</div>`;
 		const rowsHtml = (this._rows || []).map(r => this._rowHTML(r)).join("");
 		const body = `<div class="bbmm-grid-body" id="bbmm-ai-body">${rowsHtml}</div>`;
+		const form = `<style>${css}</style>
+			<section class="bbmm-ai-root">
+				<div class="bbmm-toolbar">
+					<select id="bbmm-ai-module">${moduleOpts}</select>
+					<input id="bbmm-ai-filter" type="text" placeholder="${LT.macro.search()}" />
+					<span class="count" style="opacity:.85;font-weight:600">${LT.macro.showing()} <span id="bbmm-ai-count">0</span> ${LT.macro.of()} <span id="bbmm-ai-total">${this._rows.length}</span></span>
+				</div>
+				${head} 
+				${body}
+				<div class="bbmm-add-footer">
+					<button type="button" id="bbmm-ai-close">${LT.buttons.close()}</button>
+				</div>
+			</section>`;
 
-		return (
-			`<style>${css}</style>` +
-			`<section class="bbmm-ai-root">` +
-				`<div class="bbmm-toolbar">` +
-					`<select id="bbmm-ai-module">${moduleOpts}</select>` +
-					`<input id="bbmm-ai-filter" type="text" placeholder="${foundry.utils.escapeHTML(LT.search())}" />` +
-					`<span class="count" style="opacity:.85;font-weight:600">${LT.showing()} <span id="bbmm-ai-count">0</span> ${LT.of()} <span id="bbmm-ai-total">${this._rows.length}</span></span>` +
-				`</div>` +
-				head +
-				body +
-				`<div class="bbmm-add-footer">` +
-					`<button type="button" id="bbmm-ai-close">${foundry.utils.escapeHTML(LT.buttons.close())}</button>` +
-				`</div>` +
-			`</section>`
-		);
+		return(form);
 	}
 
 	async _replaceHTML(result, _options) {
@@ -753,14 +769,14 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 						if (r?.__isMenu) {
 							added = await this._includeMenu(ns, key);
 						} else {
-							const data = foundry.utils.duplicate(game.settings.get(BBMM_ID, "userInclusions") || {});
+							const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 							if (!Array.isArray(data.settings)) data.settings = [];
 
 							const before = data.settings.length;
 							const exists = data.settings.some(s => s?.namespace === ns && s?.key === key);
 							if (!exists) data.settings.push({ namespace: ns, key });
 
-							await game.settings.set(BBMM_ID, "userInclusions", data);
+							await hlp_writeUserInclusions(data);
 
 							const after = data.settings.length;
 							added = after > before ? 1 : 0;
@@ -783,8 +799,77 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 					return;
 				}
 
-				// Expand/collapse value cell
+				// Copy / collapse (MUST run BEFORE the .c-val click toggler)
+				if (rowEl) {
+					const copyBtn = target.closest(".btn-copy");
+					if (copyBtn) {
+						ev.preventDefault();
+						ev.stopPropagation();
+
+						try {
+							const ns = String(rowEl?.dataset?.ns ?? "");
+							const key = String(rowEl?.dataset?.key ?? "");
+							if (!ns || !key) return;
+
+							const r = this._rows?.find?.(x => x.ns === ns && x.key === key);
+
+							// Ensure we have something meaningful even if the row was never expanded
+							if (r && !r.__isMenu && !r.__valLoaded) {
+								try {
+									const v = game.settings.get(r.ns, r.key);
+									r.__value = v;
+									r.__preview = this._toPreview(v);
+									r.__pretty = this._toPretty(v);
+									r.__valLoaded = true;
+
+									const codeEl = rowEl.querySelector(".val-preview code");
+									if (codeEl) {
+										codeEl.textContent = r.__preview;
+										codeEl.title = r.__preview;
+									}
+								} catch (eRead) {
+									DL(2, "inclusions.js | AddSetting: copy read value failed", { ns, key, err: eRead });
+								}
+							}
+
+							// Prefer expanded pretty view if present; else cached pretty; else preview
+							const pre = rowEl.querySelector(".val-pre");
+							const txt =
+								String(pre?.textContent ?? "").trim() ||
+								String(r?.__pretty ?? "").trim() ||
+								String(r?.__preview ?? "").trim() ||
+								"";
+
+							const ok = await copyPlainText(txt);
+							if (ok) {
+								DL(`inclusions.js | AddSetting: copied ${ns}.${key} to clipboard`);
+								ui.notifications?.info(LT.copiedToClipboard());
+							} else {
+								DL(2, "inclusions.js | AddSetting: copyPlainText failed", { ns, key });
+								ui.notifications?.warn(LT.failedCopyToClipboard());
+							}
+						} catch (e) {
+							DL(2, "inclusions.js | AddSetting: copy handler failed", e);
+							ui.notifications?.warn(LT.failedCopyToClipboard());
+						}
+						return;
+					}
+
+					const collapseBtn = target.closest(".btn-collapse");
+					if (collapseBtn) {
+						ev.preventDefault();
+						ev.stopPropagation();
+
+						rowEl.classList.remove("expanded");
+						return;
+					}
+				}
+
+				// Expand/collapse value cell (ignore clicks on buttons/controls inside)
 				if (rowEl && target.closest(".c-val")) {
+					// If the click was on an interactive element, do not toggle the row
+					if (target.closest("button, a, input, select, textarea, label")) return;
+
 					const wasExpanded = rowEl.classList.contains("expanded");
 					rowEl.classList.toggle("expanded");
 
@@ -821,29 +906,6 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 					return;
 				}
 
-				// Copy / collapse
-				if (rowEl) {
-					const copyBtn = target.closest(".btn-copy");
-					if (copyBtn) {
-						const pre = rowEl.querySelector(".val-pre");
-						const txt = pre?.textContent ?? "";
-						try {
-							await navigator.clipboard.writeText(String(txt));
-							ui.notifications?.info(LT.copiedToClipboard());
-						} catch (e) {
-							DL(2, "inclusions.js | AddSetting: clipboard failed", e);
-							ui.notifications?.warn(LT.failedCopyToClipboard());
-						}
-						return;
-					}
-
-					const collapseBtn = target.closest(".btn-collapse");
-					if (collapseBtn) {
-						rowEl.classList.remove("expanded");
-						return;
-					}
-				}
-
 				// Generic close buttons (just close, no reopen)
 				const closeBtn = target.closest?.('[data-action="close"], [data-action="cancel"], .bbmm-close');
 				if (closeBtn) {
@@ -866,7 +928,7 @@ BBMMAddSettingInclusionAppV2.prototype._includeMenu = async function(menuNs, men
 		let pairs = [];
 		try { pairs = await _resolveMenuIdsToPairs(menuNs, menuKey); } catch {}
 
-		const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 		if (!Array.isArray(data.settings)) data.settings = [];
 
 		if (Array.isArray(pairs) && pairs.length) {
@@ -891,7 +953,7 @@ BBMMAddSettingInclusionAppV2.prototype._includeMenu = async function(menuNs, men
 		}
 
 		if (added > 0) {
-			await game.settings.set(BBMM_ID, "userInclusions", data);
+			await hlp_writeUserInclusions(data);
 			try { Hooks.callAll("bbmmInclusionsChanged", { type: "menu", id: `${menuNs}.${menuKey}`, added }); } catch {}
 		}
 		return added;
@@ -917,9 +979,9 @@ class BBMMAddModuleInclusionAppV2 extends foundry.applications.api.ApplicationV2
 		this._rows = [];
 	}
 
-	_collectModules() {
+	async _collectModules() {
 	try {
-		const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 		const incModules = new Set(Array.isArray(data.modules) ? data.modules : []);
 
 		// Use helpers to mirror exclusions filtering (and hide EXPORT_SKIP)
@@ -955,10 +1017,10 @@ class BBMMAddModuleInclusionAppV2 extends foundry.applications.api.ApplicationV2
 }
 
 	async _includeModule(ns) {
-		const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 		if (!Array.isArray(data.modules)) data.modules = [];
 		if (!data.modules.includes(ns)) data.modules.push(ns);
-		await game.settings.set(BBMM_ID, "userInclusions", data);
+		await await hlp_writeUserInclusions(data);
 		try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", namespace: ns }); } catch {}
 	}
 
@@ -969,7 +1031,7 @@ class BBMMAddModuleInclusionAppV2 extends foundry.applications.api.ApplicationV2
 				await this._collectModules();
 			} else {
 				// Fallback collector (safe): all modules by title
-				const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+				const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 				const included = new Set(Array.isArray(data.modules) ? data.modules : []);
 				this._rows = Array.from(game.modules.values()).map(m => ({
 					ns: m.id,
@@ -1059,10 +1121,10 @@ class BBMMAddModuleInclusionAppV2 extends foundry.applications.api.ApplicationV2
 					try {
 						incBtn.disabled = true;
 
-						const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+						const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 						if (!Array.isArray(data.modules)) data.modules = [];
 						if (!data.modules.includes(ns)) data.modules.push(ns);
-						await game.settings.set(BBMM_ID, "userInclusions", data);
+						await hlp_writeUserInclusions(data); 
 						try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", namespace: ns }); } catch {}
 
 						incBtn.classList.add("bbmm-inc-done");
@@ -1112,42 +1174,72 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		{DATA HELPERS}
 	============================================================================ */
 
-	_getInclusions() {
-		const inc = game.settings.get(BBMM_ID, "userInclusions") || {};
+	// Get all inclusion entries (validated)
+	async _getInclusions() {
+		const inc = await hlp_readUserInclusions();
 		const arr = Array.isArray(inc.settings) ? inc.settings : [];
 		return arr.filter(s => !!s?.namespace && !!s?.key);
 	}
 
+	// Get module label (with i18n if possible)
 	_getNsLabel(ns) {
 		const mod = game.modules.get(ns);
 		return String(mod?.title ?? ns ?? "");
 	}
 
+	// Get setting label (with i18n if possible)
 	_getSettingLabel(ns, key) {
-		const entry = game.settings.settings.get(`${ns}.${key}`);
-		const nm = entry?.name ?? "";
-		if (nm) {
-			try { return game.i18n.localize(String(nm)); }
-			catch { /* fall through */ }
+		const id = `${ns}.${key}`;
+
+		// Normal setting label
+		const setting = game.settings.settings.get(id);
+		if (setting?.name) {
+			try {
+				return game.i18n.localize(String(setting.name));
+			} catch {
+				// fall through
+			}
 		}
 
-		// If not a setting, this may be a menu placeholder — use the menu's label
-		try {
-			const menu = game.settings.menus.get(`${ns}.${key}`);
-			if (menu?.name) return game.i18n.localize(String(menu.name));
-		} catch { /* ignore */ }
+		// Menu placeholder label
+		const menu = game.settings.menus.get(id);
+		if (menu?.name) {
+			try {
+				return game.i18n.localize(String(menu.name));
+			} catch {
+				// fall through
+			}
+		}
 
 		// Fallback to raw key
 		return String(key);
 	}
 
+	// Remove single setting pair
 	async _remove(namespace, key) {
-		const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 		if (!Array.isArray(data.settings)) data.settings = [];
+
+		const before = data.settings.length;
 		data.settings = data.settings.filter(s => !(s?.namespace === namespace && s?.key === key));
-		await game.settings.set(BBMM_ID, "userInclusions", data);
+		const removed = (data.settings.length !== before);
+
+		if (!removed) {
+			DL(`inclusions.js | _remove(): nothing to remove for ${namespace}.${key}`);
+			return;
+		}
+
+		const ok = await hlp_writeUserInclusions(data);
+		if (!ok) {
+			DL(3, `inclusions.js | _remove(): FAILED writing persistent storage for ${namespace}.${key}`);
+			return;
+		}
+
+		try { this._incData = data; } catch {}
 		try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace, key, removed: true }); } catch {}
+		DL(`inclusions.js | _remove(): removed ${namespace}.${key}`);
 	}
+
 
 	/* ============================================================================
 		{RENDER}
@@ -1155,9 +1247,10 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 	async _renderHTML() {
 		// Build rows (modules + settings) 
-		const inc = game.settings.get(BBMM_ID, "userInclusions") || {};
+		const inc = await hlp_readUserInclusions();
 		const mods = Array.isArray(inc.modules)  ? inc.modules  : [];
 		const sets = Array.isArray(inc.settings) ? inc.settings : [];
+		DL("inclusions.js | _renderHTML(): building rows", { modules: mods.length, settings: sets.length });
 
 		// Module rows
 		const modRows = mods.map(ns => {
@@ -1342,11 +1435,32 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					// Remove module inclusion
 					try {
 						btn.disabled = true;
-						const data = game.settings.get(BBMM_ID, "userInclusions") || {};
+
+						const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 						const mods = Array.isArray(data.modules) ? data.modules : [];
+
+						const before = mods.length;
 						data.modules = mods.filter(x => x !== ns);
-						await game.settings.set(BBMM_ID, "userInclusions", data);
+						const removed = (data.modules.length !== before);
+
+						if (!removed) {
+							DL(`inclusions.js | delete(module): nothing to remove for ${ns}`);
+							btn.disabled = false;
+							return;
+						}
+
+						const ok = await hlp_writeUserInclusions(data);
+						if (!ok) {
+							btn.disabled = false;
+							DL(3, `inclusions.js | delete(module): FAILED writing persistent storage for ${ns}`);
+							ui.notifications?.error(LT.inclusions.failedRemoveInclusion());
+							return;
+						}
+
+						try { this._incData = data; } catch {}
 						try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
+						DL(`inclusions.js | delete(module): removed ${ns}`);
+
 						await this.render(true);
 					} catch (e) {
 						btn.disabled = false;

@@ -336,8 +336,10 @@
 			"moduleNotes_name": "BBMM Module Notes",
 			"moduleNotes_hint": "Notes added to modules.",
 			"moduleLocksName": "Locked Modules",
-			"moduleLocksHint": "Modules listed here are locked in BBMM and cannot be enabled or disabled (manually or via bulk actions)."
-		},
+			"moduleLocksHint": "Modules listed here are locked in BBMM and cannot be enabled or disabled (manually or via bulk actions).",
+			"autoForceReloadName": "Force Player Reload",
+			"autoForceReloadHint": "Force instant reload to players when settings new settings are locked/synced"
+		},	
 		"macro": {
 			"columnName": "Name",
 			"columnHint": "Hint",

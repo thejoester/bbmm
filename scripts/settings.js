@@ -77,12 +77,19 @@ async function checkFolderMigration(){
 }
 
 // Preset Storage Migration =====================================================
+// !!! REMOVE after version 0.8.0 !!!
 async function hlp_loadPresets() {
 	if (!game.user.isGM) return; // GM Only	
 
 	// constants
 	const FLAG_MOD = "modulePresetsPersistentStorageMigration";
 	const FLAG_SET = "settingsPresetsPersistentStorageMigration";
+	const FLAG_INC = "inclusionsPersistentStorageMigration";
+	const FLAG_EXC = "exclusionsPersistentStorageMigration";
+	const FILE_MOD = "module-presets.json";
+	const FILE_SET = "settings-presets.json";
+	const FILE_INC = "user-inclusions.json";
+	const FILE_EXC = "user-exclusions.json";
 	const worldTitleRaw = String(game.world?.title || "Unknown World").trim();
 	const worldTitle = worldTitleRaw || "Unknown World";
 	const suffix = ` (${worldTitle})`;
@@ -91,103 +98,379 @@ async function hlp_loadPresets() {
 		HELPERS
 	================================================================== */
 
-		// Get all flags object
-		function getFlags() {
-			const obj = game.settings.get(BBMM_ID, "bbmmFlags");
-			return obj && typeof obj === "object" ? { ...obj } : {};
-		}
+	// Get storage URL for a given subdir and filename
+	function storageUrl(subdir, filename) {
+		return `modules/${BBMM_ID}/storage/${subdir}/${filename}`;
+	}
 
-		// Check a flag; falsy if missing.
-		function hasFlag(key) {
-			return Boolean(getFlags()[key]);
-		}
+	// Read object from storage file (returns null on failure/not found)
+	async function readStorageObject(subdir, filename) {
+		const url = storageUrl(subdir, filename);
 
-		// Set/merge a single flag without clobbering others.
-		async function setFlag(key, value) {
-			const current = getFlags();
-			current[key] = value;
-			await game.settings.set(BBMM_ID, "bbmmFlags", current);
-		}
-
-		// Sanitize a flat map of { [name]: value } where value is either an object or array of strings
-		function sanitizeFlatMap(raw, valueIsArray = false) {
-			const out = {};
-			if (!raw || typeof raw !== "object") return out;
-
-			for (const [k, v] of Object.entries(raw)) {
-				const name = String(k || "").trim();
-				if (!name) continue;
-
-				if (valueIsArray) {
-					if (!Array.isArray(v)) continue;
-					out[name] = v.filter(x => typeof x === "string");
-				} else {
-					if (!v || typeof v !== "object") continue;
-					out[name] = v;
+		try {
+			const res = await fetch(url, { cache: "no-store" });
+			if (!res.ok) {
+				// Avoid noisy logs for expected "missing file" cases
+				if (res.status !== 404) {
+					DL(2, `settings.js | hlp_loadPresets(): readStorageObject(): fetch not ok for "${url}" (${res.status})`);
 				}
+				return null;
 			}
-
-			return out;
+			const data = await res.json();
+			return data;
+		} catch (err) {
+			DL(2, `settings.js | hlp_loadPresets(): readStorageObject(): failed for "${url}"`, err);
+			return null;
 		}
+	}
 
-		// Generate a unique name in targetMap based on baseName
-		function makeUniqueName(targetMap, baseName) {
-			if (!targetMap[baseName]) return baseName;
+	// Write object to storage file (returns true on success)
+	async function writeStorageObject(subdir, filename, obj) {
+		const payload = JSON.stringify(obj ?? {}, null, 2);
+		const file = new File([payload], filename, { type: "application/json" });
 
-			let n = 2;
-			while (targetMap[`${baseName} ${n}`]) n++;
-			return `${baseName} ${n}`;
-		}
-
-		// Read flat map from storage file
-		async function readStorageFlat(filename) {
-			const url = `modules/${BBMM_ID}/storage/presets/${filename}`;
-
-			try {
-				const res = await fetch(url, { cache: "no-store" });
-				if (!res.ok) return {};
-				const data = await res.json();
-				return data && typeof data === "object" ? data : {};
-			} catch {
-				return {};
+		try {
+			const res = await FilePicker.uploadPersistent(BBMM_ID, subdir, file, {}, { notify: false });
+			if (!res || (!res.path && !res.url)) {
+				DL(3, `settings.js | hlp_loadPresets(): writeStorageObject(): upload returned no path/url for "${subdir}/${filename}"`, res);
+				return false;
 			}
+			DL(`settings.js | hlp_loadPresets(): writeStorageObject(): wrote "${subdir}/${filename}"`, res);
+			return true;
+		} catch (err) {
+			DL(3, `settings.js | hlp_loadPresets(): writeStorageObject(): uploadPersistent failed for "${subdir}/${filename}"`, err);
+			return false;
+		}
+	}
+
+	// Check if storage file exists (fetchable)
+	async function storageFileExistsIn(subdir, filename) {
+		const dir = `modules/${BBMM_ID}/storage/${subdir}`;
+		const url = storageUrl(subdir, filename);
+
+		// Try browse first (more reliable in Foundry hosting)
+		try {
+			const res = await FilePicker.browse("data", dir);
+			const files = Array.isArray(res?.files) ? res.files : [];
+			if (files.some(f => String(f).endsWith(`/${filename}`))) return true;
+		} catch (err) {
+			DL(2, `settings.js | hlp_loadPresets(): storageFileExistsIn(): browse failed for "${dir}", falling back to fetch`, err);
 		}
 
-		// Write flat map to storage file
-		async function writeStorageFlat(filename, obj) {
-			const payload = JSON.stringify(obj ?? {}, null, 2);
-			const file = new File([payload], filename, { type: "application/json" });
+		// Fallback: fetch
+		try {
+			const res = await fetch(url, { cache: "no-store" });
+			return res.ok;
+		} catch {
+			return false;
+		}
+	}
 
-			const res = await FilePicker.uploadPersistent(BBMM_ID, "presets", file, {}, { notify: false });
-			if (!res || (!res.path && !res.url)) return false;
+	// Ensure a storage file exists in subdir (create defaultObj if missing)
+	async function ensureStorageFileIn(subdir, filename, defaultObj = {}) {
+		const exists = await storageFileExistsIn(subdir, filename);
+		if (exists) {
+			DL(`settings.js | hlp_loadPresets(): storage file exists "${subdir}/${filename}"`);
 			return true;
 		}
 
-		// Check if storage file exists (fetchable)
-		async function storageFileExists(filename) {
-			const url = `modules/${BBMM_ID}/storage/presets/${filename}`;
+		DL(2, `settings.js | hlp_loadPresets(): storage file missing "${subdir}/${filename}", creating...`);
+		const ok = await writeStorageObject(subdir, filename, defaultObj);
 
-			try {
-				const res = await fetch(url, { cache: "no-store" });
-				return res.ok;
-			} catch {
-				return false;
-			}
+		if (ok) DL(`settings.js | hlp_loadPresets(): created storage file "${subdir}/${filename}"`);
+		else DL(3, `settings.js | hlp_loadPresets(): FAILED to create storage file "${subdir}/${filename}"`);
+
+		return ok;
+	}
+
+	// Sanitize inclusions object
+	function sanitizeInclusions(raw) {
+		const out = { settings: [], modules: [] };
+		if (!raw || typeof raw !== "object") return out;
+
+		if (Array.isArray(raw.settings)) {
+			out.settings = raw.settings
+				.filter(s => s && typeof s === "object")
+				.map(s => ({
+					namespace: String(s.namespace ?? "").trim(),
+					key: String(s.key ?? "").trim()
+				}))
+				.filter(s => s.namespace && s.key);
 		}
 
-		// Ensure a storage file exists (create empty {} if missing)
-		async function ensureStorageFile(filename) {
-			const exists = await storageFileExists(filename);
-			if (exists) return true;
+		if (Array.isArray(raw.modules)) {
+			out.modules = raw.modules
+				.filter(x => typeof x === "string")
+				.map(x => x.trim())
+				.filter(Boolean);
+		}
 
-			const ok = await writeStorageFlat(filename, {});
-			if (ok) {
-				DL(`settings.js | hlp_loadPresets(): created missing storage file "${filename}"`);
+		return out;
+	}
+
+	// Sanitize exclusions object
+	function sanitizeExclusions(raw) {
+		const out = { settings: [], modules: [] };
+		if (!raw || typeof raw !== "object") return out;
+
+		if (Array.isArray(raw.settings)) {
+			out.settings = raw.settings
+				.filter(s => s && typeof s === "object")
+				.map(s => ({
+					namespace: String(s.namespace ?? "").trim(),
+					key: String(s.key ?? "").trim()
+				}))
+				.filter(s => s.namespace && s.key);
+		}
+
+		if (Array.isArray(raw.modules)) {
+			out.modules = raw.modules
+				.filter(x => typeof x === "string")
+				.map(x => x.trim())
+				.filter(Boolean);
+		}
+
+		return out;
+	}
+
+	// Merge two arrays of {namespace, key} objects, ensuring uniqueness
+	function mergePairArraysUnique(targetArr, sourceArr) {
+		const set = new Set(targetArr.map(s => `${s.namespace}::${s.key}`));
+		let added = 0;
+
+		for (const s of sourceArr) {
+			const k = `${s.namespace}::${s.key}`;
+			if (set.has(k)) continue;
+			set.add(k);
+			targetArr.push(s);
+			added++;
+		}
+
+		return added;
+	}
+
+	// Merge two arrays of strings, ensuring uniqueness
+	function mergeStringArraysUnique(targetArr, sourceArr) {
+		const set = new Set(targetArr);
+		let added = 0;
+
+		for (const v of sourceArr) {
+			if (set.has(v)) continue;
+			set.add(v);
+			targetArr.push(v);
+			added++;
+		}
+
+		return added;
+	}
+
+	// Get all flags object
+	function getFlags() {
+		const obj = game.settings.get(BBMM_ID, "bbmmFlags");
+		return obj && typeof obj === "object" ? { ...obj } : {};
+	}
+
+	// Check a flag; falsy if missing.
+	function hasFlag(key) {
+		return Boolean(getFlags()[key]);
+	}
+
+	// Set/merge a single flag without clobbering others.
+	async function setFlag(key, value) {
+		const current = getFlags();
+		current[key] = value;
+		await game.settings.set(BBMM_ID, "bbmmFlags", current);
+	}
+
+	// Sanitize a flat map of { [name]: value } where value is either an object or array of strings
+	function sanitizeFlatMap(raw, valueIsArray = false) {
+		const out = {};
+		if (!raw || typeof raw !== "object") return out;
+
+		for (const [k, v] of Object.entries(raw)) {
+			const name = String(k || "").trim();
+			if (!name) continue;
+
+			if (valueIsArray) {
+				if (!Array.isArray(v)) continue;
+				out[name] = v.filter(x => typeof x === "string");
 			} else {
-				DL(3, `settings.js | hlp_loadPresets(): FAILED to create missing storage file "${filename}"`);
+				if (!v || typeof v !== "object") continue;
+				out[name] = v;
 			}
-			return ok;
 		}
+
+		return out;
+	}
+
+	// Generate a unique name in targetMap based on baseName
+	function makeUniqueName(targetMap, baseName) {
+		if (!targetMap[baseName]) return baseName;
+
+		let n = 2;
+		while (targetMap[`${baseName} ${n}`]) n++;
+		return `${baseName} ${n}`;
+	}
+
+	// Read flat map from storage file
+	async function readStorageFlat(filename) {
+		const url = `modules/${BBMM_ID}/storage/presets/${filename}`;
+
+		try {
+			const res = await fetch(url, { cache: "no-store" });
+			if (!res.ok) return {};
+			const data = await res.json();
+			return data && typeof data === "object" ? data : {};
+		} catch {
+			return {};
+		}
+	}
+
+	// Write flat map to storage file
+	async function writeStorageFlat(filename, obj) {
+		const payload = JSON.stringify(obj ?? {}, null, 2);
+		const file = new File([payload], filename, { type: "application/json" });
+
+		const res = await FilePicker.uploadPersistent(BBMM_ID, "presets", file, {}, { notify: false });
+		if (!res || (!res.path && !res.url)) return false;
+		return true;
+	}
+
+	// Check if storage file exists (fetchable)
+	async function storageFileExists(filename) {
+		const url = `modules/${BBMM_ID}/storage/presets/${filename}`;
+
+		try {
+			const res = await fetch(url, { cache: "no-store" });
+			return res.ok;
+		} catch {
+			return false;
+		}
+	}
+
+	// Ensure a storage file exists (create empty {} if missing)
+	async function ensureStorageFile(filename) {
+		const exists = await storageFileExists(filename);
+		if (exists) return true;
+
+		const ok = await writeStorageFlat(filename, {});
+		if (ok) {
+			DL(`settings.js | hlp_loadPresets(): created missing storage file "${filename}"`);
+		} else {
+			DL(3, `settings.js | hlp_loadPresets(): FAILED to create missing storage file "${filename}"`);
+		}
+		return ok;
+	}
+
+	/* ========================================================================= 
+		Inclusions Migration
+	========================================================================= */
+	DL("settings.js | hlp_loadPresets(): inclusions migration check starting");
+
+	await ensureStorageFileIn("lists", FILE_INC, { settings: [], modules: [] });
+
+	if (!hasFlag(FLAG_INC)) {
+		DL(2, "settings.js | hlp_loadPresets(): inclusions migration flag not set, attempting migration");
+
+		const legacyRaw = game.settings.get(BBMM_ID, "userInclusions");
+		const legacy = sanitizeInclusions(legacyRaw);
+
+		DL("settings.js | hlp_loadPresets(): inclusions legacy sanitized", {
+			legacySettings: legacy.settings.length,
+			legacyModules: legacy.modules.length
+		});
+
+		const storageRaw = await readStorageObject("lists", FILE_INC);
+		const storage = sanitizeInclusions(storageRaw);
+
+		DL("settings.js | hlp_loadPresets(): inclusions storage sanitized", {
+			storageSettings: storage.settings.length,
+			storageModules: storage.modules.length
+		});
+
+		let addedSettings = 0;
+		let addedModules = 0;
+
+		if (legacy.settings.length) {
+			addedSettings = mergePairArraysUnique(storage.settings, legacy.settings);
+			DL("settings.js | hlp_loadPresets(): inclusions merged settings", { addedSettings });
+		}
+
+		if (legacy.modules.length) {
+			addedModules = mergeStringArraysUnique(storage.modules, legacy.modules);
+			DL("settings.js | hlp_loadPresets(): inclusions merged modules", { addedModules });
+		}
+
+		if (addedSettings || addedModules) {
+			const ok = await writeStorageObject("lists", FILE_INC, storage);
+			if (ok) {
+				await setFlag(FLAG_INC, true);
+				DL("settings.js | hlp_loadPresets(): migrated inclusions to storage", { addedSettings, addedModules });
+			} else {
+				DL(3, "settings.js | hlp_loadPresets(): FAILED migrating inclusions to storage (flag not set, will retry next start)");
+			}
+		} else {
+			await setFlag(FLAG_INC, true);
+			DL("settings.js | hlp_loadPresets(): no inclusions to migrate (or all duplicates), flag set");
+		}
+	} else {
+		DL("settings.js | hlp_loadPresets(): inclusions migration flag already set, skipping");
+	}
+
+	/* ========================================================================= 
+		Exclusions Migration
+	========================================================================= */
+	DL("settings.js | hlp_loadPresets(): exclusions migration check starting");
+
+	await ensureStorageFileIn("lists", FILE_EXC, { settings: [], modules: [] });
+
+	if (!hasFlag(FLAG_EXC)) {
+		DL(2, "settings.js | hlp_loadPresets(): exclusions migration flag not set, attempting migration");
+
+		const legacyRaw = game.settings.get(BBMM_ID, "userExclusions");
+		const legacy = sanitizeExclusions(legacyRaw);
+
+		DL("settings.js | hlp_loadPresets(): exclusions legacy sanitized", {
+			legacySettings: legacy.settings.length,
+			legacyModules: legacy.modules.length
+		});
+
+		const storageRaw = await readStorageObject("lists", FILE_EXC);
+		const storage = sanitizeExclusions(storageRaw);
+
+		DL("settings.js | hlp_loadPresets(): exclusions storage sanitized", {
+			storageSettings: storage.settings.length,
+			storageModules: storage.modules.length
+		});
+
+		let addedSettings = 0;
+		let addedModules = 0;
+
+		if (legacy.settings.length) {
+			addedSettings = mergePairArraysUnique(storage.settings, legacy.settings);
+			DL("settings.js | hlp_loadPresets(): exclusions merged settings", { addedSettings });
+		}
+
+		if (legacy.modules.length) {
+			addedModules = mergeStringArraysUnique(storage.modules, legacy.modules);
+			DL("settings.js | hlp_loadPresets(): exclusions merged modules", { addedModules });
+		}
+
+		if (addedSettings || addedModules) {
+			const ok = await writeStorageObject("lists", FILE_EXC, storage);
+			if (ok) {
+				await setFlag(FLAG_EXC, true);
+				DL("settings.js | hlp_loadPresets(): migrated exclusions to storage", { addedSettings, addedModules });
+			} else {
+				DL(3, "settings.js | hlp_loadPresets(): FAILED migrating exclusions to storage (flag not set, will retry next start)");
+			}
+		} else {
+			await setFlag(FLAG_EXC, true);
+			DL("settings.js | hlp_loadPresets(): no exclusions to migrate (or all duplicates), flag set");
+		}
+	} else {
+		DL("settings.js | hlp_loadPresets(): exclusions migration flag already set, skipping");
+	}
 
 	/* ========================================================================= 
 		Module Presets Migration
@@ -197,7 +480,7 @@ async function hlp_loadPresets() {
 		const legacy = sanitizeFlatMap(legacyRaw, true);
 
 		if (Object.keys(legacy).length) {
-			const storageRaw = await readStorageFlat("module-presets.json");
+			const storageRaw = await readStorageFlat(FILE_MOD);
 			const storage = sanitizeFlatMap(storageRaw, true);
 
 			let added = 0;
@@ -209,7 +492,7 @@ async function hlp_loadPresets() {
 				added++;
 			}
 
-			const ok = await writeStorageFlat("module-presets.json", storage);
+			const ok = await writeStorageFlat(FILE_MOD, storage);
 			if (ok) {
 				await setFlag(FLAG_MOD, true);
 				DL("settings.js | hlp_loadPresets(): migrated module presets to storage (suffix applied)", { added });
@@ -225,7 +508,7 @@ async function hlp_loadPresets() {
 	}
 
 	// Always ensure the module presets storage file exists (even if empty)
-	await ensureStorageFile("module-presets.json");
+	await ensureStorageFile(FILE_MOD);
 
 	/* ========================================================================= 
 		Settings Presets Migration
@@ -235,7 +518,7 @@ async function hlp_loadPresets() {
 		const legacy = sanitizeFlatMap(legacyRaw, false);
 
 		if (Object.keys(legacy).length) { // has legacy presets
-			const storageRaw = await readStorageFlat("settings-presets.json");
+			const storageRaw = await readStorageFlat(FILE_SET);
 			const storage = sanitizeFlatMap(storageRaw, false);
 
 			let added = 0;
@@ -247,7 +530,7 @@ async function hlp_loadPresets() {
 				added++;
 			}
 
-			const ok = await writeStorageFlat("settings-presets.json", storage);
+			const ok = await writeStorageFlat(FILE_SET, storage);
 			if (ok) {
 				await setFlag(FLAG_SET, true);
 				DL("settings.js | hlp_loadPresets(): migrated settings presets to storage (suffix applied)", { added });
@@ -263,9 +546,9 @@ async function hlp_loadPresets() {
 	}
 
 	// Always ensure the settings presets storage file exists (even if empty)
-	await ensureStorageFile("settings-presets.json");
-
+	await ensureStorageFile(FILE_SET);
 }
+
 
 //	Function for debugging - Prints out colored and tagged debug lines
 export function DL(intLogType, stringLogMsg, objObject = null) {
@@ -615,11 +898,12 @@ Hooks.once("init", () => {
 				default: {}
 			});
 
+			// Module Management - Module Locks
 			game.settings.register(BBMM_ID, "moduleLocks", {
 				name: game.i18n.localize("bbmm.settings.moduleLocksName"),
 				hint: game.i18n.localize("bbmm.settings.moduleLocksHint"),
 				scope: "world",
-				config: true,
+				config: false,
 				type: Object,			
 				default: [],			
 				onChange: (value) => {
@@ -887,6 +1171,15 @@ Hooks.once("init", () => {
 				onChange: v => DL(`settings.js | gestureAction_shiftRight -> ${v}`)
 			});
 			
+			game.settings.register(BBMM_ID, "autoForceReload", {
+				name: LT._settings.autoForceReloadName(),
+				hint: LT._settings.autoForceReloadHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: false
+			});
+
 			// Debug level for THIS module
 			game.settings.register(BBMM_ID, "debugLevel", {
 				name: LT.debugLevel(),
