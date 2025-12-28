@@ -1449,16 +1449,15 @@ export function openManualModulePresetMigration() {
 		}
 
 		const legacyNames = Object.keys(legacy).sort((a, b) => a.localeCompare(b));
-
-		DL(`${FN} legacy presets discovered`, {
-			count: legacyNames.length,
-			names: legacyNames
-		});
+		DL(`${FN} legacy presets discovered`, { count: legacyNames.length, names: legacyNames });
 
 		if (!legacyNames.length) {
-			// You already have two strings for this. Use the more specific one based on raw content.
 			const hadAnyLegacyKeys = legacyRaw && typeof legacyRaw === "object" && Object.keys(legacyRaw).length > 0;
-			DL(2, `${FN} ${hadAnyLegacyKeys ? LT.macro.manualMigrateNoUsablePresets() : LT.macro.manualMigrateNoLegacyFound()}`, { legacyRawKeys: Object.keys(legacyRaw || {}).length });
+			DL(
+				2,
+				`${FN} ${hadAnyLegacyKeys ? LT.macro.manualMigrateNoUsablePresets() : LT.macro.manualMigrateNoLegacyFound()}`,
+				{ legacyRawKeys: Object.keys(legacyRaw || {}).length }
+			);
 			return;
 		}
 
@@ -1496,13 +1495,7 @@ export function openManualModulePresetMigration() {
 			const file = new File([payload], "module-presets.json", { type: "application/json" });
 
 			try {
-				const res = await FilePicker.uploadPersistent(
-					BBMM_ID,
-					"presets",
-					file,
-					{},
-					{ notify: false }
-				);
+				const res = await FilePicker.uploadPersistent(BBMM_ID, "presets", file, {}, { notify: false });
 
 				if (!res || (!res.path && !res.url)) {
 					DL(3, `${FN} writeStorageModulePresets(): upload returned no path/url`, res);
@@ -1522,135 +1515,111 @@ export function openManualModulePresetMigration() {
 		========================= */
 
 		const suffix = String(LT.macro.manualMigrateManualSuffix?.() ?? " (manual)");
-		const firstName = legacyNames[0];
-		const defaultNewName = `${firstName}${suffix}`;
 
-		const optionsHtml = legacyNames
-			.map(n => `<option value="${foundry.utils.escapeHTML(n)}">${foundry.utils.escapeHTML(n)}</option>`)
-			.join("");
+		const optionsHtml = legacyNames.map((n, i) => {
+			const safeName = foundry.utils.escapeHTML(String(n));
+			const safeVal = foundry.utils.escapeHTML(String(n));
+			const count = Number.isFinite(legacy?.[n]?.length) ? legacy[n].length : 0;
+
+			return `
+				<label class="bbmm-mm-item">
+					<input type="checkbox" name="legacyPreset" value="${safeVal}" checked />
+					<span class="bbmm-mm-name" title="${safeName}">${safeName}</span>
+					<span class="bbmm-mm-meta">(${count} modules)</span><br/>
+				</label>
+			`;
+		}).join("");
 
 		const content = `
 			<style>
-				.bbmm-manmig{display:flex;flex-direction:column;gap:.75rem;min-width:520px}
-				.bbmm-manmig h2{margin:0;font-size:1.1rem}
-				.bbmm-manmig .desc{opacity:.85}
-				.bbmm-manmig .grid{display:grid;grid-template-columns:160px 1fr;gap:.5rem .75rem;align-items:center}
-				.bbmm-manmig label{font-weight:600;opacity:.9}
-				.bbmm-manmig input[type="text"], .bbmm-manmig select{width:100%}
+				.bbmm-mm{display:flex;flex-direction:column;gap:.75rem;min-width:520px}
+				.bbmm-mm h2{margin:0;font-size:1.35rem}
+				.bbmm-mm .desc{opacity:.85}
+
+				.bbmm-mm-actions{display:flex;flex-direction:row;align-items:center;gap:6px;margin:6px 0 0 0}
+				.bbmm-mm-actions button{flex:0 0 auto;width:auto;min-width:0;padding:.2rem .55rem}
+
+				.bbmm-mm-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+				.bbmm-mm-item{display:flex;flex-direction:row;align-items:center;gap:8px;width:100%;margin:0}
+				.bbmm-mm-item input{flex:0 0 auto}
+				.bbmm-mm-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+				.bbmm-mm-meta{flex:0 0 auto;opacity:.75;font-size:.9em;white-space:nowrap}
 			</style>
 
-			<section class="bbmm-manmig">
-				<h2>${foundry.utils.escapeHTML(LT.macro.manualMigrateTitle())}</h2>
-				<div class="desc">${foundry.utils.escapeHTML(LT.macro.manualMigrateDesc())}</div>
+			<section class="bbmm-mm">
+				<h2>${LT.macro.manualMigrateTitle()}</h2>
+				<div class="desc">${LT.macro.manualMigrateDesc()}</div>
 
-				<div class="grid">
-					<label>${foundry.utils.escapeHTML(LT.macro.manualMigrateLegacyPresetLabel())}</label>
-					<select name="legacyPreset">
-						${optionsHtml}
-					</select>
+				<div><strong>${LT.macro.manualMigrateLegacyPresetLabel()}</strong> (${legacyNames.length} presets)</div>
 
-					<label>${foundry.utils.escapeHTML(LT.macro.manualMigrateNewNameLabel())}</label>
-					<input type="text" name="newName" value="${foundry.utils.escapeHTML(defaultNewName)}" />
+				<div class="bbmm-mm-actions" style="display:flex;flex-direction:row;gap:6px;align-items:center;">
+					<button type="button" data-action="check-all">${LT.macro.selectAll()}</button>
+					<button type="button" data-action="check-none">${LT.macro.clear()}</button><br /><br />
+				</div>
+
+				<div class="bbmm-mm-list">
+					${optionsHtml}
+				</div>
+
+				<div style="opacity:.85;margin-top:6px;">
+					${LT.macro.manualMigrateImportNamingHint()}
 				</div>
 			</section>
 		`;
 
-		/* =========================
-			DialogV2 wiring
-		========================= */
+		const closeLabel = (typeof LT?.buttons?.close === "function") ? LT.buttons.close() : LT.buttons.cancel();
 
 		const dlg = new foundry.applications.api.DialogV2({
 			window: { title: LT.macro.manualMigrateWindowTitle(), resizable: false },
 			position: { width: "auto", height: "auto" },
 			content,
 			buttons: [
-				{ action: "migrate", label: LT.buttons.import(), default: true },
-				{ action: "cancel", label: LT.buttons.cancel() }
-			],
-			submit: (ctx) => ctx.action
-		});
+				{
+					action: "migrate",
+					label: LT.buttons.import(),
+					default: true,
+					callback: (event, button, dialog) => {
+						try {
+							const form = button?.form;
+							const boxes = [...(form?.querySelectorAll?.('input[type="checkbox"][name="legacyPreset"]:checked') ?? [])];
+							const selected = boxes
+								.filter(b => b instanceof HTMLInputElement)
+								.map(b => String(b.value || "").trim())
+								.filter(Boolean);
 
-		const onRender = (app) => {
-			if (app !== dlg) return;
-			Hooks.off("renderDialogV2", onRender);
-
-			const root = app.element;
-			if (!root) {
-				DL(2, `${FN} render missing dialog root`, { element: root });
-				return;
-			}
-
-			const form = root.querySelector("form");
-			if (!form) {
-				DL(2, `${FN} render missing form`, {
-					hasRoot: !!root,
-					rootTag: root?.tagName,
-					hasWindowContent: !!root.querySelector(".window-content"),
-					contentTag: root.querySelector(".window-content")?.tagName
-				});
-				return;
-			}
-
-			// Controls
-			const sel = form.elements.namedItem("legacyPreset");
-			const inp = form.elements.namedItem("newName");
-
-			if (!(sel instanceof HTMLSelectElement) || !(inp instanceof HTMLInputElement)) {
-				DL(2, `${FN} missing form fields`, {
-					hasSelect: sel instanceof HTMLSelectElement,
-					hasInput: inp instanceof HTMLInputElement
-				});
-				return;
-			}
-
-			// auto-fill name when preset changes (only if user hasn't edited it away from the default pattern)
-			sel.addEventListener("change", () => {
-				const picked = String(sel.value ?? "").trim();
-				if (!picked) return;
-				inp.value = `${picked}${suffix}`;
-				DL(`${FN} preset changed`, { picked, newName: inp.value });
-			});
-
-			// Button clicks
-			form.addEventListener("click", async (ev) => {
-				const btn = ev.target?.closest?.("button");
-				if (!(btn instanceof HTMLButtonElement)) return;
-
-				const action = btn.dataset.action || "";
-				if (!action) return;
-
-				ev.preventDefault();
-				ev.stopPropagation();
-
-				DL(`${FN} click`, { action });
-
-				if (action === "cancel") {
-					try { dlg.close(); } catch {}
-					return;
+							DL(`${FN} button callback: migrate`, { selectedCount: selected.length, selected });
+							return { action: "migrate", selected };
+						} catch (e) {
+							DL(3, `${FN} button callback: migrate failed`, e);
+							return { action: "migrate", selected: [] };
+						}
+					}
+				},
+				{
+					action: "close",
+					label: closeLabel
 				}
-
-				if (action !== "migrate") return;
-
+			],
+			submit: async (result) => {
 				try {
-					btn.disabled = true;
-
-					const legacyName = String(sel.value ?? "").trim();
-					const requestedName = String(inp.value ?? "").trim();
-					const baseName = requestedName || `${legacyName}${suffix}`;
-
-					if (!legacyName || !legacy[legacyName]) {
-						DL(2, `${FN} migrate: invalid legacy selection`, { legacyName });
-						btn.disabled = false;
+					if (!result || (typeof result === "string" && result === "close") || result?.action === "close") {
+						DL(`${FN} submit: close`);
 						return;
 					}
 
-					DL(`${FN} migrate: preparing`, {
-						legacyName,
-						baseName,
-						legacyModuleCount: legacy[legacyName].length
-					});
+					if (result?.action !== "migrate") {
+						DL(2, `${FN} submit: unexpected result`, { result });
+						return;
+					}
 
-					// read storage
+					const selected = Array.isArray(result.selected) ? result.selected : [];
+					if (!selected.length) {
+						DL(2, `${FN} submit: migrate: nothing selected`);
+						return;
+					}
+
+					DL(`${FN} submit: migrate start`, { selectedCount: selected.length, selected });
+
 					const storageRaw = await readStorageModulePresets();
 
 					// sanitize storage
@@ -1668,28 +1637,95 @@ export function openManualModulePresetMigration() {
 						}
 					}
 
-					const uniqueName = makeUniqueName(storage, baseName);
-					storage[uniqueName] = [...legacy[legacyName]];
+					let imported = 0;
+					const importedNames = [];
 
-					DL(`${FN} migrate: writing to storage`, {
-						uniqueName,
-						moduleCount: storage[uniqueName].length
-					});
+					for (const legacyName of selected) {
+						if (!legacyName || !legacy[legacyName]) {
+							DL(2, `${FN} submit: migrate: skipping invalid legacy`, { legacyName });
+							continue;
+						}
+
+						const baseName = `${legacyName}${suffix}`;
+						const uniqueName = makeUniqueName(storage, baseName);
+
+						storage[uniqueName] = [...legacy[legacyName]];
+						imported++;
+						importedNames.push(uniqueName);
+
+						DL(`${FN} submit: queued import`, {
+							legacyName,
+							uniqueName,
+							moduleCount: storage[uniqueName]?.length ?? 0
+						});
+					}
+
+					if (!imported) {
+						DL(2, `${FN} submit: migrate: selected presets were not usable`, { selected });
+						return;
+					}
+
+					DL(`${FN} submit: writing storage`, { imported, importedNames });
 
 					const ok = await writeStorageModulePresets(storage);
 					if (!ok) {
-						DL(3, `${FN} migrate: FAILED write`);
-						btn.disabled = false;
+						DL(3, `${FN} submit: migrate: FAILED write`);
 						return;
 					}
-					await hlp_loadPresets(); // refresh in-memory
 
-					DL(`${FN} migrate: SUCCESS`, { uniqueName });
+					try { await hlp_loadPresets(); }
+					catch (e) { DL(2, `${FN} submit: hlp_loadPresets refresh failed`, e); }
 
-					try { dlg.close(); } catch {}
+					DL(`${FN} submit: migrate: SUCCESS`, { imported, importedNames });
 				} catch (e) {
-					btn.disabled = false;
-					DL(3, `${FN} migrate: fatal error`, e);
+					DL(3, `${FN} submit: fatal error`, e);
+				}
+			}
+		});
+
+		const onRender = (app) => {
+			if (app !== dlg) return;
+			Hooks.off("renderDialogV2", onRender);
+
+			const root = app.element;
+			if (!root) {
+				DL(2, `${FN} render missing dialog root`, { element: root });
+				return;
+			}
+
+			// clamp
+			try {
+				root.style.minWidth = "560px";
+				root.style.maxWidth = "920px";
+				root.style.maxHeight = "800px";
+				root.style.overflow = "hidden";
+			} catch (e) { DL(2, `${FN} size clamp failed`, e); }
+
+			const contentEl = root.querySelector(".window-content") || root;
+
+			contentEl.addEventListener("click", (ev) => {
+				const btn = ev.target?.closest?.("button");
+				if (!(btn instanceof HTMLButtonElement)) return;
+
+				const action = String(btn.dataset.action || "").trim();
+				if (!action) return;
+
+				if (action === "check-all") {
+					const boxes = contentEl.querySelectorAll('input[type="checkbox"][name="legacyPreset"]');
+					DL(`${FN} check-all`, { boxes: boxes.length });
+					boxes.forEach(el => { if (el instanceof HTMLInputElement) el.checked = true; });
+					ev.preventDefault();
+					ev.stopPropagation();
+					return;
+				}
+
+				if (action === "check-none") {
+					const boxes = contentEl.querySelectorAll('input[type="checkbox"][name="legacyPreset"]');
+					DL(`${FN} check-none`, { boxes: boxes.length });
+					boxes.forEach(el => { if (el instanceof HTMLInputElement) el.checked = false; });
+					ev.preventDefault();
+					ev.stopPropagation();
+					return;
 				}
 			});
 		};
@@ -1713,9 +1749,6 @@ export async function openManualSettingsPresetMigration() {
 			return;
 		}
 
-		// You said you already added these imports earlier. If not, add them at the top:
-		// import { SETTING_SETTINGS_PRESETS_U } from "./settings.js";
-
 		if (typeof SETTING_SETTINGS_PRESETS_U === "undefined") {
 			DL(3, `${FN} SETTING_SETTINGS_PRESETS_U is not defined (missing import?)`);
 			return;
@@ -1723,9 +1756,8 @@ export async function openManualSettingsPresetMigration() {
 
 		const STORAGE_FILE = "settings-presets.json";
 		const STORAGE_SUBDIR = "presets";
-		const suffix = game.i18n?.localize?.("bbmm.macro.manualMigrateManualSuffix") || " (manual)";
+		const suffix = String(LT.macro.manualMigrateManualSuffix?.() ?? " (manual)");
 
-		// --- helpers ---
 		function sanitizeFlatMap(raw) {
 			const out = {};
 			if (!raw || typeof raw !== "object") return out;
@@ -1742,7 +1774,6 @@ export async function openManualSettingsPresetMigration() {
 
 		function makeUniqueName(targetMap, baseName) {
 			if (!targetMap[baseName]) return baseName;
-
 			let n = 2;
 			while (targetMap[`${baseName} ${n}`]) n++;
 			return `${baseName} ${n}`;
@@ -1780,7 +1811,7 @@ export async function openManualSettingsPresetMigration() {
 			}
 		}
 
-		// --- read legacy ---
+		// legacy
 		const legacyRaw = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS_U) || {};
 		const legacy = sanitizeFlatMap(legacyRaw);
 
@@ -1792,142 +1823,192 @@ export async function openManualSettingsPresetMigration() {
 			return;
 		}
 
-		// --- read storage ---
+		// storage (sanitized)
 		const storageRaw = await readStorageFlat(STORAGE_FILE);
 		const storage = sanitizeFlatMap(storageRaw);
 
 		DL(`${FN} storage presets read`, { count: Object.keys(storage).length });
 
-		// --- dialog content ---
-		const opt = legacyNames
-			.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`)
-			.join("");
+		const optionsHtml = legacyNames.map((n, i) => {
+			const safeName = foundry.utils.escapeHTML(String(n));
+			const safeVal = foundry.utils.escapeHTML(String(n));
+
+			return `
+				<label class="bbmm-mm-item">
+					<input type="checkbox" name="legacyPreset" value="${safeVal}" checked />
+					<span class="bbmm-mm-name" title="${safeName}">${safeName}</span><br/>
+				</label>
+			`;
+		}).join("");
 
 		const content = `
-			<section class="bbmm-manual-migrate" style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
-				<h2 style="margin:0;">${LT.macro.manualMigrateSettingsTitle()}</h2>
-				<div style="opacity:.9;">${LT.macro.manualMigrateSettingsDesc()}</div>
+			<style>
+				.bbmm-mm{display:flex;flex-direction:column;gap:.75rem;min-width:520px}
+				.bbmm-mm h2{margin:0;font-size:1.35rem}
+				.bbmm-mm .desc{opacity:.85}
 
-				<hr style="width:100%;opacity:.4;" />
+				.bbmm-mm-actions{display:flex;flex-direction:row;align-items:center;gap:6px;margin:6px 0 0 0}
+				.bbmm-mm-actions button{flex:0 0 auto;width:auto;min-width:0;padding:.2rem .55rem}
 
-				<div style="display:grid;grid-template-columns:170px 1fr;gap:.5rem;align-items:center;">
-					<label>${LT.macro.manualMigrateLegacyPresetLabel()}</label>
-					<select name="legacyName">${opt}</select>
+				.bbmm-mm-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+				.bbmm-mm-item{display:flex;flex-direction:row;align-items:center;gap:8px;width:100%;margin:0}
+				.bbmm-mm-item input{flex:0 0 auto}
+				.bbmm-mm-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+			</style>
 
-					<label>${LT.macro.manualMigrateNewNameLabel()}</label>
-					<input type="text" name="newName" value="${hlp_esc(legacyNames[0] + suffix)}" />
+			<section class="bbmm-mm">
+				<h2>${LT.macro.manualMigrateSettingsTitle()}</h2>
+				<div class="desc">${LT.macro.manualMigrateSettingsDesc()}</div>
+
+				<div><strong>${LT.macro.manualMigrateLegacyPresetLabel()}</strong> (${legacyNames.length} presets)</div>
+
+				<div class="bbmm-mm-actions" style="display:flex;flex-direction:row;gap:6px;align-items:center;">
+					<button type="button" data-action="check-all">${LT.macro.selectAll()}</button>
+					<button type="button" data-action="check-none">${LT.macro.clear()}</button><br/><br/>
+				</div>
+
+				<div class="bbmm-mm-list">
+					${optionsHtml}
+				</div>
+
+				<div style="opacity:.85;margin-top:6px;">
+					${LT.macro.manualMigrateImportNamingHint()}
 				</div>
 			</section>
 		`;
 
+		const closeLabel = (typeof LT?.buttons?.close === "function") ? LT.buttons.close() : LT.buttons.cancel();
+
 		const dlg = new foundry.applications.api.DialogV2({
-			window: {
-				title: LT.macro.manualMigrateSettingsWindowTitle(),
-				icon: "fas fa-right-left"
-			},
+			window: { title: LT.macro.manualMigrateSettingsWindowTitle(), icon: "fas fa-right-left" },
 			content,
 			buttons: [
-				{ action: "migrate", label: LT.buttons.import(), default: true },
-				{ action: "cancel", label: LT.buttons.cancel() }
+				{
+					action: "migrate",
+					label: LT.buttons.import(),
+					default: true,
+					callback: (event, button, dialog) => {
+						try {
+							const form = button?.form;
+							const boxes = [...(form?.querySelectorAll?.('input[type="checkbox"][name="legacyPreset"]:checked') ?? [])];
+							const selected = boxes
+								.filter(b => b instanceof HTMLInputElement)
+								.map(b => String(b.value || "").trim())
+								.filter(Boolean);
+
+							DL(`${FN} button callback: migrate`, { selectedCount: selected.length, selected });
+							return { action: "migrate", selected };
+						} catch (e) {
+							DL(3, `${FN} button callback: migrate failed`, e);
+							return { action: "migrate", selected: [] };
+						}
+					}
+				},
+				{
+					action: "close",
+					label: closeLabel
+				}
 			],
-			submit: (ctx) => ctx.action
+			submit: async (result) => {
+				try {
+					if (!result || (typeof result === "string" && result === "close") || result?.action === "close") {
+						DL(`${FN} submit: close`);
+						return;
+					}
+
+					if (result?.action !== "migrate") {
+						DL(2, `${FN} submit: unexpected result`, { result });
+						return;
+					}
+
+					const selected = Array.isArray(result.selected) ? result.selected : [];
+					if (!selected.length) {
+						DL(2, `${FN} submit: migrate: nothing selected`);
+						return;
+					}
+
+					DL(`${FN} submit: migrate start`, { selectedCount: selected.length, selected });
+
+					let imported = 0;
+					const importedNames = [];
+
+					for (const legacyName of selected) {
+						if (!legacyName || !legacy[legacyName]) {
+							DL(2, `${FN} submit: migrate: skipping invalid legacy`, { legacyName });
+							continue;
+						}
+
+						const baseName = `${legacyName}${suffix}`;
+						const uniqueName = makeUniqueName(storage, baseName);
+
+						storage[uniqueName] = foundry.utils.duplicate(legacy[legacyName] || {});
+						imported++;
+						importedNames.push(uniqueName);
+
+						DL(`${FN} submit: queued import`, { legacyName, uniqueName });
+					}
+
+					if (!imported) {
+						DL(2, `${FN} submit: migrate: selected presets were not usable`, { selected });
+						return;
+					}
+
+					const ok = await writeStorageFlat(STORAGE_FILE, storage);
+					if (!ok) {
+						DL(3, `${FN} submit: failed writing storage`, { STORAGE_FILE, imported, importedNames });
+						return;
+					}
+
+					try { await svc_loadSettingsPresets({ force: true }); }
+					catch (e) { DL(2, `${FN} submit: svc_loadSettingsPresets(force) failed`, e); }
+
+					DL(`${FN} submit: migrated settings presets into persistent storage`, {
+						imported,
+						importedNames,
+						storageFile: STORAGE_FILE
+					});
+				} catch (err) {
+					DL(3, `${FN} submit: fatal error`, err);
+				}
+			}
 		});
 
 		const onRender = (app) => {
 			if (app !== dlg) return;
 			Hooks.off("renderDialogV2", onRender);
 
-			const el = app.element;
-			if (!el) {
-				DL(2, `${FN} render missing dialog root`, { element: el });
+			const root = app.element;
+			if (!root) {
+				DL(2, `${FN} render missing dialog root`, { element: root });
 				return;
 			}
 
-			try {
-				el.style.minWidth = "560px";
-				el.style.maxWidth = "920px";
-				el.style.maxHeight = "800px";
-				el.style.overflow = "hidden";
-			} catch (e) {
-				DL(2, `${FN} size clamp failed`, e);
-			}
+			const contentEl = root.querySelector(".window-content") || root;
 
-			try { dlg.setPosition({ height: "auto", left: null, top: null }); } catch {}
-
-			const form = el.querySelector("form");
-			if (!form) {
-				DL(2, `${FN} render missing form`);
-				return;
-			}
-
-			// prevent native submit
-			form.querySelectorAll("button").forEach(b => b.setAttribute("type", "button"));
-
-			const sel = /** @type {HTMLSelectElement} */ (form.elements.namedItem("legacyName"));
-			const input = /** @type {HTMLInputElement} */ (form.elements.namedItem("newName"));
-
-			if (sel && input) {
-				sel.addEventListener("change", () => {
-					const picked = String(sel.value || "").trim();
-					input.value = picked ? `${picked}${suffix}` : "";
-				});
-			}
-
-			form.addEventListener("click", async (ev) => {
-				const btn = ev.target.closest?.("button");
+			contentEl.addEventListener("click", (ev) => {
+				const btn = ev.target?.closest?.("button");
 				if (!(btn instanceof HTMLButtonElement)) return;
 
-				const action = btn.dataset.action || "";
-				if (!["migrate", "cancel"].includes(action)) return;
+				const action = String(btn.dataset.action || "").trim();
+				if (!action) return;
 
-				ev.preventDefault();
-				ev.stopPropagation();
-
-				if (action === "cancel") {
-					DL(`${FN} cancel`);
-					app.close();
+				if (action === "check-all") {
+					const boxes = contentEl.querySelectorAll('input[type="checkbox"][name="legacyPreset"]');
+					DL(`${FN} check-all`, { boxes: boxes.length });
+					boxes.forEach(el => { if (el instanceof HTMLInputElement) el.checked = true; });
+					ev.preventDefault();
+					ev.stopPropagation();
 					return;
 				}
 
-				const legacyName = String(sel?.value || "").trim();
-				let newName = String(input?.value || "").trim();
-
-				DL(`${FN} migrate clicked`, { legacyName, newName });
-
-				if (!legacyName || !legacy[legacyName]) {
-					DL(2, `${FN} missing/invalid legacy preset selection`, { legacyName });
+				if (action === "check-none") {
+					const boxes = contentEl.querySelectorAll('input[type="checkbox"][name="legacyPreset"]');
+					DL(`${FN} check-none`, { boxes: boxes.length });
+					boxes.forEach(el => { if (el instanceof HTMLInputElement) el.checked = false; });
+					ev.preventDefault();
+					ev.stopPropagation();
 					return;
 				}
-
-				if (!newName) {
-					newName = `${legacyName}${suffix}`;
-					DL(2, `${FN} newName was empty, defaulted`, { newName });
-				}
-
-				const uniqueName = makeUniqueName(storage, newName);
-				if (uniqueName !== newName) {
-					DL(2, `${FN} name collision, uniqued`, { requested: newName, uniqueName });
-					newName = uniqueName;
-				}
-
-				// Copy the preset object into storage
-				storage[newName] = foundry.utils.duplicate(legacy[legacyName] || {});
-
-				const ok = await writeStorageFlat(STORAGE_FILE, storage);
-				if (!ok) {
-					DL(3, `${FN} failed writing storage`, { STORAGE_FILE, newName });
-					return;
-				}
-				await svc_loadSettingsPresets({ force: true }); // refresh in-memory cache
-
-
-				DL(`${FN} migrated settings preset into persistent storage`, {
-					from: legacyName,
-					to: newName,
-					storageFile: STORAGE_FILE
-				});
-
-				app.close();
 			});
 		};
 

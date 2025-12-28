@@ -1,0 +1,41 @@
+{
+  "settings": [
+    {
+      "namespace": "bbmm",
+      "key": "menuAboutBBMM"
+    },
+    {
+      "namespace": "bbmm",
+      "key": "menuInclusionsManager"
+    },
+    {
+      "namespace": "autoanimations",
+      "key": "aaAutorec-aefx"
+    },
+    {
+      "namespace": "autoanimations",
+      "key": "aaAutorec-aura"
+    },
+    {
+      "namespace": "autoanimations",
+      "key": "aaAutorec-melee"
+    },
+    {
+      "namespace": "autoanimations",
+      "key": "aaAutorec-ontoken"
+    },
+    {
+      "namespace": "autoanimations",
+      "key": "aaAutorec-preset"
+    },
+    {
+      "namespace": "autoanimations",
+      "key": "aaAutorec-range"
+    },
+    {
+      "namespace": "autoanimations",
+      "key": "aaAutorec-templatefx"
+    }
+  ],
+  "modules": []
+}

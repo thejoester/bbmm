@@ -1212,7 +1212,7 @@ Hooks.once("ready", async () => {
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
 
 	// migrate presets to persistent storage - Remove after version 0.8.0
-	await hlp_loadPresets();
+	//await hlp_loadPresets();
 	
 	// Hook into settings and manage modules window to add app button in header 
 	Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
