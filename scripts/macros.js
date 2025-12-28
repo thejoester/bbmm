@@ -1,9 +1,11 @@
 /* =========================================================================
     BBMM: Macros 
 ========================================================================= */
-import { DL } from "./settings.js";
+import { DL, MODULE_SETTING_PRESETS_U, SETTING_SETTINGS_PRESETS_U } from "./settings.js";
 import { hlp_esc } from "./helpers.js";
 import { LT, BBMM_ID } from "./localization.js";
+import { svc_loadSettingsPresets } from "./settings-presets.js";
+import { hlp_loadPresets } from "./module-presets.js";
 
 
 /* ==========================================================================
@@ -1404,6 +1406,539 @@ export function openKeybindInspector() {
 }
 
 /* ==========================================================================
+	Manual migration: legacy module preset -> persistent storage
+========================================================================== */
+export function openManualModulePresetMigration() {
+	const FN = "macros.js | openManualModulePresetMigration():";
+
+	try {
+		DL(`${FN} start`);
+
+		if (!game.user?.isGM) {
+			DL(2, `${FN} GM only, aborting`);
+			return;
+		}
+
+		/* =========================
+			Read + sanitize legacy presets
+		========================= */
+
+		let legacyRaw = {};
+		try {
+			legacyRaw = game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS_U) || {};
+		} catch (e) {
+			DL(3, `${FN} failed to read legacy presets`, e);
+			return;
+		}
+
+		const legacy = {};
+		if (legacyRaw && typeof legacyRaw === "object") {
+			for (const [k, v] of Object.entries(legacyRaw)) {
+				const name = String(k ?? "").trim();
+				if (!name) continue;
+				if (!Array.isArray(v)) continue;
+
+				const mods = v
+					.filter(x => typeof x === "string")
+					.map(x => x.trim())
+					.filter(Boolean);
+
+				if (!mods.length) continue;
+				legacy[name] = mods;
+			}
+		}
+
+		const legacyNames = Object.keys(legacy).sort((a, b) => a.localeCompare(b));
+
+		DL(`${FN} legacy presets discovered`, {
+			count: legacyNames.length,
+			names: legacyNames
+		});
+
+		if (!legacyNames.length) {
+			// You already have two strings for this. Use the more specific one based on raw content.
+			const hadAnyLegacyKeys = legacyRaw && typeof legacyRaw === "object" && Object.keys(legacyRaw).length > 0;
+			DL(2, `${FN} ${hadAnyLegacyKeys ? LT.macro.manualMigrateNoUsablePresets() : LT.macro.manualMigrateNoLegacyFound()}`, { legacyRawKeys: Object.keys(legacyRaw || {}).length });
+			return;
+		}
+
+		/* =========================
+			Helpers: storage read/write
+		========================= */
+
+		function makeUniqueName(targetMap, baseName) {
+			if (!targetMap[baseName]) return baseName;
+			let n = 2;
+			while (targetMap[`${baseName} ${n}`]) n++;
+			return `${baseName} ${n}`;
+		}
+
+		async function readStorageModulePresets() {
+			const url = `modules/${BBMM_ID}/storage/presets/module-presets.json`;
+
+			try {
+				const res = await fetch(url, { cache: "no-store" });
+				if (!res.ok) {
+					DL(2, `${FN} readStorageModulePresets(): fetch not ok`, { url, status: res.status });
+					return {};
+				}
+
+				const data = await res.json();
+				return data && typeof data === "object" ? data : {};
+			} catch (e) {
+				DL(2, `${FN} readStorageModulePresets(): failed`, e);
+				return {};
+			}
+		}
+
+		async function writeStorageModulePresets(obj) {
+			const payload = JSON.stringify(obj ?? {}, null, 2);
+			const file = new File([payload], "module-presets.json", { type: "application/json" });
+
+			try {
+				const res = await FilePicker.uploadPersistent(
+					BBMM_ID,
+					"presets",
+					file,
+					{},
+					{ notify: false }
+				);
+
+				if (!res || (!res.path && !res.url)) {
+					DL(3, `${FN} writeStorageModulePresets(): upload returned no path/url`, res);
+					return false;
+				}
+
+				DL(`${FN} writeStorageModulePresets(): wrote module-presets.json`, res);
+				return true;
+			} catch (e) {
+				DL(3, `${FN} writeStorageModulePresets(): uploadPersistent failed`, e);
+				return false;
+			}
+		}
+
+		/* =========================
+			Dialog HTML
+		========================= */
+
+		const suffix = String(LT.macro.manualMigrateManualSuffix?.() ?? " (manual)");
+		const firstName = legacyNames[0];
+		const defaultNewName = `${firstName}${suffix}`;
+
+		const optionsHtml = legacyNames
+			.map(n => `<option value="${foundry.utils.escapeHTML(n)}">${foundry.utils.escapeHTML(n)}</option>`)
+			.join("");
+
+		const content = `
+			<style>
+				.bbmm-manmig{display:flex;flex-direction:column;gap:.75rem;min-width:520px}
+				.bbmm-manmig h2{margin:0;font-size:1.1rem}
+				.bbmm-manmig .desc{opacity:.85}
+				.bbmm-manmig .grid{display:grid;grid-template-columns:160px 1fr;gap:.5rem .75rem;align-items:center}
+				.bbmm-manmig label{font-weight:600;opacity:.9}
+				.bbmm-manmig input[type="text"], .bbmm-manmig select{width:100%}
+			</style>
+
+			<section class="bbmm-manmig">
+				<h2>${foundry.utils.escapeHTML(LT.macro.manualMigrateTitle())}</h2>
+				<div class="desc">${foundry.utils.escapeHTML(LT.macro.manualMigrateDesc())}</div>
+
+				<div class="grid">
+					<label>${foundry.utils.escapeHTML(LT.macro.manualMigrateLegacyPresetLabel())}</label>
+					<select name="legacyPreset">
+						${optionsHtml}
+					</select>
+
+					<label>${foundry.utils.escapeHTML(LT.macro.manualMigrateNewNameLabel())}</label>
+					<input type="text" name="newName" value="${foundry.utils.escapeHTML(defaultNewName)}" />
+				</div>
+			</section>
+		`;
+
+		/* =========================
+			DialogV2 wiring
+		========================= */
+
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: LT.macro.manualMigrateWindowTitle(), resizable: false },
+			position: { width: "auto", height: "auto" },
+			content,
+			buttons: [
+				{ action: "migrate", label: LT.buttons.import(), default: true },
+				{ action: "cancel", label: LT.buttons.cancel() }
+			],
+			submit: (ctx) => ctx.action
+		});
+
+		const onRender = (app) => {
+			if (app !== dlg) return;
+			Hooks.off("renderDialogV2", onRender);
+
+			const root = app.element;
+			if (!root) {
+				DL(2, `${FN} render missing dialog root`, { element: root });
+				return;
+			}
+
+			const form = root.querySelector("form");
+			if (!form) {
+				DL(2, `${FN} render missing form`, {
+					hasRoot: !!root,
+					rootTag: root?.tagName,
+					hasWindowContent: !!root.querySelector(".window-content"),
+					contentTag: root.querySelector(".window-content")?.tagName
+				});
+				return;
+			}
+
+			// Controls
+			const sel = form.elements.namedItem("legacyPreset");
+			const inp = form.elements.namedItem("newName");
+
+			if (!(sel instanceof HTMLSelectElement) || !(inp instanceof HTMLInputElement)) {
+				DL(2, `${FN} missing form fields`, {
+					hasSelect: sel instanceof HTMLSelectElement,
+					hasInput: inp instanceof HTMLInputElement
+				});
+				return;
+			}
+
+			// auto-fill name when preset changes (only if user hasn't edited it away from the default pattern)
+			sel.addEventListener("change", () => {
+				const picked = String(sel.value ?? "").trim();
+				if (!picked) return;
+				inp.value = `${picked}${suffix}`;
+				DL(`${FN} preset changed`, { picked, newName: inp.value });
+			});
+
+			// Button clicks
+			form.addEventListener("click", async (ev) => {
+				const btn = ev.target?.closest?.("button");
+				if (!(btn instanceof HTMLButtonElement)) return;
+
+				const action = btn.dataset.action || "";
+				if (!action) return;
+
+				ev.preventDefault();
+				ev.stopPropagation();
+
+				DL(`${FN} click`, { action });
+
+				if (action === "cancel") {
+					try { dlg.close(); } catch {}
+					return;
+				}
+
+				if (action !== "migrate") return;
+
+				try {
+					btn.disabled = true;
+
+					const legacyName = String(sel.value ?? "").trim();
+					const requestedName = String(inp.value ?? "").trim();
+					const baseName = requestedName || `${legacyName}${suffix}`;
+
+					if (!legacyName || !legacy[legacyName]) {
+						DL(2, `${FN} migrate: invalid legacy selection`, { legacyName });
+						btn.disabled = false;
+						return;
+					}
+
+					DL(`${FN} migrate: preparing`, {
+						legacyName,
+						baseName,
+						legacyModuleCount: legacy[legacyName].length
+					});
+
+					// read storage
+					const storageRaw = await readStorageModulePresets();
+
+					// sanitize storage
+					const storage = {};
+					if (storageRaw && typeof storageRaw === "object") {
+						for (const [k, v] of Object.entries(storageRaw)) {
+							const nm = String(k ?? "").trim();
+							if (!nm) continue;
+							if (!Array.isArray(v)) continue;
+
+							storage[nm] = v
+								.filter(x => typeof x === "string")
+								.map(x => x.trim())
+								.filter(Boolean);
+						}
+					}
+
+					const uniqueName = makeUniqueName(storage, baseName);
+					storage[uniqueName] = [...legacy[legacyName]];
+
+					DL(`${FN} migrate: writing to storage`, {
+						uniqueName,
+						moduleCount: storage[uniqueName].length
+					});
+
+					const ok = await writeStorageModulePresets(storage);
+					if (!ok) {
+						DL(3, `${FN} migrate: FAILED write`);
+						btn.disabled = false;
+						return;
+					}
+					await hlp_loadPresets(); // refresh in-memory
+
+					DL(`${FN} migrate: SUCCESS`, { uniqueName });
+
+					try { dlg.close(); } catch {}
+				} catch (e) {
+					btn.disabled = false;
+					DL(3, `${FN} migrate: fatal error`, e);
+				}
+			});
+		};
+
+		Hooks.on("renderDialogV2", onRender);
+		dlg.render(true);
+	} catch (e) {
+		DL(3, "macros.js | openManualModulePresetMigration(): fatal error", e);
+	}
+}
+
+/* ==========================================================================
+	Manual Settings Preset Migration (Legacy settings -> persistent storage)
+========================================================================== */
+export async function openManualSettingsPresetMigration() {
+	const FN = "macros.js | openManualSettingsPresetMigration():";
+
+	try {
+		if (!game.user?.isGM) {
+			DL(2, `${FN} GM only, aborting`);
+			return;
+		}
+
+		// You said you already added these imports earlier. If not, add them at the top:
+		// import { SETTING_SETTINGS_PRESETS_U } from "./settings.js";
+
+		if (typeof SETTING_SETTINGS_PRESETS_U === "undefined") {
+			DL(3, `${FN} SETTING_SETTINGS_PRESETS_U is not defined (missing import?)`);
+			return;
+		}
+
+		const STORAGE_FILE = "settings-presets.json";
+		const STORAGE_SUBDIR = "presets";
+		const suffix = game.i18n?.localize?.("bbmm.macro.manualMigrateManualSuffix") || " (manual)";
+
+		// --- helpers ---
+		function sanitizeFlatMap(raw) {
+			const out = {};
+			if (!raw || typeof raw !== "object") return out;
+
+			for (const [k, v] of Object.entries(raw)) {
+				const name = String(k || "").trim();
+				if (!name) continue;
+				if (!v || typeof v !== "object") continue;
+				out[name] = v;
+			}
+
+			return out;
+		}
+
+		function makeUniqueName(targetMap, baseName) {
+			if (!targetMap[baseName]) return baseName;
+
+			let n = 2;
+			while (targetMap[`${baseName} ${n}`]) n++;
+			return `${baseName} ${n}`;
+		}
+
+		async function readStorageFlat(filename) {
+			const url = `modules/${BBMM_ID}/storage/${STORAGE_SUBDIR}/${filename}`;
+
+			try {
+				const res = await fetch(url, { cache: "no-store" });
+				if (!res.ok) return {};
+				const data = await res.json();
+				return data && typeof data === "object" ? data : {};
+			} catch (err) {
+				DL(2, `${FN} readStorageFlat(): failed`, { filename, err });
+				return {};
+			}
+		}
+
+		async function writeStorageFlat(filename, obj) {
+			const payload = JSON.stringify(obj ?? {}, null, 2);
+			const file = new File([payload], filename, { type: "application/json" });
+
+			try {
+				const res = await FilePicker.uploadPersistent(BBMM_ID, STORAGE_SUBDIR, file, {}, { notify: false });
+				if (!res || (!res.path && !res.url)) {
+					DL(3, `${FN} writeStorageFlat(): upload returned no path/url`, res);
+					return false;
+				}
+				DL(`${FN} writeStorageFlat(): wrote "${STORAGE_SUBDIR}/${filename}"`, res);
+				return true;
+			} catch (err) {
+				DL(3, `${FN} writeStorageFlat(): uploadPersistent failed`, err);
+				return false;
+			}
+		}
+
+		// --- read legacy ---
+		const legacyRaw = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS_U) || {};
+		const legacy = sanitizeFlatMap(legacyRaw);
+
+		const legacyNames = Object.keys(legacy).sort((a, b) => a.localeCompare(b));
+		DL(`${FN} legacy presets read`, { count: legacyNames.length });
+
+		if (!legacyNames.length) {
+			DL(2, `${FN} no legacy settings presets found`);
+			return;
+		}
+
+		// --- read storage ---
+		const storageRaw = await readStorageFlat(STORAGE_FILE);
+		const storage = sanitizeFlatMap(storageRaw);
+
+		DL(`${FN} storage presets read`, { count: Object.keys(storage).length });
+
+		// --- dialog content ---
+		const opt = legacyNames
+			.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`)
+			.join("");
+
+		const content = `
+			<section class="bbmm-manual-migrate" style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
+				<h2 style="margin:0;">${LT.macro.manualMigrateSettingsTitle()}</h2>
+				<div style="opacity:.9;">${LT.macro.manualMigrateSettingsDesc()}</div>
+
+				<hr style="width:100%;opacity:.4;" />
+
+				<div style="display:grid;grid-template-columns:170px 1fr;gap:.5rem;align-items:center;">
+					<label>${LT.macro.manualMigrateLegacyPresetLabel()}</label>
+					<select name="legacyName">${opt}</select>
+
+					<label>${LT.macro.manualMigrateNewNameLabel()}</label>
+					<input type="text" name="newName" value="${hlp_esc(legacyNames[0] + suffix)}" />
+				</div>
+			</section>
+		`;
+
+		const dlg = new foundry.applications.api.DialogV2({
+			window: {
+				title: LT.macro.manualMigrateSettingsWindowTitle(),
+				icon: "fas fa-right-left"
+			},
+			content,
+			buttons: [
+				{ action: "migrate", label: LT.buttons.import(), default: true },
+				{ action: "cancel", label: LT.buttons.cancel() }
+			],
+			submit: (ctx) => ctx.action
+		});
+
+		const onRender = (app) => {
+			if (app !== dlg) return;
+			Hooks.off("renderDialogV2", onRender);
+
+			const el = app.element;
+			if (!el) {
+				DL(2, `${FN} render missing dialog root`, { element: el });
+				return;
+			}
+
+			try {
+				el.style.minWidth = "560px";
+				el.style.maxWidth = "920px";
+				el.style.maxHeight = "800px";
+				el.style.overflow = "hidden";
+			} catch (e) {
+				DL(2, `${FN} size clamp failed`, e);
+			}
+
+			try { dlg.setPosition({ height: "auto", left: null, top: null }); } catch {}
+
+			const form = el.querySelector("form");
+			if (!form) {
+				DL(2, `${FN} render missing form`);
+				return;
+			}
+
+			// prevent native submit
+			form.querySelectorAll("button").forEach(b => b.setAttribute("type", "button"));
+
+			const sel = /** @type {HTMLSelectElement} */ (form.elements.namedItem("legacyName"));
+			const input = /** @type {HTMLInputElement} */ (form.elements.namedItem("newName"));
+
+			if (sel && input) {
+				sel.addEventListener("change", () => {
+					const picked = String(sel.value || "").trim();
+					input.value = picked ? `${picked}${suffix}` : "";
+				});
+			}
+
+			form.addEventListener("click", async (ev) => {
+				const btn = ev.target.closest?.("button");
+				if (!(btn instanceof HTMLButtonElement)) return;
+
+				const action = btn.dataset.action || "";
+				if (!["migrate", "cancel"].includes(action)) return;
+
+				ev.preventDefault();
+				ev.stopPropagation();
+
+				if (action === "cancel") {
+					DL(`${FN} cancel`);
+					app.close();
+					return;
+				}
+
+				const legacyName = String(sel?.value || "").trim();
+				let newName = String(input?.value || "").trim();
+
+				DL(`${FN} migrate clicked`, { legacyName, newName });
+
+				if (!legacyName || !legacy[legacyName]) {
+					DL(2, `${FN} missing/invalid legacy preset selection`, { legacyName });
+					return;
+				}
+
+				if (!newName) {
+					newName = `${legacyName}${suffix}`;
+					DL(2, `${FN} newName was empty, defaulted`, { newName });
+				}
+
+				const uniqueName = makeUniqueName(storage, newName);
+				if (uniqueName !== newName) {
+					DL(2, `${FN} name collision, uniqued`, { requested: newName, uniqueName });
+					newName = uniqueName;
+				}
+
+				// Copy the preset object into storage
+				storage[newName] = foundry.utils.duplicate(legacy[legacyName] || {});
+
+				const ok = await writeStorageFlat(STORAGE_FILE, storage);
+				if (!ok) {
+					DL(3, `${FN} failed writing storage`, { STORAGE_FILE, newName });
+					return;
+				}
+				await svc_loadSettingsPresets({ force: true }); // refresh in-memory cache
+
+
+				DL(`${FN} migrated settings preset into persistent storage`, {
+					from: legacyName,
+					to: newName,
+					storageFile: STORAGE_FILE
+				});
+
+				app.close();
+			});
+		};
+
+		Hooks.on("renderDialogV2", onRender);
+		dlg.render(true);
+	} catch (err) {
+		DL(3, `${FN} fatal error`, err);
+	}
+}
+
+/* ==========================================================================
 	API registration 
 ========================================================================== */
 export function registerApi() {
@@ -1415,8 +1950,11 @@ export function registerApi() {
 			copyPlainText,
 			openNamespaceInspector,
 			openPresetInspector,
-			openKeybindInspector
+			openKeybindInspector,
+			openManualModulePresetMigration,
+			openManualSettingsPresetMigration
 		});
+
 		DL("macros.js | registerApi(): API attached", Object.keys(mod.api));
 	} catch (err) {
 		DL(3, "macros.js | registerApi(): error", err);

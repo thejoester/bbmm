@@ -12,7 +12,7 @@ const MODULE_PRESETS_STORAGE_FILE = "module-presets.json";
 let _presetCache = null;
 
 // Load presets from persistent storage into _presetCache
-async function hlp_loadPresets() {
+export async function hlp_loadPresets() {
 	try {
 		DL("module-presets.js | hlp_loadPresets(): loading presets from persistent storage");
 

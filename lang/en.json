@@ -386,7 +386,21 @@
 			"titleKeybindInspecor": "BBMM — Inspect Keybindings",
 			"keybindFilterPlaceholder": "Search namespace, action, name, hint, keys…",
 			"selectPreset":"Select a settings preset.",
-			"selectModuleToViewSettings": "Select a module to view settings."
+			"selectModuleToViewSettings": "Select a module to view settings.",
+			"manualMigrateWindowTitle": "BBMM — Manual Module Preset Migration",
+			"manualMigrateTitle": "Manual Module Preset Migration",
+			"manualMigrateDesc": "Select a legacy module preset from settings, then write it into persistent storage.",
+			"manualMigrateLegacySource": "Legacy source",
+			"manualMigrateDestination": "Destination",
+			"manualMigrateLegacyPresetLabel": "Legacy Preset",
+			"manualMigrateNewNameLabel": "New Name",
+			"manualMigrateManualSuffix": " (manual)",
+			"manualMigrateNoLegacyFound": "No legacy module presets were found to migrate.",
+			"manualMigrateNoUsablePresets": "Legacy preset data exists, but no usable presets were found.",
+			"manualMigrateSettingsWindowTitle": "BBMM — Manual Settings Preset Migration",
+			"manualMigrateSettingsTitle": "Manual Settings Preset Migration",
+			"manualMigrateSettingsDesc": "Select a legacy settings preset from settings, then write it into persistent storage."
+
 		},
 		"moduleManagement": {
 			"modListWindowTitle": "BBMM — Module Manager",

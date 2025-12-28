@@ -3,8 +3,8 @@ import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp } from "./inclusions.js";
 
-const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
-const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
+export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
+export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
 const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
 
 /* Controls Sync Globals ======================================================*/
@@ -548,7 +548,6 @@ async function hlp_loadPresets() {
 	// Always ensure the settings presets storage file exists (even if empty)
 	await ensureStorageFile(FILE_SET);
 }
-
 
 //	Function for debugging - Prints out colored and tagged debug lines
 export function DL(intLogType, stringLogMsg, objObject = null) {

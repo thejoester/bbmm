@@ -52,7 +52,7 @@ function hlp_sanitizeSettingsPresets(raw) {
 }
 
 // Read presets from persistent storage file ===========================
-async function hlp_readSettingsPresetsFromStorage() {
+export async function hlp_readSettingsPresetsFromStorage() {
 	const dir = `modules/${BBMM_ID}/storage/${SETTINGS_PRESETS_STORAGE_DIR}`;
 
 	// Prefer browse
@@ -385,6 +385,29 @@ function hlp_isRegisteredSetting(namespace, key) {
 	return game.settings?.settings?.has(fullKey) === true;
 }
 
+/* Simple char-diff highlight for small strings ======================== */
+function hlp_diffHighlight(oldVal, newVal) {
+	try {
+		const oldStr = (typeof oldVal === "string") ? oldVal : JSON.stringify(oldVal, null, 2);
+		const newStr = (typeof newVal === "string") ? newVal : JSON.stringify(newVal, null, 2);
+
+		// naive char-by-char diff
+		let out = "";
+		for (let i = 0; i < newStr.length; i++) {
+			const ch = newStr[i];
+			if (i >= oldStr.length || oldStr[i] !== ch) {
+				out += `<span style="color:#f55;background:rgba(255, 0, 0, 0)">${hlp_esc(ch)}</span>`;
+			} else {
+				out += hlp_esc(ch);
+			}
+		}
+		return out;
+	} catch (err) {
+		DL(2, "settings-presets.js | hlp_diffHighlight(): error", err);
+		return esc(String(newVal));
+	}
+}
+
 /* =======================================================================
 	{SERVICES}
 ======================================================================= */
@@ -393,7 +416,7 @@ function hlp_isRegisteredSetting(namespace, key) {
 	Collect module settings by scope, 
 		optionally restricting to active modules.
 	- Skips config:false entries
-	- GM: world + client, Non‑GM: client only
+	- GM: all scopes Non‑GM: client only
 	- includeDisabled=false -> skip modules that are not active 
 		(except core/system)
 ======================================================================= */
@@ -758,22 +781,35 @@ async function svc_planSettingsChanges(env) {
 	}
 }
 
-// Load presets from store, with migration ============================
-async function svc_loadSettingsPresets() {
+// Load presets from store, =============================================
+// Load presets from store
+export async function svc_loadSettingsPresets(opts = {}) {
+	const FN = "settings-presets.js | svc_loadSettingsPresets():";
+
+	const force = Boolean(opts?.force);
+
 	// Cache guard
-	if (_settingsPresetCache !== null) return _settingsPresetCache;
+	if (!force && _settingsPresetCache !== null) {
+		DL(`${FN} cache hit`, { count: Object.keys(_settingsPresetCache || {}).length });
+		return _settingsPresetCache;
+	}
+
+	if (force) {
+		DL(`${FN} force reload requested, clearing cache`);
+		_settingsPresetCache = null;
+	}
 
 	// Non-GM: user-scoped store
 	if (!game.user.isGM) {
 		try {
 			_settingsPresetCache = hlp_sanitizeSettingsPresets(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
-			DL("settings-presets.js | svc_loadSettingsPresets(): non-GM loaded from user setting store", {
+			DL(`${FN} non-GM loaded from user setting store`, {
 				count: Object.keys(_settingsPresetCache || {}).length
 			});
 			return _settingsPresetCache;
 		} catch (err) {
 			_settingsPresetCache = {};
-			DL(2, "settings-presets.js | svc_loadSettingsPresets(): non-GM failed to load user setting store", err);
+			DL(2, `${FN} non-GM failed to load user setting store`, err);
 			return _settingsPresetCache;
 		}
 	}
@@ -783,14 +819,14 @@ async function svc_loadSettingsPresets() {
 		const fromStorage = await hlp_readSettingsPresetsFromStorage();
 		_settingsPresetCache = hlp_sanitizeSettingsPresets(fromStorage);
 
-		DL("settings-presets.js | svc_loadSettingsPresets(): GM loaded from persistent storage", {
+		DL(`${FN} GM loaded from persistent storage`, {
 			count: Object.keys(_settingsPresetCache || {}).length
 		});
 
 		return _settingsPresetCache;
 	} catch (err) {
 		_settingsPresetCache = {};
-		DL(2, "settings-presets.js | svc_loadSettingsPresets(): GM failed to load from persistent storage", err);
+		DL(2, `${FN} GM failed to load from persistent storage`, err);
 		return _settingsPresetCache;
 	}
 }
@@ -1062,29 +1098,6 @@ function ui_openPresetPreview(rows, presetName = "") {
 	} catch (err) {
 		DL(3, "settings-presets.js | ui_openPresetPreview(): error", err);
 		ui.notifications.error(LT.errors.failedOpenPreview?.() ?? "Failed to open preview.");
-	}
-}
-
-/* Simple char-diff highlight for small strings ======================== */
-function hlp_diffHighlight(oldVal, newVal) {
-	try {
-		const oldStr = (typeof oldVal === "string") ? oldVal : JSON.stringify(oldVal, null, 2);
-		const newStr = (typeof newVal === "string") ? newVal : JSON.stringify(newVal, null, 2);
-
-		// naive char-by-char diff
-		let out = "";
-		for (let i = 0; i < newStr.length; i++) {
-			const ch = newStr[i];
-			if (i >= oldStr.length || oldStr[i] !== ch) {
-				out += `<span style="color:#f55;background:rgba(255, 0, 0, 0)">${hlp_esc(ch)}</span>`;
-			} else {
-				out += hlp_esc(ch);
-			}
-		}
-		return out;
-	} catch (err) {
-		DL(2, "settings-presets.js | hlp_diffHighlight(): error", err);
-		return esc(String(newVal));
 	}
 }
 
@@ -1857,6 +1870,7 @@ Hooks.once("ready", async () => {
 	if (!mod) return;
 	mod.api ??= {};
 	mod.api.openSettingsPresetManager = openSettingsPresetManager;
+	mod.api.loadSettingsPresets = svc_loadSettingsPresets;
 
 	// GM-only: players should not be writing to module persistent storage
 	if (!game.user.isGM) return;
