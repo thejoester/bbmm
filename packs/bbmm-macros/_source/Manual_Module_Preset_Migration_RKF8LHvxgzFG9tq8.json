@@ -1,0 +1,32 @@
+{
+  "name": "Manual Module Preset Migration",
+  "type": "script",
+  "_id": "RKF8LHvxgzFG9tq8",
+  "author": "EpqDCtSCbVNM4wPj",
+  "img": "icons/sundries/documents/document-torn-diagram-tan.webp",
+  "scope": "global",
+  "command": "game.modules.get(\"bbmm\")?.api?.openManualModulePresetMigration?.();",
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "flags": {
+    "macro-wheel": {
+      "activeCondition": ""
+    }
+  },
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.351",
+    "systemId": "pf2e",
+    "systemVersion": "7.8.0",
+    "createdTime": 1766833439874,
+    "modifiedTime": 1766833545360,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_key": "!macros!RKF8LHvxgzFG9tq8"
+}

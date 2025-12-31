@@ -1,91 +1,65 @@
-import { DL } from './settings.js';
-import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName } from './helpers.js';
+import { DL, BBMM_README_UUID } from './settings.js';
+import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, hlp_injectHeaderHelpButton } from './helpers.js';
 import { LT, BBMM_ID } from "./localization.js";
 const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  enabled module ids
 
-/*	=====	HELPERS =====
-*/
+/*	===============================================
+	HELPERS 
+================================================ */
 
-// Validate Module Preset JSON structure	
-function hlp_validateModulePresetJSON(data) {
+const MODULE_PRESETS_STORAGE_DIR = "presets";
+const MODULE_PRESETS_STORAGE_FILE = "module-presets.json";
+let _presetCache = null;
 
-	// Accept ONLY our known payloads
-	// "bbmm-state": { type, name, created, modules[], versions{} }
-	if (data && typeof data === "object" && data.type === "bbmm-state" && Array.isArray(data.modules)) {
-		return { kind: "state", modules: [...new Set(data.modules.filter(x => typeof x === "string"))] };
-	}
+// Load presets from persistent storage into _presetCache
+export async function hlp_loadPresets() {
+	try {
+		DL("module-presets.js | hlp_loadPresets(): loading presets from persistent storage");
 
-	// Everything else: reject
-	return null;
-}
+		const data = await hlp_readPresetsFromStorage();
 
-// Check if modules in preset are missing or have missing dependencies
-function hlp_validateModuleState(modIds) {
-	const unknown = [];			// { id, reason: "not installed" }
-	const depIssues = [];		// { id, depId, reason: "dependency missing" }
-
-	for (const id of modIds) {
-		if (!game.modules.has(id)) unknown.push({ id, reason: "not installed" });
-	}
-
-	for (const id of modIds) {
-		const mod = game.modules.get(id);
-		if (!mod) continue;
-		const requires = hlp_getRequiredIds(mod);
-		for (const depId of requires) {
-			if (!game.modules.has(depId)) {
-				depIssues.push({ id, depId, reason: "dependency missing" });
-			}
+		if (!data || typeof data !== "object") {
+			_presetCache = {};
+			DL("module-presets.js | hlp_loadPresets(): no presets found, using empty cache");
+			return;
 		}
-	}
 
-	// Optional debug
-	if (!unknown.length && !depIssues.length) {
-		DL("module-presets.js | hlp_validateModuleState(): No missing modules or dependencies");
-	} else {
-		DL("module-presets.js | hlp_validateModuleState(): Missing modules or dependencies found!");
-	}
-
-	return { unknown, depIssues };
-}
-
-function hlp_slugify(s) {
-	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-function hlp_formatDateD_Mon_YYYY(d = new Date()) {
-	const dd = String(d.getDate()).padStart(2, "0");
-	const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
-	const yyyy = d.getFullYear();
-	return `${dd}-${MON}-${yyyy}`;
-}
-
-// Get required dependency ids declared by a module 
-function hlp_getRequiredIds(mod) {
-	// Supports both legacy and modern manifest styles
-	const data = mod?.manifest || mod?.data?.manifest || {};
-	const req = Array.isArray(data?.relationships?.requires)
-		? data.relationships.requires
-		: (Array.isArray(mod?.relationships?.requires) ? mod.relationships.requires : []);
-	const ids = [];
-	for (const r of req) {
-		// {id, type:'module'|'system', ...}
-		if (!r) continue;
-		if ((r.id || r.name) && (r.type === "module" || !r.type)) {
-			ids.push(r.id || r.name);
+		// Ensure flat map: { presetName: [moduleIds] }
+		const clean = {};
+		for (const [name, modules] of Object.entries(data)) {
+			if (!name || !Array.isArray(modules)) continue;
+			clean[name] = modules.filter(m => typeof m === "string");
 		}
+
+		_presetCache = clean;
+
+		DL("module-presets.js | hlp_loadPresets(): presets loaded", {
+			count: Object.keys(_presetCache).length
+		});
+	} catch (err) {
+		_presetCache = {};
+		DL(3, "module-presets.js | hlp_loadPresets(): FAILED, using empty cache", err);
 	}
-	return ids;
 }
 
-// read preset map 
+// get list of presets
 function hlp_getPresets() {
-	return foundry.utils.duplicate(game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS) || {});
+	if (_presetCache === null) {
+		DL("module-presets.js | hlp_getPresets(): cache not loaded yet, returning empty map");
+		return {};
+	}
+	return foundry.utils.duplicate(_presetCache || {});
 }
 
 // set preset map
 async function hlp_setPresets(presets) {
-	await game.settings.set(BBMM_ID, MODULE_SETTING_PRESETS, presets);
+	const clean = hlp_sanitizePresetMap(presets);
+	_presetCache = clean;
+
+	const ok = await hlp_writePresetsToStorage(clean);
+	if (!ok) {
+		ui.notifications.warn("Failed to write module presets to persistent storage.");
+	}
 }
 
 // Save Preset checking if it exists and prompting to overwrite or rename
@@ -182,6 +156,169 @@ async function hlp_savePreset(name, modules) {
 	return { status: "saved", name: finalName };
 }
 
+// Sanitize a { [name]: string[] } preset map
+function hlp_sanitizePresetMap(raw) {
+	const out = {};
+	if (!raw || typeof raw !== "object") return out;
+
+	for (const [k, v] of Object.entries(raw)) {
+		if (typeof k !== "string" || !k.trim()) continue;
+		if (!Array.isArray(v)) continue;
+
+		const clean = [...new Set(v.filter(id => typeof id === "string" && id.trim()))];
+		out[k] = clean;
+	}
+
+	return out;
+}
+
+// fetch JSON from URL with no-cache
+async function hlp_fetchJSON(url) {
+	const res = await fetch(url, { cache: "no-store" });
+	if (!res.ok) return null;
+
+	try {
+		return await res.json();
+	} catch (err) {
+		DL("module-presets.js | hlp_fetchJSON(): Failed to parse JSON", { url, err });
+		return null;
+	}
+}
+
+// Ensure storage root has expected shape
+async function hlp_readPresetsFromStorage() {
+	// Try browse first (optional convenience)
+	try {
+		const dir = `modules/${BBMM_ID}/storage/presets`;
+		const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
+
+		const match = (browse?.files || []).find(f => String(f).endsWith(`/${MODULE_PRESETS_STORAGE_FILE}`));
+		if (match) {
+			const data = await hlp_fetchJSON(match);
+			return hlp_sanitizePresetMap(data);
+		}
+	} catch (err) {
+		const msg = String(err?.message ?? err);
+
+		// Folder missing is normal on first run if it wasn't shipped
+		if (msg.includes("does not exist") || msg.includes("not accessible")) {
+			DL("module-presets.js | hlp_readPresetsFromStorage(): presets folder not found yet, will try fallback");
+		} else {
+			DL(2, "module-presets.js | hlp_readPresetsFromStorage(): browse failed unexpectedly", err);
+		}
+	}
+
+	// Direct fetch fallback
+	try {
+		const url = `modules/${BBMM_ID}/storage/presets/${MODULE_PRESETS_STORAGE_FILE}`;
+		const data = await hlp_fetchJSON(url);
+		return hlp_sanitizePresetMap(data);
+	} catch (_err2) {
+		return {};
+	}
+}
+
+// Sanitize storage root shape
+async function hlp_writePresetsToStorage(presets) {
+	const clean = hlp_sanitizePresetMap(presets);
+
+	const payload = JSON.stringify(clean ?? {}, null, 2);
+	const file = new File([payload], MODULE_PRESETS_STORAGE_FILE, { type: "application/json" });
+
+	try {
+		const res = await FilePicker.uploadPersistent(BBMM_ID, MODULE_PRESETS_STORAGE_DIR, file, {}, { notify: false });
+
+		if (!res || (!res.path && !res.url)) {
+			DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent returned no path/url", res);
+			return false;
+		}
+
+		DL("module-presets.js | hlp_writePresetsToStorage(): wrote presets to persistent storage", {
+			dir: MODULE_PRESETS_STORAGE_DIR,
+			path: res.path,
+			url: res.url
+		});
+
+		return true;
+	} catch (err) {
+		DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent failed", err);
+		return false;
+	}
+}
+
+// Validate Module Preset JSON structure	
+function hlp_validateModulePresetJSON(data) {
+	// Accept ONLY our known payloads
+	// "bbmm-state": { type, name, created, modules[], versions{} }
+	if (data && typeof data === "object" && data.type === "bbmm-state" && Array.isArray(data.modules)) {
+		return { kind: "state", modules: [...new Set(data.modules.filter(x => typeof x === "string"))] };
+	}
+
+	// Everything else: reject
+	return null;
+}
+
+// Check if modules in preset are missing or have missing dependencies
+function hlp_validateModuleState(modIds) {
+	const unknown = [];			// { id, reason: "not installed" }
+	const depIssues = [];		// { id, depId, reason: "dependency missing" }
+
+	for (const id of modIds) {
+		if (!game.modules.has(id)) unknown.push({ id, reason: "not installed" });
+	}
+
+	for (const id of modIds) {
+		const mod = game.modules.get(id);
+		if (!mod) continue;
+		const requires = hlp_getRequiredIds(mod);
+		for (const depId of requires) {
+			if (!game.modules.has(depId)) {
+				depIssues.push({ id, depId, reason: "dependency missing" });
+			}
+		}
+	}
+
+	// Optional debug
+	if (!unknown.length && !depIssues.length) {
+		DL("module-presets.js | hlp_validateModuleState(): No missing modules or dependencies");
+	} else {
+		DL("module-presets.js | hlp_validateModuleState(): Missing modules or dependencies found!");
+	}
+
+	return { unknown, depIssues };
+}
+
+// Slugify string for filenames
+function hlp_slugify(s) {
+	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+// Format date as DD-Mon-YYYY
+function hlp_formatDateD_Mon_YYYY(d = new Date()) {
+	const dd = String(d.getDate()).padStart(2, "0");
+	const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+	const yyyy = d.getFullYear();
+	return `${dd}-${MON}-${yyyy}`;
+}
+
+// Get required dependency ids declared by a module 
+function hlp_getRequiredIds(mod) {
+	// Supports both legacy and modern manifest styles
+	const data = mod?.manifest || mod?.data?.manifest || {};
+	const req = Array.isArray(data?.relationships?.requires)
+		? data.relationships.requires
+		: (Array.isArray(mod?.relationships?.requires) ? mod.relationships.requires : []);
+	const ids = [];
+	for (const r of req) {
+		// {id, type:'module'|'system', ...}
+		if (!r) continue;
+		if ((r.id || r.name) && (r.type === "module" || !r.type)) {
+			ids.push(r.id || r.name);
+		}
+	}
+	return ids;
+}
+
 // Current enabled module ids (exclude core/system) 
 function hlp_getEnabledModuleIds() {
 	const list = [];
@@ -214,9 +351,9 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 				buttons: [
 					{ action: "ok", label: LT.buttons.ok(), default: true }
 				],
-				submit: (_res, _ev, button) => button?.action === "ok"
+				submit: (_res, _ev, button) => resolve(button?.action === "ok")
 			}).render(true);
-		})
+		});
 	}
 	
 	
@@ -255,6 +392,84 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 	const issues = await displayIssues(lines);
 	return;
 		
+}
+
+// Import module preset json file, validate it, save as preset. 
+async function importModuleStateAsPreset(data) {
+	// validate file structure
+	const validated = hlp_validateModulePresetJSON(data);
+	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
+		DL(3, "module-presets.js | Not a BBMM export. Expected a file created by BBMM.");
+		await new foundry.applications.api.DialogV2({
+			window: { title: LT.errors.titleImportError() },
+			content: `<p>${LT.errors.notBBMMFile()}.</p>`,
+			buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
+			submit: () => "ok"
+		}).render(true);
+		return { status: "cancel" };
+	}
+	const modules = validated.modules;
+
+	// compute report now (so we can show it after save)
+	const report = hlp_validateModuleState(modules);
+
+	// ask for preset name and save
+	return await new Promise((resolve) => {
+		const dlgName = new foundry.applications.api.DialogV2({
+			window: { title: LT.titleImportPreset() },
+			content: `
+				<div style="display:flex;flex-direction:column;gap:.5rem;">
+					<div style="display:flex;gap:.5rem;align-items:center;">
+						<label style="min-width:7rem;">${LT.presetName()}</label>
+						<input name="presetName" type="text" placeholder="e.g. staging" style="flex:1;">
+					</div>
+				</div>
+			`,
+			buttons: [
+				{
+					action: "ok",
+					label: LT.buttons.import(),
+					default: true,
+					callback: (_ev, button) => button.form.elements.presetName?.value?.trim() || ""
+				},
+				{ action: "cancel", label: LT.buttons.cancel() }
+			],
+			submit: async (_result, _ev, button) => {
+				if (button?.action === "cancel") {
+					resolve({ status: "cancel" });
+					return;
+				}
+
+				const baseName = _result;
+				if (!baseName) {
+					ui.notifications.warn(`${LT.importNamePrompt()}.`);
+					return;
+				}
+
+				const res = await hlp_savePreset(`${baseName} (${hlp_formatDateD_Mon_YYYY()})`, modules);
+				if (res.status !== "saved") {
+					resolve(res);
+					return;
+				}
+
+				ui.notifications.info(`${LT.importedSummary({ name: res.name, count: modules.length })}.`);
+
+				// CLOSE the naming dialog *before* showing issues
+				try { await dlgName.close(); } catch {}
+
+				// Show issues once (if any)
+				if (report.unknown.length || report.depIssues.length) {
+					await showImportIssuesDialog(report);
+				}
+
+				DL("module-presets.js | importModuleStateAsPreset() returning ", res);
+				resolve(res);
+			},
+			rejectClose: false
+		});
+
+		dlgName.render(true);
+	});
 }
 
 // Open Dialog to export Module state json
@@ -321,66 +536,6 @@ async function exportCurrentModuleStateDialog() {
 	}).render(true);
 }
 
-// Import module preset json file, validate it, save as preset. 
-async function importModuleStateAsPreset(data) {
-	// validate file structure
-	const validated = hlp_validateModulePresetJSON(data);
-	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
-		DL(3, "module-presets.js | Not a BBMM export. Expected a file created by BBMM.");
-		await new foundry.applications.api.DialogV2({
-			window: { title: LT.errors.titleImportError() },
-			content: `<p>${LT.errors.notBBMMFile()}.</p>`,
-			buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
-			submit: () => "ok"
-		}).render(true);
-		return;
-	}
-	const modules = validated.modules;
-
-	// compute report now (so we can show it after save)
-	const report = hlp_validateModuleState(modules);
-
-	// ask for preset name and save
-	const dlgName = new foundry.applications.api.DialogV2({
-		window: { title: LT.titleImportPreset() },
-		content: `
-			<div style="display:flex;flex-direction:column;gap:.5rem;">
-				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:7rem;">${LT.presetName()}</label>
-					<input name="presetName" type="text" placeholder="e.g. staging" style="flex:1;">
-				</div>
-			</div>
-		`,
-		buttons: [
-			{ action: "ok", label: LT.buttons.import(), default: true,
-			  callback: (ev, button) => button.form.elements.presetName?.value?.trim() || "" },
-			{ action: "cancel", label: LT.buttons.cancel() }
-		],
-		submit: async (_result) => {
-			const baseName = _result;
-			if (!baseName) { ui.notifications.warn(`${LT.importNamePrompt()}.`); return; }
-
-			const res = await hlp_savePreset(`${baseName} (${hlp_formatDateD_Mon_YYYY()})`, modules);
-			if (res.status !== "saved") return res;
-
-			ui.notifications.info(`${LT.importedSummary({ name: res.name, count: modules.length })}.`);
-
-			// CLOSE the naming dialog *before* showing issues
-			try { await dlgName.close(); } catch {}
-
-			// Show issues once (if any)
-			if (report.unknown.length || report.depIssues.length) {
-				await showImportIssuesDialog(report); 
-			}
-
-			DL("module-presets.js | importModuleStateAsPreset() returning ", res);
-			return res;
-		},
-		rejectClose: false
-	});
-	dlgName.render(true);
-}
-
 // Apply a set of enabled ids -> update core.moduleConfiguration 
 async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 	const config = hlp_getModuleConfig();
@@ -420,215 +575,256 @@ async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 
 //	Open Dialog to manage presets 
 export async function openPresetManager() {
-	// Start
 	DL("module-presets.js | openPresetManager: start");
 
-	// Load existing presets and build the select options
-	const presets = hlp_getPresets();
-	DL("module-presets.js | openPresetManager: presets loaded", presets);
+	// Make sure the in-memory cache is populated before we build the list
+	await hlp_loadPresets();
 
-	const names = Object.keys(presets).sort((a, b) => a.localeCompare(b));
-	const options = names.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`).join("");
+	// Build list and index of presets
+	async function hlp_buildPresetList() {
+		// This populates _presetCache but DOES NOT return the presets map.
+		await hlp_loadPresets();
 
-	// Dialog content (adds "Update" button next to Load/Delete)
-	const content = `
-		<div style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
+		// Always build from the cache
+		const map = hlp_getPresets();
 
-			<div style="display:flex;gap:.5rem;align-items:center;">
-				<label style="min-width:10rem;">${LT.savedPresets()}</label>
-				<select name="presetName" style="flex:1;">${options}</select>
-				<button type="button" data-action="load">${LT.buttons.load()}</button>
-				<button type="button" data-action="update">${LT.buttons.update()}</button>
-				<button type="button" data-action="delete">${LT.buttons.delete()}</button>
+		/**	Build list of presets 
+		 * @type {Array<{ id: string, name: string, displayName: string, modules: string[] }>} 
+		*/
+		const list = [];
+
+		for (const [name, modules] of Object.entries(map)) {
+			if (!name || !Array.isArray(modules)) continue;
+
+			list.push({
+				id: name,
+				name,
+				displayName: name,
+				modules: modules.filter(x => typeof x === "string")
+			});
+		}
+
+		// Sort alphabetically
+		list.sort((a, b) => a.name.localeCompare(b.name));
+
+		/** Build index of presets by id
+		 * @type {Record<string, { id: string, name: string, displayName: string, modules: string[] }>} 
+		*/
+		const index = {};
+		for (const p of list) index[p.id] = p;
+
+		return { list, index };
+	}
+
+	(async () => {
+		const { list, index } = await hlp_buildPresetList();
+
+		DL("module-presets.js | openPresetManager: presets loaded", {
+			count: list.length
+		});
+
+		const options = list
+			.map(p => `<option value="${hlp_esc(p.id)}">${hlp_esc(p.displayName)}</option>`)
+			.join("");
+
+		// Dialog content
+		const content = `
+			<div style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
+
+				<div style="display:flex;gap:.5rem;align-items:center;">
+					<label style="min-width:10rem;">${LT.savedPresets()}</label>
+					<select name="presetName" style="flex:1;">${options}</select>
+					<button type="button" data-action="load">${LT.buttons.load()}</button>
+					<button type="button" data-action="update">${LT.buttons.update()}</button>
+					<button type="button" data-action="delete">${LT.buttons.delete()}</button>
+				</div>
+
+				<hr>
+
+				<div style="display:flex;gap:.5rem;align-items:center;">
+					<input name="newName" type="text" placeholder="${LT.newPresetName()}…" style="flex:1;">
+					<button type="button" data-action="save-current">${LT.buttons.saveCurrent()}</button>
+				</div>
+
+				<hr>
+
+				<h3 style="margin:0;">${LT.titleImportExportModuleState()}</h3>
+				<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+					<button type="button" data-action="bbmm-export-state">${LT.buttons.exportToJSON()}</button>
+					<button type="button" data-action="bbmm-import-state">${LT.buttons.importFromJSON()}</button>
+				</div>
 			</div>
+		`;
 
-			<hr>
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: LT.modulePresets() },
+			content,
+			buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
+		});
 
-			<div style="display:flex;gap:.5rem;align-items:center;">
-				<input name="newName" type="text" placeholder="${LT.newPresetName()}…" style="flex:1;">
-				<button type="button" data-action="save-current">${LT.buttons.saveCurrent()}</button>
-			</div>
+		const onRender = (app) => {
+			if (app !== dlg) return;
+			Hooks.off("renderDialogV2", onRender);
 
-			<hr>
+			DL("module-presets.js | renderDialogV2 fired for Preset Manager");
 
-			<h3 style="margin:0;">${LT.titleImportExportModuleState()}</h3>
-			<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-				<button type="button" data-action="bbmm-export-state">${LT.buttons.exportToJSON()}</button>
-				<button type="button" data-action="bbmm-import-state">${LT.buttons.importFromJSON()}</button>
-			</div>
-		</div>
-	`;
+			const form = app.element?.querySelector("form");
+			if (!form) { DL(2, "module-presets.js | openPresetManager(): form not found"); return; }
 
-	// Create the DialogV2
-	const dlg = new foundry.applications.api.DialogV2({
-		window: { title: LT.modulePresets() },
-		content,
-		buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
-	});
-
-	/*
-		Hook to wire up the click handlers once the dialog is rendered
-	*/
-	const onRender = (app) => {
-		if (app !== dlg) return;
-		Hooks.off("renderDialogV2", onRender);
-		DL("module-presets.js | renderDialogV2 fired for Preset Manager", { appId: app.appId });
-
-		const form = app.element?.querySelector("form");
-		if (!form) { DL(2, "module-presets.js | openPresetManager(): form not found"); return; }
-
-		// Defensive: ensure buttons don’t submit the form
-		form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
-
-		// Single delegated click handler
-		form.addEventListener("click", async (ev) => {
-			const btn = ev.target;
-			if (!(btn instanceof HTMLButtonElement)) return;
-			const action = btn.dataset.action || "";
-
-			// Only handle our buttons; stop other listeners
-			if (!action.startsWith("bbmm-") && !["save-current", "load", "update", "delete"].includes(action)) return;
-			ev.preventDefault();
-			ev.stopPropagation();
-			ev.stopImmediatePropagation();
-
-			DL(`module-presets.js | openPresetManager(): click ${action}`);
-
-			const sel = form.elements.namedItem("presetName");
-			const txt = form.elements.namedItem("newName");
-
-			const selected = (sel instanceof HTMLSelectElement) ? sel.value : "";
-			const newName = (txt instanceof HTMLInputElement) ? txt.value.trim() : "";
-
+			// Inject help button into title bar
 			try {
-				// Save Current → save enabled modules as NEW preset
-				if (action === "save-current") {
-					if (!newName) { ui.notifications.warn(`${LT.promptNewPresetName()}.`); return; }
+				hlp_injectHeaderHelpButton(app, {
+					uuid: BBMM_README_UUID,
+					iconClass: "fas fa-circle-question",
+					title: LT.buttons.help?.() ?? "Help"
+				});
+			} catch (e) {
+				DL(2, `module-presets.js | help injection failed`, e);
+			}
 
-					const enabled = hlp_getEnabledModuleIds();
-					DL("module-presets.js | save-current: collected enabled module ids", { count: enabled.length });
+			form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
 
-					const res = await hlp_savePreset(newName, enabled);
-					if (res?.status !== "saved") return;
-					ui.notifications.info(`${LT.savedSummary({ name: res.name, count: enabled.length })}.`);
+			form.addEventListener("click", async (ev) => {
+				const btn = ev.target;
+				if (!(btn instanceof HTMLButtonElement)) return;
 
-					// Refresh UI list
-					app.close();
-					openPresetManager();
-					return;
-				}
+				const action = btn.dataset.action || "";
+				if (!["load", "update", "delete", "save-current", "bbmm-export-state", "bbmm-import-state"].includes(action)) return;
 
-				// Update → overwrite selected preset with current enabled modules
-				if (action === "update") {
-					if (!selected) { ui.notifications.warn(`${LT.warnUpdatePreset()}.`); return; }
+				ev.preventDefault();
+				ev.stopPropagation();
+				ev.stopImmediatePropagation();
 
-					const enabled = hlp_getEnabledModuleIds();
-					DL("module-presets.js | update: collected enabled module ids", { count: enabled.length, target: selected });
+				try {
+					const sel = form.elements.namedItem("presetName");
+					const selectedId = sel ? String(sel.value || "") : "";
+					const picked = selectedId ? index[selectedId] : null;
 
-					const res = await hlp_savePreset(selected, enabled);
-					if (res?.status !== "saved") return;
+					if (action === "save-current") {
+						const raw = form.elements.namedItem("newName")?.value ?? "";
+						const newName = String(raw).trim();
+						if (!newName) return ui.notifications.warn(`${LT.warnEnterName()}.`);
 
-					ui.notifications.info(`${LT.updatedSummary({name: selected, count: enabled.length})}.`);
+						const enabled = hlp_getEnabledModuleIds();
+						DL("module-presets.js | save-current: collected enabled module ids", { count: enabled.length });
 
-					// Refresh UI list (names unchanged, but keep flow consistent)
-					app.close();
-					openPresetManager();
-					return;
-				}
+						const res = await hlp_savePreset(newName, enabled);
+						if (res?.status !== "saved") return;
 
-				// Load → apply selected preset
-				if (action === "load") {
-					if (!selected) return ui.notifications.warn("Select a preset to load.");
-
-					const enabled = (hlp_getPresets()[selected] || []);
-					DL("module-presets.js | load: applying preset", { name: selected, count: enabled.length });
-
-					const proceed = await foundry.applications.api.DialogV2.confirm({
-						window: { title: LT.titleApplyModulePreset() },
-						content: `<p>${LT.promptApplyModulePreset({ name: hlp_esc(selected) })}?</p>`,
-						modal: true,
-						ok: { label: LT.buttons.apply() }
-					});
-					if (!proceed) return;
-
-					await applyEnabledIds(enabled, { autoEnableDeps: true });
-					DL("module-presets.js | load: applied; prompting reload");
-
-					const reload = await foundry.applications.api.DialogV2.confirm({
-						window: { title: LT.titleReloadFoundry() },
-						content: `<p>${LT.promptReloadNow()}</p>`,
-						ok: { label: LT.buttons.reload() }
-					});
-					if (reload) location.reload();
-					return;
-				}
-
-				// Delete → delete selected preset
-				if (action === "delete") {
-					if (!selected) return ui.notifications.warn(`${LT.warnSelectPresetDelete()}.`);
-
-					const ok = await foundry.applications.api.DialogV2.confirm({
-						window: { title: LT.titleDeleteModulePreset() },
-						content: `<p>${LT.promptDeleteModulePreset()} <b>${hlp_esc(selected)}</b>?</p>`,
-						ok: { label: LT.buttons.delete() }
-					});
-					if (!ok) return;
-
-					const p = hlp_getPresets();
-					delete p[selected];
-					await hlp_setPresets(p);
-
-					ui.notifications.info(`${LT.deletedPreset()} "${selected}".`);
-					app.close();
-					openPresetManager();
-					return;
-				}
-
-				// Export current enabled modules to JSON file
-				if (action === "bbmm-export-state") {
-					DL("module-presets.js | export-current: starting");
-					exportCurrentModuleStateDialog();
-					return;
-				}
-
-				// Import module state from JSON file, validate, save as preset
-				if (action === "bbmm-import-state") {
-					const file = await hlp_pickLocalJSONFile();
-					if (!file) return;
-
-					let data;
-					try { data = JSON.parse(await file.text()); }
-					catch { ui.notifications.error(`${LT.errors.invalidJSONFile()}.`); return; }
-
-					const res = await importModuleStateAsPreset(data);
-					DL("module-presets.js | import-state: result:", res);
-
-					if (res?.status === "saved") {
+						ui.notifications.info(`${LT.savedSummary({ name: res.name, count: enabled.length })}.`);
 						app.close();
 						openPresetManager();
-						DL("module-presets.js | bbmm-import-state: app.close() fired");
-					} else {
-						DL("module-presets.js | bbmm-import-state: app.close() skipped");
+						return;
 					}
-					
-					
-					return;
-				}
-			} catch (err) {
-				DL(3, "module-presets.js | openPresetManager(): click handler error", {
-					name: err?.name, message: err?.message, stack: err?.stack
-				});
-				ui.notifications.error(`${LT.errors.errorOccured()}.`);
-			}
-		});
-	};
-	Hooks.on("renderDialogV2", onRender);
 
-	// Render
-	dlg.render(true);
+					if (action === "load") {
+						if (!picked) return ui.notifications.warn("Select a preset to load.");
+
+						const enabled = picked.modules || [];
+						DL("module-presets.js | load: applying preset", { name: picked.name, count: enabled.length });
+
+						const proceed = await foundry.applications.api.DialogV2.confirm({
+							window: { title: LT.titleApplyModulePreset() },
+							content: `<p>${LT.promptApplyModulePreset({ name: hlp_esc(picked.displayName) })}?</p>`,
+							modal: true,
+							ok: { label: LT.buttons.apply() }
+						});
+						if (!proceed) return;
+
+						await applyEnabledIds(enabled, { autoEnableDeps: true });
+
+						const reload = await foundry.applications.api.DialogV2.confirm({
+							window: { title: LT.titleReloadFoundry() },
+							content: `<p>${LT.promptReloadNow()}</p>`,
+							ok: { label: LT.buttons.reload() }
+						});
+						if (reload) location.reload();
+						return;
+					}
+
+					if (action === "update") {
+						if (!picked) return ui.notifications.warn(`${LT.warnUpdatePreset()}.`);
+
+						const enabled = hlp_getEnabledModuleIds();
+						DL("module-presets.js | update: collected enabled module ids", { count: enabled.length, target: picked.name });
+
+						const res = await hlp_savePreset(picked.name, enabled);
+						if (res?.status !== "saved") return;
+
+						ui.notifications.info(`${LT.updatedSummary({ name: picked.name, count: enabled.length })}.`);
+						app.close();
+						openPresetManager();
+						return;
+					}
+
+					if (action === "delete") {
+						if (!picked) return ui.notifications.warn(`${LT.warnSelectPresetDelete()}.`);
+
+						const ok = await foundry.applications.api.DialogV2.confirm({
+							window: { title: LT.titleDeleteModulePreset() },
+							content: `<p>${LT.promptDeleteModulePreset()} <b>${hlp_esc(picked.name)}</b>?</p>`,
+							ok: { label: LT.buttons.delete() }
+						});
+						if (!ok) return;
+
+						const p = hlp_getPresets();
+						delete p[picked.name];
+						await hlp_setPresets(p);
+
+						ui.notifications.info(`${LT.deletedPreset()} "${picked.name}".`);
+						app.close();
+						openPresetManager();
+						return;
+					}
+
+					if (action === "bbmm-export-state") {
+						DL("module-presets.js | export-current: starting");
+						exportCurrentModuleStateDialog();
+						return;
+					}
+
+					if (action === "bbmm-import-state") {
+						const file = await hlp_pickLocalJSONFile();
+						if (!file) return;
+
+						let data;
+						try {
+							data = JSON.parse(await file.text());
+						} catch (err) {
+							DL(3, "module-presets.js | openPresetManager(): invalid json import file", err);
+							ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+							return;
+						}
+
+						const res = await importModuleStateAsPreset(data);
+						DL("module-presets.js | openPresetManager(): import-state result", res);
+
+						if (res?.status === "saved") {
+							app.close();
+							openPresetManager();
+						}
+
+						return;
+					}
+				} catch (err) {
+					DL(3, "module-presets.js | openPresetManager(): click handler error", {
+						name: err?.name, message: err?.message, stack: err?.stack
+					});
+					ui.notifications.error(`${LT.errors.errorOccured()}.`);
+				}
+			});
+		};
+
+		Hooks.on("renderDialogV2", onRender);
+		dlg.render(true);
+	})();
 }
 
-Hooks.once("ready", () => {
+Hooks.once("ready", async () => {
+	// load presets into cache
+	await hlp_loadPresets();
+
+	// expose API
 	window.openPresetManager = openPresetManager; 
 	const mod = game.modules.get("bbmm");
 	if (!mod) return;
@@ -639,4 +835,3 @@ Hooks.once("ready", () => {
 
 Hooks.on("setup", () => DL("module-presets.js | setup fired"));
 Hooks.once("ready", () => DL("module-presets.js | ready fired"));
-

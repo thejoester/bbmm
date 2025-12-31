@@ -1,9 +1,11 @@
 /* =========================================================================
     BBMM: Macros 
 ========================================================================= */
-import { DL } from "./settings.js";
+import { DL, MODULE_SETTING_PRESETS_U, SETTING_SETTINGS_PRESETS_U } from "./settings.js";
 import { hlp_esc } from "./helpers.js";
 import { LT, BBMM_ID } from "./localization.js";
+import { svc_loadSettingsPresets } from "./settings-presets.js";
+import { hlp_loadPresets } from "./module-presets.js";
 
 
 /* ==========================================================================
@@ -16,7 +18,7 @@ export async function copyPlainText(text) {
 		ui.notifications.info(LT.macro.copiedValToClipboard());
 		return true;
 	} catch (e1) {
-		DL("macros.js | copyPlainText(): navigator.clipboard failed... trying failback", e1);
+		DL("macros.js | copyPlainText(): navigator.clipboard failed... trying fallback", e1);
 		try {
 			const ta = document.createElement("textarea");
 			ta.value = String(text ?? "");
@@ -72,7 +74,7 @@ function toPreview(v) {
 
 // pretty-printed (multi-line) JSON or string
 function toPretty(v) {
-    try {
+	try {
 		if (typeof v === "string") {
 			try { return JSON.stringify(JSON.parse(v), null, 2); }
 			catch { return v; }
@@ -190,6 +192,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		this._renderedCount = 0;
 	}
 
+	// settings namespaces
 	_listNamespacesForSettings() {
 		const set = new Set();
 		for (const [fullKey] of game.settings.settings.entries()) {
@@ -198,9 +201,13 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		}
 		return Array.from(set).sort((a,b)=>a.localeCompare(b));
 	}
+
+	// current user's flags
 	_listNamespacesForFlagsMe() {
 		return Object.keys(game.user?.flags || {}).sort((a,b)=>a.localeCompare(b));
 	}
+
+	// all users' flags
 	_listNamespacesForFlagsAll() {
 		const set = new Set();
 		for (const u of game.users.contents) {
@@ -209,6 +216,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		return Array.from(set).sort((a,b)=>a.localeCompare(b));
 	}
 
+	// collect settings for namespace
 	async _collectSettingsNamespace(ns) {
 		const out = [];
 		if (!ns) return out;
@@ -263,6 +271,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		return out;
 	}
 
+	// collect current user's flags for namespace
 	async _collectUserFlagsNamespaceMe(ns) {
 		const out = [];
 		const flags = game.user?.flags?.[ns];
@@ -299,6 +308,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		return out;
 	}
 
+	// collect all users' flags for namespace
 	async _collectUserFlagsNamespaceAll(ns) {
 		const out = [];
 		if (!game.user?.isGM) return out;
@@ -338,6 +348,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		return out;
 	}
 
+	// make a row object from an entry
 	_makeRow(e) {
 		return {
 			ns: e.namespace,
@@ -349,6 +360,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		};
 	}
 
+	// filter/sort items into _matchRows
 	_runFilter() {
 		const q = String(this.filter ?? "").trim().toLowerCase();
 		let list = this.items;
@@ -375,6 +387,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		this._renderedCount = 0;
 	}
 
+	// header HTML
 	_renderHeader() {
 		const arrow = (k) => this.sortKey !== k ? "" : (this.sortDir === "asc" ? " ▲" : " ▼");
 		return (
@@ -385,6 +398,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		);
 	}
 
+	// row HTML
 	_rowHTML(r) {
 		const id = `${r.ns}::${r.key}`;
 		const preview =hlp_esc(r.preview);
@@ -406,28 +420,26 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 			</div>`;
 	}
 
+	// render HTML
 	async _renderHTML() {
 		const cols = "grid-template-columns: minmax(220px,1.4fr) 0.8fr 0.8fr minmax(280px,2fr);";
-		const css =
-			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important}` +
-			`.bbmm-inspector-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}` +
-			`.bbmm-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}` +
-			`.bbmm-toolbar select{width:180px;min-width:180px;max-width:180px}` +
-			`.bbmm-toolbar #bbmm-namespace{width:220px;min-width:220px;max-width:220px}` +
-			`.bbmm-toolbar input[type="text"]{flex:1;min-width:260px}` +
-			`.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}` +
-			`.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}` +
-			`.bbmm-grid-head .sortable{cursor:pointer;user-select:none}` +
-			`.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}` +
-			`.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}` +
-			`.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}` +
-			`.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}` +
-			`.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}` +
-			`.bbmm-grid-body .c-val{cursor:pointer}` +
-			`.bbmm-grid-body .row .val-expand{display:none;grid-column:4 / 5;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}` +
-			`.bbmm-grid-body .row.expanded .val-expand{display:block}` +
-			`.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}` +
-			`.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}`;
+		const css = `
+			#${this.id} .window-content { display:flex; flex-direction:column; padding:.4rem !important; }
+			#${this.id} .bbmm-inspector-root { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:.4rem; }
+			#${this.id} .bbmm-toolbar { display:flex; gap:.4rem; align-items:center; flex-wrap:nowrap; }
+			#${this.id} .bbmm-grid-head { display:grid; grid-template-columns:minmax(220px,1.4fr) .8fr .8fr minmax(280px,2fr); border:1px solid var(--color-border,#444); border-radius:.4rem .4rem 0 0; background:var(--color-bg-header,#1e1e1e); }
+			#${this.id} .bbmm-grid-head .h { padding:.25rem .4rem; border-bottom:1px solid #444; font-weight:600; line-height:1.2; }
+			#${this.id} .bbmm-grid-body { display:block; flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--color-border,#444); border-top:0; border-radius:0 0 .4rem .4rem; }
+			#${this.id} .bbmm-grid-body .row { display:grid; grid-template-columns:minmax(220px,1.4fr) .8fr .8fr minmax(280px,2fr); border-bottom:1px solid #333; }
+			#${this.id} .bbmm-grid-body .row > div { padding:.2rem .4rem; min-width:0; line-height:1.2; }
+			#${this.id} .bbmm-grid-body .c-val { cursor:pointer; }
+			#${this.id} .bbmm-grid-body .c-val .val-preview { max-height:2.2em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+			#${this.id} .bbmm-grid-body .c-val .val-preview code { white-space:pre-wrap; word-break:break-word; }
+			#${this.id} .bbmm-grid-body .row .val-expand { display:none; grid-column:4 / 5; margin-top:.2rem; border-top:1px dotted #444; padding-top:.2rem; }
+			#${this.id} .bbmm-grid-body .row.expanded .val-expand { display:block; }
+			#${this.id} .bbmm-grid-body .val-toolbar { display:flex; gap:.4rem; margin-bottom:.2rem; }
+			#${this.id} .bbmm-grid-body .val-pre { max-height:40vh; overflow:auto; margin:0; background:rgba(255,255,255,.03); padding:.3rem; border-radius:.3rem; }
+			`;
 
 		const head = `<div class="bbmm-grid-head" id="bbmm-head">${this._renderHeader()}</div>`;
 		const body = `<div class="bbmm-grid-body" id="bbmm-body"></div>`;
@@ -451,6 +463,7 @@ class BBMMNamespaceInspector extends foundry.applications.api.ApplicationV2 {
 		);
 	}
 
+	// render and setup interactivity
 	async _replaceHTML(result, _options) {
 		const content = this.element.querySelector(".window-content") || this.element;
 		Object.assign(content.style, { display:"flex", flexDirection:"column", height:"100%", minHeight:"0" });
@@ -696,9 +709,32 @@ function toPresetItems(preset) {
 	return out;
 }
 
-// Retrieve all user-defined settings presets
-function getAllSettingsPresets() {
-	return game.settings.get(BBMM_ID, "settingsPresetsUser") || {};
+// Retrieve all user-defined settings presets (persistent storage JSON)
+async function getAllSettingsPresets() {
+	const url = `modules/${BBMM_ID}/storage/presets/settings-presets.json`;
+
+	try {
+		const res = await fetch(url, { cache: "no-store" });
+
+		// Missing file is valid on first run
+		if (res.status === 404) {
+			DL("macros.js | getAllSettingsPresets(): settings-presets.json not found (404), returning empty object");
+			return {};
+		}
+
+		if (!res.ok) {
+			DL(2, "macros.js | getAllSettingsPresets(): fetch failed", { url, status: res.status, statusText: res.statusText });
+			return {};
+		}
+
+		const data = await res.json();
+		if (!data || typeof data !== "object") return {};
+
+		return data;
+	} catch (err) {
+		DL(2, "macros.js | getAllSettingsPresets(): fetch threw, returning empty object", { url, err });
+		return {};
+	}
 }
 
 class BBMMPresetInspector extends foundry.applications.api.ApplicationV2 {
@@ -804,31 +840,26 @@ class BBMMPresetInspector extends foundry.applications.api.ApplicationV2 {
 		const cols = "grid-template-columns: minmax(160px,1.1fr) minmax(200px,1.3fr) 0.6fr 0.7fr minmax(260px,1.8fr);";
 
 		const css =
-			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important}` +
-			`#${this.id} section.bbmm-preset-inspector{display:flex;flex:1 1 auto;min-height:0}` +
-			`.bbmm-inspector-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}` +
-			`.bbmm-toolbar{display:flex;gap:.5rem;align-items:center}` +
-			`.bbmm-toolbar input{flex:1}` +
-
-			`.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}` +
-			`.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}` +
-			`.bbmm-grid-head .sortable{cursor:pointer;user-select:none}` +
-
-			`.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}` +
-			`.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}` +
-			`.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}` +
-
-			`.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}` +
-			`.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}` +
-			`.bbmm-grid-body .c-val{cursor:pointer}` +
-
-			`.bbmm-grid-body .row .val-expand{display:none;grid-column:5 / 6;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}` +
-			`.bbmm-grid-body .row.expanded .val-expand{display:block}` +
-			`.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}` +
-			`.bbmm-grid-body .val-toolbar .btn-copy,.bbmm-grid-body .val-toolbar .btn-collapse{padding:.15rem .4rem;border:1px solid var(--color-border,#555);background:rgba(255,255,255,.05);border-radius:.35rem}` +
-			`.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}` +
-
-			`.bbmm-grid-body .row>div:not(.c-val){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`;
+			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important}
+			#${this.id} section.bbmm-preset-inspector{display:flex;flex:1 1 auto;min-height:0}
+			.bbmm-inspector-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}
+			.bbmm-toolbar{display:flex;gap:.5rem;align-items:center}
+			.bbmm-toolbar input{flex:1}
+			.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}
+			.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}
+			.bbmm-grid-head .sortable{cursor:pointer;user-select:none}
+			.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}
+			.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}
+			.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}
+			.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}
+			.bbmm-grid-body .c-val .val-preview code{white-space:pre-wrap;word-break:break-word}
+			.bbmm-grid-body .c-val{cursor:pointer}
+			.bbmm-grid-body .row .val-expand{display:none;grid-column:5 / 6;margin-top:.25rem;border-top:1px dotted #444;padding-top:.25rem}
+			.bbmm-grid-body .row.expanded .val-expand{display:block}
+			.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}
+			.bbmm-grid-body .val-toolbar .btn-copy,.bbmm-grid-body .val-toolbar .btn-collapse{padding:.15rem .4rem;border:1px solid var(--color-border,#555);background:rgba(255,255,255,.05);border-radius:.35rem}
+			.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}
+			.bbmm-grid-body .row>div:not(.c-val){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`;
 
 		const head =
 			`<div class="bbmm-grid-head" id="bbmm-preset-head">` +
@@ -841,15 +872,15 @@ class BBMMPresetInspector extends foundry.applications.api.ApplicationV2 {
 			`</div>`;
 
 		return (
-			`<style>${css}</style>` +
-			`<div class="bbmm-inspector-root">` +
-				`<div class="bbmm-toolbar">` +
-					`<input id="bbmm-preset-filter" type="text" placeholder="${LT.macro.presetFilterPlaceholder()}" value="${hlp_esc(this.filter ?? "")}" />` +
-					`<span class="count">${LT.macro.showing()} <span id="bbmm-preset-count">${this.rows.length}</span> ${LT.macro.of()} ${this.itemsAll.length}</span>` +
-				`</div>` +
-				head +
-				body +
-			`</div>`
+			`<style>${css}</style>
+			<div class="bbmm-inspector-root">
+				<div class="bbmm-toolbar">
+					<input id="bbmm-preset-filter" type="text" placeholder="${LT.macro.presetFilterPlaceholder()}" value="${hlp_esc(this.filter ?? "")}" />
+					<span class="count">${LT.macro.showing()} <span id="bbmm-preset-count">${this.rows.length}</span> ${LT.macro.of()} ${this.itemsAll.length}</span>
+				</div>
+				${head} 
+				${body}
+			</div>`
 		);
 	}
 
@@ -977,7 +1008,8 @@ class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
 		this._rows = [];
 	}
 
-		_collect() {
+	// Collect keybind actions from game.keybindings
+	_collect() {
 		const out = [];
 		try {
 			const isMap = (x) => x && typeof x === "object" && x instanceof Map;
@@ -991,6 +1023,7 @@ class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
 				return out;
 			}
 
+			// localization helper
 			function localizeMaybe(val) {
 				if (val == null) return "";
 				if (typeof val !== "string") return String(val);
@@ -999,6 +1032,8 @@ class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
 					return loc && loc !== val ? loc : val;
 				} catch { return val; }
 			}
+
+			// binding formatters
 			function normalizeBinding(b) {
 				if (!b) return null;
 				if (typeof b === "object" && "key" in b) {
@@ -1103,16 +1138,17 @@ class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
 
 		// Name, Hint, Namespace, Action, Keys, Restricted, Editable, Uneditable, Reserved Mods
 		const cols = "grid-template-columns: 1.2fr 1.4fr 1.0fr 1.0fr 1.2fr 0.7fr 1.1fr 1.1fr 1.0fr;";
-		const css =
-			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important}` +
-			`.bbmm-kb-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}` +
-			`.bbmm-toolbar{display:flex;gap:.5rem;align-items:center}` +
-			`.bbmm-toolbar input{flex:1}` +
-			`.grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}` +
-			`.grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600;user-select:none}` +
-			`.grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}` +
-			`.grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}` +
-			`.grid-body .row>div{padding:.3rem .5rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`;
+		const css = `
+			#${this.id} .window-content { display:flex; flex-direction:column; padding:.4rem !important; }
+			#${this.id} .bbmm-kb-root { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:.4rem; }
+			#${this.id} .bbmm-toolbar { display:flex; gap:.4rem; align-items:center; }
+			#${this.id} .bbmm-toolbar input { flex:1; }
+			#${this.id} .grid-head { display:grid; grid-template-columns:1.2fr 1.4fr 1fr 1fr 1.2fr .7fr 1.1fr 1.1fr 1fr; border:1px solid var(--color-border,#444); border-radius:.4rem .4rem 0 0; background:var(--color-bg-header,#1e1e1e); }
+			#${this.id} .grid-head .h { padding:.25rem .4rem; border-bottom:1px solid #444; font-weight:600; line-height:1.2; user-select:none; }
+			#${this.id} .grid-body { display:block; flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--color-border,#444); border-top:0; border-radius:0 0 .4rem .4rem; }
+			#${this.id} .grid-body .row { display:grid; grid-template-columns:1.2fr 1.4fr 1fr 1fr 1.2fr .7fr 1.1fr 1.1fr 1fr; border-bottom:1px solid #333; }
+			#${this.id} .grid-body .row > div { padding:.2rem .4rem; min-width:0; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+			`;
 
 		return (
 			`<style>${css}</style>` +
@@ -1196,12 +1232,80 @@ export function openNamespaceInspector() {
 		ui.notifications.error(LT.macro.failedOpenSettingsInspector());
 	}
 }
-export function openPresetInspector() {
+
+export async function openPresetInspector() {
 	try {
-		const presetsMap = getAllSettingsPresets();
-		const names = Object.keys(presetsMap).sort((a,b)=>a.localeCompare(b));
-		if (!names.length) { ui.notifications.warn(LT.macro.settingsPresetNoneFound()); return; }
-		const options = names.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`).join("");
+		const presetsRoot = await getAllSettingsPresets();
+
+		// Support both schemas:
+		// 1) New: { worlds: { [worldId]: { [presetName]: presetObj } } }
+		// 2) Old: { [presetName]: presetObj }
+		const worlds = (presetsRoot?.worlds && typeof presetsRoot.worlds === "object")
+			? presetsRoot.worlds
+			: null;
+
+		/** @type {Array<{ id: string, name: string, displayName: string, worldId: string, preset: object, isCurrentWorld: boolean }>} */
+		const list = [];
+
+		const currentWorldId = game.world?.id || "unknownWorld";
+
+		if (worlds) {
+			for (const [worldId, presetsObj] of Object.entries(worlds)) {
+				if (!presetsObj || typeof presetsObj !== "object") continue;
+
+				for (const [name, preset] of Object.entries(presetsObj)) {
+					list.push({
+						id: `${worldId}::${name}`,
+						name,
+						displayName: name, // possibly updated below
+						worldId,
+						preset: (preset && typeof preset === "object") ? preset : {},
+						isCurrentWorld: worldId === currentWorldId
+					});
+				}
+			}
+		} else {
+			// Flat legacy map
+			for (const [name, preset] of Object.entries(presetsRoot || {})) {
+				list.push({
+					id: `__legacy__::${name}`,
+					name,
+					displayName: name,
+					worldId: "__legacy__",
+					preset: (preset && typeof preset === "object") ? preset : {},
+					isCurrentWorld: true
+				});
+			}
+		}
+
+		if (!list.length) {
+			ui.notifications.warn(LT.macro.settingsPresetNoneFound());
+			return;
+		}
+
+		// Disambiguate duplicates by name across worlds
+		const counts = {};
+		for (const p of list) counts[p.name] = (counts[p.name] || 0) + 1;
+		for (const p of list) {
+			if (counts[p.name] > 1) p.displayName = `${p.name} (${p.worldId})`;
+		}
+
+		// Sort: current world first, then name, then worldId
+		list.sort((a, b) => {
+			if (a.isCurrentWorld !== b.isCurrentWorld) return a.isCurrentWorld ? -1 : 1;
+			const an = a.name.toLowerCase();
+			const bn = b.name.toLowerCase();
+			if (an !== bn) return an.localeCompare(bn);
+			return a.worldId.localeCompare(b.worldId);
+		});
+
+		// Build index for lookups on click
+		const presetIndex = {};
+		for (const p of list) presetIndex[p.id] = p;
+
+		const options = list
+			.map(p => `<option value="${hlp_esc(p.id)}">${hlp_esc(p.displayName)}</option>`)
+			.join("");
 
 		const content = `
 			<div style="min-width:420px;display:flex;flex-direction:column;gap:.75rem;">
@@ -1213,8 +1317,10 @@ export function openPresetInspector() {
 		`;
 
 		const dlg = new foundry.applications.api.DialogV2({
-			window: { title: LT.macro.titleInspectPreset(), resizable: true },
-			position: { width: 1200, height: "auto" },
+			window: {
+				title: LT.macro.titleInspectPreset(),
+				icon: "fas fa-magnifying-glass"
+			},
 			content,
 			buttons: [
 				{ action: "inspect", label: LT.macro.btnInspect(), default: true },
@@ -1229,6 +1335,7 @@ export function openPresetInspector() {
 
 			try {
 				const el = app.element;
+
 				el.style.minWidth = "420px";
 				el.style.maxWidth = "600px";
 				el.style.maxHeight = "600px";
@@ -1247,26 +1354,38 @@ export function openPresetInspector() {
 			form.addEventListener("click", (ev) => {
 				const btn = ev.target.closest?.("button");
 				if (!(btn instanceof HTMLButtonElement)) return;
+
 				const action = btn.dataset.action || "";
-				if (!["inspect","cancel"].includes(action)) return;
+				if (!["inspect", "cancel"].includes(action)) return;
+
 				ev.preventDefault();
-				if (action === "cancel") { app.close(); return; }
+
+				if (action === "cancel") {
+					app.close();
+					return;
+				}
 
 				const sel = /** @type {HTMLSelectElement} */ (form.elements.namedItem("presetName"));
-				const presetName = sel?.value;
-				if (!presetName) { ui.notifications.warn(LT.macro.selectPreset()); return; }
+				const presetId = sel?.value;
+				if (!presetId) {
+					ui.notifications.warn(LT.macro.selectPreset());
+					return;
+				}
 
-				const preset = presetsMap[presetName] ?? {};
+				const picked = presetIndex[presetId];
+				const preset = picked?.preset ?? {};
 				const items = toPresetItems(preset);
+
 				if (!items.length) {
 					ui.notifications.error(LT.macro.presetMalformed());
 					return;
 				}
 
 				app.close();
-				new BBMMPresetInspector({ name: presetName, items }).render(true);
+				new BBMMPresetInspector({ name: picked.displayName, items }).render(true);
 			});
 		};
+
 		Hooks.on("renderDialogV2", onRender);
 
 		dlg.render(true);
@@ -1275,6 +1394,7 @@ export function openPresetInspector() {
 		ui.notifications.error(LT.macro.failedOpenPresetInspector());
 	}
 }
+
 export function openKeybindInspector() {
 	try {
 		DL("macros.js | openKeybindInspector(): launching");
@@ -1282,6 +1402,620 @@ export function openKeybindInspector() {
 	} catch (err) {
 		DL(3, "macros.js | openKeybindInspector(): error", err);
 		ui.notifications.error(LT.macro.failedOpenKeybindInspector());
+	}
+}
+
+/* ==========================================================================
+	Manual migration: legacy module preset -> persistent storage
+========================================================================== */
+export function openManualModulePresetMigration() {
+	const FN = "macros.js | openManualModulePresetMigration():";
+
+	try {
+		DL(`${FN} start`);
+
+		if (!game.user?.isGM) {
+			DL(2, `${FN} GM only, aborting`);
+			return;
+		}
+
+		/* =========================
+			Read + sanitize legacy presets
+		========================= */
+
+		let legacyRaw = {};
+		try {
+			legacyRaw = game.settings.get(BBMM_ID, MODULE_SETTING_PRESETS_U) || {};
+		} catch (e) {
+			DL(3, `${FN} failed to read legacy presets`, e);
+			return;
+		}
+
+		const legacy = {};
+		if (legacyRaw && typeof legacyRaw === "object") {
+			for (const [k, v] of Object.entries(legacyRaw)) {
+				const name = String(k ?? "").trim();
+				if (!name) continue;
+				if (!Array.isArray(v)) continue;
+
+				const mods = v
+					.filter(x => typeof x === "string")
+					.map(x => x.trim())
+					.filter(Boolean);
+
+				if (!mods.length) continue;
+				legacy[name] = mods;
+			}
+		}
+
+		const legacyNames = Object.keys(legacy).sort((a, b) => a.localeCompare(b));
+		DL(`${FN} legacy presets discovered`, { count: legacyNames.length, names: legacyNames });
+
+		if (!legacyNames.length) {
+			const hadAnyLegacyKeys = legacyRaw && typeof legacyRaw === "object" && Object.keys(legacyRaw).length > 0;
+			DL(
+				2,
+				`${FN} ${hadAnyLegacyKeys ? LT.macro.manualMigrateNoUsablePresets() : LT.macro.manualMigrateNoLegacyFound()}`,
+				{ legacyRawKeys: Object.keys(legacyRaw || {}).length }
+			);
+			return;
+		}
+
+		/* =========================
+			Helpers: storage read/write
+		========================= */
+
+		function makeUniqueName(targetMap, baseName) {
+			if (!targetMap[baseName]) return baseName;
+			let n = 2;
+			while (targetMap[`${baseName} ${n}`]) n++;
+			return `${baseName} ${n}`;
+		}
+
+		async function readStorageModulePresets() {
+			const url = `modules/${BBMM_ID}/storage/presets/module-presets.json`;
+
+			try {
+				const res = await fetch(url, { cache: "no-store" });
+				if (!res.ok) {
+					DL(2, `${FN} readStorageModulePresets(): fetch not ok`, { url, status: res.status });
+					return {};
+				}
+
+				const data = await res.json();
+				return data && typeof data === "object" ? data : {};
+			} catch (e) {
+				DL(2, `${FN} readStorageModulePresets(): failed`, e);
+				return {};
+			}
+		}
+
+		async function writeStorageModulePresets(obj) {
+			const payload = JSON.stringify(obj ?? {}, null, 2);
+			const file = new File([payload], "module-presets.json", { type: "application/json" });
+
+			try {
+				const res = await FilePicker.uploadPersistent(BBMM_ID, "presets", file, {}, { notify: false });
+
+				if (!res || (!res.path && !res.url)) {
+					DL(3, `${FN} writeStorageModulePresets(): upload returned no path/url`, res);
+					return false;
+				}
+
+				DL(`${FN} writeStorageModulePresets(): wrote module-presets.json`, res);
+				return true;
+			} catch (e) {
+				DL(3, `${FN} writeStorageModulePresets(): uploadPersistent failed`, e);
+				return false;
+			}
+		}
+
+		/* =========================
+			Dialog HTML
+		========================= */
+
+		const suffix = String(LT.macro.manualMigrateManualSuffix?.() ?? " (manual)");
+
+		const optionsHtml = legacyNames.map((n, i) => {
+			const safeName = foundry.utils.escapeHTML(String(n));
+			const safeVal = foundry.utils.escapeHTML(String(n));
+			const count = Number.isFinite(legacy?.[n]?.length) ? legacy[n].length : 0;
+
+			return `
+				<label class="bbmm-mm-item">
+					<input type="checkbox" name="legacyPreset" value="${safeVal}" checked />
+					<span class="bbmm-mm-name" title="${safeName}">${safeName}</span>
+					<span class="bbmm-mm-meta">(${count} modules)</span><br/>
+				</label>
+			`;
+		}).join("");
+
+		const content = `
+			<style>
+				.bbmm-mm{display:flex;flex-direction:column;gap:.75rem;min-width:520px}
+				.bbmm-mm h2{margin:0;font-size:1.35rem}
+				.bbmm-mm .desc{opacity:.85}
+
+				.bbmm-mm-actions{display:flex;flex-direction:row;align-items:center;gap:6px;margin:6px 0 0 0}
+				.bbmm-mm-actions button{flex:0 0 auto;width:auto;min-width:0;padding:.2rem .55rem}
+
+				.bbmm-mm-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+				.bbmm-mm-item{display:flex;flex-direction:row;align-items:center;gap:8px;width:100%;margin:0}
+				.bbmm-mm-item input{flex:0 0 auto}
+				.bbmm-mm-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+				.bbmm-mm-meta{flex:0 0 auto;opacity:.75;font-size:.9em;white-space:nowrap}
+			</style>
+
+			<section class="bbmm-mm">
+				<h2>${LT.macro.manualMigrateTitle()}</h2>
+				<div class="desc">${LT.macro.manualMigrateDesc()}</div>
+
+				<div><strong>${LT.macro.manualMigrateLegacyPresetLabel()}</strong> (${legacyNames.length} presets)</div>
+
+				<div class="bbmm-mm-actions" style="display:flex;flex-direction:row;gap:6px;align-items:center;">
+					<button type="button" data-action="check-all">${LT.macro.selectAll()}</button>
+					<button type="button" data-action="check-none">${LT.macro.clear()}</button><br /><br />
+				</div>
+
+				<div class="bbmm-mm-list">
+					${optionsHtml}
+				</div>
+
+				<div style="opacity:.85;margin-top:6px;">
+					${LT.macro.manualMigrateImportNamingHint()}
+				</div>
+			</section>
+		`;
+
+		const closeLabel = (typeof LT?.buttons?.close === "function") ? LT.buttons.close() : LT.buttons.cancel();
+
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: LT.macro.manualMigrateWindowTitle(), resizable: false },
+			position: { width: "auto", height: "auto" },
+			content,
+			buttons: [
+				{
+					action: "migrate",
+					label: LT.buttons.import(),
+					default: true,
+					callback: (event, button, dialog) => {
+						try {
+							const form = button?.form;
+							const boxes = [...(form?.querySelectorAll?.('input[type="checkbox"][name="legacyPreset"]:checked') ?? [])];
+							const selected = boxes
+								.filter(b => b instanceof HTMLInputElement)
+								.map(b => String(b.value || "").trim())
+								.filter(Boolean);
+
+							DL(`${FN} button callback: migrate`, { selectedCount: selected.length, selected });
+							return { action: "migrate", selected };
+						} catch (e) {
+							DL(3, `${FN} button callback: migrate failed`, e);
+							return { action: "migrate", selected: [] };
+						}
+					}
+				},
+				{
+					action: "close",
+					label: closeLabel
+				}
+			],
+			submit: async (result) => {
+				try {
+					if (!result || (typeof result === "string" && result === "close") || result?.action === "close") {
+						DL(`${FN} submit: close`);
+						return;
+					}
+
+					if (result?.action !== "migrate") {
+						DL(2, `${FN} submit: unexpected result`, { result });
+						return;
+					}
+
+					const selected = Array.isArray(result.selected) ? result.selected : [];
+					if (!selected.length) {
+						DL(2, `${FN} submit: migrate: nothing selected`);
+						return;
+					}
+
+					DL(`${FN} submit: migrate start`, { selectedCount: selected.length, selected });
+
+					const storageRaw = await readStorageModulePresets();
+
+					// sanitize storage
+					const storage = {};
+					if (storageRaw && typeof storageRaw === "object") {
+						for (const [k, v] of Object.entries(storageRaw)) {
+							const nm = String(k ?? "").trim();
+							if (!nm) continue;
+							if (!Array.isArray(v)) continue;
+
+							storage[nm] = v
+								.filter(x => typeof x === "string")
+								.map(x => x.trim())
+								.filter(Boolean);
+						}
+					}
+
+					let imported = 0;
+					const importedNames = [];
+
+					for (const legacyName of selected) {
+						if (!legacyName || !legacy[legacyName]) {
+							DL(2, `${FN} submit: migrate: skipping invalid legacy`, { legacyName });
+							continue;
+						}
+
+						const baseName = `${legacyName}${suffix}`;
+						const uniqueName = makeUniqueName(storage, baseName);
+
+						storage[uniqueName] = [...legacy[legacyName]];
+						imported++;
+						importedNames.push(uniqueName);
+
+						DL(`${FN} submit: queued import`, {
+							legacyName,
+							uniqueName,
+							moduleCount: storage[uniqueName]?.length ?? 0
+						});
+					}
+
+					if (!imported) {
+						DL(2, `${FN} submit: migrate: selected presets were not usable`, { selected });
+						return;
+					}
+
+					DL(`${FN} submit: writing storage`, { imported, importedNames });
+
+					const ok = await writeStorageModulePresets(storage);
+					if (!ok) {
+						DL(3, `${FN} submit: migrate: FAILED write`);
+						return;
+					}
+
+					try { await hlp_loadPresets(); }
+					catch (e) { DL(2, `${FN} submit: hlp_loadPresets refresh failed`, e); }
+
+					DL(`${FN} submit: migrate: SUCCESS`, { imported, importedNames });
+				} catch (e) {
+					DL(3, `${FN} submit: fatal error`, e);
+				}
+			}
+		});
+
+		const onRender = (app) => {
+			if (app !== dlg) return;
+			Hooks.off("renderDialogV2", onRender);
+
+			const root = app.element;
+			if (!root) {
+				DL(2, `${FN} render missing dialog root`, { element: root });
+				return;
+			}
+
+			// clamp
+			try {
+				root.style.minWidth = "560px";
+				root.style.maxWidth = "920px";
+				root.style.maxHeight = "800px";
+				root.style.overflow = "hidden";
+			} catch (e) { DL(2, `${FN} size clamp failed`, e); }
+
+			const contentEl = root.querySelector(".window-content") || root;
+
+			contentEl.addEventListener("click", (ev) => {
+				const btn = ev.target?.closest?.("button");
+				if (!(btn instanceof HTMLButtonElement)) return;
+
+				const action = String(btn.dataset.action || "").trim();
+				if (!action) return;
+
+				if (action === "check-all") {
+					const boxes = contentEl.querySelectorAll('input[type="checkbox"][name="legacyPreset"]');
+					DL(`${FN} check-all`, { boxes: boxes.length });
+					boxes.forEach(el => { if (el instanceof HTMLInputElement) el.checked = true; });
+					ev.preventDefault();
+					ev.stopPropagation();
+					return;
+				}
+
+				if (action === "check-none") {
+					const boxes = contentEl.querySelectorAll('input[type="checkbox"][name="legacyPreset"]');
+					DL(`${FN} check-none`, { boxes: boxes.length });
+					boxes.forEach(el => { if (el instanceof HTMLInputElement) el.checked = false; });
+					ev.preventDefault();
+					ev.stopPropagation();
+					return;
+				}
+			});
+		};
+
+		Hooks.on("renderDialogV2", onRender);
+		dlg.render(true);
+	} catch (e) {
+		DL(3, "macros.js | openManualModulePresetMigration(): fatal error", e);
+	}
+}
+
+/* ==========================================================================
+	Manual Settings Preset Migration (Legacy settings -> persistent storage)
+========================================================================== */
+export async function openManualSettingsPresetMigration() {
+	const FN = "macros.js | openManualSettingsPresetMigration():";
+
+	try {
+		if (!game.user?.isGM) {
+			DL(2, `${FN} GM only, aborting`);
+			return;
+		}
+
+		if (typeof SETTING_SETTINGS_PRESETS_U === "undefined") {
+			DL(3, `${FN} SETTING_SETTINGS_PRESETS_U is not defined (missing import?)`);
+			return;
+		}
+
+		const STORAGE_FILE = "settings-presets.json";
+		const STORAGE_SUBDIR = "presets";
+		const suffix = String(LT.macro.manualMigrateManualSuffix?.() ?? " (manual)");
+
+		function sanitizeFlatMap(raw) {
+			const out = {};
+			if (!raw || typeof raw !== "object") return out;
+
+			for (const [k, v] of Object.entries(raw)) {
+				const name = String(k || "").trim();
+				if (!name) continue;
+				if (!v || typeof v !== "object") continue;
+				out[name] = v;
+			}
+
+			return out;
+		}
+
+		function makeUniqueName(targetMap, baseName) {
+			if (!targetMap[baseName]) return baseName;
+			let n = 2;
+			while (targetMap[`${baseName} ${n}`]) n++;
+			return `${baseName} ${n}`;
+		}
+
+		async function readStorageFlat(filename) {
+			const url = `modules/${BBMM_ID}/storage/${STORAGE_SUBDIR}/${filename}`;
+
+			try {
+				const res = await fetch(url, { cache: "no-store" });
+				if (!res.ok) return {};
+				const data = await res.json();
+				return data && typeof data === "object" ? data : {};
+			} catch (err) {
+				DL(2, `${FN} readStorageFlat(): failed`, { filename, err });
+				return {};
+			}
+		}
+
+		async function writeStorageFlat(filename, obj) {
+			const payload = JSON.stringify(obj ?? {}, null, 2);
+			const file = new File([payload], filename, { type: "application/json" });
+
+			try {
+				const res = await FilePicker.uploadPersistent(BBMM_ID, STORAGE_SUBDIR, file, {}, { notify: false });
+				if (!res || (!res.path && !res.url)) {
+					DL(3, `${FN} writeStorageFlat(): upload returned no path/url`, res);
+					return false;
+				}
+				DL(`${FN} writeStorageFlat(): wrote "${STORAGE_SUBDIR}/${filename}"`, res);
+				return true;
+			} catch (err) {
+				DL(3, `${FN} writeStorageFlat(): uploadPersistent failed`, err);
+				return false;
+			}
+		}
+
+		// legacy
+		const legacyRaw = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS_U) || {};
+		const legacy = sanitizeFlatMap(legacyRaw);
+
+		const legacyNames = Object.keys(legacy).sort((a, b) => a.localeCompare(b));
+		DL(`${FN} legacy presets read`, { count: legacyNames.length });
+
+		if (!legacyNames.length) {
+			DL(2, `${FN} no legacy settings presets found`);
+			return;
+		}
+
+		// storage (sanitized)
+		const storageRaw = await readStorageFlat(STORAGE_FILE);
+		const storage = sanitizeFlatMap(storageRaw);
+
+		DL(`${FN} storage presets read`, { count: Object.keys(storage).length });
+
+		const optionsHtml = legacyNames.map((n, i) => {
+			const safeName = foundry.utils.escapeHTML(String(n));
+			const safeVal = foundry.utils.escapeHTML(String(n));
+
+			return `
+				<label class="bbmm-mm-item">
+					<input type="checkbox" name="legacyPreset" value="${safeVal}" checked />
+					<span class="bbmm-mm-name" title="${safeName}">${safeName}</span><br/>
+				</label>
+			`;
+		}).join("");
+
+		const content = `
+			<style>
+				.bbmm-mm{display:flex;flex-direction:column;gap:.75rem;min-width:520px}
+				.bbmm-mm h2{margin:0;font-size:1.35rem}
+				.bbmm-mm .desc{opacity:.85}
+
+				.bbmm-mm-actions{display:flex;flex-direction:row;align-items:center;gap:6px;margin:6px 0 0 0}
+				.bbmm-mm-actions button{flex:0 0 auto;width:auto;min-width:0;padding:.2rem .55rem}
+
+				.bbmm-mm-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+				.bbmm-mm-item{display:flex;flex-direction:row;align-items:center;gap:8px;width:100%;margin:0}
+				.bbmm-mm-item input{flex:0 0 auto}
+				.bbmm-mm-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+			</style>
+
+			<section class="bbmm-mm">
+				<h2>${LT.macro.manualMigrateSettingsTitle()}</h2>
+				<div class="desc">${LT.macro.manualMigrateSettingsDesc()}</div>
+
+				<div><strong>${LT.macro.manualMigrateLegacyPresetLabel()}</strong> (${legacyNames.length} presets)</div>
+
+				<div class="bbmm-mm-actions" style="display:flex;flex-direction:row;gap:6px;align-items:center;">
+					<button type="button" data-action="check-all">${LT.macro.selectAll()}</button>
+					<button type="button" data-action="check-none">${LT.macro.clear()}</button><br/><br/>
+				</div>
+
+				<div class="bbmm-mm-list">
+					${optionsHtml}
+				</div>
+
+				<div style="opacity:.85;margin-top:6px;">
+					${LT.macro.manualMigrateImportNamingHint()}
+				</div>
+			</section>
+		`;
+
+		const closeLabel = (typeof LT?.buttons?.close === "function") ? LT.buttons.close() : LT.buttons.cancel();
+
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: LT.macro.manualMigrateSettingsWindowTitle(), icon: "fas fa-right-left" },
+			content,
+			buttons: [
+				{
+					action: "migrate",
+					label: LT.buttons.import(),
+					default: true,
+					callback: (event, button, dialog) => {
+						try {
+							const form = button?.form;
+							const boxes = [...(form?.querySelectorAll?.('input[type="checkbox"][name="legacyPreset"]:checked') ?? [])];
+							const selected = boxes
+								.filter(b => b instanceof HTMLInputElement)
+								.map(b => String(b.value || "").trim())
+								.filter(Boolean);
+
+							DL(`${FN} button callback: migrate`, { selectedCount: selected.length, selected });
+							return { action: "migrate", selected };
+						} catch (e) {
+							DL(3, `${FN} button callback: migrate failed`, e);
+							return { action: "migrate", selected: [] };
+						}
+					}
+				},
+				{
+					action: "close",
+					label: closeLabel
+				}
+			],
+			submit: async (result) => {
+				try {
+					if (!result || (typeof result === "string" && result === "close") || result?.action === "close") {
+						DL(`${FN} submit: close`);
+						return;
+					}
+
+					if (result?.action !== "migrate") {
+						DL(2, `${FN} submit: unexpected result`, { result });
+						return;
+					}
+
+					const selected = Array.isArray(result.selected) ? result.selected : [];
+					if (!selected.length) {
+						DL(2, `${FN} submit: migrate: nothing selected`);
+						return;
+					}
+
+					DL(`${FN} submit: migrate start`, { selectedCount: selected.length, selected });
+
+					let imported = 0;
+					const importedNames = [];
+
+					for (const legacyName of selected) {
+						if (!legacyName || !legacy[legacyName]) {
+							DL(2, `${FN} submit: migrate: skipping invalid legacy`, { legacyName });
+							continue;
+						}
+
+						const baseName = `${legacyName}${suffix}`;
+						const uniqueName = makeUniqueName(storage, baseName);
+
+						storage[uniqueName] = foundry.utils.duplicate(legacy[legacyName] || {});
+						imported++;
+						importedNames.push(uniqueName);
+
+						DL(`${FN} submit: queued import`, { legacyName, uniqueName });
+					}
+
+					if (!imported) {
+						DL(2, `${FN} submit: migrate: selected presets were not usable`, { selected });
+						return;
+					}
+
+					const ok = await writeStorageFlat(STORAGE_FILE, storage);
+					if (!ok) {
+						DL(3, `${FN} submit: failed writing storage`, { STORAGE_FILE, imported, importedNames });
+						return;
+					}
+
+					try { await svc_loadSettingsPresets({ force: true }); }
+					catch (e) { DL(2, `${FN} submit: svc_loadSettingsPresets(force) failed`, e); }
+
+					DL(`${FN} submit: migrated settings presets into persistent storage`, {
+						imported,
+						importedNames,
+						storageFile: STORAGE_FILE
+					});
+				} catch (err) {
+					DL(3, `${FN} submit: fatal error`, err);
+				}
+			}
+		});
+
+		const onRender = (app) => {
+			if (app !== dlg) return;
+			Hooks.off("renderDialogV2", onRender);
+
+			const root = app.element;
+			if (!root) {
+				DL(2, `${FN} render missing dialog root`, { element: root });
+				return;
+			}
+
+			const contentEl = root.querySelector(".window-content") || root;
+
+			contentEl.addEventListener("click", (ev) => {
+				const btn = ev.target?.closest?.("button");
+				if (!(btn instanceof HTMLButtonElement)) return;
+
+				const action = String(btn.dataset.action || "").trim();
+				if (!action) return;
+
+				if (action === "check-all") {
+					const boxes = contentEl.querySelectorAll('input[type="checkbox"][name="legacyPreset"]');
+					DL(`${FN} check-all`, { boxes: boxes.length });
+					boxes.forEach(el => { if (el instanceof HTMLInputElement) el.checked = true; });
+					ev.preventDefault();
+					ev.stopPropagation();
+					return;
+				}
+
+				if (action === "check-none") {
+					const boxes = contentEl.querySelectorAll('input[type="checkbox"][name="legacyPreset"]');
+					DL(`${FN} check-none`, { boxes: boxes.length });
+					boxes.forEach(el => { if (el instanceof HTMLInputElement) el.checked = false; });
+					ev.preventDefault();
+					ev.stopPropagation();
+					return;
+				}
+			});
+		};
+
+		Hooks.on("renderDialogV2", onRender);
+		dlg.render(true);
+	} catch (err) {
+		DL(3, `${FN} fatal error`, err);
 	}
 }
 
@@ -1297,8 +2031,11 @@ export function registerApi() {
 			copyPlainText,
 			openNamespaceInspector,
 			openPresetInspector,
-			openKeybindInspector
+			openKeybindInspector,
+			openManualModulePresetMigration,
+			openManualSettingsPresetMigration
 		});
+
 		DL("macros.js | registerApi(): API attached", Object.keys(mod.api));
 	} catch (err) {
 		DL(3, "macros.js | registerApi(): error", err);

@@ -2,10 +2,13 @@ import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp } from "./inclusions.js";
+import { hlp_openManualByUuid, hlp_injectHeaderHelpButton } from "./helpers.js";
 
-const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
-const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
+export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
+export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
 const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
+export const BBMM_README_UUID = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn";
+export const BBMM_MIGRATION_INSTRUCTIONS = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.fBhc3e12eZRtNnSd";
 
 /* Controls Sync Globals ======================================================*/
 export const CTRL_STORE_KEY = "userControlSync";				// world: { [id]: {rev, lock?, soft?} }
@@ -15,12 +18,12 @@ export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
 	["bbmm", new Set(["settingsPresetsUser", "modulePresetsUser"])],
-		// "userSettingSync", "softLockLedger", "softLockRevMap"
 	["core", new Set(["moduleConfiguration", "compendiumConfiguration", "time"])],	
 	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
 
 // Check folder migration 
+// !!! REMOVE  after version 0.7.0 !!!
 async function checkFolderMigration(){
 	if (!game.user.isGM) return; // GM only
 
@@ -74,6 +77,91 @@ async function checkFolderMigration(){
 	} catch (err) {
 		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
 	}
+}
+
+// Show notice that presets have moved to their own module
+// !!! REMOVE  after version 0.8.0 !!!
+async function showPresetsMovedNotice() {
+	
+	if (!game.user.isGM) return;
+
+	const flags = game.settings.get(BBMM_ID, "bbmmFlags");
+	if (flags && typeof flags === "object" && flags["0.6.0-hidepresetnotice"]) return;
+
+	const content = `
+		<style>
+			.bbmm-presets-moved-notice-dialog .window-content{
+				padding:.5rem .75rem !important;
+			}
+			.bbmm-presets-moved-notice-dialog .bbmm-presets-moved-notice p{
+				margin:0;
+			}
+
+			/* Stop the equal-width button crime */
+			.bbmm-presets-moved-notice-dialog .dialog-buttons{
+				display:flex;
+				gap:.5rem;
+				justify-content:flex-end;
+				flex-wrap:wrap;
+			}
+			.bbmm-presets-moved-notice-dialog .dialog-buttons .dialog-button{
+				flex:0 0 auto;
+				width:auto;
+				min-width:140px;
+			}
+		</style>
+
+		<div class="bbmm-presets-moved-notice">
+			<h2>${LT.presetNoticePleaseRead()}</h2>
+			<p>${LT.presetNoticeBody()}</p>
+		</div>
+	`;
+
+	new foundry.applications.api.DialogV2({
+		window: { title: LT.presetNoticeTitle() },
+		classes: ["bbmm-presets-moved-notice-dialog"],
+		content,
+		buttons: [
+			{
+				action: "docs",
+				label: LT.presetNoticeOpenDocs(),
+				icon: "fas fa-book-open",
+				callback: () => {
+					try {
+						hlp_openManualByUuid(BBMM_MIGRATION_INSTRUCTIONS);
+						DL("settings.js | showPresetsMovedNotice(): opened BBMM manual journal");
+					} catch (err) {
+						DL(3, "settings.js | showPresetsMovedNotice(): failed to open manual journal", err);
+					}
+				}
+			},
+			{
+				action: "dontShowAgain",
+				label: LT.presetNoticeDontShowAgain(),
+				icon: "fas fa-eye-slash",
+				callback: async (_event, _button, dialog) => {
+					try {
+						const current = game.settings.get(BBMM_ID, "bbmmFlags");
+						const next = (current && typeof current === "object") ? { ...current } : {};
+						next["0.6.0-hidepresetnotice"] = true;
+						await game.settings.set(BBMM_ID, "bbmmFlags", next);
+						DL("settings.js | showPresetsMovedNotice(): user hid preset notice");
+					} catch (err) {
+						DL(3, "settings.js | showPresetsMovedNotice(): failed to set hide flag", err);
+					} finally {
+						dialog?.close();
+					}
+				}
+			},
+			{
+				action: "close",
+				label: LT.presetNoticeClose(),
+				default: true
+			}
+		],
+		rejectClose: false,
+		position: { width: 560, height: "auto" }
+	}).render(true);
 }
 
 //	Function for debugging - Prints out colored and tagged debug lines
@@ -244,28 +332,43 @@ export function openExclusionsManager() {
 }
 
 // Open a small chooser dialog, then launch the selected manager
+// Open a small chooser dialog, then launch the selected manager
 export async function openBBMMLauncher() {
 	DL("settings.js | openBBMMLauncher()");
 
 	const choice = await new Promise((resolve) => {
-		const dlg = new foundry.applications.api.DialogV2({
-			window: { title: LT.moduleName() },
-			classes: ["bbmm-launcher-dialog"],
-			content: ``,
-			buttons: [
-				{ action: "modules",  label: LT.modulePresetMgr(), default: true },
-				{ action: "settings", label: LT.settingsPresetMgr() },
-				// { action: "controls-presets", label: LT.controlsPresetMgr() },
-				{ action: "exclusions", label: LT.exclusionsMgr() },
-				{ action: "inclusions", label: LT.inclusionsMgr() },	
-				{ action: "cancel",   label: LT.buttons.cancel() }
-			],
-			submit: (res) => resolve(res ?? "cancel"),
-			rejectClose: false,
-			position: { width: 400, height: "auto" }
-		});
-		dlg.render(true);
+		(async () => {
+			const dlg = new foundry.applications.api.DialogV2({
+				window: { title: LT.moduleName() },
+				classes: ["bbmm-launcher-dialog"],
+				content: ``,
+				buttons: [
+					{ action: "modules",  label: LT.modulePresetMgr(), default: true },
+					{ action: "settings", label: LT.settingsPresetMgr() },
+					// { action: "controls-presets", label: LT.controlsPresetMgr() },
+					{ action: "exclusions", label: LT.exclusionsMgr() },
+					{ action: "inclusions", label: LT.inclusionsMgr() },
+					{ action: "cancel",   label: LT.buttons.cancel() }
+				],
+				submit: (res) => resolve(res ?? "cancel"),
+				rejectClose: false,
+				position: { width: 400, height: "auto" }
+			});
 
+			// Render FIRST so dlg.element exists
+			await dlg.render(true);
+
+			// Inject help button into title bar AFTER render
+			try {
+				hlp_injectHeaderHelpButton(dlg, {
+					uuid: BBMM_README_UUID,
+					iconClass: "fas fa-circle-question",
+					title: LT.buttons.help?.() ?? "Help"
+				});
+			} catch (e) {
+				DL(2, "settings.js | openBBMMLauncher(): help injection failed", e);
+			}
+		})();
 	});
 
 	DL(`settings.js | openBBMMLauncher(): choice = ${choice}`);
@@ -424,11 +527,12 @@ Hooks.once("init", () => {
 				default: {}
 			});
 
+			// Module Management - Module Locks
 			game.settings.register(BBMM_ID, "moduleLocks", {
 				name: game.i18n.localize("bbmm.settings.moduleLocksName"),
 				hint: game.i18n.localize("bbmm.settings.moduleLocksHint"),
 				scope: "world",
-				config: true,
+				config: false,
 				type: Object,			
 				default: [],			
 				onChange: (value) => {
@@ -696,6 +800,15 @@ Hooks.once("init", () => {
 				onChange: v => DL(`settings.js | gestureAction_shiftRight -> ${v}`)
 			});
 			
+			game.settings.register(BBMM_ID, "autoForceReload", {
+				name: LT._settings.autoForceReloadName(),
+				hint: LT._settings.autoForceReloadHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: false
+			});
+
 			// Debug level for THIS module
 			game.settings.register(BBMM_ID, "debugLevel", {
 				name: LT.debugLevel(),
@@ -725,9 +838,12 @@ Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
 	
-	//check folder migration
+	// check folder migration - Remove after version 0.7.0
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
 
+	// show presets moved notice - Remove after version 0.8.0
+	try { await showPresetsMovedNotice(); } catch (err) { DL(2, "settings.js | ready | presets moved notice failed", err); }
+	
 	// Hook into settings and manage modules window to add app button in header 
 	Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
 	Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));

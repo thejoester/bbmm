@@ -4,13 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-test5] - 2025-12-28
+### Changed
+- No longer perform migration autiomatically, instead added two macros to manually import from world settings. 
+
+## [0.6.0-test4] - 2025-12-20
+### Changed
+- **Inclusions/Exclusions:**
+  - Inclusion/Exclusion lists are now stored in persistent storage, and accessible from all worlds. 
+  - Should migrate when loading a world for the first time. 
+  - Filtered '[menu]’ settings
+- **Settings-Sync:**
+  - Added setting to just force reload for players when setting requiring reload is locked/synced. 
+### Fixed
+- fixed localization issues.
+- fixed importing exclusions json.
+- fixed preview comparisons.
+
+## [0.6.0-test3] - 2025-12-19
+### Changed
+- **Settings Preset Manager:**
+  - Presets no longer attached to worlds, can update/delete in any world.
+  - On initial migration the preset name will have originating world name appended. 
+- **Module Preset Manager:**
+  - Presets no longer attached to worlds, can update/delete in any world.
+  - On initial migration the preset name will have originating world name appended. 
+- **Inclusions/Exclusions Managers:**
+  - When adding a setting inclusion/exclusion, will filter by module in drop down. 
+  - Reminder: Please read the [Wiki](https://github.com/thejoester/bbmm/wiki) regarding inclusions/exclusions and hidden Settings. 
+
+## [0.6.0-test2] - 2025-12-17
+### Changed
+- **Settings Preset Manager:**
+  - If preset with same name exists when loading a world for the first time after this update, will append "(world-name)" to the name so it does not overwrite. 
+- **Module Preset Manager:**
+  - Module presets available to load in all worlds, but can only update or delete in the world they originate in. 
+
+## [0.6.0-test1] - 2025-12-17
+### Changed
+- **Settings Preset Manager:**
+  - Setting presets for GM are now saved in persistent storage, and will be shared across worlds.
+- **Module Preset Manager:**
+  - Module presets are now stored in persistent storage, and will be shared across worlds.
+
 ## [0.5.17] - 2025-12-06
 ### Changed
-- **Localization:** 
+- **Localization:**
   - [#71](https://github.com/thejoester/bbmm/issues/71): Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
 ### Fixed
 - **Changelog Report:**
-  - Fixed bug causing inline text to be unreadable in light mode. 
+  - Fixed bug causing inline text to be unreadable in light mode.
 
 ## [0.5.16] - 2025-12-04
 ### Changed
@@ -18,7 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - [#66](https://github.com/thejoester/bbmm/issues/66): When marking changelog entry as seen, will move to next unread entry.
 ### Fixed
 - **Module Management:**
-  - [#69](https://github.com/thejoester/bbmm/issues/69) (nice): Fixed CSS style for "All Modules" button so it shows properly in light and dark modes. 
+  - [#69](https://github.com/thejoester/bbmm/issues/69) (nice): Fixed CSS style for "All Modules" button so it shows properly in light and dark modes.
 
 ## [0.5.15] - 2025-11-19
 ### Changed
@@ -36,6 +79,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Added Polish language to module.json. 
 
 ## [0.5.12] - 2025-10-31 
+### Added
 - **Localization:** 
   - Added Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
 
@@ -48,6 +92,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
 
 ## [0.5.10] - 2025-10-29
+### Fixed
 - **Module Management:** Fixed setting so that enhanced module management does not open if disabled in settings.  
 
 ## [0.5.9] - 2025-10-29
@@ -201,7 +246,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 - **Settings Sync**
   - Fixed typo affecting hover text and missing entry in en.json
-  
+ 
 ## [0.3.1] - 2025-09-03
 ### Changed
 - **Settings Sync**
@@ -246,7 +291,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Settings Preset Manager:** Added "Preview" button to preview changes loading a preset will make, will highlight changes in red. 
   - This may hang for a minute if lots of changes or large data included. 
 - **v12:** added minimal v12 support. In v12 just added tools to export settings and module states to .json to prep for migration to v13.
-    - NOTE! Cannot guarantee all settings will import in v13 if setting names have changed. 
+  - NOTE! Cannot guarantee all settings will import in v13 if setting names have changed. 
 ### Fixed
 - **Module Preset Manager:** Fixed dual 'export to .json' buttons.
 
@@ -293,6 +338,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Settings Preset Manager:** Blocking importing preset settings to prevent them being overwritten when importing, and siginificantly reducing the size of export. 
 ### Added
 - **Settings Preset Manager:** 	
+
 ## [0.0.4] - 2025-08-21
 ### Added
 - **Settings Preset Manager:**

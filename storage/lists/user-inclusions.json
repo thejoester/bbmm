@@ -1,0 +1,9 @@
+{
+  "settings": [
+    {
+      "namespace": "bbmm",
+      "key": "seenChangelogs"
+    }
+  ],
+  "modules": []
+}

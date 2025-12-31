@@ -1,8 +1,13 @@
-import { DL, EXPORT_SKIP } from './settings.js';
-import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, getSkipMap, isExcludedWith } from './helpers.js';
+import { DL, BBMM_README_UUID, EXPORT_SKIP } from './settings.js';
+import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, getSkipMap, isExcludedWith, hlp_injectHeaderHelpButton } from './helpers.js';
 import { LT, BBMM_ID } from "./localization.js";
 const SETTING_SETTINGS_PRESETS = "settingsPresetsUser";	// user-scoped store defined in settings.js
-const PRESET_MANAGER_ID = "bbmm-settings-preset-manager";	// stable window id
+const PRESET_MANAGER_ID = "bbmm-settings-preset-manager"; // stable window id
+const SETTINGS_PRESETS_STORAGE_DIR = "presets";
+const SETTINGS_PRESETS_STORAGE_FILE = "settings-presets.json";
+let _settingsPresetCache = null;
+
+const BBMM_V2_WINDOWS = new Map();	// id -> app
 
 const AppV2 = foundry?.applications?.api?.ApplicationV2;
 if (!AppV2) {
@@ -13,7 +18,131 @@ if (!AppV2) {
 	{HELPERS}
 ======================================================================= */
 
-const BBMM_V2_WINDOWS = new Map();	// id -> app
+// fetch JSON from URL with no-cache
+async function hlp_fetchJSON(url) {
+	const res = await fetch(url, { cache: "no-store" });
+	
+	if (res.status === 404) return null; // Missing file is expected on first run / before migration
+
+	if (!res.ok) return null;
+
+	try {
+		return await res.json();
+	} catch (err) {
+		DL(2, "settings-presets.js | hlp_fetchJSON(): failed to parse JSON", { url, err });
+		return null;
+	}
+}
+
+async function hlp_verifyPresetsDir() {
+	const dir = `modules/${BBMM_ID}/storage/${SETTINGS_PRESETS_STORAGE_DIR}`;
+
+	try {
+		await FilePicker.browse("data", dir, {});
+		return true;
+	} catch (err) {
+		DL(3, "settings-presets.js | hlp_verifyPresetsDir(): missing or inaccessible", { dir, err });
+		return false;
+	}
+}
+
+function hlp_sanitizeSettingsPresets(raw) {
+	// Don’t get cute: just ensure “object or empty object”
+	return raw && typeof raw === "object" ? raw : {};
+}
+
+// Read presets from persistent storage file ===========================
+export async function hlp_readSettingsPresetsFromStorage() {
+	const dir = `modules/${BBMM_ID}/storage/${SETTINGS_PRESETS_STORAGE_DIR}`;
+
+	// Prefer browse
+	try {
+		const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
+		const match = (browse?.files || []).find(f => String(f).endsWith(`/${SETTINGS_PRESETS_STORAGE_FILE}`));
+		if (match) {
+			const data = await hlp_fetchJSON(match);
+			return hlp_sanitizeSettingsPresets(data);
+		}
+	} catch (err) {
+		const msg = String(err?.message ?? err ?? "");
+		if (msg.includes("does not exist") || msg.includes("not accessible")) {
+			DL("settings-presets.js | hlp_readSettingsPresetsFromStorage(): presets folder not found yet, will try fallback");
+		} else {
+			DL(2, "settings-presets.js | hlp_readSettingsPresetsFromStorage(): browse failed", err);
+		}
+	}
+
+	// Fallback fetch
+	try {
+		const url = `${dir}/${SETTINGS_PRESETS_STORAGE_FILE}`;
+		const data = await hlp_fetchJSON(url);
+		return hlp_sanitizeSettingsPresets(data);
+	} catch (err) {
+		DL(2, "settings-presets.js | hlp_readSettingsPresetsFromStorage(): fallback fetch failed", err);
+	}
+
+	return null;
+}
+
+// Write presets to persistent storage file ============================
+async function hlp_writeSettingsPresetsToStorage(obj) {
+	const okDir = await hlp_verifyPresetsDir();
+	if (!okDir) return false;
+
+	// Make a JSON-safe copy so Foundry types (ex: Color) don't stringify into {}
+	const safe = foundry.utils.deepClone(obj ?? {});
+
+	const coerce = (v) => {
+		if (v == null || typeof v !== "object") return v;
+
+		// Arrays: recurse
+		if (Array.isArray(v)) return v.map(coerce);
+
+		// Plain object: recurse keys
+		if (v.constructor === Object) {
+			for (const k of Object.keys(v)) v[k] = coerce(v[k]);
+			return v;
+		}
+
+		// Non-plain objects (Color, Set, Map, etc.): try to convert to something stable
+		try {
+			// Many Foundry objects give meaningful string output (Color -> "#rrggbb")
+			const s = String(v);
+			if (s && s !== "[object Object]") return s;
+		} catch {}
+
+		// Last resort: leave it alone (may stringify to {} but we've tried)
+		return v;
+	};
+
+	for (const presetName of Object.keys(safe)) {
+		safe[presetName] = coerce(safe[presetName]);
+	}
+
+	const payload = JSON.stringify(safe, null, 2);
+	const file = new File([payload], SETTINGS_PRESETS_STORAGE_FILE, { type: "application/json" });
+
+	try {
+		const res = await FilePicker.uploadPersistent(
+			BBMM_ID,
+			SETTINGS_PRESETS_STORAGE_DIR,
+			file,
+			{},
+			{ notify: false }
+		);
+
+		if (!res || (!res.path && !res.url)) {
+			DL(3, "settings-presets.js | hlp_writeSettingsPresetsToStorage(): upload returned no path/url", res);
+			return false;
+		}
+
+		DL("settings-presets.js | hlp_writeSettingsPresetsToStorage(): wrote presets to persistent storage", res);
+		return true;
+	} catch (err) {
+		DL(3, "settings-presets.js | hlp_writeSettingsPresetsToStorage(): uploadPersistent failed", err);
+		return false;
+	}
+}
 
 /* Deep equals for settings values =====================================*/
 function hlp_valuesEqual(a, b) {
@@ -133,22 +262,17 @@ function hlp_findExistingSettingsPresetKey(name) {
 /* JSON (de)hydration helpers so Sets/Maps survive JSON.stringify ======== */
 function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 	const here = path || "<root>";
-	const ROOT = depth === 0;
-	//if (ROOT) DL(`settings-presets.js | toJsonSafe IN ${here}`, value);
-
 	let out;
 
 	// primitives / null
 	if (value == null || (typeof value !== "object" && typeof value !== "function")) {
 		out = value;
-		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 
 	// cycle guard
 	if (seen.has(value)) {
 		out = "[[Circular]]";
-		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 	seen.add(value);
@@ -156,12 +280,10 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 	// Sets / Maps
 	if (value instanceof Set) {
 		out = { __type: "Set", value: [...value] };
-		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 	if (value instanceof Map) {
 		out = { __type: "Map", value: Object.fromEntries(value) };
-		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 
@@ -171,7 +293,6 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 			const obj = Object.fromEntries(value.entries());
 			out = {};
 			for (const [k, v] of Object.entries(obj)) out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
-			//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 			return out;
 		}
 	} catch {}
@@ -179,7 +300,6 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 	// Arrays
 	if (Array.isArray(value)) {
 		out = value.map((v, i) => hlp_toJsonSafe(v, seen, `${here}[${i}]`, depth + 1));
-		//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 		return out;
 	}
 
@@ -193,7 +313,6 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 					out = {};
 					for (const [k, v] of Object.entries(dup)) out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
 				}
-				//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 				return out;
 			}
 		}
@@ -207,7 +326,6 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
 		out[k] = hlp_toJsonSafe(v, seen, `${here}.${k}`, depth + 1);
 	}
 
-	//if (ROOT) DL(`settings-presets.js | toJsonSafe OUT ${here}`, out);
 	return out;
 }
 
@@ -267,38 +385,38 @@ function hlp_isRegisteredSetting(namespace, key) {
 	return game.settings?.settings?.has(fullKey) === true;
 }
 
+/* Simple char-diff highlight for small strings ======================== */
+function hlp_diffHighlight(oldVal, newVal) {
+	try {
+		const oldStr = (typeof oldVal === "string") ? oldVal : JSON.stringify(oldVal, null, 2);
+		const newStr = (typeof newVal === "string") ? newVal : JSON.stringify(newVal, null, 2);
+
+		// naive char-by-char diff
+		let out = "";
+		for (let i = 0; i < newStr.length; i++) {
+			const ch = newStr[i];
+			if (i >= oldStr.length || oldStr[i] !== ch) {
+				out += `<span style="color:#f55;background:rgba(255, 0, 0, 0)">${hlp_esc(ch)}</span>`;
+			} else {
+				out += hlp_esc(ch);
+			}
+		}
+		return out;
+	} catch (err) {
+		DL(2, "settings-presets.js | hlp_diffHighlight(): error", err);
+		return esc(String(newVal));
+	}
+}
+
 /* =======================================================================
 	{SERVICES}
 ======================================================================= */
-
-/* Get all saved presets from settings store ============================ */
-function svc_getSettingsPresets() {
-	return foundry.utils.duplicate(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
-}
-
-/* Save all presets to settings store ============================ */
-async function svc_setSettingsPresets(obj) {
-	// Write to user-scoped store "settingsPresetsUser"
-	try {
-		DL("settings-presets.js | svc_setSettingsPresets(): writing bbmm.settingsPresetsUser");
-		await game.settings.set("bbmm", "settingsPresetsUser", obj);
-		DL("settings-presets.js | svc_setSettingsPresets(): OK");
-	} catch (e) {
-		DL(3, "settings-presets.js | svc_setSettingsPresets(): FAILED", {
-			name: e?.name,
-			message: e?.message,
-			stack: e?.stack,
-			key: "bbmm.settingsPresetsUser"
-		});
-		throw e;
-	}
-}
 
 /* Collect all Settings - except excluded ================================
 	Collect module settings by scope, 
 		optionally restricting to active modules.
 	- Skips config:false entries
-	- GM: world + client, Non‑GM: client only
+	- GM: all scopes Non‑GM: client only
 	- includeDisabled=false -> skip modules that are not active 
 		(except core/system)
 ======================================================================= */
@@ -515,16 +633,18 @@ function svc_askSettingsPresetConflict(existingKey) {
 /* Export Preset to File ============================================== */
 async function svc_savePresetToSettings(presetName, selectedEntries) {
 	try {
-		const current = foundry.utils.duplicate(
-			game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS)
-		) || {};
+		// Ensure cache is loaded (GM: persistent storage, non-GM: user setting)
+		await svc_loadSettingsPresets();
+
+		const current = foundry.utils.duplicate(svc_getSettingsPresets()) || {};
 		const now = Date.now();
 
 		current[presetName] ??= { created: now, updated: now, items: [] };
 		current[presetName].updated = now;
 		current[presetName].items = selectedEntries;
 
-		await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, current);
+		// IMPORTANT: use the unified writer so GM goes to persistent storage JSON
+		await svc_setSettingsPresets(current);
 
 		DL(`settings-presets.js | svc_savePresetToSettings(): saved preset "${presetName}" with ${selectedEntries.length} entries`);
 		return current[presetName];
@@ -539,7 +659,12 @@ async function svc_saveSettingsPreset(name, payload) {
 	const rawInput = String(name).trim();
 	let finalName = rawInput;
 
+	const all = svc_getSettingsPresets();
 	const existingKey = hlp_findExistingSettingsPresetKey(rawInput);
+
+	// Store a copy of the original payload
+	const storedPayload = payload;
+	// If a preset with this name exists already, decide how to handle it.
 	if (existingKey) {
 		const choice = await svc_askSettingsPresetConflict(existingKey);
 		if (choice === "cancel") return { status: "cancel" };
@@ -550,12 +675,53 @@ async function svc_saveSettingsPreset(name, payload) {
 			finalName = newName;
 		}
 	}
-	const flatView = hlp_normalizeToEntries(payload)?.entries ?? [];
-	const stored = flatView.length ? { ...payload, entries: flatView } : payload;
-	const all = svc_getSettingsPresets();
+
+	// Preserve"entries" flattening behavior
+	const flatView = hlp_normalizeToEntries(storedPayload)?.entries ?? [];
+	const stored = flatView.length ? { ...storedPayload, entries: flatView } : storedPayload;
+
 	all[finalName] = stored;
 	await svc_setSettingsPresets(all);
+
 	return { status: "saved", name: finalName };
+}
+
+/* Get all saved presets from settings store ============================ */
+function svc_getSettingsPresets() {
+	return (_settingsPresetCache && typeof _settingsPresetCache === "object") ? _settingsPresetCache : {};
+}
+
+/* Save all presets to settings store ============================ */
+async function svc_setSettingsPresets(obj) {
+	const clean = hlp_sanitizeSettingsPresets(obj);
+	_settingsPresetCache = clean;
+
+	// Non-GM: user-scoped store
+	if (!game.user.isGM) {
+		try {
+			DL("settings-presets.js | svc_setSettingsPresets(): writing bbmm.settingsPresetsUser (non-GM path)");
+			await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, clean);
+			DL("settings-presets.js | svc_setSettingsPresets(): OK (non-GM path)");
+			return;
+		} catch (e) {
+			DL(3, "settings-presets.js | svc_setSettingsPresets(): FAILED (non-GM path)", {
+				name: e?.name,
+				message: e?.message,
+				stack: e?.stack,
+				key: `${BBMM_ID}.${SETTING_SETTINGS_PRESETS}`
+			});
+			throw e;
+		}
+	}
+
+	// GM: persistent storage JSON only (NO flags, NO migration)
+	const ok = await hlp_writeSettingsPresetsToStorage(clean);
+	if (!ok) {
+		DL(3, "settings-presets.js | svc_setSettingsPresets(): FAILED (GM storage path)");
+		throw new Error("Failed to write settings presets to persistent storage.");
+	}
+
+	DL("settings-presets.js | svc_setSettingsPresets(): OK (GM storage path)");
 }
 
 /* plan settings changes ================================================= 
@@ -612,6 +778,56 @@ async function svc_planSettingsChanges(env) {
 	} catch (err) {
 		DL(3, "settings-presets.js | svc_planSettingsChanges(): error", err);
 		return rows;
+	}
+}
+
+// Load presets from store, =============================================
+// Load presets from store
+export async function svc_loadSettingsPresets(opts = {}) {
+	const FN = "settings-presets.js | svc_loadSettingsPresets():";
+
+	const force = Boolean(opts?.force);
+
+	// Cache guard
+	if (!force && _settingsPresetCache !== null) {
+		DL(`${FN} cache hit`, { count: Object.keys(_settingsPresetCache || {}).length });
+		return _settingsPresetCache;
+	}
+
+	if (force) {
+		DL(`${FN} force reload requested, clearing cache`);
+		_settingsPresetCache = null;
+	}
+
+	// Non-GM: user-scoped store
+	if (!game.user.isGM) {
+		try {
+			_settingsPresetCache = hlp_sanitizeSettingsPresets(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {});
+			DL(`${FN} non-GM loaded from user setting store`, {
+				count: Object.keys(_settingsPresetCache || {}).length
+			});
+			return _settingsPresetCache;
+		} catch (err) {
+			_settingsPresetCache = {};
+			DL(2, `${FN} non-GM failed to load user setting store`, err);
+			return _settingsPresetCache;
+		}
+	}
+
+	// GM: load from persistent storage JSON ONLY
+	try {
+		const fromStorage = await hlp_readSettingsPresetsFromStorage();
+		_settingsPresetCache = hlp_sanitizeSettingsPresets(fromStorage);
+
+		DL(`${FN} GM loaded from persistent storage`, {
+			count: Object.keys(_settingsPresetCache || {}).length
+		});
+
+		return _settingsPresetCache;
+	} catch (err) {
+		_settingsPresetCache = {};
+		DL(2, `${FN} GM failed to load from persistent storage`, err);
+		return _settingsPresetCache;
 	}
 }
 
@@ -735,39 +951,124 @@ function ui_openPresetPreview(rows, presetName = "") {
 		const esc = (s) => (typeof hlp_esc === "function")
 			? hlp_esc(s)
 			: String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
-		const asText = (v) => {
-			if (typeof hlp_toPrettyJson === "function") return hlp_toPrettyJson(v);
-			try { return typeof v === "string" ? v : JSON.stringify(v, null, 2); } catch { return String(v); }
+
+		// Stable stringify so object key order doesn't create fake diffs
+		const stableStringify = (value, space = 2) => {
+			const seen = new WeakSet();
+
+			const sortDeep = (v) => {
+				if (v === null || v === undefined) return v;
+
+				// Preserve primitives
+				const t = typeof v;
+				if (t === "string" || t === "number" || t === "boolean") return v;
+
+				// Avoid circular explosions
+				if (t === "object") {
+					if (seen.has(v)) return "[Circular]";
+					seen.add(v);
+				}
+
+				// Arrays
+				if (Array.isArray(v)) return v.map(sortDeep);
+
+				// Sets -> arrays
+				if (v instanceof Set) return Array.from(v).map(sortDeep);
+
+				// Maps -> sorted object
+				if (v instanceof Map) {
+					const obj = {};
+					for (const [k, val] of Array.from(v.entries()).sort(([a], [b]) => String(a).localeCompare(String(b)))) {
+						obj[String(k)] = sortDeep(val);
+					}
+					return obj;
+				}
+
+				// Plain object
+				if (t === "object") {
+					const obj = {};
+					for (const key of Object.keys(v).sort((a, b) => a.localeCompare(b))) {
+						obj[key] = sortDeep(v[key]);
+					}
+					return obj;
+				}
+
+				// Fallback
+				return String(v);
+			};
+
+			try {
+				return JSON.stringify(sortDeep(value), null, space);
+			} catch (e) {
+				return String(value);
+			}
 		};
 
-		const body = (rows ?? []).map(r => `
+		// Turn any value into a canonical string for compare + display
+		const canonText = (v) => {
+			// Normalize simple cases
+			if (v === undefined) return "undefined";
+			if (v === null) return "null";
+
+			// If it's already a string, try to treat JSON strings as JSON
+			if (typeof v === "string") {
+				const s = v.trim();
+
+				// Avoid turning normal strings into weird per-char objects
+				// Only parse if it looks like JSON object/array
+				if ((s.startsWith("{") && s.endsWith("}")) || (s.startsWith("[") && s.endsWith("]"))) {
+					try {
+						const parsed = JSON.parse(s);
+						return stableStringify(parsed, 2);
+					} catch {
+						// Not valid JSON, display raw
+						return v;
+					}
+				}
+
+				return v;
+			}
+
+			// Numbers/bools
+			if (typeof v === "number" || typeof v === "boolean") return String(v);
+
+			// Objects/arrays: stable JSON
+			return stableStringify(v, 2);
+		};
+
+		// Only keep rows that actually differ after canonicalization
+		const normRows = (rows ?? []).map(r => {
+			const curText = canonText(r.current);
+			const nextText = canonText(r.next);
+			return { ...r, __curText: curText, __nextText: nextText };
+		}).filter(r => r.__curText !== r.__nextText);
+
+		const body = normRows.map(r => `
 			<tr>
-				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${hlp_esc(r.ns)}</td>
+				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">${esc(r.ns)}</td>
 				<td style="white-space:nowrap;padding:.25rem .5rem;vertical-align:top;">
 					<span
-						data-tooltip="${hlp_esc(`${r.ns}.${r.key}`)}"
-						title="${hlp_esc(`${r.ns}.${r.key}`)}"
+						data-tooltip="${esc(`${r.ns}.${r.key}`)}"
+						title="${esc(`${r.ns}.${r.key}`)}"
 						style="cursor: help;"
-					>${hlp_esc(r.name || r.key)}</span>
+					>${esc(r.name || r.key)}</span>
 				</td>
 				<td style="padding:.25rem .5rem;vertical-align:top;">
-					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_esc(asText(r.current))}</pre>
+					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${esc(r.__curText)}</pre>
 				</td>
 				<td style="padding:.25rem .5rem;vertical-align:top;">
-					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_diffHighlight(r.current, r.next)}</pre>
+					<pre style="margin:0;white-space:pre-wrap;word-break:break-word;">${hlp_diffHighlight(r.__curText, r.__nextText)}</pre>
 				</td>
 			</tr>
 		`).join("");
 
-		// KEY: a single, outer scroller that clamps to 70vh
 		const content = `
 			<div style="max-width:1200px;margin:0 auto;">
 				<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.5rem;">
-					<h3 style="margin:.25rem 0;">${hlp_esc(LT.titlePresetPreview?.() ?? "Preset changes preview")}</h3>
-					<div style="opacity:.8;">${hlp_esc(presetName)} — ${rows.length} change${rows.length===1?"":"s"}</div>
+					<h3 style="margin:.25rem 0;">${esc(LT.titlePresetPreview?.() ?? "Preset changes preview")}</h3>
+					<div style="opacity:.8;">${esc(presetName)} — ${normRows.length} change${normRows.length===1?"":"s"}</div>
 				</div>
 
-				<!-- SINGLE SCROLL CONTAINER -->
 				<div style="max-height:70vh;overflow:auto;border:1px solid var(--color-border);border-radius:6px;">
 					<table style="width:100%;border-collapse:collapse;font-size:12px;">
 						<thead style="position:sticky;top:0;background:var(--app-background);z-index:1;">
@@ -782,11 +1083,10 @@ function ui_openPresetPreview(rows, presetName = "") {
 					</table>
 				</div>
 
-				${rows.length === 0 ? `<p style="opacity:.75;margin:.5rem 0 0 0;">${hlp_esc(LT.noChangesDetected?.() ?? "No changes detected.")}</p>` : ""}
+				${normRows.length === 0 ? `<p style="opacity:.75;margin:.5rem 0 0 0;">${esc(LT.noChangesDetected?.() ?? "No changes detected.")}</p>` : ""}
 			</div>
 		`;
 
-		// Keep it simple: width only, no height, no resizable
 		new foundry.applications.api.DialogV2({
 			window: { title: LT.titlePresetPreview?.() ?? "Preset changes preview" },
 			position: { width: Math.min(1200, window.innerWidth - 100) },
@@ -798,29 +1098,6 @@ function ui_openPresetPreview(rows, presetName = "") {
 	} catch (err) {
 		DL(3, "settings-presets.js | ui_openPresetPreview(): error", err);
 		ui.notifications.error(LT.errors.failedOpenPreview?.() ?? "Failed to open preview.");
-	}
-}
-
-/* Simple char-diff highlight for small strings ======================== */
-function hlp_diffHighlight(oldVal, newVal) {
-	try {
-		const oldStr = (typeof oldVal === "string") ? oldVal : JSON.stringify(oldVal, null, 2);
-		const newStr = (typeof newVal === "string") ? newVal : JSON.stringify(newVal, null, 2);
-
-		// naive char-by-char diff
-		let out = "";
-		for (let i = 0; i < newStr.length; i++) {
-			const ch = newStr[i];
-			if (i >= oldStr.length || oldStr[i] !== ch) {
-				out += `<span style="color:#f55;background:rgba(255, 0, 0, 0)">${hlp_esc(ch)}</span>`;
-			} else {
-				out += hlp_esc(ch);
-			}
-		}
-		return out;
-	} catch (err) {
-		DL(2, "settings-presets.js | hlp_diffHighlight(): error", err);
-		return esc(String(newVal));
 	}
 }
 
@@ -1137,6 +1414,9 @@ class BBMMImportWizard extends AppV2 {
 
 /* Settings Preset Manager ============================================= */
 export async function openSettingsPresetManager() {
+
+	await svc_loadSettingsPresets(); // Ensure presets are loaded
+
 	// Stable id for this manager window so we can find/close it reliably
 	const PRESET_MANAGER_ID = "bbmm-settings-preset-manager";
 
@@ -1164,10 +1444,34 @@ export async function openSettingsPresetManager() {
 		catch (e) { DL(2, "settings-presets.js | openSettingsPresetManager(): failed to close existing instance", e); }
 	}
 
-	// Build list of current presets
-	const presets = svc_getSettingsPresets();
-	const names = Object.keys(presets).sort((a,b)=>a.localeCompare(b));
-	const options = names.map(n => `<option value="${ hlp_esc(n)}">${ hlp_esc(n)}</option>`).join("");
+	// Build list from flat persistent storage map (global presets)
+	const map = svc_getSettingsPresets();
+	const list = [];
+
+	for (const [name, preset] of Object.entries(map)) {
+		if (!name) continue;
+
+		list.push({
+			id: name, // select value
+			name,
+			preset: preset && typeof preset === "object" ? preset : {}
+		});
+	}
+
+	// Sort alphabetically
+	list.sort((a, b) => a.name.localeCompare(b.name));
+
+	// Index for fast lookup on click actions
+	const presetIndex = {};
+	for (const p of list) presetIndex[p.id] = p;
+
+	const options = list.map(p => {
+		return `<option value="${hlp_esc(p.id)}">${hlp_esc(p.name)}</option>`;
+	}).join("");
+
+	DL("settings-presets.js | openSettingsPresetManager(): merged presets list built", {
+		total: list.length
+	});
 
 	// Content markup (make central area scrollable to avoid off-screen growth)
 	const content = `
@@ -1225,6 +1529,17 @@ export async function openSettingsPresetManager() {
 		const root = app.element;
 		const form = root?.querySelector("form");
 		if (!form) return;
+
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(app, {
+				uuid: BBMM_README_UUID,
+				iconClass: "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, `settings-presets.js | help injection failed`, e);
+		}
 
 		// Ensure all action buttons are non-submitting buttons 
 		form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
@@ -1343,7 +1658,8 @@ export async function openSettingsPresetManager() {
 				// LOAD -> apply the selected preset to current settings
 				if (action === "load") {
 					if (!selected) return ui.notifications.warn(`${LT.selectSettingsPresetLoad()}.`);
-					const preset = svc_getSettingsPresets()[selected];
+					const picked = presetIndex[selected];
+					const preset = picked?.preset;
 					if (!preset) return;
 
 					const skippedMissing = [];
@@ -1559,10 +1875,23 @@ export async function openSettingsPresetManager() {
 	dlg.render(true);
 }
 
-// Expose API
-Hooks.once("ready", () => {
+// Expose API + migrate presets on load (GM only)
+Hooks.once("ready", async () => {
 	const mod = game.modules.get(BBMM_ID);
 	if (!mod) return;
 	mod.api ??= {};
 	mod.api.openSettingsPresetManager = openSettingsPresetManager;
+	mod.api.loadSettingsPresets = svc_loadSettingsPresets;
+
+	// GM-only: players should not be writing to module persistent storage
+	if (!game.user.isGM) return;
+
+	try {
+		// Load from storage if present
+		await svc_loadSettingsPresets();
+
+		DL("settings-presets.js | ready: settings presets loaded");
+	} catch (err) {
+		DL(3, "settings-presets.js | ready: settings presets loading failed", err);
+	}
 });

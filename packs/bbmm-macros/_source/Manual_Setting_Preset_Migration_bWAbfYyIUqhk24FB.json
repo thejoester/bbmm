@@ -1,0 +1,32 @@
+{
+  "name": "Manual Setting Preset Migration",
+  "type": "script",
+  "_id": "bWAbfYyIUqhk24FB",
+  "author": "EpqDCtSCbVNM4wPj",
+  "img": "icons/commodities/tech/cog-brass.webp",
+  "scope": "global",
+  "command": "game.modules.get(\"bbmm\")?.api?.openManualSettingsPresetMigration?.();",
+  "folder": null,
+  "sort": 0,
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "flags": {
+    "macro-wheel": {
+      "activeCondition": ""
+    }
+  },
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.351",
+    "systemId": "pf2e",
+    "systemVersion": "7.8.0",
+    "createdTime": 1766887237135,
+    "modifiedTime": 1766887340001,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_key": "!macros!bWAbfYyIUqhk24FB"
+}
