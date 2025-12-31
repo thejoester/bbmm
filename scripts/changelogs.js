@@ -3,9 +3,9 @@
 	- been updated and have a changelog file or URL.
 ============================================================================ */
 
-import { DL } from "./settings.js";
+import { DL, BBMM_README_UUID } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
-import { hlp_esc } from "./helpers.js";
+import { hlp_esc, hlp_injectHeaderHelpButton } from "./helpers.js";
 
 /* ============================================================================
         {GLOBALS}
@@ -37,14 +37,14 @@ Hooks.once("init", () => {
 
 				// Must be GM
 				if (!game.user.isGM) {
-					ui.notifications?.warn(LT?.changelog?.gm_only?.() ?? "GM only.");
+					// ui.notifications?.warn(LT?.changelog?.gm_only?.() ?? "GM only.");
 					return;
 				}
 
 				// Collect updated modules with changelogs
 				const entries = await _bbmmCollectUpdatedModulesWithChangelogs();
 				if (!entries.length) {
-					ui.notifications?.info(LT.changelog.noneFound());
+					// ui.notifications?.info(LT.changelog.noneFound());
 					return;
 				}
 
@@ -56,7 +56,7 @@ Hooks.once("init", () => {
 				// Filter out empty texts
 				const nonEmpty = entries.filter(e => (e.text && e.text.trim().length));
 				if (!nonEmpty.length) {
-					ui.notifications?.info(LT.changelog.noneFound());
+					// ui.notifications?.info(LT.changelog.noneFound());
 					return;
 				}
 
@@ -64,7 +64,7 @@ Hooks.once("init", () => {
 				new BBMMChangelogJournal(nonEmpty).render(true); 
 			} catch (err) {
 				DL(3, `changelog.js | api.openChangelogReport(): ${err?.message || err}`, err);
-				ui.notifications?.error("Failed to open BBMM Changelog Report. See console for details.");
+				// ui.notifications?.error("Failed to open BBMM Changelog Report. See console for details.");
 			}
 		};
 
@@ -217,7 +217,6 @@ function _bbmmSizeFrameOnce(frame, app) {
 		DL(3, `changelog.js | _bbmmSizeFrameOnce error: ${err?.message || err}`, err);
 	}
 }
-
 
 /* ============================================================================
 	Convert basic subset of Markdown to HTML
@@ -435,10 +434,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		}
 	}
 
-	/* ============================================================================
-		Replaces the leading "[label](" 
-		with "(" and injects {label} between > and </a>
-	============================================================================ */
+	// Fix Markdown-generated links that wrap empty anchors
 	_fixMdWrappedEmptyAnchors(html) {
 		try {
 			let s = String(html ?? "");
@@ -488,6 +484,8 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			DL(2, `changelog.js | _captureNavScroll(): ${err?.message || err}`, err);
 		}
 	}
+
+	// Restore left-nav scroll after re-render
 	_restoreNavScroll(root) {
 		try {
 			if (typeof this._navScrollTop !== "number") return;
@@ -501,6 +499,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			DL(2, `changelog.js | _restoreNavScroll(): ${err?.message || err}`, err);
 		}
 	}
+	
 	async _renderHTML() {
 		// escape helper for titles/urls etc.
 		const esc = (s) => String(s ?? "")
@@ -564,7 +563,21 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 				style="display:flex;gap:.75rem;min-height:0;height:100%;width:100%;min-width:0;">
 
 				<!-- Sidebar -->
-				<aside class="bbmm-theme-reset" style="width:300px;min-width:220px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;padding:.5rem;border-right:1px solid var(--color-border-light, #888);">
+				<aside class="bbmm-theme-reset" style="width:300px;min-width:220px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;gap:.5rem;border-right:1px solid var(--color-border-light, #888);">
+					<div class="bbmm-left-actions" style="display:flex;gap:.5rem;flex:0 0 auto;">
+						<button type="button" data-action="mark-current" style="flex:1;min-width:0;padding:.25rem .5rem;font-size:.85rem;line-height:1.1;">
+							${this._markedSeen.has(current.id)
+								? LT.changelog.mark_current_unseen()
+								: LT.changelog.mark_current()}
+						</button>
+
+						<button type="button" data-action="mark-all" style="flex:1;min-width:0;padding:.25rem .5rem;font-size:.85rem;line-height:1.1;">
+							${this.entries.length && this.entries.every(e => this._markedSeen.has(e.id))
+								? LT.changelog.mark_all_unseen()
+								: LT.changelog.mark_all()}
+						</button>
+					</div>
+
 					<div class="bbmm-nav-scroll" style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:.5rem;">
 						${list}
 					</div>
@@ -581,19 +594,6 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 							<div class="bbmm-source">
 								${LT.changelog.source()}: <a href="${current.url || "#"}" target="_blank" rel="noopener">${esc(current.url || "")}</a>
 							</div>
-						</div>
-						<!-- Toolbar: duplicates footer actions for convenience -->
-						<div class="bbmm-toolbar" style="display:flex;gap:.5rem;align-items:center;flex:0 0 auto;">
-							<button type="button" data-action="mark-current">
-								${this._markedSeen.has(current.id)
-									? LT.changelog.mark_current_unseen()
-									: LT.changelog.mark_current()}
-							</button>
-							<button type="button" data-action="mark-all">
-								${this.entries.length && this.entries.every(e => this._markedSeen.has(e.id))
-									? LT.changelog.mark_all_unseen()
-									: LT.changelog.mark_all()}
-							</button>
 						</div>
 					</div>
 
@@ -663,6 +663,17 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 			if (!root) {
 				DL(2, "changelog.js | _onRender: missing root element");
 				return;
+			}
+
+			// Inject help button into title bar
+			try {
+				hlp_injectHeaderHelpButton(this, {
+					uuid: BBMM_README_UUID,
+					iconClass: "fas fa-circle-question",
+					title: LT.buttons.help?.() ?? "Help"
+				});
+			} catch (e) {
+				DL(2, `changelogs.js | help injection failed`, e);
 			}
 
 			const frame = (root.closest?.(".app, .window-app")) || root.parentElement;
@@ -737,18 +748,13 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 								// currently marked -> unmark
 								await _bbmmUnmarkChangelogSeen(entry.id);
 								this._markedSeen.delete(entry.id);
-								ui.notifications?.info(`Unmarked ${entry.title || entry.id} v${entry.version}`);
+								//ui.notifications?.info(`Unmarked ${entry.title || entry.id} v${entry.version}`);
 							} else {
 								// not marked -> mark
 								await _bbmmMarkChangelogSeen(entry.id, entry.version);
 								this._markedSeen.add(entry.id);
 								this._pendingOnClose.delete(entry.id);
-								ui.notifications?.info(
-									LT.changelog.marked_seen_single({
-										title: entry.title || entry.id,
-										version: entry.version
-									})
-								);
+								// ui.notifications?.info(	LT.changelog.marked_seen_single({title: entry.title || entry.id, version: entry.version}));
 
 								// After marking current as read, move to the next unread entry (if any).
 								let nextIndex = -1;
@@ -796,7 +802,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 									await _bbmmUnmarkChangelogSeen(e.id);
 									this._markedSeen.delete(e.id);
 								}
-								ui.notifications?.info(`Unmarked ${this.entries.length} changelog(s).`);
+								// ui.notifications?.info(`Unmarked ${this.entries.length} changelog(s).`);
 							} else {
 								// mark all
 								for (const e of this.entries) {
@@ -804,7 +810,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 									this._markedSeen.add(e.id);
 									this._pendingOnClose.delete(e.id);
 								}
-								ui.notifications?.info(LT.changelog.marked_seen_all({ count: this.entries.length }));
+								//ui.notifications?.info(LT.changelog.marked_seen_all({ count: this.entries.length }));
 							}
 							this._captureNavScroll(root);
 							this.render();
@@ -1004,7 +1010,7 @@ async function _bbmmShowSingleChangelogDialog(entry) {
 								// Still mark seen if they click explicit "Mark Seen"
 							}
 							await _bbmmMarkChangelogSeen(id, version);
-							ui.notifications?.info(`Marked ${title} v${version} as seen.`);
+							//ui.notifications?.info(`Marked ${title} v${version} as seen.`);
 							DL(`changelog.js | marked seen for ${id} -> ${version}`);
 						} catch (err) {
 							DL(3, `changelog.js | Mark seen failed for ${id}: ${err?.message || err}`, err);
@@ -1075,12 +1081,12 @@ export async function BBMM_openChangelogFor(moduleId) {
 	try {
 		const mod = game.modules.get(moduleId);
 		if (!mod) {
-			ui.notifications?.warn(`Module not found: ${moduleId}`);
+			// ui.notifications?.warn(`Module not found: ${moduleId}`);
 			return;
 		}
 		const url = await _bbmmFindChangelogURL(mod);
 		if (!url) {
-			ui.notifications?.warn(`No changelog found for: ${mod.title || moduleId}`);
+			//ui.notifications?.warn(`No changelog found for: ${mod.title || moduleId}`);
 			return;
 		}
 		await _bbmmShowSingleChangelogDialog({

@@ -1,5 +1,5 @@
-import { DL, EXPORT_SKIP } from './settings.js';
-import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, getSkipMap, isExcludedWith } from './helpers.js';
+import { DL, BBMM_README_UUID, EXPORT_SKIP } from './settings.js';
+import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, getSkipMap, isExcludedWith, hlp_injectHeaderHelpButton } from './helpers.js';
 import { LT, BBMM_ID } from "./localization.js";
 const SETTING_SETTINGS_PRESETS = "settingsPresetsUser";	// user-scoped store defined in settings.js
 const PRESET_MANAGER_ID = "bbmm-settings-preset-manager"; // stable window id
@@ -1529,6 +1529,17 @@ export async function openSettingsPresetManager() {
 		const root = app.element;
 		const form = root?.querySelector("form");
 		if (!form) return;
+
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(app, {
+				uuid: BBMM_README_UUID,
+				iconClass: "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, `settings-presets.js | help injection failed`, e);
+		}
 
 		// Ensure all action buttons are non-submitting buttons 
 		form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));

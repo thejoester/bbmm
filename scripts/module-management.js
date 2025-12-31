@@ -5,9 +5,9 @@
 		• Whole row visually selectable (does not toggle enable/disable yet)
 		• Keep this purely presentational (no core behavior changes)
 ============================================================================== */
-import { DL, injectBBMMHeaderButton } from "./settings.js";
+import { DL, BBMM_README_UUID, injectBBMMHeaderButton } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
-import { hlp_esc } from "./helpers.js";
+import { hlp_esc, hlp_injectHeaderHelpButton } from "./helpers.js";
 
 /* Return true if the module has at least one configurable setting (config === true). */
 function _bbmmModuleHasConfigSettings(modId) {
@@ -185,6 +185,22 @@ function _bbmmIsEmptyNoteHTML(html) {
 	}
 }
 
+// Refresh the Module Manager after notes edit
+function _bbmmRefreshModuleManagerApp() {
+	try {
+		const app = foundry.applications?.instances?.get?.("bbmm-module-manager");
+		if (!app) return;
+
+		if (typeof app._rerender === "function") {
+			app._rerender({ keepFocus: true });
+		} else if (typeof app.render === "function") {
+			app.render({ force: true });
+		}
+	} catch (err) {
+		DL(2, "module-management | _bbmmRefreshModuleManagerApp(): error", err);
+	}
+}
+
 /* Open the notes editor dialog for a specific module */
 async function _bbmmOpenNotesDialog(moduleId) {
     try {
@@ -349,8 +365,10 @@ async function _bbmmOpenNotesDialog(moduleId) {
 							// If nothing left, store {} to keep setting small
 							if (!Object.keys(notes).length) {
 								await game.settings.set(BBMM_ID, KEY, {});
+								_bbmmRefreshModuleManagerApp();
 							} else {
 								await game.settings.set(BBMM_ID, KEY, notes);
+								_bbmmRefreshModuleManagerApp();
 							}
 
 							ui.notifications.info(LT.modListNotesDeleted());
@@ -361,6 +379,7 @@ async function _bbmmOpenNotesDialog(moduleId) {
 						// Non-empty -> save/update
 						notes[moduleId] = html;
 						await game.settings.set(BBMM_ID, KEY, notes);
+						_bbmmRefreshModuleManagerApp();
 
 						ui.notifications.info(LT.modListNotesSaved());
 						DL(`module-management | saved notes for ${moduleId}`, { length: html.length });
@@ -1375,12 +1394,25 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				return `<div class="bbmm-mm-empty">${LT.moduleManagement.noResults()}</div>`;
 			}
 
+			// Pull all saved notes once (avoid re-reading per row)
+			const allNotes = game.settings.get(BBMM_ID, "moduleNotes") || {};
+
 			return rows.map((m) => {
 				const planned = !!this._getTempActive(m.id);
 				const changed = planned !== !!this._coreSnap?.[m.id];
 				const verTxt  = m.version ? String(m.version) : "";
+
 				// get the REAL Module object for the tag strip
 				const modObj = game.modules.get(m.id);
+
+				// Note badge: show if custom notes exist for this module
+				const rawNote = _bbmmExtractEditorContent(allNotes[m.id] || "").trim();
+				const hasCustomNote = !!rawNote && !_bbmmIsEmptyNoteHTML(rawNote);
+				const noteBadge = hasCustomNote
+					? `<span class="tag note" title="${hlp_esc(LT.modListCustomNotesExist())}">
+						<i class="fa-solid fa-note-sticky fa-fw"></i>
+					</span>`
+					: "";
 				
 				// Compatibility color/tooltip applied to version tag
 				let verColor = "";
@@ -1446,6 +1478,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 					<div class="actions">
 						<div class="tags">
+						${noteBadge}
 						${this._buildTagsFor(modObj)}
 						${verTxt ? `<span class="ver-text" title="${hlp_esc(verTitle)}" style="${verColor ? `color:${verColor}` : ""}">v${hlp_esc(verTxt)}</span>` : ``}
 						</div>
@@ -1495,6 +1528,17 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		content.style.minHeight = "0";
 		content.innerHTML = result;
 		this._root = content;
+
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(this, {
+				uuid: BBMM_README_UUID,
+				iconClass:  "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, "module-management.js | _onRender(): help inject failed", e);
+		}
 
 		// add the standard BBMM header button 
 		try { injectBBMMHeaderButton(this.element); } catch (e) { DL(2, "BBMM MM | header btn inject failed", e); }

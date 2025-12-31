@@ -93,7 +93,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>Setting Presets allow you to save your current settings state into a preset.</p><p><br data-start=\"349\" data-end=\"352\" />This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><p></p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current settings state into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current settings</strong> to the preset.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li><li><p><strong>Import/Export: </strong>Presets are specific to the game world, to use a preset in another game world you can export/import.</p></li></ul><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Import / Export</span></strong></span></h3><ul><li><p><strong>Export:</strong> exports <span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">current settings state</span></strong></span> to a .json file. To export a specific preset you must load it first, then export to .json.</p></li><li><p><strong>Import:</strong> Imports .json file into a preset. When importing it will let you choose what to import:</p><ul><li><p>\"All Settings\": imports everything from the .json</p></li><li><p>\"Select Modules\": Select which module settings to import.</p></li><li><p>\"Select Settings\": Select specific settings to import.</p></li><li><p><strong>Note:</strong> Anything in the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusions} will not be imported.</p></li></ul></li><li><p><strong>Note:</strong> Once you import the preset, you must choose it and load it for it to be activated.</p></li></ul><h3>Also See</h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}</p>"
+        "content": "<p>Setting Presets allow you to save your current settings state into a preset.</p><p><br data-start=\"349\" data-end=\"352\" />This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current settings state into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current settings</strong> to the preset.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li><li><p><strong>Import/Export: </strong>Presets are specific to the game world, to use a preset in another game world you can export/import.</p></li></ul><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Import / Export</span></strong></span></h3><ul><li><p><strong>Export:</strong> exports <span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">current settings state</span></strong></span> to a .json file. To export a specific preset you must load it first, then export to .json.</p></li><li><p><strong>Import:</strong> Imports .json file into a preset. When importing it will let you choose what to import:</p><ul><li><p>\"All Settings\": imports everything from the .json</p></li><li><p>\"Select Modules\": Select which module settings to import.</p></li><li><p>\"Select Settings\": Select specific settings to import.</p></li><li><p><strong>Note:</strong> Anything in the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusions} will not be imported.</p></li></ul></li><li><p><strong>Note:</strong> Once you import the preset, you must choose it and load it for it to be activated.</p></li></ul><h3>Also See</h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}</p>"
       },
       "video": {
         "controls": true,
@@ -110,11 +110,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.348",
+        "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757733847774,
-        "modifiedTime": 1757753172987,
+        "modifiedTime": 1767100480471,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.mB68DCCQ83f9d3EQ"
@@ -327,7 +327,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>Big Bad Module Manager macros found in the compendium:</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe]{View Changelog Report} - Launch the changelog report manually.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.KKjNNKp07HamxcUO]{BBMM: Reset Changelog} - Reset the \"seen\" state of changelogs and launch Changelog Report. </p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.sc6d0g6syYz3nEbB]{BBMM: Setting Preset Inspector} - allows you to inspect a preset, see the saved settings and values contained inside for troubleshooting purposes.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector} - Tool to view module settings to see both visible and hidden settings, and their current values. This is a read only tool. May be useful for deciding what to put on inclusion / exclusion manager.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.cwDZlfhhZAZaUPER]{BBMM: Keybind inspector} - Tool to inspect keybiniding details. </p><p></p><p></p>"
+        "content": "<p>Big Bad Module Manager macros found in the compendium:</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe]{View Changelog Report} - Launch the changelog report manually.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.KKjNNKp07HamxcUO]{BBMM: Reset Changelog} - Reset the \"seen\" state of changelogs and launch Changelog Report.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.sc6d0g6syYz3nEbB]{BBMM: Setting Preset Inspector} - allows you to inspect a preset, see the saved settings and values contained inside for troubleshooting purposes.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector} - Tool to view module settings to see both visible and hidden settings, and their current values. This is a read only tool. May be useful for deciding what to put on inclusion / exclusion manager.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.cwDZlfhhZAZaUPER]{BBMM: Keybind inspector} - Tool to inspect keybiniding details.</p><p></p><p></p>"
       },
       "video": {
         "controls": true,
@@ -344,11 +344,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.350",
+        "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757800788174,
-        "modifiedTime": 1760257988593,
+        "modifiedTime": 1767100476958,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Tw7LX79cvGnJ3F67"
@@ -444,7 +444,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>If you have issues please consider the following:</p><ul><li><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusions} will take priority over inclusions. Check the module or setting is not also in the Exclusions Manager. </p></li><li><p>Settings for modules that are not enabled will not appear when adding settings. </p></li></ul><p>If you are having issues or have questions please <a href=\"https://github.com/thejoester/bbmm/issues\">open an issue</a> on Github. </p><p></p>"
+        "content": "<h3>Where did my Presets go?!</h3><p>If you have updated the module and your presets are missing, please read @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.fBhc3e12eZRtNnSd]{How To: Migrate presets}</p><p></p><h3>General Troubleshooting</h3><p>If you have issues please consider the following:</p><ul><li><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusions} will take priority over inclusions. Check the module or setting is not also in the Exclusions Manager.</p></li><li><p>Settings for modules that are not enabled will not appear when adding settings.</p></li></ul><p>If you are having issues or have questions please <a href=\"https://github.com/thejoester/bbmm/issues\">open an issue</a> on Github.</p><p></p>"
       },
       "video": {
         "controls": true,
@@ -461,14 +461,53 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.350",
+        "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.5.2",
         "createdTime": 1759830012035,
-        "modifiedTime": 1759830417597,
+        "modifiedTime": 1767010337016,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.EWkK8UJBIc3junpJ"
+    },
+    {
+      "sort": 800000,
+      "name": "How To: Migrate presets",
+      "type": "text",
+      "_id": "fBhc3e12eZRtNnSd",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>As of BBMM v0.6.0, <strong data-start=\"180\" data-end=\"250\">module presets and settings presets are no longer stored per-world </strong>(local). All presets are now saved in <strong data-start=\"281\" data-end=\"303\">persistent storage</strong> (global), which is shared across worlds.</p><p data-start=\"337\" data-end=\"544\">Because of this change, <strong data-start=\"361\" data-end=\"430\">existing presets from older worlds are not migrated automatically</strong>. This is intentional, to avoid accidental overwrites and to give you full control over what gets carried forward.</p><p>If you have presets created before v0.6.0 and want to keep using them, follow the steps below.</p><h3 data-start=\"133\" data-end=\"151\">Important Note</h3><p data-start=\"153\" data-end=\"322\">BBMM will only retain legacy per-world presets for a limited time. These older presets will remain available for the next few releases to allow ample time for migration.</p><p data-start=\"324\" data-end=\"555\">After that period, the legacy preset data will be removed as part of a cleanup of world-level settings. If you wish to keep any existing presets, be sure to import them into <strong>persistent storage</strong> before this cleanup occurs.</p><h2 data-start=\"647\" data-end=\"683\">Step 1: Open the Migration Macros</h2><p data-start=\"685\" data-end=\"788\">BBMM provides macros specifically for exporting old presets and importing them into persistent storage.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RKF8LHvxgzFG9tq8]{Manual Module Preset Migration} - Will let you choose which <strong>Module Presets</strong> to import from the current world into the persistent module storage that will be available in all worlds.</p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.bWAbfYyIUqhk24FB]{Manual Setting Preset Migration} - Will let you choose which <strong>Settings Presets</strong> to import from the current world into the persistent module storage that will be available in all worlds.</p><h2 data-start=\"975\" data-end=\"1019\">Step 2: Import Presets into Persistent Storage</h2><ul><li><p data-start=\"1021\" data-end=\"1104\">When you run the macro, you will be shown a list of local presets available in the current world's settings.</p></li><li><p data-start=\"1021\" data-end=\"1104\">Select the presets you wish to copy to global, and click \"Import\"<br /></p><img src=\"worlds/pf2e-test/assets/pages/u3uUIp6Jfg8411Pn-pages-fBhc3e12eZRtNnSd-image-kS9ncQKdkfvN7Utx.png\" /></li></ul><p data-start=\"1108\" data-end=\"1167\"></p><hr data-start=\"1729\" data-end=\"1732\" /><h2 data-start=\"1734\" data-end=\"1752\">Important Notes</h2><ul data-start=\"1754\" data-end=\"1992\"><li data-start=\"1754\" data-end=\"1819\"><p data-start=\"1756\" data-end=\"1819\">Importing presets <strong data-start=\"1774\" data-end=\"1819\">does not overwrite anything automatically</strong>, any preset imported this way will have \"(manual)\" appended to the name, and if that already exists it will be renamed with a numerical value added to the name, for example \"good-backup\" would become \"good-backup (manual) \", and then \"good-backup (manual) 2\" if that already existed, and so on.</p></li><li data-start=\"1880\" data-end=\"1944\"><p data-start=\"1882\" data-end=\"1944\">Once imported, presets are shared across all worlds using BBMM</p></li><li data-start=\"1945\" data-end=\"1992\"><p data-start=\"1947\" data-end=\"1992\">You only need to import each preset file once</p></li><li data-start=\"1945\" data-end=\"1992\"><p>If you want to keep a backup, you can either:</p><ul><li data-start=\"1945\" data-end=\"1992\"><p>Load the preset, then export to .json, or</p></li><li data-start=\"1945\" data-end=\"1992\"><p>the .json files can be copied from the `Data/modules/bbmm/storage/presets/` directory.</p></li></ul></li></ul><hr data-start=\"1994\" data-end=\"1997\" /><h2 data-start=\"1999\" data-end=\"2024\">Why This Change Exists</h2><p data-start=\"2026\" data-end=\"2068\">Persistent storage allows BBMM presets to:</p><ul data-start=\"2069\" data-end=\"2201\"><li data-start=\"2069\" data-end=\"2107\"><p data-start=\"2071\" data-end=\"2107\">Survive world deletion or recreation</p></li><li data-start=\"2108\" data-end=\"2145\"><p data-start=\"2110\" data-end=\"2145\">Be reused across multiple campaigns / worlds</p></li></ul><p data-start=\"2203\" data-end=\"2263\">This migration step is a one-time task for existing presets.</p><hr data-start=\"2265\" data-end=\"2268\" /><p data-start=\"2270\" data-end=\"2411\">If something doesn’t look right after importing, you can safely re-run the import macro or remove presets manually using the preset managers.<br /><br />If you have any questions or need assistance please <a href=\"https://github.com/thejoester/bbmm/issues\">open an issue on Github</a>, or <a href=\"https://discord.com/users/182349607190265857\">contact me on Discord</a>.</p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "pf2e",
+        "systemVersion": "7.8.0",
+        "createdTime": 1767008505790,
+        "modifiedTime": 1767100291562,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.fBhc3e12eZRtNnSd"
     }
   ],
   "folder": null,

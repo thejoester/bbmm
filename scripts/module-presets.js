@@ -1,5 +1,5 @@
-import { DL } from './settings.js';
-import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_normalizePresetName } from './helpers.js';
+import { DL, BBMM_README_UUID } from './settings.js';
+import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, hlp_injectHeaderHelpButton } from './helpers.js';
 import { LT, BBMM_ID } from "./localization.js";
 const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  enabled module ids
 
@@ -351,9 +351,9 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 				buttons: [
 					{ action: "ok", label: LT.buttons.ok(), default: true }
 				],
-				submit: (_res, _ev, button) => button?.action === "ok"
+				submit: (_res, _ev, button) => resolve(button?.action === "ok")
 			}).render(true);
-		})
+		});
 	}
 	
 	
@@ -392,6 +392,84 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 	const issues = await displayIssues(lines);
 	return;
 		
+}
+
+// Import module preset json file, validate it, save as preset. 
+async function importModuleStateAsPreset(data) {
+	// validate file structure
+	const validated = hlp_validateModulePresetJSON(data);
+	if (!validated || !Array.isArray(validated.modules) || !validated.modules.length) {
+		DL(3, "module-presets.js | Not a BBMM export. Expected a file created by BBMM.");
+		await new foundry.applications.api.DialogV2({
+			window: { title: LT.errors.titleImportError() },
+			content: `<p>${LT.errors.notBBMMFile()}.</p>`,
+			buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
+			submit: () => "ok"
+		}).render(true);
+		return { status: "cancel" };
+	}
+	const modules = validated.modules;
+
+	// compute report now (so we can show it after save)
+	const report = hlp_validateModuleState(modules);
+
+	// ask for preset name and save
+	return await new Promise((resolve) => {
+		const dlgName = new foundry.applications.api.DialogV2({
+			window: { title: LT.titleImportPreset() },
+			content: `
+				<div style="display:flex;flex-direction:column;gap:.5rem;">
+					<div style="display:flex;gap:.5rem;align-items:center;">
+						<label style="min-width:7rem;">${LT.presetName()}</label>
+						<input name="presetName" type="text" placeholder="e.g. staging" style="flex:1;">
+					</div>
+				</div>
+			`,
+			buttons: [
+				{
+					action: "ok",
+					label: LT.buttons.import(),
+					default: true,
+					callback: (_ev, button) => button.form.elements.presetName?.value?.trim() || ""
+				},
+				{ action: "cancel", label: LT.buttons.cancel() }
+			],
+			submit: async (_result, _ev, button) => {
+				if (button?.action === "cancel") {
+					resolve({ status: "cancel" });
+					return;
+				}
+
+				const baseName = _result;
+				if (!baseName) {
+					ui.notifications.warn(`${LT.importNamePrompt()}.`);
+					return;
+				}
+
+				const res = await hlp_savePreset(`${baseName} (${hlp_formatDateD_Mon_YYYY()})`, modules);
+				if (res.status !== "saved") {
+					resolve(res);
+					return;
+				}
+
+				ui.notifications.info(`${LT.importedSummary({ name: res.name, count: modules.length })}.`);
+
+				// CLOSE the naming dialog *before* showing issues
+				try { await dlgName.close(); } catch {}
+
+				// Show issues once (if any)
+				if (report.unknown.length || report.depIssues.length) {
+					await showImportIssuesDialog(report);
+				}
+
+				DL("module-presets.js | importModuleStateAsPreset() returning ", res);
+				resolve(res);
+			},
+			rejectClose: false
+		});
+
+		dlgName.render(true);
+	});
 }
 
 // Open Dialog to export Module state json
@@ -593,6 +671,17 @@ export async function openPresetManager() {
 			const form = app.element?.querySelector("form");
 			if (!form) { DL(2, "module-presets.js | openPresetManager(): form not found"); return; }
 
+			// Inject help button into title bar
+			try {
+				hlp_injectHeaderHelpButton(app, {
+					uuid: BBMM_README_UUID,
+					iconClass: "fas fa-circle-question",
+					title: LT.buttons.help?.() ?? "Help"
+				});
+			} catch (e) {
+				DL(2, `module-presets.js | help injection failed`, e);
+			}
+
 			form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
 
 			form.addEventListener("click", async (ev) => {
@@ -695,8 +784,26 @@ export async function openPresetManager() {
 					}
 
 					if (action === "bbmm-import-state") {
-						DL("module-presets.js | import-current: starting");
-						importModuleStateDialog();
+						const file = await hlp_pickLocalJSONFile();
+						if (!file) return;
+
+						let data;
+						try {
+							data = JSON.parse(await file.text());
+						} catch (err) {
+							DL(3, "module-presets.js | openPresetManager(): invalid json import file", err);
+							ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+							return;
+						}
+
+						const res = await importModuleStateAsPreset(data);
+						DL("module-presets.js | openPresetManager(): import-state result", res);
+
+						if (res?.status === "saved") {
+							app.close();
+							openPresetManager();
+						}
+
 						return;
 					}
 				} catch (err) {

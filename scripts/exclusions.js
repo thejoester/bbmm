@@ -5,9 +5,10 @@
 	- "Exclude" updates setting, closes, then re-opens manager
 ============================================================================ */
 
-import { DL } from './settings.js';
+import { DL, BBMM_README_UUID } from './settings.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { copyPlainText } from "./macros.js";
+import { hlp_injectHeaderHelpButton } from "./helpers.js";
 
 // CONSTANTS
 const EXC_STORAGE_SUBDIR = "lists";
@@ -137,6 +138,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 	}
 
 	async _renderHTML(_context, _options) {
+
 		this._excData = await hlp_readUserExclusions();
 		this._collectCandidates();
 
@@ -223,12 +225,23 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 			winEl.style.maxHeight = this._maxH + "px";
 			winEl.style.overflow  = "hidden";
 		} catch (e) { DL(2, "BBMMAddModuleExclusionAppV2: size clamp failed", e); }
-		
+
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
 
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(this, {
+				uuid: BBMM_README_UUID,
+				iconClass:  "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, "exclusions.js | _onRender(): help inject failed", e);
+		}
+
 		// add footer with cancel button
-		//const footer = document.createElement("footer");
+		const footer = document.createElement("footer");
 		footer.classList.add("form-footer");
 		footer.style.display = "flex";
 		footer.style.justifyContent = "flex-end";
@@ -248,7 +261,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		});
 
 		footer.appendChild(closeBtn);
-		//content.appendChild(footer);
+		content.appendChild(footer);
 
 		content.addEventListener("click", async (ev) => {
 
@@ -810,6 +823,17 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
+
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(this, {
+				uuid: BBMM_README_UUID,
+				iconClass:  "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, "exclusions.js | _onRender(): help inject failed", e);
+		}	
 
 		// Apply visibility immediately (blank until module selected)
 		this._applyFilterToDOM();
@@ -1398,6 +1422,17 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
+
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(this, {
+				uuid: BBMM_README_UUID,
+				iconClass:  "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, "exclusions.js | _onRender(): help inject failed", e);
+		}
 
 		// avoid double-binding across re-renders
 		if (!this._delegated) {

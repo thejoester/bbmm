@@ -194,11 +194,19 @@
 		"openChangelog": "Open Changelog",
 		"openedSettingsFor": "Opened settings for {title}.",
 		"noSettingsFoundFor": "No configurable settings for {title}.",
-		"modListNotesDeleted": "Notes deleted.",	
+		"modListNotesDeleted": "Notes deleted.",
+		"modListCustomNotesExist": "Custom notes exist",
+		"presetNoticeTitle": "Presets Moved to Persistent Storage",
+		"presetNoticePleaseRead": "IMPORTANT! Please read!",
+		"presetNoticeBody": "<p><strong>Big Bad Module Manager</strong> has migrated Settings Presets and Module Presets to persistent module storage.</p><p><h4>What does this mean?</h4> These settings are no longer stored in the FoundryVTT world data, and will now be shared across worlds, meaning you can save one preset and use it in any world!</p><p>Because of this change, any presets previously saved in a world will no longer show up in  the Preset Managers, however they can be migrated manually using provided macros. Click the Open README button for instructions or use the macros in the compendiums.</p>",
+		"presetNoticeOpenDocs": "Open README",
+		"presetNoticeDontShowAgain": "Don't Show Again",
+		"presetNoticeClose": "Close",
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",
 			"ok": "OK",
+			"help": "Manual",
 			"cancel": "Cancel",
 			"close": "Close",
 			"save": "Save",
@@ -361,6 +369,8 @@
 			"search": "Search…",
 			"showing": "Showing",
 			"of": "of",
+			"selectAll": "Select All",
+			"clear": "Clear",
 			"btnInspect": "Inspect",
 			"visibility": "Visibility",
 			"copiedValToClipboard": "Copied value to clipboard.",
@@ -399,7 +409,8 @@
 			"manualMigrateNoUsablePresets": "Legacy preset data exists, but no usable presets were found.",
 			"manualMigrateSettingsWindowTitle": "BBMM — Manual Settings Preset Migration",
 			"manualMigrateSettingsTitle": "Manual Settings Preset Migration",
-			"manualMigrateSettingsDesc": "Select a legacy settings preset from settings, then write it into persistent storage."
+			"manualMigrateSettingsDesc": "Select a legacy settings preset from settings, then write it into persistent storage.",
+			"manualMigrateImportNamingHint": "Imported presets will be named <strong>&lt;legacy name&gt; (manual)</strong> and uniqued if needed."
 
 		},
 		"moduleManagement": {

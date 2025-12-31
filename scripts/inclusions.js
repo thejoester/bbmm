@@ -4,9 +4,9 @@
 	- Persistent storage: modules/bbmm/storage/lists/user-inclusions.json
 ============================================================================ */
 
-import { DL } from './settings.js';
+import { DL, BBMM_README_UUID  } from './settings.js';
 import { LT, BBMM_ID } from "./localization.js";
-import { getSkipMap, isExcludedWith } from './helpers.js';
+import { getSkipMap, isExcludedWith, hlp_injectHeaderHelpButton } from './helpers.js';
 import { copyPlainText } from "./macros.js";
 
 
@@ -580,10 +580,6 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		}
 	}
 
-	/* ============================================================================
-		{RENDER}
-	============================================================================ */
-
 	async _renderHTML() {
 		try {
 			this._incData = await hlp_readUserInclusions();
@@ -681,6 +677,17 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
+
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(this, {
+				uuid: BBMM_README_UUID,
+				iconClass:  "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, "inclusions.js | _onRender(): help inject failed", e);
+		}
 
 		// Apply visibility immediately (initial state shows nothing until module selected)
 		this._applyFilterToDOM();
@@ -1107,6 +1114,17 @@ class BBMMAddModuleInclusionAppV2 extends foundry.applications.api.ApplicationV2
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
 
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(this, {
+				uuid: BBMM_README_UUID,
+				iconClass:  "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, "inclusions.js | _onRender(): help inject failed", e);
+		}
+
 		if (this._delegated) return;
 		this._delegated = true;
 
@@ -1239,11 +1257,6 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace, key, removed: true }); } catch {}
 		DL(`inclusions.js | _remove(): removed ${namespace}.${key}`);
 	}
-
-
-	/* ============================================================================
-		{RENDER}
-	============================================================================ */
 
 	async _renderHTML() {
 		// Build rows (modules + settings) 
@@ -1384,6 +1397,17 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
+
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(this, {
+				uuid: BBMM_README_UUID,
+				iconClass:  "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, "inclusions.js | _onRender(): help inject failed", e);
+		}
 
 		// avoid double-binding across re-renders
 		if (this._delegated) return;
