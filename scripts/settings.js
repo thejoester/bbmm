@@ -334,6 +334,7 @@ async function hlp_loadPresets() {
 	}
 
 }
+
 // Check folder migration 
 // !!! REMOVE  after version 0.7.0 !!!
 async function checkFolderMigration(){
@@ -630,6 +631,7 @@ export function injectBBMMHeaderButton(root) {
 	DL("settings.js | BBMM header button injected");
 }
 
+// Open Exclusions Manager
 export function openExclusionsManager() {
 	// Wrapper that calls the actual app launcher if present
 	DL("settings.js | openExclusionsManager(): fired");
@@ -640,6 +642,18 @@ export function openExclusionsManager() {
 	ui.notifications?.warn(LT?.exclusionsNotAvailable?.() ?? `${LT.errors.exclusionsMgrNotFound()}.`);
 	} catch (e) {
 		DL(3, "settings.js | openExclusionsManager(): error", e);
+	}
+}
+
+// Open Hidden Client Setting Sync Manager
+export function openhiddenSettingSyncManager() {
+	DL("settings.js | openhiddenSettingSyncManager(): fired");
+	try {
+		const fn = globalThis.bbmm?.openhiddenSettingSyncManagerApp;
+		if (typeof fn === "function") return fn();
+		DL(3, "settings.js | openhiddenSettingSyncManager(): launcher not found");
+	} catch (err) {
+		DL(3, "settings.js | openhiddenSettingSyncManager(): failed", err);
 	}
 }
 
@@ -660,6 +674,7 @@ export async function openBBMMLauncher() {
 					// { action: "controls-presets", label: LT.controlsPresetMgr() },
 					{ action: "exclusions", label: LT.exclusionsMgr() },
 					{ action: "inclusions", label: LT.inclusionsMgr() },
+					{ action: "hiddenSettings",   label: LT.hiddenSettingSync.menuLabel() },
 					{ action: "cancel",   label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
@@ -695,6 +710,8 @@ export async function openBBMMLauncher() {
 		openInclusionsManagerApp();
 	} else if (choice === "controls-presets") {
 		openControlsPresetManager();
+	} else if (choice === "hiddenSettings") {
+		openhiddenSettingSyncManager();
 	}
 	// "cancel" -> do nothing
 }
@@ -997,6 +1014,42 @@ Hooks.once("init", () => {
 				}
 			});
 
+			// Hidden Client Setting Sync Manager menu
+			game.settings.registerMenu(BBMM_ID, "hiddenSettingSyncManager", {
+				name: LT.hiddenSettingSync?.menuName?.() ?? "Hidden Client Setting Sync",
+				label: LT.hiddenSettingSync?.menuLabel?.() ?? "Open Manager",
+				icon: "fas fa-user-gear",
+				restricted: true,
+				type: class extends FormApplication {
+					constructor(...args){ super(...args); }
+					static get defaultOptions() {
+						return foundry.utils.mergeObject(super.defaultOptions, {
+							id: "bbmm-hidden-client-sync-opener",
+							title: LT.hiddenSettingSync?.title?.() ?? "Hidden Client Setting Sync",
+							template: null,
+							width: 600
+						});
+					}
+					async render(...args) {
+						try {
+							const fn = globalThis.bbmm?.openhiddenSettingSyncManagerApp;
+
+							if (typeof fn !== "function") {
+								DL(3, "settings.js | openhiddenSettingSyncManager(): global opener not found", globalThis.bbmm);
+								ui.notifications?.error(LT.hiddenSettingSync?.openError?.() ?? "Hidden Client Sync Manager not available.");
+								return this;
+							}
+
+							fn();
+						} catch (err) {
+							DL(2, "settings.js | Hidden Client Sync Manager open failed", err);
+						}
+						return this;
+					}
+					async _updateObject() {}
+				}
+			});
+
 			// World toggle to Show changelog on GM login
 			game.settings.register(BBMM_ID, "showChangelogsOnLogin", {
 				name: LT.name_showChangelogsOnLogin(),
@@ -1149,10 +1202,10 @@ Hooks.on("setup", () => {
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
-	
 
+	// migrate inclusions/exclusions to storage - Remove after version 0.8.0
 	try { await hlp_loadPresets(); DL(`settings.js | Inclusions/Exclusions migrated`)} catch (err) { DL(3, "settings.js | Inclusions/Exclusions migration failed:", err?.message ?? err); }
-
+	
 	// check folder migration - Remove after version 0.7.0
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
 
