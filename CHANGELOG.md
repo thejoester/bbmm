@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] - 2026-01-01
+## [0.6.1] - 2026-01-02
+### Added
+- **Hidden Setting Sync Manager:**
+  - Added Hidden Setting Sync Manager to allow GM to manually add lock or soft-lock to hidden client settings. 
+### Fixed
+- **Inclusion/Exclusion Presets:**
+  - Fixed Inclusion/Exclusion list migration, now when you load up your previously saved inclusions and exclusions will show up and be accessible from all worlds. 
+
+## [0.6.0] - 2025-12-31
 ### Changed
 - **Presets:**
   - GM Setting presets and Module presets are now saved in persistent storage, and will be shared across worlds.
