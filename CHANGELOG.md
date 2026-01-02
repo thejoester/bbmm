@@ -4,52 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0-test6] - 2025-12-31
+## [0.6.1] - 2026-01-02
+### Added
+- **Setting Sync:**
+  - Added setting to force player reload when setting sync happens with setting that requires reload instead of prompting them. Default is disabled.
+  - Added Hidden Setting Sync manager to allow manual adding of hidden client settings that may be on menus.
 ### Fixed
-- Fixed Inclusions / Exclusions migration. 
+- **Inclusions/Exclusions:**
+ - Fixed issue with saved inclusions / exclusions not migrating to the global persistent storage. 
 
-## [0.6.0-test5] - 2025-12-28
+## [0.6.0] - 2025-12-31
 ### Changed
-- No longer perform migration autiomatically, instead added two macros to manually import from world settings. 
-
-## [0.6.0-test4] - 2025-12-20
+- **Presets:**
+  - GM Setting presets and Module presets are now saved in persistent storage, and will be shared across worlds.
+    - See instructions in Compendium Journal on how to import your old presets! 
 ### Changed
 - **Inclusions/Exclusions:**
   - Inclusion/Exclusion lists are now stored in persistent storage, and accessible from all worlds. 
   - Should migrate when loading a world for the first time. 
-  - Filtered '[menu]’ settings
-- **Settings-Sync:**
-  - Added setting to just force reload for players when setting requiring reload is locked/synced. 
-### Fixed
-- fixed localization issues.
-- fixed importing exclusions json.
-- fixed preview comparisons.
-
-## [0.6.0-test3] - 2025-12-19
-### Changed
-- **Settings Preset Manager:**
-  - Presets no longer attached to worlds, can update/delete in any world.
-  - On initial migration the preset name will have originating world name appended. 
-- **Module Preset Manager:**
-  - Presets no longer attached to worlds, can update/delete in any world.
-  - On initial migration the preset name will have originating world name appended. 
-- **Inclusions/Exclusions Managers:**
+  - Filtered out '[menu]’ settings to clean up lists. 
   - When adding a setting inclusion/exclusion, will filter by module in drop down. 
-  - Reminder: Please read the [Wiki](https://github.com/thejoester/bbmm/wiki) regarding inclusions/exclusions and hidden Settings. 
-
-## [0.6.0-test2] - 2025-12-17
-### Changed
-- **Settings Preset Manager:**
-  - If preset with same name exists when loading a world for the first time after this update, will append "(world-name)" to the name so it does not overwrite. 
-- **Module Preset Manager:**
-  - Module presets available to load in all worlds, but can only update or delete in the world they originate in. 
-
-## [0.6.0-test1] - 2025-12-17
-### Changed
-- **Settings Preset Manager:**
-  - Setting presets for GM are now saved in persistent storage, and will be shared across worlds.
-- **Module Preset Manager:**
-  - Module presets are now stored in persistent storage, and will be shared across worlds.
+  - Reminder: Please read the [Wiki](https://github.com/thejoester/bbmm/wiki) or compendium journal regarding inclusions/exclusions and hidden settings!
+- **Settings-Sync:**
+  - Added optional setting to force reload for players when setting requiring reload is locked/synced. 
+- **Changelog:**
+  - Moved "Mark Current Seen" and "Mark All Seen" buttons so they remain static even if window resizes. 
 
 ## [0.5.17] - 2025-12-06
 ### Changed
