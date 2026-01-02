@@ -6,11 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.6.1] - 2026-01-02
 ### Added
-- **Hidden Setting Sync Manager:**
-  - Added Hidden Setting Sync Manager to allow GM to manually add lock or soft-lock to hidden client settings. 
+- **Setting Sync:**
+  - Added setting to force player reload when setting sync happens with setting that requires reload instead of prompting them. Default is disabled.
+  - Added Hidden Setting Sync manager to allow manual adding of hidden client settings that may be on menus.
 ### Fixed
-- **Inclusion/Exclusion Presets:**
-  - Fixed Inclusion/Exclusion list migration, now when you load up your previously saved inclusions and exclusions will show up and be accessible from all worlds. 
+- **Inclusions/Exclusions:**
+ - Fixed issue with saved inclusions / exclusions not migrating to the global persistent storage. 
 
 ## [0.6.0] - 2025-12-31
 ### Changed

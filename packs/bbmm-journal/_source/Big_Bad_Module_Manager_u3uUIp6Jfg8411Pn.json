@@ -15,7 +15,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h3><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h3></div><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Rc4FRPurKuPwxhou]{Enhanced Module Management}</h3><ul><li><p>Add Notes per module</p></li><li><p>Click to expand and show notes</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / delete preset.</li><li>Export module state to .json.</li><li>import .json to preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / delete preset.</li><li>Export settings state to .json</li><li><p>import .json to preset:</p><ul dir=\"auto\"><li>Choose which modules or specific settings to import.</li></ul></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>Add modules to ignore on presets/imports/exports.</li><li>Add specific setting to ignore on presets/imports/exports.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Include hidden Settings}</h3><ul><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Add hidden settings to always include in presets/imports/exports.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
+        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h3><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h3></div><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Rc4FRPurKuPwxhou]{Enhanced Module Management}</h3><ul><li><p>Add Notes per module</p></li><li><p>Click to expand and show notes</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / delete preset.</li><li>Export module state to .json.</li><li>import .json to preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / delete preset.</li><li>Export settings state to .json</li><li><p>import .json to preset:</p><ul dir=\"auto\"><li>Choose which modules or specific settings to import.</li></ul></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.JBIsgjN4Vl79tU2Q]{Hidden Setting Sync Manager}</h3><ul><li><p>Allows GM to manually add a sync for a hidden client setting. </p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>Add modules to ignore on presets/imports/exports.</li><li>Add specific setting to ignore on presets/imports/exports.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Include hidden Settings}</h3><ul><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Add hidden settings to always include in presets/imports/exports.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
       },
       "video": {
         "controls": true,
@@ -32,11 +32,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.348",
+        "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757732832081,
-        "modifiedTime": 1758414199593,
+        "modifiedTime": 1767347941337,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.LqdPKzBQbWas56RQ"
@@ -171,7 +171,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>The Inclusion Manager will let you manually add Hidden settings to ensure they are saved in @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets} and exports.</p><p><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">This tool should be used with a bit of caution!</span></strong></span> Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p><h2></h2><p><br /><br /></p>"
+        "content": "<p></p><h3>⚠ USE THIS TOOL WITH CAUTION ⚠</h3><p>Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p><p></p><p>The Inclusion Manager will let you manually add Hidden settings to ensure they are saved in @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets} and exports.</p><p><br /><br /></p>"
       },
       "video": {
         "controls": true,
@@ -188,11 +188,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.350",
+        "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757740379508,
-        "modifiedTime": 1759829974048,
+        "modifiedTime": 1767347938372,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Q3JVPh8ykzMc3kLS"
@@ -210,7 +210,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>By default the settings preset manager will only save / import / export the un-hidden settings. You can manually configure what hidden settings you wish to include in presets and exports using the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Inclusion Manager}. Use this tool with caution! Please see below for more information! </p><h3>Why is data hidden?</h3><p>Many modules (and even Foundry itself) store part of their information in <strong data-start=\"230\" data-end=\"249\">hidden settings</strong>.</p><p data-start=\"254\" data-end=\"271\">These settings:</p><ul data-start=\"272\" data-end=\"471\"><li data-start=\"272\" data-end=\"324\"><p data-start=\"274\" data-end=\"324\">Are not meant to be clicked or changed directly.</p></li><li data-start=\"325\" data-end=\"379\"><p data-start=\"327\" data-end=\"379\">Help keep the Configure Settings menu uncluttered.</p></li><li data-start=\"380\" data-end=\"471\"><p data-start=\"382\" data-end=\"471\">Prevent confusion about options that aren’t useful for players or GMs to edit manually.</p></li></ul><p data-start=\"473\" data-end=\"616\">Behind the scenes, hidden settings are stored in your world’s database (.db) file. There are two main reasons Foundry and modules use them:</p><ol data-start=\"618\" data-end=\"1286\"><li data-start=\"618\" data-end=\"905\"><p data-start=\"621\" data-end=\"905\"><strong data-start=\"621\" data-end=\"647\">Background bookkeeping</strong><br data-start=\"647\" data-end=\"650\" />Modules often need to remember things from one session to the next — like combat states, world time/date, cached module data, or other internal states. Since you don’t need to interact with these directly, they are kept hidden and managed automatically.</p></li><li data-start=\"907\" data-end=\"1286\"><p data-start=\"910\" data-end=\"1286\"><strong data-start=\"910\" data-end=\"942\">Custom configuration windows</strong><br data-start=\"942\" data-end=\"945\" />Some modules don’t list all their settings in the main Configure Settings menu. Instead, they provide a button that opens a custom window or manager (for example, Foundry’s own <strong data-start=\"1123\" data-end=\"1146\">Configure Interface</strong> option). The underlying settings for those windows are hidden so they don’t clutter the main menu, but they still exist and can be saved.</p></li></ol><h2>Why do we need to include hidden settings?</h2><p>Even though they’re invisible in the menu, hidden settings often hold data for the state of a module. Things like saved preferences, remembered choices, or tracking information.</p><p data-start=\"1528\" data-end=\"1772\">This includes the settings tied to <strong data-start=\"1563\" data-end=\"1595\">custom configuration windows</strong> (like advanced managers or setup pages). If these hidden values aren’t included, a module may lose part of its setup when you load a saved preset or import from a .json backup.</p><p data-start=\"1774\" data-end=\"2002\">By including hidden settings in presets/exports, you ensure that <strong data-start=\"1839\" data-end=\"1846\">all</strong> module options — both visible and hidden, including those in custom windows — are preserved so everything continues working exactly as you configured it.</p><h2>Why not just save/export all hidden data?</h2><p>Not all hidden data should be preserved. Some hidden values are <strong data-start=\"1338\" data-end=\"1368\">temporary or session-based</strong> (e.g., live combat trackers, transient caches, current world time). Restoring those over a different session can cause errors, weird behavior, or even data loss.</p><p data-start=\"1532\" data-end=\"1870\" data-is-last-node data-is-only-node><strong data-start=\"1532\" data-end=\"1546\">IMPORTANT:</strong> BBMM does not auto-save this kind of temporary “state” data by default out of caution, so that it won’t overwrite live game state when you restore.</p><p data-start=\"1532\" data-end=\"1870\" data-is-last-node data-is-only-node>You <em data-start=\"1687\" data-end=\"1692\">can</em> include specific hidden settings in a preset if you know they’re safe to restore, but it’s <strong data-start=\"1784\" data-end=\"1822\">advised to add settings cautiously</strong> and focus on stable, configuration-type values.</p><h2>Macro to help determine which hidden data to add to the inclusion manager</h2><p>You can preview the data that is stored in these settings using the included macro: @UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector}. This macro will let you view each modules settings.</p><p><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">How to use:</span></strong></span></p><ul><li><p>Run the macro</p></li><li><p>select module from dropdown on top left:</p><img src=\"modules/bbmm/assets/readme/macro-settings-inspector.png\" /></li><li><p>It may take a second for data to load depending if the module has large data items.</p></li><li><p>Once data loads you will see the data for this module that is saved in your world. If visibility is <strong>Config</strong> this means it is visible in the settings menu and BBMM will save/export it by default. If it is <strong>Hidden</strong> then it will not. you can see the data that is stored in each setting.</p><ul><li><p>For some settings the data will be quite large and is not all displayed. Clicking the value field will expand this, and you can copy or collapse it back.</p><img src=\"modules/bbmm/assets/readme/macro-settings-inspector-2.png\" /></li><li><p>This should give you an idea based on the setting name (key) and the value.</p></li><li><p>If you are in doubt, leave it out.</p></li></ul></li></ul><p>Also, please feel free to ask advice on the <a href=\"https://github.com/thejoester/bbmm\">BBMM GitHub</a>.</p><p></p>"
+        "content": "<p>By default the settings preset manager will only save / import / export the un-hidden settings. You can manually configure what hidden settings you wish to include in presets and exports using the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Inclusion Manager}. Use this tool with caution! Please see below for more information!</p><h3>Why is data hidden?</h3><p>Many modules (and even Foundry itself) store part of their information in <strong data-start=\"230\" data-end=\"249\">hidden settings</strong>.</p><p data-start=\"254\" data-end=\"271\">These settings:</p><ul data-start=\"272\" data-end=\"471\"><li data-start=\"272\" data-end=\"324\"><p data-start=\"274\" data-end=\"324\">Are not meant to be clicked or changed directly.</p></li><li data-start=\"325\" data-end=\"379\"><p data-start=\"327\" data-end=\"379\">Help keep the Configure Settings menu uncluttered.</p></li><li data-start=\"380\" data-end=\"471\"><p data-start=\"382\" data-end=\"471\">Prevent confusion about options that aren’t useful for players or GMs to edit manually.</p></li></ul><p data-start=\"473\" data-end=\"616\">Behind the scenes, hidden settings are stored in your world’s database (.db) file. There are two main reasons Foundry and modules use them:</p><ol data-start=\"618\" data-end=\"1286\"><li data-start=\"618\" data-end=\"905\"><p data-start=\"621\" data-end=\"905\"><strong data-start=\"621\" data-end=\"647\">Background bookkeeping</strong><br data-start=\"647\" data-end=\"650\" />Modules often need to remember things from one session to the next — like combat states, world time/date, cached module data, or other internal states. Since you don’t need to interact with these directly, they are kept hidden and managed automatically.</p></li><li data-start=\"907\" data-end=\"1286\"><p data-start=\"910\" data-end=\"1286\"><strong data-start=\"910\" data-end=\"942\">Custom configuration windows</strong><br data-start=\"942\" data-end=\"945\" />Some modules don’t list all their settings in the main Configure Settings menu. Instead, they provide a button that opens a custom window or manager (for example, Foundry’s own <strong data-start=\"1123\" data-end=\"1146\">Configure Interface</strong> option). The underlying settings for those windows are hidden so they don’t clutter the main menu, but they still exist and can be saved.</p></li></ol><h2>Why do we need to include hidden settings?</h2><p>Even though they’re invisible in the menu, hidden settings often hold data for the state of a module. Things like saved preferences, remembered choices, or tracking information.</p><p data-start=\"1528\" data-end=\"1772\">This includes the settings tied to <strong data-start=\"1563\" data-end=\"1595\">custom configuration windows</strong> (like advanced managers or setup pages). If these hidden values aren’t included, a module may lose part of its setup when you load a saved preset or import from a .json backup.</p><p data-start=\"1774\" data-end=\"2002\">By including hidden settings in presets/exports, you ensure that <strong data-start=\"1839\" data-end=\"1846\">all</strong> module options — both visible and hidden, including those in custom windows — are preserved so everything continues working exactly as you configured it.</p><h2>Why not just save/export all hidden data?</h2><p>Not all hidden data should be preserved. Some hidden values are <strong data-start=\"1338\" data-end=\"1368\">temporary or session-based</strong> (e.g., live combat trackers, transient caches, current world time). Restoring those over a different session can cause errors, weird behavior, or even data loss.</p><p data-start=\"1532\" data-end=\"1870\" data-is-last-node data-is-only-node><strong data-start=\"1532\" data-end=\"1546\">IMPORTANT:</strong> BBMM does not auto-save this kind of temporary “state” data by default out of caution, so that it won’t overwrite live game state when you restore.</p><p data-start=\"1532\" data-end=\"1870\" data-is-last-node data-is-only-node>You <em data-start=\"1687\" data-end=\"1692\">can</em> include specific hidden settings in a preset if you know they’re safe to restore, but it’s <strong data-start=\"1784\" data-end=\"1822\">advised to add settings cautiously</strong> and focus on stable, configuration-type values.</p><h2>Macro to help determine which hidden data to add to the inclusion manager</h2><p>You can preview the data that is stored in these settings using the included macro: @UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector}. This macro will let you view each modules settings.</p><p><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">How to use:</span></strong></span></p><ul><li><p>Run the macro</p></li><li><p>select module from dropdown on top left:</p><img src=\"modules/bbmm/assets/readme/macro-settings-inspector.png\" /></li><li><p>It may take a second for data to load depending if the module has large data items.</p></li><li><p>Once data loads you will see the data for this module that is saved in your world. If visibility is <strong>Config</strong> this means it is visible in the settings menu and BBMM will save/export it by default. If it is <strong>Hidden</strong> then it will not. you can see the data that is stored in each setting.</p><ul><li><p>For some settings the data will be quite large and is not all displayed. Clicking the value field will expand this, and you can copy or collapse it back.</p><img src=\"modules/bbmm/assets/readme/macro-settings-inspector-2.png\" /></li><li><p>This should give you an idea based on the setting name (key) and the value.</p></li><li><p>If you are in doubt, leave it out.</p></li></ul></li></ul><p>Also, please feel free to ask advice on the <a href=\"https://github.com/thejoester/bbmm\">BBMM GitHub</a>.</p><p></p>"
       },
       "video": {
         "controls": true,
@@ -227,11 +227,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.348",
+        "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757740476956,
-        "modifiedTime": 1758086138384,
+        "modifiedTime": 1767347950044,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.XsS4wjBTXbMDeHpr"
@@ -508,6 +508,45 @@
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.fBhc3e12eZRtNnSd"
+    },
+    {
+      "sort": 321875,
+      "name": "Hidden Setting Sync Manager",
+      "type": "text",
+      "_id": "JBIsgjN4Vl79tU2Q",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<h3>⚠ USE THIS TOOL WITH CAUTION ⚠</h3><p><br />Please see the @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} page for more information on hidden settings. </p><p>This tool will allow the GM to manually add a lock or soft-lock (see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}) to hidden client settings. </p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "pf2e",
+        "systemVersion": "7.8.0",
+        "createdTime": 1767347671081,
+        "modifiedTime": 1767347933712,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.JBIsgjN4Vl79tU2Q"
     }
   ],
   "folder": null,

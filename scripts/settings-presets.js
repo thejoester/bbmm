@@ -34,6 +34,7 @@ async function hlp_fetchJSON(url) {
 	}
 }
 
+// Verify that presets storage directory exists
 async function hlp_verifyPresetsDir() {
 	const dir = `modules/${BBMM_ID}/storage/${SETTINGS_PRESETS_STORAGE_DIR}`;
 
@@ -46,9 +47,62 @@ async function hlp_verifyPresetsDir() {
 	}
 }
 
+// Sanitize settings presets structure
 function hlp_sanitizeSettingsPresets(raw) {
 	// Don’t get cute: just ensure “object or empty object”
 	return raw && typeof raw === "object" ? raw : {};
+}
+
+// Sanitize user inclusions structure
+function hlp_sanitizeUserInclusions(raw) {
+	if (!raw || typeof raw !== "object") return { settings: [], modules: [] };
+	return {
+		settings: Array.isArray(raw.settings) ? raw.settings : [],
+		modules: Array.isArray(raw.modules) ? raw.modules : []
+	};
+}
+
+// Read user inclusions from persistent storage file ====================
+async function hlp_readUserInclusionsFromStorage() {
+	const base = `modules/${BBMM_ID}/storage`;
+	const candidates = [
+		"user-inclusions.json",
+		"userInclusions.json",
+		"inclusions.json",
+		"user-includes.json",
+		"includes.json"
+	];
+	const dirs = [
+		base,
+		`${base}/inclusions`,
+		`${base}/presets`
+	];
+
+	for (const dir of dirs) {
+		try {
+			const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
+			const files = (browse?.files || []).map(f => String(f));
+			let match = null;
+
+			for (const name of candidates) {
+				match = files.find(f => f.endsWith(`/${name}`));
+				if (match) break;
+			}
+			if (!match) {
+				match = files.find(f => f.toLowerCase().includes("inclusion") && f.toLowerCase().endsWith(".json")) || null;
+			}
+
+			if (match) {
+				const data = await hlp_fetchJSON(match);
+				return hlp_sanitizeUserInclusions(data);
+			}
+		} catch (err) {
+			// Missing folders are normal depending on version/migration
+			continue;
+		}
+	}
+
+	return null;
 }
 
 // Read presets from persistent storage file ===========================
@@ -420,26 +474,65 @@ function hlp_diffHighlight(oldVal, newVal) {
 	- includeDisabled=false -> skip modules that are not active 
 		(except core/system)
 ======================================================================= */
-function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden = false } = {}) {
+async function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden = false } = {}) {
 	// Build a bbmm-settings envelope
 	const isGM = game.user.isGM;
 	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
 	const sysId = game.system.id;
-	const skipMap = getSkipMap();
+
+	// Build skip map from EXPORT_SKIP + persistent exclusions file (NO game.settings)
+	const skipMap = new Map(EXPORT_SKIP ?? new Map());
+
 	let includedPairs = new Set();
 	let includedModules = new Set();
 
+	// Read inclusions + exclusions from persistent storage lists =====================
 	try {
-		const inc = game.settings.get(BBMM_ID, "userInclusions") || {};
-		const arrSettings = Array.isArray(inc.settings) ? inc.settings : [];
-		const arrModules  = Array.isArray(inc.modules)  ? inc.modules  : [];
+		const inc = await hlp_fetchJSON(`modules/${BBMM_ID}/storage/lists/user-inclusions.json`);
+		const arrSettings = Array.isArray(inc?.settings) ? inc.settings : [];
+		const arrModules  = Array.isArray(inc?.modules)  ? inc.modules  : [];
+
 		includedPairs = new Set(arrSettings.map(s => `${s?.namespace ?? ""}.${s?.key ?? ""}`));
 		includedModules = new Set(arrModules.map(ns => String(ns ?? "")));
-		DL("settings-presets.js | svc_collectAllModuleSettings(): inclusions loaded", { settings: includedPairs.size, modules: includedModules.size });
+
+		DL("settings-presets.js | svc_collectAllModuleSettings(): inclusions loaded (storage)", {
+			settings: includedPairs.size,
+			modules: includedModules.size
+		});
 	} catch (e) {
-		DL(2, "settings-presets.js | svc_collectAllModuleSettings(): failed to load inclusions", e);
+		DL(2, "settings-presets.js | svc_collectAllModuleSettings(): failed to load inclusions (storage)", e);
 	}
 
+	try {
+		const exc = await hlp_fetchJSON(`modules/${BBMM_ID}/storage/lists/user-exclusions.json`);
+		const excModules = Array.isArray(exc?.modules) ? exc.modules : [];
+		const excSettings = Array.isArray(exc?.settings) ? exc.settings : [];
+
+		// Entire modules → add "*"
+		for (const ns of excModules) {
+			if (!ns) continue;
+			const set = skipMap.get(ns) ?? new Set();
+			set.add("*");
+			skipMap.set(ns, set);
+		}
+
+		// Specific settings [{ namespace, key }]
+		for (const ent of excSettings) {
+			if (!ent?.namespace || !ent?.key) continue;
+			const set = skipMap.get(ent.namespace) ?? new Set();
+			set.add(ent.key);
+			skipMap.set(ent.namespace, set);
+		}
+
+		DL("settings-presets.js | svc_collectAllModuleSettings(): exclusions loaded (storage)", {
+			modules: excModules.length,
+			settings: excSettings.length
+		});
+	} catch (e) {
+		DL(2, "settings-presets.js | svc_collectAllModuleSettings(): failed to load exclusions (storage)", e);
+	}
+
+	// Collect settings ==============================================================
 	try {
 		for (const def of game.settings.settings.values()) {
 			const { namespace, key, scope } = def;
@@ -467,7 +560,7 @@ function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden =
 				}
 			}
 
-			// EXPORT_SKIP (helpers.js) — inclusions do NOT override these
+			// EXPORT_SKIP + user-exclusions.json — inclusions do NOT override these
 			if (isExcludedWith(skipMap, namespace) || isExcludedWith(skipMap, namespace, key)) {
 				DL(`settings-presets.js | svc_collectAllModuleSettings(): excluded ${namespace}.${key}`);
 				continue;
@@ -1596,7 +1689,7 @@ export async function openSettingsPresetManager() {
 			try {
 				// SAVE CURRENT -> collect current settings and save as new preset
 				if (action === "save-current") {
-					const payload = svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
+					const payload = await svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
 					DL("settings-presets.js | openSettingsPresetManager(): save-current — collected payload", {
 						counts: {
 							world: Object.keys(payload.world ?? {}).length,
@@ -1628,7 +1721,7 @@ export async function openSettingsPresetManager() {
 					if (!selected) { ui.notifications.warn(`${LT.selectSettingsPreset()}.`); return; }
 
 					// Collect fresh current settings
-					const payload = svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
+					const payload = await svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
 					DL("settings-presets.js | openSettingsPresetManager(): update — collected payload", {
 						counts: {
 							world: Object.keys(payload.world ?? {}).length,
@@ -1799,7 +1892,7 @@ export async function openSettingsPresetManager() {
 				if (action === "export") {
 					try {
 						DL("settings-presets.js | openSettingsPresetManager(): Export: start");
-						const payload = svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
+						const payload = await svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
 
 						// Normalize schema types
 						hlp_schemaCorrectNonPlainTypes(payload);
