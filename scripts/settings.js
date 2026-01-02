@@ -2,6 +2,7 @@ import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp } from "./inclusions.js";
+import { hlp_readUserExclusions } from "./exclusions.js";
 import { hlp_openManualByUuid, hlp_injectHeaderHelpButton } from "./helpers.js";
 
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
@@ -1205,7 +1206,10 @@ Hooks.once("ready", async () => {
 
 	// migrate inclusions/exclusions to storage - Remove after version 0.8.0
 	try { await hlp_loadPresets(); DL(`settings.js | Inclusions/Exclusions migrated`)} catch (err) { DL(3, "settings.js | Inclusions/Exclusions migration failed:", err?.message ?? err); }
-	
+
+	// Prime exclusions cache for getSkipMap() users
+	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }1
+
 	// check folder migration - Remove after version 0.7.0
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
 

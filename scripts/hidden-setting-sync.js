@@ -168,7 +168,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 					modTitle: _hcsModTitle(ns),
 					setTitle: _hcsSettingLabel(ns, key, cfg),
 					setHint: _hcsSettingHint(cfg),
-					state: entry?.soft === true ? (LT.name_SoftLock?.() ?? "Soft Lock") : (LT.lockAllTip?.() ?? "Lock"),
+					state: entry?.soft === true ? (LT.name_SoftLock()) : (LT.lockAllTip()),
 					preview: _hcsToPreview(entry?.value)
 				});
 			}
@@ -195,14 +195,14 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 		const setHint = foundry.utils.escapeHTML(String(r.setHint ?? ""));
 		const state = foundry.utils.escapeHTML(String(r.state));
 		const preview = foundry.utils.escapeHTML(String(r.preview));
-		
+
 		return `
 			<div class="row" data-ns="${ns}" data-key="${key}">
 				<div class="c-mod" title="${ns}">${modTitle}</div>
 
 				<div class="c-key" title="${ns}.${key}">
 					<div class="setting-title">${setTitle}</div>
-					${setHint ? '<div class="setting-hint">' + setHint + '</div>' : ''}
+					${setHint ? `<div class="setting-hint">${setHint}</div>` : ``}
 				</div>
 
 				<div class="c-state" title="${state}">${state}</div>
@@ -217,7 +217,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 				</div>
 
 				<div class="c-act">
-					<button type="button" class="bbmm-hcs-del">${LT.buttons?.delete?.() ?? "Delete"}</button>
+					<button type="button" class="bbmm-hcs-del">${LT.buttons.delete()}</button>
 				</div>
 			</div>
 		`;
@@ -226,7 +226,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 	async _renderHTML() {
 		this._collectRows();
 
-		const cols = "grid-template-columns: minmax(220px,1.2fr) minmax(260px,1.8fr) 120px minmax(360px,2.2fr) 110px;";
+		const cols = "grid-template-columns: minmax(220px,1.2fr) minmax(260px,1.8fr) 110px minmax(360px,2.2fr) 140px;";
 		const css = `#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important;overflow:hidden}
 			.bbmm-hcs-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}
 			.bbmm-hcs-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}
@@ -242,6 +242,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 			.bbmm-hcs-body .c-key .setting-hint{font-size:.85em;font-style:italic;opacity:.75;line-height:1.1;white-space:normal}
 			.c-val{min-width:0;cursor:pointer}
 			.val-preview code{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+			.val-expand{margin-top:.25rem}
 			.val-pre{max-height:220px;overflow:auto;padding:.35rem .5rem;border:1px solid rgba(255,255,255,.12);border-radius:.35rem}
 			.c-act{display:flex;justify-content:flex-end;align-items:flex-start}
 			.c-act button{white-space:nowrap}`;
@@ -249,22 +250,25 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 		const rows = this._rows || [];
 		const body = rows.length
 			? rows.map(r => this._rowHTML(r)).join("")
-			: `<div style="padding:.75rem;opacity:.85">${LT.hiddenSettingSync?.none?.() ?? "No synced hidden client settings."}</div>`;
+			: `<div style="padding:.75rem;opacity:.85">${LT.hiddenSettingSync.none()}</div>`;
 
 		return `
 			<style>${css}</style>
 			<section class="bbmm-hcs-root">
 				<div class="bbmm-hcs-toolbar">
-					<button type="button" class="bbmm-hcs-add">${LT.hiddenSettingSync?.btnAdd?.() ?? "Add Setting Sync"}</button>
+					<button type="button" class="bbmm-hcs-add">${LT.hiddenSettingSync.btnAdd()}</button>
 					<div class="bbmm-hcs-count">${foundry.utils.escapeHTML(String(rows.length))}</div>
 				</div>
 
-				<div class="bbmm-hcs-head">
-					<div>${LT.module()}</div>
-					<div>${LT.setting()}</div>
-					<div>${LT.state()}</div>
-					<div>${LT.value()}</div>
-					<div>${LT.macro.columnAction()}</div>
+				<div class="bbmm-hcs-table">
+					<div class="bbmm-hcs-head">
+						<div>${LT.module()}</div>
+						<div>${LT.setting()}</div>
+						<div>${LT.state()}</div>
+						<div>${LT.macro.value()}</div>
+						<div>${LT.macro.columnAction()}</div>
+					</div>
+					<div class="bbmm-hcs-body">${body}</div>
 				</div>
 			</section>
 		`;
@@ -274,7 +278,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 
 		try {
 			this.element.style.minWidth  = `${this._minW ?? 520}px`;
-			this.element.style.maxWidth  = `${this._maxW ?? 1200}px`;
+			this.element.style.maxWidth  = `${this._maxW ?? 980}px`;
 			this.element.style.minHeight = `${this._minH ?? 420}px`;
 			this.element.style.maxHeight = `${this._maxH ?? 720}px`;
 			this.element.style.overflow  = "hidden";
@@ -287,7 +291,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 			hlp_injectHeaderHelpButton(this, {
 				uuid: BBMM_README_UUID,
 				iconClass: "fas fa-circle-question",
-				title: LT.buttons?.help?.() ?? "Help"
+				title: LT.buttons.help()
 			});
 		} catch (err) {
 			DL(2, "hidden-setting-sync.js | manager._replaceHTML(): help inject failed", err);
@@ -301,6 +305,40 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 			if (!root) return;
 
 			root.addEventListener("click", async (ev) => {
+
+				const cval = ev.target?.closest?.(".c-val");
+				if (cval) {
+					ev.preventDefault();
+
+					const rowEl = cval.closest(".row");
+					const box = rowEl?.querySelector?.(".val-expand");
+					const pre = rowEl?.querySelector?.(".val-pre");
+					if (!rowEl || !box || !pre) return;
+
+					const isOpen = box.style.display !== "none";
+					if (isOpen) {
+						box.style.display = "none";
+						return;
+					}
+
+					box.style.display = "";
+
+					if (pre.dataset.loaded !== "1") {
+						try {
+							const ns = rowEl.dataset.ns;
+							const key = rowEl.dataset.key;
+							const id = _hcsSettingId(ns, key);
+							const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
+							pre.textContent = _hcsToPretty(map?.[id]?.value);
+							pre.dataset.loaded = "1";
+						} catch (err) {
+							DL(2, "hidden-setting-sync.js | manager: expand load failed", err);
+						}
+					}
+
+					return;
+				}
+
 				const addBtn = ev.target?.closest?.(".bbmm-hcs-add");
 				if (addBtn) {
 					ev.preventDefault();
@@ -315,6 +353,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 				const delBtn = ev.target?.closest?.(".bbmm-hcs-del");
 				if (delBtn) {
 					ev.preventDefault();
+
 					const rowEl = delBtn.closest(".row");
 					const ns = rowEl?.dataset?.ns;
 					const key = rowEl?.dataset?.key;
@@ -326,16 +365,16 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 					try {
 						ok = await new Promise((resolve) => {
 							const dlg = new foundry.applications.api.DialogV2({
-								window: { title: LT.buttons?.delete?.() ?? "Delete", modal: true, width: 520 },
+								window: { title: LT.buttons.delete(), modal: true, width: 520 },
 								content: `
 									<section style="display:flex;flex-direction:column;gap:.75rem;min-width:520px;">
-										<div style="font-weight:600;">${LT.buttons?.delete?.() ?? "Delete"}</div>
-										<div style="opacity:.85;">Delete sync block for <b>${foundry.utils.escapeHTML(id)}</b>?</div>
+										<div style="font-weight:600;">${LT.buttons.delete()}</div>
+										<div style="opacity:.85;">${LT.hiddenSettingSync.deleteLock()} <b>${foundry.utils.escapeHTML(id)}</b>?</div>
 									</section>
 								`,
 								buttons: [
-									{ action: "delete", label: LT.buttons?.delete?.() ?? "Delete", default: true, callback: () => resolve(true) },
-									{ action: "cancel", label: LT.buttons?.cancel?.() ?? "Cancel", callback: () => resolve(false) }
+									{ action: "delete", label: LT.buttons.delete(), default: true, callback: () => resolve(true) },
+									{ action: "cancel", label: LT.buttons.cancel(), callback: () => resolve(false) }
 								],
 								close: () => resolve(false)
 							});
@@ -357,6 +396,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 						}
 
 						rowEl.remove();
+
 						try {
 							const cnt = root.querySelector(".bbmm-hcs-count");
 							if (cnt) {
@@ -369,51 +409,12 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 					}
 					return;
 				}
-
-				const exp = ev.target?.closest?.(".btn-expand");
-				if (exp) {
-					ev.preventDefault();
-					const rowEl = exp.closest(".row");
-					const box = rowEl?.querySelector?.(".val-expand");
-					const pre = rowEl?.querySelector?.(".val-pre");
-					if (!box || !pre) return;
-
-					box.style.display = "";
-					exp.style.display = "none";
-
-					if (pre.dataset.loaded !== "1") {
-						try {
-							const ns = rowEl.dataset.ns;
-							const key = rowEl.dataset.key;
-							const id = _hcsSettingId(ns, key);
-							const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
-							pre.textContent = _hcsToPretty(map?.[id]?.value);
-							pre.dataset.loaded = "1";
-						} catch (err) {
-							DL(2, "hidden-setting-sync.js | manager: expand load failed", err);
-						}
-					}
-					return;
-				}
-
-				const col = ev.target?.closest?.(".btn-collapse");
-				if (col) {
-					ev.preventDefault();
-					const rowEl = col.closest(".row");
-					const box = rowEl?.querySelector?.(".val-expand");
-					const expBtn = rowEl?.querySelector?.(".btn-expand");
-					if (!box || !expBtn) return;
-					box.style.display = "none";
-					expBtn.style.display = "";
-					return;
-				}
 			});
 		} catch (err) {
 			DL(2, "hidden-setting-sync.js | manager._replaceHTML(): listener failed", err);
 		}
 	}
 }
-
 class BBMMAddHiddenClientSettingSyncAppV2 extends foundry.applications.api.ApplicationV2 {
 
 	constructor() {
