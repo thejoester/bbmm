@@ -25,7 +25,8 @@
         "scripts/setting-sync.js",
         "scripts/module-management.js",
         "scripts/changelogs.js",
-        "scripts/macros.js"
+        "scripts/macros.js",
+        "scripts/hidden-setting-sync.js"
     ],
     "socket": true,
     "persistentStorage": true,
