@@ -8,7 +8,7 @@
 import { DL, BBMM_README_UUID } from './settings.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { copyPlainText } from "./macros.js";
-import { hlp_injectHeaderHelpButton } from "./helpers.js";
+import { hlp_injectHeaderHelpButton, invalidateSkipMap } from "./helpers.js";
 
 // CONSTANTS
 const EXC_STORAGE_SUBDIR = "lists";
@@ -43,6 +43,8 @@ export async function hlp_readUserExclusions({ force = false } = {}) {
 		if (!res.ok) {
 			DL(2, `exclusions.js | hlp_readUserExclusions(): fetch not ok (${res.status})`);
 			_excCache = { settings: [], modules: [] };
+			globalThis.bbmm._userExclusions = _excCache;
+			invalidateSkipMap();
 			return _excCache;
 		}
 
@@ -53,10 +55,14 @@ export async function hlp_readUserExclusions({ force = false } = {}) {
 		};
 
 		_excCache = out;
+		globalThis.bbmm._userExclusions = _excCache;
+		invalidateSkipMap();
 		return out;
 	} catch (err) {
 		DL(3, "exclusions.js | hlp_readUserExclusions(): failed", err);
 		_excCache = { settings: [], modules: [] };
+		globalThis.bbmm._userExclusions = _excCache;
+		invalidateSkipMap();
 		return _excCache;
 	}
 }
@@ -74,6 +80,8 @@ export async function hlp_writeUserExclusions(obj) {
 		}
 
 		_excCache = obj ?? { settings: [], modules: [] };
+		globalThis.bbmm._userExclusions = _excCache;
+		invalidateSkipMap();
 		DL("exclusions.js | hlp_writeUserExclusions(): wrote exclusions to persistent storage", res);
 		return true;
 	} catch (err) {

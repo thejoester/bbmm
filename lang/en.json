@@ -410,8 +410,7 @@
 			"manualMigrateSettingsWindowTitle": "BBMM — Manual Settings Preset Migration",
 			"manualMigrateSettingsTitle": "Manual Settings Preset Migration",
 			"manualMigrateSettingsDesc": "Select a legacy settings preset from settings, then write it into persistent storage.",
-			"manualMigrateImportNamingHint": "Imported presets will be named <strong>&lt;legacy name&gt; (manual)</strong> and uniqued if needed."
-
+			"manualMigrateImportNamingHint": "Imported presets will be named <strong>&lt;legacy name&gt; (manual)</strong> and uniqued if needed."			
 		},
 		"moduleManagement": {
 			"modListWindowTitle": "BBMM — Module Manager",
@@ -460,6 +459,19 @@
 			"disableDependentsPromptMulti": "Disable the following modules that depend on this one? Uncheck any you want to keep enabled:",
 			"disableOrphansPromptMulti": "These modules are no longer required. Disable them as well? Uncheck any you want to keep enabled:",
 			"filterClear": "Clear filter"
+		},
+		"hiddenSettingSync": {
+			"title": "Hidden Client Setting Sync",
+			"titleAdd": "Add Setting Sync",
+			"menuName": "Hidden Client Setting Sync",
+			"menuLabel": "Hidden Settings Sync Manager",
+			"btnAdd": "Add Setting Sync",
+			"none": "No synced hidden client settings.",
+			"noneEligible": "No eligible hidden client settings found.",
+			"selectModule": "Select module...",
+			"filter": "Filter...",
+			"softLock": "Soft Lock",
+			"lock": "Lock"
 		}
 	}
 }

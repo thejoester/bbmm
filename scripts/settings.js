@@ -2,6 +2,7 @@ import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp } from "./inclusions.js";
+import { hlp_readUserExclusions } from "./exclusions.js";
 import { hlp_openManualByUuid, hlp_injectHeaderHelpButton } from "./helpers.js";
 
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
@@ -21,6 +22,319 @@ export const EXPORT_SKIP = new Map([
 	["core", new Set(["moduleConfiguration", "compendiumConfiguration", "time"])],	
 	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
+
+// Preset Storage Migration =====================================================
+// !!! REMOVE after version 0.8.0 !!!
+async function hlp_loadPresets() {
+	if (!game.user.isGM) return; // GM Only	
+
+	// constants
+	const FLAG_INC = "inclusionsPersistentStorageMigration";
+	const FLAG_EXC = "exclusionsPersistentStorageMigration";
+	const FILE_INC = "user-inclusions.json";
+	const FILE_EXC = "user-exclusions.json";
+	const worldTitleRaw = String(game.world?.title || "Unknown World").trim();
+	const worldTitle = worldTitleRaw || "Unknown World";
+
+	/* ==================================================================
+		HELPERS
+	================================================================== */
+
+	// Get storage URL for a given subdir and filename
+	function storageUrl(subdir, filename) {
+		return `modules/${BBMM_ID}/storage/${subdir}/${filename}`;
+	}
+
+	// Read object from storage file (returns null on failure/not found)
+	async function readStorageObject(subdir, filename) {
+		const url = storageUrl(subdir, filename);
+
+		try {
+			const res = await fetch(url, { cache: "no-store" });
+			if (!res.ok) {
+				// Avoid noisy logs for expected "missing file" cases
+				if (res.status !== 404) {
+					DL(2, `settings.js | hlp_loadPresets(): readStorageObject(): fetch not ok for "${url}" (${res.status})`);
+				}
+				return null;
+			}
+			const data = await res.json();
+			return data;
+		} catch (err) {
+			DL(2, `settings.js | hlp_loadPresets(): readStorageObject(): failed for "${url}"`, err);
+			return null;
+		}
+	}
+
+	// Write object to storage file (returns true on success)
+	async function writeStorageObject(subdir, filename, obj) {
+		const payload = JSON.stringify(obj ?? {}, null, 2);
+		const file = new File([payload], filename, { type: "application/json" });
+
+		try {
+			const res = await FilePicker.uploadPersistent(BBMM_ID, subdir, file, {}, { notify: false });
+			if (!res || (!res.path && !res.url)) {
+				DL(3, `settings.js | hlp_loadPresets(): writeStorageObject(): upload returned no path/url for "${subdir}/${filename}"`, res);
+				return false;
+			}
+			DL(`settings.js | hlp_loadPresets(): writeStorageObject(): wrote "${subdir}/${filename}"`, res);
+			return true;
+		} catch (err) {
+			DL(3, `settings.js | hlp_loadPresets(): writeStorageObject(): uploadPersistent failed for "${subdir}/${filename}"`, err);
+			return false;
+		}
+	}
+
+	// Check if storage file exists (fetchable)
+	async function storageFileExistsIn(subdir, filename) {
+		const dir = `modules/${BBMM_ID}/storage/${subdir}`;
+		const url = storageUrl(subdir, filename);
+
+		// Try browse first (more reliable in Foundry hosting)
+		try {
+			const res = await FilePicker.browse("data", dir);
+			const files = Array.isArray(res?.files) ? res.files : [];
+			if (files.some(f => String(f).endsWith(`/${filename}`))) return true;
+		} catch (err) {
+			DL(2, `settings.js | hlp_loadPresets(): storageFileExistsIn(): browse failed for "${dir}", falling back to fetch`, err);
+		}
+
+		// Fallback: fetch
+		try {
+			const res = await fetch(url, { cache: "no-store" });
+			return res.ok;
+		} catch {
+			return false;
+		}
+	}
+
+	// Ensure a storage file exists in subdir (create defaultObj if missing)
+	async function ensureStorageFileIn(subdir, filename, defaultObj = {}) {
+		const exists = await storageFileExistsIn(subdir, filename);
+		if (exists) {
+			DL(`settings.js | hlp_loadPresets(): storage file exists "${subdir}/${filename}"`);
+			return true;
+		}
+
+		DL(2, `settings.js | hlp_loadPresets(): storage file missing "${subdir}/${filename}", creating...`);
+		const ok = await writeStorageObject(subdir, filename, defaultObj);
+
+		if (ok) DL(`settings.js | hlp_loadPresets(): created storage file "${subdir}/${filename}"`);
+		else DL(3, `settings.js | hlp_loadPresets(): FAILED to create storage file "${subdir}/${filename}"`);
+
+		return ok;
+	}
+
+	// Sanitize inclusions object
+	function sanitizeInclusions(raw) {
+		const out = { settings: [], modules: [] };
+		if (!raw || typeof raw !== "object") return out;
+
+		if (Array.isArray(raw.settings)) {
+			out.settings = raw.settings
+				.filter(s => s && typeof s === "object")
+				.map(s => ({
+					namespace: String(s.namespace ?? "").trim(),
+					key: String(s.key ?? "").trim()
+				}))
+				.filter(s => s.namespace && s.key);
+		}
+
+		if (Array.isArray(raw.modules)) {
+			out.modules = raw.modules
+				.filter(x => typeof x === "string")
+				.map(x => x.trim())
+				.filter(Boolean);
+		}
+
+		return out;
+	}
+
+	// Sanitize exclusions object
+	function sanitizeExclusions(raw) {
+		const out = { settings: [], modules: [] };
+		if (!raw || typeof raw !== "object") return out;
+
+		if (Array.isArray(raw.settings)) {
+			out.settings = raw.settings
+				.filter(s => s && typeof s === "object")
+				.map(s => ({
+					namespace: String(s.namespace ?? "").trim(),
+					key: String(s.key ?? "").trim()
+				}))
+				.filter(s => s.namespace && s.key);
+		}
+
+		if (Array.isArray(raw.modules)) {
+			out.modules = raw.modules
+				.filter(x => typeof x === "string")
+				.map(x => x.trim())
+				.filter(Boolean);
+		}
+
+		return out;
+	}
+
+	// Merge two arrays of {namespace, key} objects, ensuring uniqueness
+	function mergePairArraysUnique(targetArr, sourceArr) {
+		const set = new Set(targetArr.map(s => `${s.namespace}::${s.key}`));
+		let added = 0;
+
+		for (const s of sourceArr) {
+			const k = `${s.namespace}::${s.key}`;
+			if (set.has(k)) continue;
+			set.add(k);
+			targetArr.push(s);
+			added++;
+		}
+
+		return added;
+	}
+
+	// Merge two arrays of strings, ensuring uniqueness
+	function mergeStringArraysUnique(targetArr, sourceArr) {
+		const set = new Set(targetArr);
+		let added = 0;
+
+		for (const v of sourceArr) {
+			if (set.has(v)) continue;
+			set.add(v);
+			targetArr.push(v);
+			added++;
+		}
+
+		return added;
+	}
+
+	// Get all flags object
+	function getFlags() {
+		const obj = game.settings.get(BBMM_ID, "bbmmFlags");
+		return obj && typeof obj === "object" ? { ...obj } : {};
+	}
+
+	// Check a flag; falsy if missing.
+	function hasFlag(key) {
+		return Boolean(getFlags()[key]);
+	}
+
+	// Set/merge a single flag without clobbering others.
+	async function setFlag(key, value) {
+		const current = getFlags();
+		current[key] = value;
+		await game.settings.set(BBMM_ID, "bbmmFlags", current);
+	}
+
+	/* ========================================================================= 
+		Inclusions Migration
+	========================================================================= */
+	DL("settings.js | hlp_loadPresets(): inclusions migration check starting");
+
+	await ensureStorageFileIn("lists", FILE_INC, { settings: [], modules: [] });
+
+	if (!hasFlag(FLAG_INC)) {
+		DL(2, "settings.js | hlp_loadPresets(): inclusions migration flag not set, attempting migration");
+
+		const legacyRaw = game.settings.get(BBMM_ID, "userInclusions");
+		const legacy = sanitizeInclusions(legacyRaw);
+
+		DL("settings.js | hlp_loadPresets(): inclusions legacy sanitized", {
+			legacySettings: legacy.settings.length,
+			legacyModules: legacy.modules.length
+		});
+
+		const storageRaw = await readStorageObject("lists", FILE_INC);
+		const storage = sanitizeInclusions(storageRaw);
+
+		DL("settings.js | hlp_loadPresets(): inclusions storage sanitized", {
+			storageSettings: storage.settings.length,
+			storageModules: storage.modules.length
+		});
+
+		let addedSettings = 0;
+		let addedModules = 0;
+
+		if (legacy.settings.length) {
+			addedSettings = mergePairArraysUnique(storage.settings, legacy.settings);
+			DL("settings.js | hlp_loadPresets(): inclusions merged settings", { addedSettings });
+		}
+
+		if (legacy.modules.length) {
+			addedModules = mergeStringArraysUnique(storage.modules, legacy.modules);
+			DL("settings.js | hlp_loadPresets(): inclusions merged modules", { addedModules });
+		}
+
+		if (addedSettings || addedModules) {
+			const ok = await writeStorageObject("lists", FILE_INC, storage);
+			if (ok) {
+				await setFlag(FLAG_INC, true);
+				DL("settings.js | hlp_loadPresets(): migrated inclusions to storage", { addedSettings, addedModules });
+			} else {
+				DL(3, "settings.js | hlp_loadPresets(): FAILED migrating inclusions to storage (flag not set, will retry next start)");
+			}
+		} else {
+			await setFlag(FLAG_INC, true);
+			DL("settings.js | hlp_loadPresets(): no inclusions to migrate (or all duplicates), flag set");
+		}
+	} else {
+		DL("settings.js | hlp_loadPresets(): inclusions migration flag already set, skipping");
+	}
+
+	/* ========================================================================= 
+		Exclusions Migration
+	========================================================================= */
+	DL("settings.js | hlp_loadPresets(): exclusions migration check starting");
+
+	await ensureStorageFileIn("lists", FILE_EXC, { settings: [], modules: [] });
+
+	if (!hasFlag(FLAG_EXC)) {
+		DL(2, "settings.js | hlp_loadPresets(): exclusions migration flag not set, attempting migration");
+
+		const legacyRaw = game.settings.get(BBMM_ID, "userExclusions");
+		const legacy = sanitizeExclusions(legacyRaw);
+
+		DL("settings.js | hlp_loadPresets(): exclusions legacy sanitized", {
+			legacySettings: legacy.settings.length,
+			legacyModules: legacy.modules.length
+		});
+
+		const storageRaw = await readStorageObject("lists", FILE_EXC);
+		const storage = sanitizeExclusions(storageRaw);
+
+		DL("settings.js | hlp_loadPresets(): exclusions storage sanitized", {
+			storageSettings: storage.settings.length,
+			storageModules: storage.modules.length
+		});
+
+		let addedSettings = 0;
+		let addedModules = 0;
+
+		if (legacy.settings.length) {
+			addedSettings = mergePairArraysUnique(storage.settings, legacy.settings);
+			DL("settings.js | hlp_loadPresets(): exclusions merged settings", { addedSettings });
+		}
+
+		if (legacy.modules.length) {
+			addedModules = mergeStringArraysUnique(storage.modules, legacy.modules);
+			DL("settings.js | hlp_loadPresets(): exclusions merged modules", { addedModules });
+		}
+
+		if (addedSettings || addedModules) {
+			const ok = await writeStorageObject("lists", FILE_EXC, storage);
+			if (ok) {
+				await setFlag(FLAG_EXC, true);
+				DL("settings.js | hlp_loadPresets(): migrated exclusions to storage", { addedSettings, addedModules });
+			} else {
+				DL(3, "settings.js | hlp_loadPresets(): FAILED migrating exclusions to storage (flag not set, will retry next start)");
+			}
+		} else {
+			await setFlag(FLAG_EXC, true);
+			DL("settings.js | hlp_loadPresets(): no exclusions to migrate (or all duplicates), flag set");
+		}
+	} else {
+		DL("settings.js | hlp_loadPresets(): exclusions migration flag already set, skipping");
+	}
+
+}
 
 // Check folder migration 
 // !!! REMOVE  after version 0.7.0 !!!
@@ -318,6 +632,7 @@ export function injectBBMMHeaderButton(root) {
 	DL("settings.js | BBMM header button injected");
 }
 
+// Open Exclusions Manager
 export function openExclusionsManager() {
 	// Wrapper that calls the actual app launcher if present
 	DL("settings.js | openExclusionsManager(): fired");
@@ -328,6 +643,18 @@ export function openExclusionsManager() {
 	ui.notifications?.warn(LT?.exclusionsNotAvailable?.() ?? `${LT.errors.exclusionsMgrNotFound()}.`);
 	} catch (e) {
 		DL(3, "settings.js | openExclusionsManager(): error", e);
+	}
+}
+
+// Open Hidden Client Setting Sync Manager
+export function openhiddenSettingSyncManager() {
+	DL("settings.js | openhiddenSettingSyncManager(): fired");
+	try {
+		const fn = globalThis.bbmm?.openhiddenSettingSyncManagerApp;
+		if (typeof fn === "function") return fn();
+		DL(3, "settings.js | openhiddenSettingSyncManager(): launcher not found");
+	} catch (err) {
+		DL(3, "settings.js | openhiddenSettingSyncManager(): failed", err);
 	}
 }
 
@@ -348,6 +675,7 @@ export async function openBBMMLauncher() {
 					// { action: "controls-presets", label: LT.controlsPresetMgr() },
 					{ action: "exclusions", label: LT.exclusionsMgr() },
 					{ action: "inclusions", label: LT.inclusionsMgr() },
+					{ action: "hiddenSettings",   label: LT.hiddenSettingSync.menuLabel() },
 					{ action: "cancel",   label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
@@ -383,6 +711,8 @@ export async function openBBMMLauncher() {
 		openInclusionsManagerApp();
 	} else if (choice === "controls-presets") {
 		openControlsPresetManager();
+	} else if (choice === "hiddenSettings") {
+		openhiddenSettingSyncManager();
 	}
 	// "cancel" -> do nothing
 }
@@ -685,6 +1015,42 @@ Hooks.once("init", () => {
 				}
 			});
 
+			// Hidden Client Setting Sync Manager menu
+			game.settings.registerMenu(BBMM_ID, "hiddenSettingSyncManager", {
+				name: LT.hiddenSettingSync?.menuName?.() ?? "Hidden Client Setting Sync",
+				label: LT.hiddenSettingSync?.menuLabel?.() ?? "Open Manager",
+				icon: "fas fa-user-gear",
+				restricted: true,
+				type: class extends FormApplication {
+					constructor(...args){ super(...args); }
+					static get defaultOptions() {
+						return foundry.utils.mergeObject(super.defaultOptions, {
+							id: "bbmm-hidden-client-sync-opener",
+							title: LT.hiddenSettingSync?.title?.() ?? "Hidden Client Setting Sync",
+							template: null,
+							width: 600
+						});
+					}
+					async render(...args) {
+						try {
+							const fn = globalThis.bbmm?.openhiddenSettingSyncManagerApp;
+
+							if (typeof fn !== "function") {
+								DL(3, "settings.js | openhiddenSettingSyncManager(): global opener not found", globalThis.bbmm);
+								ui.notifications?.error(LT.hiddenSettingSync?.openError?.() ?? "Hidden Client Sync Manager not available.");
+								return this;
+							}
+
+							fn();
+						} catch (err) {
+							DL(2, "settings.js | Hidden Client Sync Manager open failed", err);
+						}
+						return this;
+					}
+					async _updateObject() {}
+				}
+			});
+
 			// World toggle to Show changelog on GM login
 			game.settings.register(BBMM_ID, "showChangelogsOnLogin", {
 				name: LT.name_showChangelogsOnLogin(),
@@ -837,7 +1203,13 @@ Hooks.on("setup", () => {
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
-	
+
+	// migrate inclusions/exclusions to storage - Remove after version 0.8.0
+	try { await hlp_loadPresets(); DL(`settings.js | Inclusions/Exclusions migrated`)} catch (err) { DL(3, "settings.js | Inclusions/Exclusions migration failed:", err?.message ?? err); }
+
+	// Prime exclusions cache for getSkipMap() users
+	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }1
+
 	// check folder migration - Remove after version 0.7.0
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
 

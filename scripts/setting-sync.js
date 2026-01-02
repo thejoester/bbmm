@@ -42,6 +42,9 @@ import { LT, BBMM_ID } from "./localization.js";
 		} catch { return false; }
 	}
 
+	/*  Detect if auto-force-reload is enabled =======================================
+		- Returns true if the GM has enabled auto-force-reload setting
+	============================================================================== */
 	function hlp_shouldAutoForceReload() {
 		try {
 			return Boolean(game.settings.get(BBMM_ID, "autoForceReload"));
@@ -569,6 +572,179 @@ import { LT, BBMM_ID } from "./localization.js";
 			DL(2, "setting-sync.js |  bbmm-setting-lock: broadcast error", err);
 		}
 	}
+
+	/* ============================================================================
+		{EXPORTED API: Hidden Client Setting Sync}
+		- Used by the Hidden Client Sync Manager UI
+		- Centralizes write logic so UI doesn't duplicate setting-sync rules
+	============================================================================ */
+
+	function _bbmmIsClientHiddenSetting(cfg) {
+		try {
+			if (!cfg) return false;
+			if (cfg.__isMenu) return false;
+			if (String(cfg.scope ?? "") !== "client") return false;
+			if (cfg.config !== false) return false; // hidden setting (not shown in normal config UI)
+			const ns = String(cfg.namespace ?? "");
+			const key = String(cfg.key ?? "");
+			if (!ns || !key) return false;
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	function _bbmmMakeSettingId(ns, key) {
+		return `${String(ns)}.${String(key)}`;
+	}
+
+	/* Add Soft Lock immediately ===================================================
+		- Stores in bbmm.userSettingSync:
+			{ namespace, key, value, requiresReload, soft:true, rev }
+		- Bumps bbmm.softLockRevMap[id]
+		- Broadcasts refresh trigger
+	============================================================================ */
+	export async function bbmmAddUserSettingSoftLock({ ns, key }) {
+		try {
+			if (!game.user?.isGM) return false;
+
+			const id = _bbmmMakeSettingId(ns, key);
+			const cfg = game.settings.settings.get(id);
+			if (!_bbmmIsClientHiddenSetting(cfg)) {
+				DL(2, "setting-sync.js | bbmmAddUserSettingSoftLock(): not a hidden client setting", { id });
+				return false;
+			}
+
+			const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			if (map[id]) {
+				DL(2, "setting-sync.js | bbmmAddUserSettingSoftLock(): already synced/locked", { id, existing: map[id] });
+				return false;
+			}
+
+			let value;
+			try { value = game.settings.get(ns, key); }
+			catch (err) {
+				DL(2, "setting-sync.js | bbmmAddUserSettingSoftLock(): failed reading setting value", { id, err });
+				return false;
+			}
+
+			const revMap = game.settings.get(BBMM_ID, "softLockRevMap") || {};
+			const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
+			const newRev = currentRev + 1;
+
+			map[id] = {
+				namespace: String(ns),
+				key: String(key),
+				value,
+				requiresReload: !!cfg?.requiresReload,
+				soft: true,
+				rev: newRev
+			};
+
+			revMap[id] = newRev;
+
+			await game.settings.set(BBMM_ID, "userSettingSync", map);
+			await game.settings.set(BBMM_ID, "softLockRevMap", revMap);
+
+			DL(`setting-sync.js | bbmmAddUserSettingSoftLock(): soft lock added ${id} rev=${newRev}`, value);
+
+			// Same trigger used elsewhere
+			bbmmBroadcastTrigger();
+
+			// Optional: one-time soft push like queued ops do (rev-aware on client)
+			if (game.socket) {
+				const targets = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+				game.socket.emit(BBMM_SYNC_CH, {
+					t: "bbmm-sync-push",
+					soft: true,
+					softRev: newRev,
+					namespace: String(ns),
+					key: String(key),
+					value,
+					targets,
+					requiresReload: !!cfg?.requiresReload
+				});
+				DL(`setting-sync.js | bbmmAddUserSettingSoftLock(): soft PUSH ${id} rev=${newRev}`);
+			}
+
+			return true;
+		} catch (err) {
+			DL(3, "setting-sync.js | bbmmAddUserSettingSoftLock(): failed", err);
+			return false;
+		}
+	}
+
+	/* Add Lock All immediately ====================================================
+		- Stores in bbmm.userSettingSync:
+			{ namespace, key, value, requiresReload }
+		- Uses existing rule:
+			- If no non-GM users yet => store global lock anyway
+			- If all users => global lock (no userIds)
+		- Broadcasts refresh trigger
+	============================================================================ */
+	export async function bbmmAddUserSettingLockAll({ ns, key }) {
+		try {
+			if (!game.user?.isGM) return false;
+
+			const id = _bbmmMakeSettingId(ns, key);
+			const cfg = game.settings.settings.get(id);
+			if (!_bbmmIsClientHiddenSetting(cfg)) {
+				DL(2, "setting-sync.js | bbmmAddUserSettingLockAll(): not a hidden client setting", { id });
+				return false;
+			}
+
+			const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			if (map[id]) {
+				DL(2, "setting-sync.js | bbmmAddUserSettingLockAll(): already synced/locked", { id, existing: map[id] });
+				return false;
+			}
+
+			let value;
+			try { value = game.settings.get(ns, key); }
+			catch (err) {
+				DL(2, "setting-sync.js | bbmmAddUserSettingLockAll(): failed reading setting value", { id, err });
+				return false;
+			}
+
+			// Non-GM users
+			const allTargets = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+
+			// Store global lock (no userIds) same as _bbmmApplyPendingOps lockAll path
+			map[id] = {
+				namespace: String(ns),
+				key: String(key),
+				value,
+				requiresReload: !!cfg?.requiresReload
+			};
+
+			await game.settings.set(BBMM_ID, "userSettingSync", map);
+
+			DL(`setting-sync.js | bbmmAddUserSettingLockAll(): lockAll added ${id} (targets=${allTargets.length || "none-yet"})`, value);
+
+			bbmmBroadcastTrigger();
+
+			// Optional: immediate hard push to online users (targets=null => all)
+			if (game.socket) {
+				game.socket.emit(BBMM_SYNC_CH, {
+					t: "bbmm-sync-push",
+					id,
+					namespace: String(ns),
+					key: String(key),
+					value,
+					requiresReload: !!cfg?.requiresReload,
+					targets: null
+				});
+				DL(`setting-sync.js | bbmmAddUserSettingLockAll(): hard PUSH ${id}`);
+			}
+
+			return true;
+		} catch (err) {
+			DL(3, "setting-sync.js | bbmmAddUserSettingLockAll(): failed", err);
+			return false;
+		}
+	}
+
+
 
 	/* 	Class: BBMMUserPicker ======================================================
 		- Shows a per-user selection dialog for Lock/Sync

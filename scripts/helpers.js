@@ -97,9 +97,8 @@ export function getSkipMap() {
 	if (_skipMapCache) return _skipMapCache;
 
 	const out = new Map(EXPORT_SKIP ?? new Map());
-	let ex = {};
-	try { ex = game?.settings?.get?.("bbmm","userExclusions") ?? {}; } catch {}
-
+	const ex = globalThis.bbmm?._userExclusions ?? { settings: [], modules: [] };
+	
 	// Entire modules → add "*"
 	for (const ns of ex.modules ?? []) {
 		if (!ns) continue;
