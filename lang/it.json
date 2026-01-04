@@ -194,11 +194,19 @@
 		"openChangelog": "Apri Changelog",
 		"openedSettingsFor": "Impostazioni aperte per {title}.",
 		"noSettingsFoundFor": "Nessuna impostazione configurabile per {title}.",
-		"modListNotesDeleted": "Note eliminate.",	
+		"modListNotesDeleted": "Note eliminate.",
+		"modListCustomNotesExist": "Esistono note personalizzate",
+		"presetNoticeTitle": "Preset spostati nell'archivio persistente",
+		"presetNoticePleaseRead": "IMPORTANTE! Per favore leggi!",
+		"presetNoticeBody": "<p><strong>Big Bad Module Manager</strong> ha migrato i preset delle impostazioni e i preset dei moduli nell'archivio moduli persistente.</p><p><h4>Cosa significa?</h4> Queste impostazioni non sono più memorizzate nei dati del mondo di FoundryVTT e ora saranno condivise tra i mondi, il che significa che puoi salvare un preset e utilizzarlo in qualsiasi mondo!</p><p>A causa di questa modifica, tutti i preset salvati in precedenza in un mondo non verranno più visualizzati nei Preset Manager, tuttavia possono essere migrati manualmente utilizzando le macro fornite. Fai clic sul pulsante Apri README per le istruzioni o utilizza le macro nei compendi.</p>",
+		"presetNoticeOpenDocs": "Apri README",
+		"presetNoticeDontShowAgain": "Non mostrare più",
+		"presetNoticeClose": "Chiudi",
 		"buttons": {
 			"yes": "Sì",
 			"no": "No",
 			"ok": "OK",
+			"help": "Manuale",
 			"cancel": "Annulla",
 			"close": "Chiudi",
 			"save": "Salva",
@@ -336,7 +344,9 @@
 			"moduleNotes_name": "Note moduli BBMM",
 			"moduleNotes_hint": "Note aggiunte ai moduli.",
 			"moduleLocksName": "Moduli Bloccati",
-			"moduleLocksHint": "I moduli elencati qui sono bloccati in BBMM e non possono essere abilitati o disabilitati (manualmente o tramite azioni in blocco)."
+			"moduleLocksHint": "I moduli elencati qui sono bloccati in BBMM e non possono essere abilitati o disabilitati (manualmente o tramite azioni in blocco).",
+			"autoForceReloadName": "Forza Ricaricamento Giocatore",
+			"autoForceReloadHint": "Forza il ricaricamento immediato ai giocatori quando le nuove impostazioni sono bloccate/sincronizzate"
 		},
 		"macro": {
   			"columnName": "Nome",
@@ -359,6 +369,8 @@
   			"search": "Cerca…",
   			"showing": "Mostrando",
   			"of": "di",
+			"selectAll": "Seleziona Tutto",
+			"clear": "Pulisci",
   			"btnInspect": "Ispeziona",
   			"visibility": "Visibilità",
   			"copiedValToClipboard": "Valore copiato negli appunti.",
@@ -383,7 +395,22 @@
   			"failedOpenKeybindInspector": "Impossibile aprire l'Ispettore dei comandi da tastiera (vedi console).",
   			"titleKeybindInspecor": "BBMM — Ispeziona comandi da tastiera",
   			"keybindFilterPlaceholder": "Cerca spazio nomi, azione, nome, suggerimento, tasti…",
-  			"selectPreset": "Seleziona un preset di impostazioni."
+  			"selectPreset": "Seleziona un preset di impostazioni.",
+			"selectModuleToViewSettings": "Seleziona un modulo per visualizzare le impostazioni.",
+			"manualMigrateWindowTitle": "BBMM — Migrazione Manuale Preset Moduli",
+			"manualMigrateTitle": "Migrazione Manuale Preset Moduli",
+			"manualMigrateDesc": "Selezionare un preset del modulo Legacy dalle impostazioni, quindi scriverlo nella memoria persistente.",
+			"manualMigrateLegacySource": "Fonte Legacy",
+			"manualMigrateDestination": "Destinazione",
+			"manualMigrateLegacyPresetLabel": "Preimpostazione Legacy",
+			"manualMigrateNewNameLabel": "Nuovo Nome",
+			"manualMigrateManualSuffix": " (manuale)",
+			"manualMigrateNoLegacyFound": "Non sono stati trovati preset di moduli legacy da migrare.",
+			"manualMigrateNoUsablePresets": "Esistono dati preimpostati legacy, ma non sono stati trovati preset utilizzabili.",
+			"manualMigrateSettingsWindowTitle": "BBMM — Migrazione Impostazioni Predefinite Manuali",
+			"manualMigrateSettingsTitle": "Migrazione Impostazioni Predefinite Manuali",
+			"manualMigrateSettingsDesc": "Selezionare un'impostazione predefinita legacy dalle impostazioni, quindi scriverla nell'archivio persistente.",
+			"manualMigrateImportNamingHint": "I preset importati saranno denominati <strong>&lt;legacy name&gt; (manuale)</strong> e univoco se necessario."
 		},
 		"moduleManagement": {
 			"modListWindowTitle": "BBMM — Gestore Moduli",
@@ -432,6 +459,19 @@
   			"disableDependentsPromptMulti": "Disattivare i seguenti moduli che dipendono da questo? Deseleziona quelli che vuoi mantenere attivi:",
   			"disableOrphansPromptMulti": "Questi moduli non sono più necessari. Disattivarli? Deseleziona quelli che vuoi mantenere attivi:",
   			"filterClear": "Pulisci filtro"
+			},
+		"hiddenSettingSync": {
+			"title": "Sincronizzazione Impostazioni Client Nascoste",
+			"titleAdd": "Aggiungi Sincronizzazione Impostazioni",
+			"menuName": "Sincronizzazione Impostazioni Client Nascoste",
+			"menuLabel": "Gestore Sincronizzazione Impostazioni Nascoste",
+			"btnAdd": "Aggiungi Sincronizzazione Impostazioni",
+			"none": "Nessuna impostazione client nascosta sincronizzata.",
+			"noneEligible": "Nessuna impostazione client nascosta idonea trovata.",
+			"selectModule": "Seleziona modulo...",
+			"filter": "Filtra...",
+			"softLock": "Blocco Leggero",
+			"lock": "Blocco"
 		}
 	}
 }
