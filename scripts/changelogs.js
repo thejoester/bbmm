@@ -524,7 +524,9 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		const list = this.entries.map((e, i) => {
 			const activeAttr = i === this.index ? `data-active="1"` : "";
 			const vv = esc(e.version || "0.0.0");
+			const pv = e.prevSeen ? esc(e.prevSeen) : "";
 			const tt = esc(e.title || e.id || "Unknown");
+			const verLabel = pv ? `v${pv} -> v${vv}` : `v${vv}`;
 
 			// add a tiny check icon if marked seen this session
 			const seenNow = this._markedSeen.has(e.id)
@@ -536,7 +538,7 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 					<div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
 						${tt} ${seenNow}
 					</div>
-					<div style="opacity:.75;font-size:.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">v${vv}</div>
+					<div style="opacity:.75;font-size:.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${verLabel}</div>
 				</button>
 			`;
 		}).join("");
@@ -915,7 +917,7 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 				const url = await _bbmmFindChangelogURL(mod);
 				if (!url) continue;
 
-				results.push({ id, title, version, url, mod });
+				results.push({ id, title, version, prevSeen, url, mod });
 			} catch (errInner) {
 				DL(2, `changelog.js |  Changelog collect: skipping a module due to error: ${errInner?.message || errInner}`, errInner);
 			}
