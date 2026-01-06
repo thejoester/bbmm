@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated version tag in changelog to reflect the version that it was updated from. Example: "1.0.0 -> 1.2.3". Thanks [ChasarooniZ](https://github.com/ChasarooniZ/)!
 - **Journal:**
   - Fixed broken image link in journal for preset migration instructions. 
+- **Localization:**
+  - Updated Italian localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+is%3Aopen+author%3AGregoryWarn)!
 
 ## [0.6.1] - 2026-01-02
 ### Added
