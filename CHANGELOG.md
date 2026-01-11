@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-01-11
+### Changed
+- **BBMM Buttons:**
+  - Changed "BBMM" buttons on settings and module management windows to display a drop-down menu instead of opening a seperate window. 
+### Fixed
+- **Inclusions/Exclusions:**
+  - Fixed bug in inclusions/exclusions migration to persistent storage where when opening a new world, or world that has not migrated could overwrite inclusions/exclusions.
+
 ## [0.6.3] - 2026-01-05
 ### Fixed
 - **Journal:**
