@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5-test1] - 2026-01-12
+### Changed
+- **Import/Export:**
+  - Import/Export functionality moved from module/settings presets windows into consolidated settings menu.
+  - Export module/setting preset will prompt to select specific preset or export all presets in one .json file
+  - Importing a module/setting preset will allow to import a single preset or a group of presets (from the export all), and if a preset with the same name exists it will rename it to append "(imported on 2026-01-12 02:37)" to the preset name.
+  - Ability to import and export inclusions and exclusions. These will just import/export all and when importing will overwrite current lists.
+- **Module/Settings Presets:**
+  - Added rename functionality to module and setting presets. Will prompt for new name, if the new name already exists will prompt to overwrite or rename again. 
+
 ## [0.6.4] - 2026-01-11
 ### Changed
 - **BBMM Buttons:**

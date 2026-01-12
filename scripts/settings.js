@@ -108,23 +108,6 @@ async function hlp_loadPresets() {
 		}
 	}
 
-	// Ensure a storage file exists in subdir (create defaultObj if missing)
-	async function ensureStorageFileIn(subdir, filename, defaultObj = {}) {
-		const exists = await storageFileExistsIn(subdir, filename);
-		if (exists) {
-			DL(`settings.js | hlp_loadPresets(): storage file exists "${subdir}/${filename}"`);
-			return true;
-		}
-
-		DL(2, `settings.js | hlp_loadPresets(): storage file missing "${subdir}/${filename}", creating...`);
-		const ok = await writeStorageObject(subdir, filename, defaultObj);
-
-		if (ok) DL(`settings.js | hlp_loadPresets(): created storage file "${subdir}/${filename}"`);
-		else DL(3, `settings.js | hlp_loadPresets(): FAILED to create storage file "${subdir}/${filename}"`);
-
-		return ok;
-	}
-
 	// Sanitize inclusions object
 	function sanitizeInclusions(raw) {
 		const out = { settings: [], modules: [] };
@@ -229,18 +212,24 @@ async function hlp_loadPresets() {
 	========================================================================= */
 	DL("settings.js | hlp_loadPresets(): inclusions migration check starting");
 
-	await ensureStorageFileIn("lists", FILE_INC, { settings: [], modules: [] });
-
+	
 	if (!hasFlag(FLAG_INC)) {
-		DL(2, "settings.js | hlp_loadPresets(): inclusions migration flag not set, attempting migration");
+		DL(2, "settings.js | hlp_loadPresets(): BEGINNING INCLUSIONS MIGRATION ---");
 
 		const legacyRaw = game.settings.get(BBMM_ID, "userInclusions");
 		const legacy = sanitizeInclusions(legacyRaw);
 
-		DL("settings.js | hlp_loadPresets(): inclusions legacy sanitized", {
-			legacySettings: legacy.settings.length,
-			legacyModules: legacy.modules.length
+		DL(`settings.js | hlp_loadPresets(): exclusions legacy sanitized Settings: ${legacy.settings.length}, Modules: ${legacy.modules.length}`, {
+			legacySettings: legacy.settings,
+			legacyModules: legacy.modules
 		});
+
+		// Ensure persistent storage file exists (do not overwrite if it already exists)
+		const incExists = await storageFileExistsIn("lists", FILE_INC);
+		if (!incExists) {
+			try { await writeStorageObject("lists", FILE_INC, { settings: [], modules: [] }); DL("settings.js | hlp_loadPresets(): Created inclusions storage file"); }
+			catch (err) { DL(3, "settings.js | hlp_loadPresets(): FAILED ensuring inclusions storage file exists:", err);}
+		}
 
 		const storageRaw = await readStorageObject("lists", FILE_INC);
 		const storage = sanitizeInclusions(storageRaw);
@@ -276,25 +265,32 @@ async function hlp_loadPresets() {
 			DL("settings.js | hlp_loadPresets(): no inclusions to migrate (or all duplicates), flag set");
 		}
 	} else {
-		DL("settings.js | hlp_loadPresets(): inclusions migration flag already set, skipping");
+		DL("settings.js | hlp_loadPresets(): SKIPPING INCLUSIONS MIGRATION - flag already set");
 	}
 
 	/* ========================================================================= 
 		Exclusions Migration
 	========================================================================= */
-	DL("settings.js | hlp_loadPresets(): exclusions migration check starting");
+	DL("settings.js | hlp_loadPresets(): EXCLUSIONS MIGRATION CHECK:");
 
-	await ensureStorageFileIn("lists", FILE_EXC, { settings: [], modules: [] });
+	// await ensureStorageFileIn("lists", FILE_EXC, { settings: [], modules: [] });
 
 	if (!hasFlag(FLAG_EXC)) {
-		DL(2, "settings.js | hlp_loadPresets(): exclusions migration flag not set, attempting migration");
+		DL(2, "settings.js | hlp_loadPresets(): BEGINNING EXCLUSIONS MIGRATION ---");
 
 		const legacyRaw = game.settings.get(BBMM_ID, "userExclusions");
 		const legacy = sanitizeExclusions(legacyRaw);
 
-		DL("settings.js | hlp_loadPresets(): exclusions legacy sanitized", {
-			legacySettings: legacy.settings.length,
-			legacyModules: legacy.modules.length
+		// Ensure persistent storage file exists (do not overwrite if it already exists)
+		const excExists = await storageFileExistsIn("lists", FILE_EXC);
+		if (!excExists) {
+			try { await writeStorageObject("lists", FILE_EXC, { settings: [], modules: [] }); DL("settings.js | hlp_loadPresets(): Created exclusions storage file"); }
+			catch (err) { DL(3, "settings.js | hlp_loadPresets(): FAILED ensuring exclusions storage file exists:", err);}
+		}
+
+		DL(`settings.js | hlp_loadPresets(): exclusions legacy sanitized Settings: ${legacy.settings.length}, Modules: ${legacy.modules.length}`, {
+			legacySettings: legacy.settings,
+			legacyModules: legacy.modules
 		});
 
 		const storageRaw = await readStorageObject("lists", FILE_EXC);
@@ -331,9 +327,8 @@ async function hlp_loadPresets() {
 			DL("settings.js | hlp_loadPresets(): no exclusions to migrate (or all duplicates), flag set");
 		}
 	} else {
-		DL("settings.js | hlp_loadPresets(): exclusions migration flag already set, skipping");
+		DL("settings.js | hlp_loadPresets(): SKIPPING EXCLUSIONS MIGRATION - flag already set");
 	}
-
 }
 
 // Check folder migration 
@@ -516,7 +511,7 @@ export function DL(intLogType, stringLogMsg, objObject = null) {
 
 	// Capture stack trace to get file and line number
 	const stack = new Error().stack.split("\n");
-	let fileInfo = "Unknown Source";
+	let fileInfo = "";
 	for (let i = 2; i < stack.length; i++) {
 		const line = stack[i].trim();
 		const fileInfoMatch = line.match(/(\/[^)]+):(\d+):(\d+)/); // Match file path and line number
@@ -527,7 +522,9 @@ export function DL(intLogType, stringLogMsg, objObject = null) {
 	}
 
 	// Prepend the file and line info to the log message
-	const formattedLogMsg = `[${fileInfo}] ${stringLogMsg}`;
+	const formattedLogMsg = fileInfo === ""
+		? stringLogMsg
+		: `[${fileInfo}] ${stringLogMsg}`;
 	
 	if (objObject) {
 		switch (intLogType) {
@@ -581,18 +578,15 @@ export function injectBBMMHeaderButton(root) {
 	}
 	const controls = header.querySelector(".window-controls") || header;
 
-	// Prevent duplicate header button
-	if (controls.querySelector(".bbmm-header-btn")) return;
+	// Prevent duplicate header menu
+	if (controls.querySelector(".bbmm-header-menu-btn")) return;
 
-	// Create header button
+	// Create main button (looks like a normal header control)
 	const btn = document.createElement("button");
 	btn.type = "button";
-	btn.className = "header-control bbmm-header-btn";
+	btn.className = "header-control bbmm-header-menu-btn";
 	btn.setAttribute("data-tooltip", LT.buttons.bbmmBtnToolTip());
 	btn.setAttribute("aria-label", LT.buttons.bbmmBtnToolTip());
-<<<<<<< Updated upstream
-	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i><span>BBMM</span>`;
-=======
 	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i><span>BBMM</span><i class="fa-solid fa-caret-down"></i>`;
 
 
@@ -670,46 +664,101 @@ export function injectBBMMHeaderButton(root) {
 
 		menu.style.left = `${Math.round(left)}px`;
 	}
->>>>>>> Stashed changes
 
 	btn.addEventListener("click", (ev) => {
 		ev.preventDefault();
 		ev.stopPropagation();
 
-		if (game.user.isGM) {
-			DL("settings.js | Opening BBMM Launcher from header button");
-			openBBMMLauncher();
-		} else {
-			DL("settings.js | Opening BBMM Settings Preset Manager from header button");
-			openSettingsPresetManager();
+		menu.hidden = !menu.hidden;
+		if (!menu.hidden) {
+			positionMenu();
 		}
 	});
+
+	// Close menu when clicking elsewhere
+	const onDocClick = (ev) => {
+		if (ev.target === btn || menu.contains(ev.target)) return;
+		menu.hidden = true;
+	};
+	document.addEventListener("click", onDocClick, { capture: true });
+
+	// Reposition on resize/scroll while open
+	const onWindowMove = () => {
+		if (!menu.hidden) positionMenu();
+	};
+	window.addEventListener("resize", onWindowMove);
+	window.addEventListener("scroll", onWindowMove, true);
+
+	// Cleanup when the window is removed from DOM
+	const obs = new MutationObserver(() => {
+		if (!document.body.contains(root)) {
+			try {
+				document.removeEventListener("click", onDocClick, { capture: true });
+			} catch (e) {}
+			try {
+				window.removeEventListener("resize", onWindowMove);
+				window.removeEventListener("scroll", onWindowMove, true);
+			} catch (e) {}
+			try {
+				menu.remove();
+			} catch (e) {}
+			obs.disconnect();
+		}
+	});
+	obs.observe(document.body, { childList: true, subtree: true });
 
 	// Insert before the Close button if present
 	const closeBtn = controls.querySelector('button.header-control[data-action="close"]');
 	if (closeBtn) controls.insertBefore(btn, closeBtn);
 	else controls.appendChild(btn);
 
+	// Add dropdown to body
+	document.body.appendChild(menu);
+
 	// Minimal style (inject once)
 	if (!document.getElementById("bbmm-header-style")) {
 		const style = document.createElement("style");
 		style.id = "bbmm-header-style";
 		style.textContent = `
-			header.window-header .header-control.bbmm-header-btn {
+			header.window-header .header-control.bbmm-header-menu-btn {
 				display: inline-flex;
 				align-items: center;
-				gap: 0.4rem;
+				gap: 0.5rem;
 				white-space: nowrap;
-				padding-inline: 0.5rem;
+				padding-inline: 0.6rem;
+				font-size: 0.95rem;
 			}
-			header.window-header .header-control.bbmm-header-btn i {
+			header.window-header .header-control.bbmm-header-menu-btn i {
 				font-size: 0.9em;
+			}
+			.bbmm-header-dropdown {
+				position: fixed;
+				z-index: 100000;
+				display: flex;
+				flex-direction: column;
+				min-width: 260px;
+				padding: .75rem;
+				border: 1px solid var(--color-border-dark, #491313ff);
+				border-radius: 0.6rem;
+				background: var(--color-bg, #111);
+				box-shadow: 0 6px 16px rgba(0,0,0,0.45);
+			}
+			.bbmm-header-item {
+				text-align: left;
+				padding: 0.5rem 0.75rem;
+				border-radius: 0.4rem;
+				white-space: nowrap;
+				font-size: 0.95rem;
+				line-height: 1.2;
+			}
+			.bbmm-header-item:hover {
+				background: rgba(255,255,255,0.08);
 			}
 		`;
 		document.head.appendChild(style);
 	}
 
-	DL("settings.js | BBMM header button injected");
+	DL("settings.js | BBMM header dropdown injected");
 }
 
 // Open Exclusions Manager
