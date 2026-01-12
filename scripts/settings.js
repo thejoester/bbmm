@@ -1,9 +1,9 @@
 import { openPresetManager } from './module-presets.js';
-import { openSettingsPresetManager } from './settings-presets.js';
+import { openSettingsPresetManager, svc_loadSettingsPresets } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp } from "./inclusions.js";
 import { hlp_readUserExclusions } from "./exclusions.js";
-import { hlp_openManualByUuid, hlp_injectHeaderHelpButton } from "./helpers.js";
+import { hlp_openManualByUuid, hlp_injectHeaderHelpButton, hlp_saveJSONFile, hlp_pickLocalJSONFile, bbmm_exportSettingsPresetsAll, bbmm_importSettingsPresetsAll, bbmm_exportModulePresetsAll, bbmm_importModulePresetsAll, hlp_esc } from "./helpers.js";
 
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
@@ -590,7 +590,87 @@ export function injectBBMMHeaderButton(root) {
 	btn.className = "header-control bbmm-header-btn";
 	btn.setAttribute("data-tooltip", LT.buttons.bbmmBtnToolTip());
 	btn.setAttribute("aria-label", LT.buttons.bbmmBtnToolTip());
+<<<<<<< Updated upstream
 	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i><span>BBMM</span>`;
+=======
+	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i><span>BBMM</span><i class="fa-solid fa-caret-down"></i>`;
+
+
+	// Create dropdown menu, but attach it to BODY so it doesn't get clipped by the header
+	const menu = document.createElement("div");
+	menu.className = "bbmm-header-dropdown";
+	menu.hidden = true;
+
+	const isGM = game.user.isGM;
+
+	const items = isGM
+		? [
+			{ action: "modules", label: LT.modulePresetMgr(), onClick: () => openPresetManager() },
+			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
+			{ action: "exclusions", label: LT.exclusionsMgr(), onClick: () => openExclusionsManager() },
+			{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },
+			{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel(), onClick: () => openhiddenSettingSyncManager() },
+			// Import / Export
+			{
+				action: "importExport",
+				label: LT.buttons.importExport(),
+				onClick: () => {
+					try {
+						const menu = game.settings.menus.get(`${BBMM_ID}.importExport`);
+						if (!menu || !menu.type) {
+							DL(3, "settings.js | BBMM header dropdown: importExport menu not found", `${BBMM_ID}.importExport`);
+							return;
+						}
+
+						new menu.type().render(true);
+					} catch (err) {
+						DL(3, "settings.js | BBMM header dropdown: failed to open importExport menu", err);
+					}
+				}
+			},
+			{ action: "help", label: (LT.buttons.help?.() ?? "Help"), onClick: () => hlp_openManualByUuid(BBMM_README_UUID) }
+		]
+		: [
+			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
+			{ action: "help", label: (LT.buttons.help?.() ?? "Help"), onClick: () => hlp_openManualByUuid(BBMM_README_UUID) }
+		];
+
+	for (const it of items) {
+		const mi = document.createElement("button");
+		mi.type = "button";
+		mi.className = "bbmm-header-item";
+		mi.dataset.action = it.action;
+		mi.textContent = it.label;
+
+		mi.addEventListener("click", (ev) => {
+			ev.preventDefault();
+			ev.stopPropagation();
+			menu.hidden = true;
+
+			try {
+				it.onClick();
+			} catch (e) {
+				DL(3, `settings.js | BBMM header dropdown: click failed (${it.action})`, e);
+			}
+		});
+
+		menu.appendChild(mi);
+	}
+
+	// Position menu under the button (fixed, so no clipping)
+	function positionMenu() {
+		const r = btn.getBoundingClientRect();
+		menu.style.top = `${Math.round(r.bottom + 4)}px`;
+
+		// Align RIGHT edge of menu to RIGHT edge of button
+		let left = r.right - menu.offsetWidth;
+
+		// Clamp to viewport
+		left = Math.max(8, Math.min(left, window.innerWidth - menu.offsetWidth - 8));
+
+		menu.style.left = `${Math.round(left)}px`;
+	}
+>>>>>>> Stashed changes
 
 	btn.addEventListener("click", (ev) => {
 		ev.preventDefault();
@@ -659,7 +739,6 @@ export function openhiddenSettingSyncManager() {
 }
 
 // Open a small chooser dialog, then launch the selected manager
-// Open a small chooser dialog, then launch the selected manager
 export async function openBBMMLauncher() {
 	DL("settings.js | openBBMMLauncher()");
 
@@ -676,6 +755,7 @@ export async function openBBMMLauncher() {
 					{ action: "exclusions", label: LT.exclusionsMgr() },
 					{ action: "inclusions", label: LT.inclusionsMgr() },
 					{ action: "hiddenSettings",   label: LT.hiddenSettingSync.menuLabel() },
+					{ action: "importExport", label: LT.buttons.importExport() },
 					{ action: "cancel",   label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
@@ -711,11 +791,376 @@ export async function openBBMMLauncher() {
 		openInclusionsManagerApp();
 	} else if (choice === "controls-presets") {
 		openControlsPresetManager();
+	} else if (choice === "importExport") {
+		try {
+				const menu = game.settings.menus.get(`${BBMM_ID}.importExport`);
+				if (!menu || !menu.type) {
+					DL(3, "settings.js | BBMM header dropdown: importExport menu not found", `${BBMM_ID}.importExport`);
+					return;
+				}
+
+				new menu.type().render(true);
+			} catch (err) {
+				DL(3, "settings.js | BBMM header dropdown: failed to open importExport menu", err);
+			}
 	} else if (choice === "hiddenSettings") {
 		openhiddenSettingSyncManager();
 	}
 	// "cancel" -> do nothing
 }
+
+// BBMM Import / Export Dialog
+class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
+	constructor() {
+		super({
+			window: { title: `${LT.moduleInit()} ${LT.buttons.importExport()}` },
+			content: `
+				<div style="display:flex;flex-direction:column;gap:.75rem;">
+					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">${LT.modulePresetsBtn()}:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-mod-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-mod-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
+
+					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">${LT.settingsPresetsBtn()}:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-set-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-set-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
+
+					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">${LT.inclusions.manager()}:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-inc-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-inc-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
+
+					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">${LT.exclusions()}:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-exc-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-exc-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
+				</div>
+			`,
+			buttons: [
+				{ action: "close", label: LT.buttons.close(), default: true }
+			],
+			submit: () => "close"
+		});
+	}
+
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+
+		const root = this.element;
+		if (!root) return;
+
+		// Inject help button into title bar
+		try {
+			hlp_injectHeaderHelpButton(this, {
+				uuid: BBMM_README_UUID,
+				iconClass: "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+		} catch (e) {
+			DL(2, `settings-presets.js | help injection failed`, e);
+		}
+
+		// Prevent double-binding on re-render
+		if (root.dataset.bbmmIeBound === "1") return;
+		root.dataset.bbmmIeBound = "1";
+
+		root.addEventListener("click", async (ev) => {
+			const btn = ev.target?.closest?.("button[data-action]");
+			if (!btn) return;
+
+			const action = btn.dataset.action;
+
+			try {
+				if (action === "bbmm-mod-export") {
+					const FN = "settings.js | BBMMImportExportDialog._onRender(): module preset export chooser:";
+					try {
+						const url = `modules/${BBMM_ID}/storage/presets/module-presets.json`;
+						const res = await fetch(url, { cache: "no-store" });
+						if (!res.ok) {
+							DL(3, `${FN} fetch not ok`, { url, status: res.status });
+							ui.notifications.error(LT.errors.failedReadModulePreset());
+							return;
+						}
+
+						const presets = await res.json();
+						const names = Object.keys(presets ?? {}).sort((a, b) => a.localeCompare(b));
+
+						const options =
+							`<option value="__all">${LT._importExport.allPresets()}</option>` +
+							names.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`).join("");
+
+						const pick = await new Promise((resolve) => {
+							const dlg = new foundry.applications.api.DialogV2({
+								window: { title: LT._importExport.exportModulePreset() },
+								content: `
+									<form>
+										<div style="display:flex;flex-direction:column;gap:.5rem;">
+											<label style="font-weight:700;">${LT._importExport.whichPreset()}?</label>
+											<select name="preset" style="width:100%;">
+												${options}
+											</select>
+										</div>
+									</form>
+								`,
+								buttons: [
+									{ action: "export", label: LT.buttons.export(), default: true },
+									{ action: "cancel", label: LT.buttons.cancel() }
+								],
+								submit: (res) => {
+									const val = dlg.element?.querySelector('select[name="preset"]')?.value ?? "__all";
+									resolve({ action: res ?? "cancel", preset: val });
+								},
+								rejectClose: false,
+								position: { width: 420, height: "auto" }
+							});
+							dlg.render(true);
+						});
+
+						if (!pick || pick.action !== "export") return;
+
+						// All presets → existing behavior
+						if (pick.preset === "__all") {
+							await bbmm_exportModulePresetsAll();
+							return;
+						}
+
+						// Single preset export
+						const presetName = pick.preset;
+						const one = presets?.[presetName];
+
+						if (!Array.isArray(one)) {
+							DL(3, `${FN} selected preset missing/invalid`, { presetName });
+							ui.notifications.error(LT.errors.selectedPresetNotFound());
+							return;
+						}
+
+						const d = new Date();
+						const pad = (n) => String(n).padStart(2, "0");
+						const safeName = presetName.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+						const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-bbmm-module-preset-${safeName}.json`;
+
+						await hlp_saveJSONFile({ [presetName]: one }, fname);
+						ui.notifications.info(LT.notifications.exportedModulePreset());
+						DL(1, `${FN} exported single preset`, { presetName, fname });
+
+					} catch (err) {
+						DL(3, `${FN} failed`, err);
+						ui.notifications.error(LT._importExport.importExportFailed());
+					}
+					return;
+				}
+
+				if (action === "bbmm-mod-import") return await bbmm_importModulePresetsAll();
+
+				if (action === "bbmm-set-export") {
+					const FN = "settings.js | BBMMImportExportDialog._onRender(): settings preset export chooser:";
+					try {
+						const url = `modules/${BBMM_ID}/storage/presets/settings-presets.json`;
+						const res = await fetch(url, { cache: "no-store" });
+						if (!res.ok) {
+							DL(3, `${FN} fetch not ok`, { url, status: res.status });
+							ui.notifications.error(LT.errors.failedReadSettingsPreset());
+							return;
+						}
+
+						const presets = await res.json();
+						const names = Object.keys(presets ?? {}).sort((a, b) => a.localeCompare(b));
+
+						const options =
+							`<option value="__all">${LT._importExport.allPresets()}</option>` +
+							names.map(n => `<option value="${hlp_esc(n)}">${hlp_esc(n)}</option>`).join("");
+
+						const pick = await new Promise((resolve) => {
+							const dlg = new foundry.applications.api.DialogV2({
+								window: { title: LT._importExport.exportSettingsPreset() },
+								content: `
+									<form>
+										<div style="display:flex;flex-direction:column;gap:.5rem;">
+											<label style="font-weight:700;">${LT._importExport.whichPreset()}?</label>
+											<select name="preset" style="width:100%;">
+												${options}
+											</select>
+										</div>
+									</form>
+								`,
+								buttons: [
+									{ action: "export", label: LT.buttons.export(), default: true },
+									{ action: "cancel", label: LT.buttons.cancel() }
+								],
+								submit: (res) => {
+									const val = dlg.element?.querySelector('select[name="preset"]')?.value ?? "__all";
+									resolve({ action: res ?? "cancel", preset: val });
+								},
+								rejectClose: false,
+								position: { width: 420, height: "auto" }
+							});
+							dlg.render(true);
+						});
+
+						if (!pick || pick.action !== "export") return;
+
+						// All presets → same behavior as now
+						if (pick.preset === "__all") {
+							await bbmm_exportSettingsPresetsAll();
+							return;
+						}
+
+						// Single preset export
+						const presetName = pick.preset;
+						const oneRaw = presets?.[presetName];
+
+						if (!oneRaw || typeof oneRaw !== "object") {
+							DL(3, `${FN} selected preset missing/invalid`, { presetName });
+							ui.notifications.error(LT.errors.selectedPresetNotFound());
+							return;
+						}
+
+						let one = oneRaw;
+
+						// If the preset is in the OLD FORMAT, convert it before exporting
+						// OLD FORMAT: { created, updated, items:[{ namespace,key,value,scope }] }
+						if (Array.isArray(oneRaw.items)) {
+							const out = {
+								type: "bbmm-settings",
+								created: null,
+								world: {},
+								client: {},
+								user: {}
+							};
+
+							const createdVal = oneRaw.created ?? oneRaw.updated ?? Date.now();
+							if (typeof createdVal === "number") out.created = new Date(createdVal).toISOString();
+							else if (typeof createdVal === "string" && createdVal.trim()) out.created = createdVal.trim();
+							else out.created = new Date().toISOString();
+
+							for (const it of oneRaw.items) {
+								const ns = it?.namespace;
+								const key = it?.key;
+								if (!ns || !key) continue;
+
+								const scope = String(it?.scope || "world").toLowerCase();
+								const bucket = (scope === "world" || scope === "client" || scope === "user") ? scope : "world";
+
+								if (!out[bucket][ns]) out[bucket][ns] = {};
+								out[bucket][ns][key] = it?.value;
+							}
+
+							one = out;
+						} else {
+							// Ensure expected envelope fields exist for export sanity
+							const hasBuckets = oneRaw.world && oneRaw.client && oneRaw.user
+								&& typeof oneRaw.world === "object"
+								&& typeof oneRaw.client === "object"
+								&& typeof oneRaw.user === "object";
+
+							if (hasBuckets && oneRaw.type !== "bbmm-settings") one = { ...oneRaw, type: "bbmm-settings" };
+							if (hasBuckets && !one?.created) one = { ...one, created: new Date().toISOString() };
+						}
+
+						const d = new Date();
+						const pad = (n) => String(n).padStart(2, "0");
+						const safeName = presetName.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+						const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-bbmm-settings-preset-${safeName}.json`;
+
+						await hlp_saveJSONFile({ [presetName]: one }, fname);
+						ui.notifications.info(LT._importExport.exportedSettingsPreset());
+						DL(1, `${FN} exported single preset`, { presetName, fname });
+
+					} catch (err) {
+						DL(3, `${FN} failed`, err);
+						ui.notifications.error(LT.errors.importExportFailed());
+					}
+					return;
+				}
+				// Settings Presets import
+				if (action === "bbmm-set-import") {
+					await bbmm_importSettingsPresetsAll();
+
+					// Force refresh the Settings Presets cache
+					try {
+						await svc_loadSettingsPresets({ force: true });
+
+						// If the Settings Preset Manager is open, reopen it to rebuild the list
+						const existing = Object.values(ui.windows ?? {}).find(w => w?.id === "bbmm-settings-preset-manager") ?? null;
+						if (existing) {
+							await openSettingsPresetManager();
+						}
+					} catch (err) {
+						DL(2, "settings.js | BBMMImportExportDialog._onRender(): post-import refresh failed", err);
+					}
+
+					return;
+				}
+
+				// Inclusions/Exclusions: all-only file export/import (storage/lists)
+				if (action === "bbmm-inc-export") return await bbmm_exportListFile("user-inclusions.json", "bbmm-inclusions.json");
+				if (action === "bbmm-inc-import") return await bbmm_importListFile("user-inclusions.json");
+
+				if (action === "bbmm-exc-export") return await bbmm_exportListFile("user-exclusions.json", "bbmm-exclusions.json");
+				if (action === "bbmm-exc-import") return await bbmm_importListFile("user-exclusions.json");
+			} catch (err) {
+				DL(3, "settings.js | BBMMImportExportDialog._onRender(): action failed", { action, name: err?.name, message: err?.message, stack: err?.stack });
+				ui.notifications.error(LT.errors.importExportFailed());
+			}
+		});
+	}
+}
+
+// Export a storage list file (inclusions/exclusions)
+async function bbmm_exportListFile(storageFile, exportName) {
+	const url = `modules/${BBMM_ID}/storage/lists/${storageFile}`;
+	const data = await fetch(url, { cache: "no-store" }).then(r => r.json());
+
+	const d = new Date();
+	const pad = (n) => String(n).padStart(2, "0");
+	const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${exportName}`;
+
+	await hlp_saveJSONFile(data, fname);
+	DL("settings.js | bbmm_exportListFile(): exported list file", { storageFile, fname });
+}
+
+// Import a storage list file (inclusions/exclusions)
+async function bbmm_importListFile(storageFile) {
+	const file = await hlp_pickLocalJSONFile();
+	if (!file) return;
+
+	let data;
+	try {
+		data = JSON.parse(await file.text());
+	} catch (err) {
+		DL(3, "settings.js | bbmm_importListFile(): invalid json import file", err);
+		ui.notifications.error(LT.errors.invalidJsonFile());
+		return;
+	}
+
+	const payload = JSON.stringify(data ?? {}, null, 2);
+	const f = new File([payload], storageFile, { type: "application/json" });
+
+	const res = await FilePicker.uploadPersistent(
+		BBMM_ID,
+		"lists",
+		f,
+		{},
+		{ notify: false }
+	);
+
+	DL("settings.js | bbmm_importListFile(): imported list file", { storageFile, res });
+	ui.notifications.info(LT._importExport.importedList());
+}
+
 
 Hooks.once("init", () => {
 
@@ -963,7 +1408,7 @@ Hooks.once("init", () => {
 			
 			// Add a  menu entry for Exclusions manager
 			game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
-				name: LT.exclusionsMgrBtn(),
+				name: LT.exclusionsMgr(),
 				label: LT.lblExclusionsMgr(),
 				icon: "fas fa-filter",
 				restricted: true,
@@ -1049,6 +1494,16 @@ Hooks.once("init", () => {
 					}
 					async _updateObject() {}
 				}
+			});
+
+			// Import / Export menu
+			game.settings.registerMenu(BBMM_ID, "importExport", {
+				name: LT.buttons.importExport(),
+				label: LT.buttons.importExport(),
+				hint: LT._settings.importExportHint(),
+				icon: "fas fa-file-import",
+				type: BBMMImportExportDialog,
+				restricted: true
 			});
 
 			// World toggle to Show changelog on GM login

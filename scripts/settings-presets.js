@@ -62,49 +62,6 @@ function hlp_sanitizeUserInclusions(raw) {
 	};
 }
 
-// Read user inclusions from persistent storage file ====================
-async function hlp_readUserInclusionsFromStorage() {
-	const base = `modules/${BBMM_ID}/storage`;
-	const candidates = [
-		"user-inclusions.json",
-		"userInclusions.json",
-		"inclusions.json",
-		"user-includes.json",
-		"includes.json"
-	];
-	const dirs = [
-		base,
-		`${base}/inclusions`,
-		`${base}/presets`
-	];
-
-	for (const dir of dirs) {
-		try {
-			const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
-			const files = (browse?.files || []).map(f => String(f));
-			let match = null;
-
-			for (const name of candidates) {
-				match = files.find(f => f.endsWith(`/${name}`));
-				if (match) break;
-			}
-			if (!match) {
-				match = files.find(f => f.toLowerCase().includes("inclusion") && f.toLowerCase().endsWith(".json")) || null;
-			}
-
-			if (match) {
-				const data = await hlp_fetchJSON(match);
-				return hlp_sanitizeUserInclusions(data);
-			}
-		} catch (err) {
-			// Missing folders are normal depending on version/migration
-			continue;
-		}
-	}
-
-	return null;
-}
-
 // Read presets from persistent storage file ===========================
 export async function hlp_readSettingsPresetsFromStorage() {
 	const dir = `modules/${BBMM_ID}/storage/${SETTINGS_PRESETS_STORAGE_DIR}`;
@@ -283,17 +240,6 @@ function hlp_normalizeToEntries(bbmmExport) {
 
 	DL("settings-presets.js | hlp_normalizeToEntries(): produced entries", { count: entries.length });
 	return entries;
-}
-
-/* Convert flat entries array back to bbmm-settings envelope ============= */
-function hlp_entriesToEnvelope(entries) {
-	const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
-	for (const e of entries || []) {
-		const scope = (e.scope === "world") ? "world" : (e.scope === "user" ? "user" : "client");
-		out[scope][e.namespace] ??= {};
-		out[scope][e.namespace][e.key] = e.value;
-	}
-	return out;
 }
 
 /* Default preset name suggestion ======================================= */
@@ -1575,6 +1521,7 @@ export async function openSettingsPresetManager() {
 				<button type="button" data-action="load">${LT.buttons.load()}</button>
 				<button type="button" data-action="preview">${LT.buttons.preview()}</button>
 				<button type="button" data-action="update">${LT.buttons.update()}</button>
+				<button type="button" data-action="rename">${LT.errors.rename()}</button>
 				<button type="button" data-action="delete">${LT.buttons.delete()}</button>
 			</div>
 			<div>
@@ -1582,23 +1529,16 @@ export async function openSettingsPresetManager() {
 				<hr>
 			</div>
 			
+			<p>${LT.presetSaveCurrentSettings()}:</p>
+			<div style="display:flex;gap:.5rem;align-items:center;">
+				<input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
+				<button type="button" data-action="save-current">${LT.buttons.saveCurrentSettings()}</button>
+			</div>
 			<div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
 				<label><input type="checkbox" name="includeDisabled" checked> ${LT.incDisabledModules()}</label>
 				<label><input type="checkbox" name="includeHidden"> ${LT.includeHidden()}</label>
 			</div>
 
-			<div style="display:flex;gap:.5rem;align-items:center;">
-				<input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
-				<button type="button" data-action="save-current">${LT.buttons.saveCurrentSettings()}</button>
-			</div>
-
-			<hr>
-
-			<h3 style="margin:0;">${LT.expImpCurrentSettings()}</h3>
-			<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-				<button type="button" data-action="export">${LT.buttons.exportToJSON()}</button>
-				<button type="button" data-action="import">${LT.buttons.importFromJSON()}</button>
-			</div>
 		</section>
 	`;
 
@@ -1642,7 +1582,7 @@ export async function openSettingsPresetManager() {
 			const btn = ev.target;
 			if (!(btn instanceof HTMLButtonElement)) return;
 			const action = btn.dataset.action || "";
-			if (!["save-current","load","update","delete","export","import","preview"].includes(action)) return;
+			if (!["save-current","load","update","rename","delete","preview"].includes(action)) return;
 
 			ev.preventDefault();
 			ev.stopPropagation();
@@ -1867,6 +1807,65 @@ export async function openSettingsPresetManager() {
 					return;
 				}
 				
+				// RENAME -> rename selected preset only (NO saving current settings)
+				if (action === "rename") {
+					if (!selected) { ui.notifications.warn(`${LT.selectSettingsPreset()}.`); return; }
+
+					const all = foundry.utils.duplicate(svc_getSettingsPresets()) || {};
+
+					// Resolve the real stored key (case-insensitive match)
+					const oldKey = hlp_findExistingSettingsPresetKey(selected) ?? selected;
+					const oldPreset = all[oldKey];
+					if (!oldPreset) { ui.notifications.warn(`${LT.selectSettingsPreset()}.`); return; }
+
+					let attemptName = await ui_promptRenamePreset(oldKey);
+					if (!attemptName) return;
+
+					let finalKey = null;
+
+					while (true) {
+						const wanted = String(attemptName).trim();
+						if (!wanted) return;
+
+						const existingKey = hlp_findExistingSettingsPresetKey(wanted);
+
+						// Accept if no conflict, or it's the same preset (including casing change)
+						if (!existingKey || existingKey === oldKey) {
+							finalKey = wanted;
+							break;
+						}
+
+						// Conflict with another preset
+						const choice = await svc_askSettingsPresetConflict(existingKey);
+						if (choice === "cancel") return;
+
+						if (choice === "overwrite") {
+							// Use the existing key (preserve stored casing)
+							finalKey = existingKey;
+							break;
+						}
+
+						// Rename again
+						attemptName = await ui_promptRenamePreset(wanted);
+						if (!attemptName) return;
+					}
+
+					if (!finalKey) return;
+
+					// Apply rename / overwrite
+					all[finalKey] = oldPreset;
+					if (oldKey !== finalKey) delete all[oldKey];
+
+					await svc_setSettingsPresets(all);
+
+					ui.notifications.info(`${LT.renameSettingPreset()}: "${oldKey}" -> "${finalKey}".`);
+
+					// Refresh list
+					app.close();
+					openSettingsPresetManager();
+					return;
+				}
+
 				// DELETE -> delete the selected preset after confirmation
 				if (action === "delete") {
 					if (!selected) return ui.notifications.warn(`${LT.errors.selectSettingPresetDelete()}.`);
@@ -1888,68 +1887,6 @@ export async function openSettingsPresetManager() {
 					return;
 				}
 
-				// EXPORT settings to a JSON file
-				if (action === "export") {
-					try {
-						DL("settings-presets.js | openSettingsPresetManager(): Export: start");
-						const payload = await svc_collectAllModuleSettings({ includeDisabled, includeHidden: includeHiddenFinal });
-
-						// Normalize schema types
-						hlp_schemaCorrectNonPlainTypes(payload);
-
-						const base = game.user.isGM ? "settings-world-client-user" : "settings-client-user";
-						const fname = `bbmm-${base}-${hlp_timestampStr()}.json`;
-
-						await hlp_saveJSONFile(payload, fname);
-						ui.notifications.info(`${LT.exportedCurrentSettings()}.`);
-						DL("settings-presets.js | openSettingsPresetManager(): Export: done");
-					} catch (e) {
-						DL(3, `settings-presets.js | Export: FAILED — ${e?.name ?? "Error"}: ${e?.message ?? e}`);
-						ui.notifications.error(`${LT.errors.settingsExportFailed()}.`);
-						throw e;
-					}
-					return;
-				}
-
-				// IMPORT settings from a JSON file
-				if (action === "import") {
-					const file = await hlp_pickLocalJSONFile();
-					if (!file) return;
-
-					let data;
-					try { data = JSON.parse(await file.text()); }
-					catch { ui.notifications.error(`${LT.invalidJSONFile()}.`); return; }
-
-					// Require BBMM settings export type
-					if (!data || data.type !== "bbmm-settings") {
-						await new foundry.applications.api.DialogV2({
-							window: { title: LT.errors.titleImportError() },
-							content: `<p>${LT.errors.notBBMMSettingsFile()}.</p>`,
-							buttons: [{ action: "ok", label: LT.buttons.ok(), default: true }],
-							submit: () => "ok"
-						}).render(true);
-						return;
-					}
-
-					// Normalize (applies exclusions) then re-envelope
-					const before = { 
-						world: Object.values(data.world ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
-						client: Object.values(data.client ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
-						user: Object.values(data.user ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0)
-					};
-					const entries = hlp_normalizeToEntries(data);	// exclusions enforced here
-					const filtered = hlp_entriesToEnvelope(entries);
-					const after = { 
-						world: Object.values(filtered.world ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
-						client: Object.values(filtered.client ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0),
-						user: Object.values(filtered.user ?? {}).reduce((n,ns)=>n+Object.keys(ns).length,0)
-					};
-					DL("settings-presets.js | Import: counts before/after exclusions", { before, after, entryCount: entries.length });
-
-					// Hand off to Import Wizard with the filtered envelope
-					await ui_openSettingsImportWizard(filtered);
-					return;
-				}
 			} catch (err) {
 				// Log the real failure details
 				DL(3, "settings-presets.js | openSettingsPresetManager(): action failed", {

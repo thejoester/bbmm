@@ -90,7 +90,7 @@
 		"name_checkDisabledModules": "Changelog Report: Check Disabled Modules",
 		"hint_checkDisabledModules": "When enabled, BBMM will also look for changelogs in installed but disabled modules.",
 		"exclusionsMgr": "Exclusions Manager",
-		"exclusionsMgrBtn": "Exclusions Manager",
+		"exclusions": "Exclusions",
 		"lblExclusionsMgr": "Open Exclusions Manager",
 		"titleExclusionsMgr": "BBBM Exclusions Manager",
 		"titleAddModuleExclusion": "BBMM — Add Module Exclusion",
@@ -202,11 +202,14 @@
 		"presetNoticeOpenDocs": "Open README",
 		"presetNoticeDontShowAgain": "Don't Show Again",
 		"presetNoticeClose": "Close",
+		"presetSaveCurrentModules": "Save current module state to preset",
+		"presetSaveCurrentSettings": "Save current Settings state to preset",
+		"selectPreset": "Select a preset to load.",
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",
 			"ok": "OK",
-			"help": "Manual",
+			"help": "Read Me",
 			"cancel": "Cancel",
 			"close": "Close",
 			"save": "Save",
@@ -214,6 +217,7 @@
 			"reload": "Reload",
 			"export": "Export",
 			"import": "Import",
+			"importExport": "Import / Export",
 			"load": "Load",
 			"btnSync": "Sync",
 			"preview": "Preview",
@@ -260,7 +264,13 @@
 			"settingsExportFailed": "Settings Export failed (see console)",
 			"settingsRegUnavail": "Settings registry unavailable",
 			"failedOpenLegacyExport": "Failed to open legacy export dialog (See console)",
-			"failedModulestateExp": "Module state export failed (See console)"
+			"failedModulestateExp": "Module state export failed (See console)",
+			"failedReadSettingsPreset": "Failed to read settings presets.",
+			"failedReadModulePreset": "Failed to read module presets.",
+			"selectedPresetNotFound": "Selected preset not found.",
+			"importExportFailed": "Import/Export failed. See console.",
+			"notInstalled": "not installed",
+			"depMissing": "dependency missing"
 		},
 		"changelog": {
 			"window_title": "Module Changelogs",
@@ -346,7 +356,8 @@
 			"moduleLocksName": "Locked Modules",
 			"moduleLocksHint": "Modules listed here are locked in BBMM and cannot be enabled or disabled (manually or via bulk actions).",
 			"autoForceReloadName": "Force Player Reload",
-			"autoForceReloadHint": "Force instant reload to players when settings new settings are locked/synced"
+			"autoForceReloadHint": "Force instant reload to players when settings new settings are locked/synced",
+			"importExportHint": "Import/export presets and lists."
 		},	
 		"macro": {
 			"columnName": "Name",
@@ -472,6 +483,14 @@
 			"filter": "Filter...",
 			"softLock": "Soft Lock",
 			"lock": "Lock"
+		},
+		"_importExport": {
+			"allPresets": "All Presets",
+			"whichPreset": "Which preset do you want to export",
+			"exportedSettingsPreset": "Exported settings preset.",
+			"importedList": "Imported List.",
+			"exportModulePreset": "Export Module Preset",
+			"exportSettingsPreset": "Export Settings Preset"
 		}
 	}
 }
