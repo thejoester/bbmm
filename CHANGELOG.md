@@ -4,8 +4,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<<<<<<< Updated upstream
-=======
 ## [0.6.4] - 2026-01-11
 ### Changed
 - **BBMM Buttons:**
@@ -28,7 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Localization:**
   - Updated Italian localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+is%3Aopen+author%3AGregoryWarn)!
 
->>>>>>> Stashed changes
 ## [0.6.1] - 2026-01-02
 ### Added
 - **Setting Sync:**
