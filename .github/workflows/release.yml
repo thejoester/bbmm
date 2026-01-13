@@ -70,7 +70,7 @@ jobs:
           zip -r dist/bbmm.zip \
             module.json README.md "$LIC" CHANGELOG.md \
             scripts/ packs/ styles/ lang/ assets/ \
-            -x "packs/*/_source/*"
+            -x "packs/*/_source/*" \
             -x "storage/**"
 
       - uses: release-flow/keep-a-changelog-action@v3
