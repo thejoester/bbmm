@@ -69,8 +69,9 @@ jobs:
           if [ -f LICENSE.md ]; then LIC="LICENSE.md"; else LIC="LICENSE"; fi
           zip -r dist/bbmm.zip \
             module.json README.md "$LIC" CHANGELOG.md \
-            scripts/ packs/ styles/ lang/ assets/ storage/ \
+            scripts/ packs/ styles/ lang/ assets/ \
             -x "packs/*/_source/*"
+            -x "storage/**"
 
       - uses: release-flow/keep-a-changelog-action@v3
         id: changelog
