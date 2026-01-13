@@ -211,7 +211,6 @@ async function hlp_loadPresets() {
 		Inclusions Migration
 	========================================================================= */
 	DL("settings.js | hlp_loadPresets(): inclusions migration check starting");
-
 	
 	if (!hasFlag(FLAG_INC)) {
 		DL(2, "settings.js | hlp_loadPresets(): BEGINNING INCLUSIONS MIGRATION ---");
@@ -272,8 +271,6 @@ async function hlp_loadPresets() {
 		Exclusions Migration
 	========================================================================= */
 	DL("settings.js | hlp_loadPresets(): EXCLUSIONS MIGRATION CHECK:");
-
-	// await ensureStorageFileIn("lists", FILE_EXC, { settings: [], modules: [] });
 
 	if (!hasFlag(FLAG_EXC)) {
 		DL(2, "settings.js | hlp_loadPresets(): BEGINNING EXCLUSIONS MIGRATION ---");
