@@ -54,7 +54,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>Module Presets allow you to <strong data-start=\"306\" data-end=\"348\">save and load groups of active modules</strong>.<br data-start=\"349\" data-end=\"352\" /></p><p>This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><p></p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current module states into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current module state </strong>to the preset.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li><li><p><strong>Import/Export: </strong>Presets are specific to the game world, to use a preset in another game world you can export/import.</p></li></ul><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Import / Export</span></strong></span></h3><ul><li><p><strong>Export:</strong> exports <strong><span style=\"text-decoration:underline\">current module state</span></strong> to a .json file. To export a specific preset you must load it first, then export to .json.</p></li><li><p><strong>Import:</strong> Imports .json file into a preset.</p></li><li><p><strong>Note:</strong> Once you import the preset, you must choose it and load it for it to be activated.</p></li></ul><h3>Also see: </h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclusion Manager}</p><p></p>"
+        "content": "<p>Module Presets allow you to <strong data-start=\"306\" data-end=\"348\">save and load groups of active modules</strong>.<br data-start=\"349\" data-end=\"352\" /></p><p>This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><p></p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current module states into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current module state </strong>to the preset.</p></li><li><p><strong>Rename Preset:</strong> Will prompt you to enter a new name, if that name already exists will prompt to overwrite existing or rename again.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li></ul><h3>Also see:</h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.w87gAp63EPHThdk4]{Import / Export}</p><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}</p><p></p>"
       },
       "video": {
         "controls": true,
@@ -71,11 +71,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.348",
+        "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757733057278,
-        "modifiedTime": 1757742304573,
+        "modifiedTime": 1768213816527,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.ALKM5KUILeJAZi62"
@@ -93,7 +93,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>Setting Presets allow you to save your current settings state into a preset.</p><p><br data-start=\"349\" data-end=\"352\" />This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current settings state into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current settings</strong> to the preset.</p></li><li><p><strong>Rename Preset:</strong> Will prompt you to enter a new name, if that name already exists will prompt to overwrite existing or rename again. </p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li><li><p><strong>Import/Export: </strong>Presets are specific to the game world, to use a preset in another game world you can export/import.</p></li></ul><h3>Also See</h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.w87gAp63EPHThdk4]{Import / Export}</p><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}</p>"
+        "content": "<p>Setting Presets allow you to save your current settings state into a preset.</p><p><br data-start=\"349\" data-end=\"352\" />This is useful when you switch between campaigns, test setups, or want to quickly return to a known-good configuration.</p><h2>How it works:</h2><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Presets</span></strong></span></h3><ul><li><p><strong>Save Preset:</strong> You can save the current settings state into a preset by typing a name and clicking \"Save Current\".</p></li><li><p><strong>Load Preset: </strong>You can load a saved preset by selecting a preset and clicking \"Load\".</p></li><li><p><strong>Update Preset: </strong>If you want to update an existing preset, select the preset and click update, this will save the <strong>current settings</strong> to the preset.</p></li><li><p><strong>Rename Preset:</strong> Will prompt you to enter a new name, if that name already exists will prompt to overwrite existing or rename again.</p></li><li><p><strong>Delete Preset: </strong>Deletes the preset (crazy I know!), <span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">this is not reversible!</span></span></p></li></ul><h3>Also See</h3><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.w87gAp63EPHThdk4]{Import / Export}</p><p>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}</p>"
       },
       "video": {
         "controls": true,
@@ -114,7 +114,7 @@
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757733847774,
-        "modifiedTime": 1768212150246,
+        "modifiedTime": 1768213739433,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.mB68DCCQ83f9d3EQ"
@@ -327,7 +327,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>Big Bad Module Manager macros found in the compendium:</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe]{View Changelog Report} - Launch the changelog report manually.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.KKjNNKp07HamxcUO]{BBMM: Reset Changelog} - Reset the \"seen\" state of changelogs and launch Changelog Report.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.sc6d0g6syYz3nEbB]{BBMM: Setting Preset Inspector} - allows you to inspect a preset, see the saved settings and values contained inside for troubleshooting purposes.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector} - Tool to view module settings to see both visible and hidden settings, and their current values. This is a read only tool. May be useful for deciding what to put on inclusion / exclusion manager.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.cwDZlfhhZAZaUPER]{BBMM: Keybind inspector} - Tool to inspect keybiniding details.</p><p></p><p></p>"
+        "content": "<p>Big Bad Module Manager macros found in the compendium:</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe]{View Changelog Report} - Launch the changelog report manually.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.KKjNNKp07HamxcUO]{BBMM: Reset Changelog} - Reset the \"seen\" state of changelogs and launch Changelog Report.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.sc6d0g6syYz3nEbB]{BBMM: Setting Preset Inspector} - allows you to inspect a preset, see the saved settings and values contained inside for troubleshooting purposes.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.MclNrZrBvfKhgRB5]{BBMM: Game Settings Inspector} - Tool to view module settings to see both visible and hidden settings, and their current values. This is a read only tool. May be useful for deciding what to put on inclusion / exclusion manager.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.cwDZlfhhZAZaUPER]{BBMM: Keybind inspector} - Tool to inspect keybiniding details.</p><hr /><p><strong>Also see:</strong> @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.fBhc3e12eZRtNnSd]{How To: Migrate presets}</p>"
       },
       "video": {
         "controls": true,
@@ -348,8 +348,8 @@
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757800788174,
-        "modifiedTime": 1767100476958,
-        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+        "modifiedTime": 1768307455519,
+        "lastModifiedBy": "sDmTHDFOKZoe85XE"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Tw7LX79cvGnJ3F67"
     },
@@ -561,7 +561,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>*As of v0.6.5 the Import and Export functions for presets have moved to their own section under the settings menu.</p><p></p><h2>Module/Setting Presets</h2><p><strong>Import: </strong></p><ul><li><p>Will import all presets from the selected exported .json file. </p></li><li><p>If importing a preset with a name that already exists it will be renamed. </p></li></ul><p><strong>Export:</strong> </p><ul><li><p>When exporting you will be prompted to export all presets, or select a specific preset to export.</p></li></ul><h2>Inclusion / Exclusion lists</h2><ul><li><p>When exporting or importing inclusion/exclusion lists, the entire list will be imported/exported. </p></li><li><p>When importing, it will overwrite the current inclusion/exclusion list. </p></li></ul>"
+        "content": "<p>*As of v0.6.5 the Import and Export functions for presets have moved to their own section under the settings menu.</p><ul><li><p><strong>Note:</strong> Importing a preset does not load it automatically. After importing you will have to load the preset.</p></li></ul><h2>Module/Setting Presets</h2><p><strong>Import:</strong></p><ul><li><p>Will import all presets from the selected exported .json file.</p></li><li><p>If importing a preset with a name that already exists it will be renamed.</p></li></ul><p><strong>Export:</strong></p><ul><li><p>When exporting you will be prompted to export all presets, or select a specific preset to export.</p></li></ul><h2>Inclusion / Exclusion lists</h2><ul><li><p>When exporting or importing inclusion/exclusion lists, the entire list will be imported/exported.</p></li><li><p>When importing, it will overwrite the current inclusion/exclusion list.</p></li></ul>"
       },
       "video": {
         "controls": true,
@@ -582,7 +582,7 @@
         "systemId": "pf2e",
         "systemVersion": "7.8.0",
         "createdTime": 1768201087450,
-        "modifiedTime": 1768212007587,
+        "modifiedTime": 1768213815008,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.w87gAp63EPHThdk4"

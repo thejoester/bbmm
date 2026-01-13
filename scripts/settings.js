@@ -1721,8 +1721,20 @@ Hooks.once("ready", async () => {
 	try { await showPresetsMovedNotice(); } catch (err) { DL(2, "settings.js | ready | presets moved notice failed", err); }
 	
 	// Hook into settings and manage modules window to add app button in header 
-	Hooks.on("renderSettingsConfig", (app, html) => injectBBMMHeaderButton(html));
-	Hooks.on("renderModuleManagement", (app, html) => injectBBMMHeaderButton(html));
+	Hooks.on("renderSettingsConfig", (app, html) => {
+		try {
+			hlp_injectHeaderHelpButton(app, {
+				uuid: BBMM_README_UUID,
+				iconClass: "fas fa-circle-question",
+				title: LT.buttons.help?.() ?? "Help"
+			});
+			injectBBMMHeaderButton(html);
+		} catch (e) {
+			DL(2, "settings.js | renderSettingsConfig: help or menu injection failed", e);
+		}
+		
+	});
+	Hooks.on("renderModuleManagement", (app, html) => { try { injectBBMMHeaderButton(html) } catch (e) { DL(2, "settings.js | renderModuleManagement: menu injection failed", e); } });
 	
 });
 
