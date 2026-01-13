@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5-test2] - 2026-01-12
+### Fixed
+- clearing of inclusions and exclusions
+- Hidden settings sync manager button functionality
+- Help button on settings window
+
 ## [0.6.5-test1] - 2026-01-12
 ### Changed
 - **Import/Export:**
