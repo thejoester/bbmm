@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.6.5-test3] - 2026-01-14
+### Fixed
+- This is just another test to ensure settings are not overwritten
 
+## [0.6.5-test3] - 2026-01-14
 ### Fixed
 - Due to an issue found in versions 0.6.0 - 0.6.4 causing persistent storage to be reset upon each update, major changes had to be made to the persistent storage. 
   - This update will, unfortunately reset the module and settings presets. Data from prior to the v0.6.0 will still be avalable to import in using the macros in the compendium. 
