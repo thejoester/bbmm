@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.6.5-test3] - 2026-01-14
 ### Fixed
-- This is just another test to ensure settings are not overwritten
+- This is just another test to ensure settings are not overwritten.
 
 ## [0.6.5-test3] - 2026-01-14
 ### Fixed
