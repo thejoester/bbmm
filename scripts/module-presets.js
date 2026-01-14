@@ -189,7 +189,7 @@ async function hlp_fetchJSON(url) {
 async function hlp_readPresetsFromStorage() {
 	// Try browse first (optional convenience)
 	try {
-		const dir = `modules/${BBMM_ID}/storage/presets`;
+		const dir = `bbmm-data`;
 		const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
 
 		const match = (browse?.files || []).find(f => String(f).endsWith(`/${MODULE_PRESETS_STORAGE_FILE}`));
@@ -210,7 +210,7 @@ async function hlp_readPresetsFromStorage() {
 
 	// Direct fetch fallback
 	try {
-		const url = `modules/${BBMM_ID}/storage/presets/${MODULE_PRESETS_STORAGE_FILE}`;
+		const url = foundry.utils.getRoute(`bbmm-data/${MODULE_PRESETS_STORAGE_FILE}`);
 		const data = await hlp_fetchJSON(url);
 		return hlp_sanitizePresetMap(data);
 	} catch (_err2) {
@@ -226,7 +226,7 @@ async function hlp_writePresetsToStorage(presets) {
 	const file = new File([payload], MODULE_PRESETS_STORAGE_FILE, { type: "application/json" });
 
 	try {
-		const res = await FilePicker.uploadPersistent(BBMM_ID, MODULE_PRESETS_STORAGE_DIR, file, {}, { notify: false });
+		const res = await FilePicker.upload("data", "bbmm-data", file, { notify: false });
 
 		if (!res || (!res.path && !res.url)) {
 			DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent returned no path/url", res);

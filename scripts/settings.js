@@ -25,70 +25,71 @@ export const EXPORT_SKIP = new Map([
 
 // Preset Storage Migration =====================================================
 // !!! REMOVE after version 0.8.0 !!!
-async function hlp_loadPresets() {
+async function hlp_migrateLists(){
 	if (!game.user.isGM) return; // GM Only	
 
 	// constants
-	const FLAG_INC = "inclusionsPersistentStorageMigration";
-	const FLAG_EXC = "exclusionsPersistentStorageMigration";
+	const FLAG = "listsMigration_v0_6_5";
 	const FILE_INC = "user-inclusions.json";
 	const FILE_EXC = "user-exclusions.json";
 	const worldTitleRaw = String(game.world?.title || "Unknown World").trim();
 	const worldTitle = worldTitleRaw || "Unknown World";
+	let INC_MIGRATED = false;
+	let EXC_MIGRATED = false;
 
 	/* ==================================================================
 		HELPERS
 	================================================================== */
 
-	// Get storage URL for a given subdir and filename
-	function storageUrl(subdir, filename) {
-		return `modules/${BBMM_ID}/storage/${subdir}/${filename}`;
+	// Get storage URL for a given filename
+	function storageUrl(filename) {
+		return foundry.utils.getRoute(`bbmm-data/${filename}`);
 	}
 
 	// Read object from storage file (returns null on failure/not found)
-	async function readStorageObject(subdir, filename) {
-		const url = storageUrl(subdir, filename);
+	async function readStorageObject(filename) {
+		const url = storageUrl(filename);
 
 		try {
 			const res = await fetch(url, { cache: "no-store" });
 			if (!res.ok) {
 				// Avoid noisy logs for expected "missing file" cases
 				if (res.status !== 404) {
-					DL(2, `settings.js | hlp_loadPresets(): readStorageObject(): fetch not ok for "${url}" (${res.status})`);
+					DL(2, `settings.js | hlp_migrateLists(): readStorageObject(): fetch not ok for "${url}" (${res.status})`);
 				}
 				return null;
 			}
 			const data = await res.json();
 			return data;
 		} catch (err) {
-			DL(2, `settings.js | hlp_loadPresets(): readStorageObject(): failed for "${url}"`, err);
+			DL(2, `settings.js | hlp_migrateLists(): readStorageObject(): failed for "${url}"`, err);
 			return null;
 		}
 	}
 
 	// Write object to storage file (returns true on success)
-	async function writeStorageObject(subdir, filename, obj) {
+	async function writeStorageObject(filename, obj) {
 		const payload = JSON.stringify(obj ?? {}, null, 2);
 		const file = new File([payload], filename, { type: "application/json" });
 
 		try {
-			const res = await FilePicker.uploadPersistent(BBMM_ID, subdir, file, {}, { notify: false });
+			const res = await FilePicker.upload("data", "bbmm-data", file, { notify: false });
 			if (!res || (!res.path && !res.url)) {
-				DL(3, `settings.js | hlp_loadPresets(): writeStorageObject(): upload returned no path/url for "${subdir}/${filename}"`, res);
+				DL(3, `settings.js | hlp_migrateLists(): writeStorageObject(): upload returned no path/url for "${filename}"`, res);
 				return false;
 			}
-			DL(`settings.js | hlp_loadPresets(): writeStorageObject(): wrote "${subdir}/${filename}"`, res);
+			DL(`settings.js | hlp_migrateLists(): writeStorageObject(): wrote "${filename}"`, res);
 			return true;
 		} catch (err) {
-			DL(3, `settings.js | hlp_loadPresets(): writeStorageObject(): uploadPersistent failed for "${subdir}/${filename}"`, err);
+			DL(3, `settings.js | hlp_migrateLists(): writeStorageObject(): upload failed for "${filename}"`, err);
 			return false;
 		}
 	}
 
 	// Check if storage file exists (fetchable)
-	async function storageFileExistsIn(subdir, filename) {
-		const dir = `modules/${BBMM_ID}/storage/${subdir}`;
-		const url = storageUrl(subdir, filename);
+	async function storageFileExistsIn(filename) {
+		const dir = "bbmm-data";
+		const url = storageUrl(filename);
 
 		// Try browse first (more reliable in Foundry hosting)
 		try {
@@ -96,7 +97,7 @@ async function hlp_loadPresets() {
 			const files = Array.isArray(res?.files) ? res.files : [];
 			if (files.some(f => String(f).endsWith(`/${filename}`))) return true;
 		} catch (err) {
-			DL(2, `settings.js | hlp_loadPresets(): storageFileExistsIn(): browse failed for "${dir}", falling back to fetch`, err);
+			DL(2, `settings.js | hlp_migrateLists(): storageFileExistsIn(): browse failed for "${dir}", falling back to fetch`, err);
 		}
 
 		// Fallback: fetch
@@ -207,124 +208,149 @@ async function hlp_loadPresets() {
 		await game.settings.set(BBMM_ID, "bbmmFlags", current);
 	}
 
-	/* ========================================================================= 
-		Inclusions Migration
-	========================================================================= */
-	DL("settings.js | hlp_loadPresets(): inclusions migration check starting");
-	
-	if (!hasFlag(FLAG_INC)) {
-		DL(2, "settings.js | hlp_loadPresets(): BEGINNING INCLUSIONS MIGRATION ---");
+	/* ==================================================================
+		MIGRATION LOGIC
+	================================================================== */
+	if (!hasFlag(FLAG)) {
+		DL(2, `settings.js | hlp_migrateLists(): MIGRATION FLAG (${FLAG}) NOT SET - BEGINNING MIGRATION ---`);
 
-		const legacyRaw = game.settings.get(BBMM_ID, "userInclusions");
-		const legacy = sanitizeInclusions(legacyRaw);
+		// Clean up 
+		{		
+			const removedFlags = [
+				"exclusionsPersistentStorageMigration",
+				"inclusionsPersistentStorageMigration"
+			];
 
-		DL(`settings.js | hlp_loadPresets(): exclusions legacy sanitized Settings: ${legacy.settings.length}, Modules: ${legacy.modules.length}`, {
-			legacySettings: legacy.settings,
-			legacyModules: legacy.modules
-		});
+			const flags = foundry.utils.duplicate(game.settings.get("bbmm", "bbmmFlags") ?? {});
+			for (const key of removedFlags) delete flags[key];
+			await game.settings.set("bbmm", "bbmmFlags", flags);
 
-		// Ensure persistent storage file exists (do not overwrite if it already exists)
-		const incExists = await storageFileExistsIn("lists", FILE_INC);
-		if (!incExists) {
-			try { await writeStorageObject("lists", FILE_INC, { settings: [], modules: [] }); DL("settings.js | hlp_loadPresets(): Created inclusions storage file"); }
-			catch (err) { DL(3, "settings.js | hlp_loadPresets(): FAILED ensuring inclusions storage file exists:", err);}
+			DL("settings.js | hlp_migrateLists(): Cleaned up old bbmmFlags entries", { removedFlags });
 		}
 
-		const storageRaw = await readStorageObject("lists", FILE_INC);
-		const storage = sanitizeInclusions(storageRaw);
+		/* ========================================================================= 
+			Inclusions Migration
+		========================================================================= */
+		{
+			DL(2, "settings.js | hlp_migrateLists(): BEGINNING INCLUSIONS MIGRATION ---");
 
-		DL("settings.js | hlp_loadPresets(): inclusions storage sanitized", {
-			storageSettings: storage.settings.length,
-			storageModules: storage.modules.length
-		});
+			const legacyRaw = game.settings.get(BBMM_ID, "userInclusions");
+			const legacy = sanitizeInclusions(legacyRaw);
 
-		let addedSettings = 0;
-		let addedModules = 0;
+			DL(`settings.js | hlp_migrateLists(): inclusions legacy sanitized Settings: ${legacy.settings.length}, Modules: ${legacy.modules.length}`, {
+				legacySettings: legacy.settings,
+				legacyModules: legacy.modules
+			});
 
-		if (legacy.settings.length) {
-			addedSettings = mergePairArraysUnique(storage.settings, legacy.settings);
-			DL("settings.js | hlp_loadPresets(): inclusions merged settings", { addedSettings });
-		}
-
-		if (legacy.modules.length) {
-			addedModules = mergeStringArraysUnique(storage.modules, legacy.modules);
-			DL("settings.js | hlp_loadPresets(): inclusions merged modules", { addedModules });
-		}
-
-		if (addedSettings || addedModules) {
-			const ok = await writeStorageObject("lists", FILE_INC, storage);
-			if (ok) {
-				await setFlag(FLAG_INC, true);
-				DL("settings.js | hlp_loadPresets(): migrated inclusions to storage", { addedSettings, addedModules });
-			} else {
-				DL(3, "settings.js | hlp_loadPresets(): FAILED migrating inclusions to storage (flag not set, will retry next start)");
+			// Ensure persistent storage file exists (do not overwrite if it already exists)
+			const incExists = await storageFileExistsIn(FILE_INC);
+			if (!incExists) {
+				try { await writeStorageObject(FILE_INC, { settings: [], modules: [] }); DL("settings.js | hlp_migrateLists(): Created inclusions storage file"); }
+				catch (err) { DL(3, "settings.js | hlp_migrateLists(): FAILED ensuring inclusions storage file exists:", err);}
 			}
-		} else {
-			await setFlag(FLAG_INC, true);
-			DL("settings.js | hlp_loadPresets(): no inclusions to migrate (or all duplicates), flag set");
-		}
-	} else {
-		DL("settings.js | hlp_loadPresets(): SKIPPING INCLUSIONS MIGRATION - flag already set");
-	}
 
-	/* ========================================================================= 
-		Exclusions Migration
-	========================================================================= */
-	DL("settings.js | hlp_loadPresets(): EXCLUSIONS MIGRATION CHECK:");
+			const storageRaw = await readStorageObject(FILE_INC);
+			const storage = sanitizeInclusions(storageRaw);
 
-	if (!hasFlag(FLAG_EXC)) {
-		DL(2, "settings.js | hlp_loadPresets(): BEGINNING EXCLUSIONS MIGRATION ---");
+			DL("settings.js | hlp_migrateLists(): inclusions storage sanitized", {
+				storageSettings: storage.settings.length,
+				storageModules: storage.modules.length
+			});
 
-		const legacyRaw = game.settings.get(BBMM_ID, "userExclusions");
-		const legacy = sanitizeExclusions(legacyRaw);
+			let addedSettings = 0;
+			let addedModules = 0;
 
-		// Ensure persistent storage file exists (do not overwrite if it already exists)
-		const excExists = await storageFileExistsIn("lists", FILE_EXC);
-		if (!excExists) {
-			try { await writeStorageObject("lists", FILE_EXC, { settings: [], modules: [] }); DL("settings.js | hlp_loadPresets(): Created exclusions storage file"); }
-			catch (err) { DL(3, "settings.js | hlp_loadPresets(): FAILED ensuring exclusions storage file exists:", err);}
-		}
-
-		DL(`settings.js | hlp_loadPresets(): exclusions legacy sanitized Settings: ${legacy.settings.length}, Modules: ${legacy.modules.length}`, {
-			legacySettings: legacy.settings,
-			legacyModules: legacy.modules
-		});
-
-		const storageRaw = await readStorageObject("lists", FILE_EXC);
-		const storage = sanitizeExclusions(storageRaw);
-
-		DL("settings.js | hlp_loadPresets(): exclusions storage sanitized", {
-			storageSettings: storage.settings.length,
-			storageModules: storage.modules.length
-		});
-
-		let addedSettings = 0;
-		let addedModules = 0;
-
-		if (legacy.settings.length) {
-			addedSettings = mergePairArraysUnique(storage.settings, legacy.settings);
-			DL("settings.js | hlp_loadPresets(): exclusions merged settings", { addedSettings });
-		}
-
-		if (legacy.modules.length) {
-			addedModules = mergeStringArraysUnique(storage.modules, legacy.modules);
-			DL("settings.js | hlp_loadPresets(): exclusions merged modules", { addedModules });
-		}
-
-		if (addedSettings || addedModules) {
-			const ok = await writeStorageObject("lists", FILE_EXC, storage);
-			if (ok) {
-				await setFlag(FLAG_EXC, true);
-				DL("settings.js | hlp_loadPresets(): migrated exclusions to storage", { addedSettings, addedModules });
-			} else {
-				DL(3, "settings.js | hlp_loadPresets(): FAILED migrating exclusions to storage (flag not set, will retry next start)");
+			if (legacy.settings.length) {
+				addedSettings = mergePairArraysUnique(storage.settings, legacy.settings);
+				DL("settings.js | hlp_migrateLists(): inclusions merged settings", { addedSettings });
 			}
-		} else {
-			await setFlag(FLAG_EXC, true);
-			DL("settings.js | hlp_loadPresets(): no exclusions to migrate (or all duplicates), flag set");
+
+			if (legacy.modules.length) {
+				addedModules = mergeStringArraysUnique(storage.modules, legacy.modules);
+				DL("settings.js | hlp_migrateLists(): inclusions merged modules", { addedModules });
+			}
+
+			if (addedSettings || addedModules) {
+				const ok = await writeStorageObject(FILE_INC, storage);
+				if (ok) {
+					INC_MIGRATED = true;
+					DL("settings.js | hlp_migrateLists(): migrated inclusions to storage", { addedSettings, addedModules });
+				} else {
+					DL(3, "settings.js | hlp_migrateLists(): FAILED migrating inclusions to storage (flag not set, will retry next start)");
+				}
+			} else {
+				INC_MIGRATED = true;
+				DL("settings.js | hlp_migrateLists(): no inclusions to migrate (or all duplicates), flag set");
+			}
 		}
+		/* ========================================================================= 
+			Exclusions Migration
+		========================================================================= */
+		{
+			DL(2, "settings.js | hlp_migrateLists(): BEGINNING LISTS MIGRATION ---");
+
+			const legacyRaw = game.settings.get(BBMM_ID, "userExclusions");
+			const legacy = sanitizeExclusions(legacyRaw);
+
+			// Ensure persistent storage file exists (do not overwrite if it already exists)
+			const excExists = await storageFileExistsIn(FILE_EXC);
+			if (!excExists) {
+				try { await writeStorageObject( FILE_EXC, { settings: [], modules: [] }); DL("settings.js | hlp_migrateLists(): Created exclusions storage file"); }
+				catch (err) { DL(3, "settings.js | hlp_migrateLists(): FAILED ensuring exclusions storage file exists:", err);}
+			}
+
+			DL(`settings.js | hlp_migrateLists(): exclusions legacy sanitized Settings: ${legacy.settings.length}, Modules: ${legacy.modules.length}`, {
+				legacySettings: legacy.settings,
+				legacyModules: legacy.modules
+			});
+
+			const storageRaw = await readStorageObject(FILE_EXC);
+			const storage = sanitizeExclusions(storageRaw);
+
+			DL("settings.js | hlp_migrateLists(): exclusions storage sanitized", {
+				storageSettings: storage.settings.length,
+				storageModules: storage.modules.length
+			});
+
+			let addedSettings = 0;
+			let addedModules = 0;
+
+			if (legacy.settings.length) {
+				addedSettings = mergePairArraysUnique(storage.settings, legacy.settings);
+				DL("settings.js | hlp_migrateLists(): exclusions merged settings", { addedSettings });
+			}
+
+			if (legacy.modules.length) {
+				addedModules = mergeStringArraysUnique(storage.modules, legacy.modules);
+				DL("settings.js | hlp_migrateLists(): exclusions merged modules", { addedModules });
+			}
+
+			if (addedSettings || addedModules) {
+				const ok = await writeStorageObject(FILE_EXC, storage);
+				if (ok) {
+					EXC_MIGRATED = true;
+					DL("settings.js | hlp_migrateLists(): migrated exclusions to storage", { addedSettings, addedModules });
+				} else {
+					DL(3, "settings.js | hlp_migrateLists(): FAILED migrating exclusions to storage (flag not set, will retry next start)");
+				}
+			} else {
+				EXC_MIGRATED = true;
+				DL("settings.js | hlp_migrateLists(): no exclusions to migrate (or all duplicates), flag set");
+			}
+
+			DL(2, "settings.js | hlp_migrateLists(): LISTS MIGRATION COMPLETE ---");
+		}
+
+		// Final flag check
+		if (INC_MIGRATED && EXC_MIGRATED) {
+			await setFlag(FLAG, true);
+			DL("settings.js | hlp_migrateLists(): LISTS MIGRATION SUCCESS - flag set");
+		} else {	
+			DL(3, "settings.js | hlp_migrateLists(): LISTS MIGRATION INCOMPLETE - flag NOT set");
+		}
+
 	} else {
-		DL("settings.js | hlp_loadPresets(): SKIPPING EXCLUSIONS MIGRATION - flag already set");
+		DL("settings.js | hlp_migrateLists(): SKIPPING LISTS MIGRATION - flag already set");
 	}
 }
 
@@ -392,7 +418,7 @@ async function showPresetsMovedNotice() {
 	if (!game.user.isGM) return;
 
 	const flags = game.settings.get(BBMM_ID, "bbmmFlags");
-	if (flags && typeof flags === "object" && flags["0.6.0-hidepresetnotice"]) return;
+	if (flags && typeof flags === "object" && flags["0.6.5-hidepresetnotice"]) return;
 
 	const content = `
 		<style>
@@ -419,7 +445,7 @@ async function showPresetsMovedNotice() {
 
 		<div class="bbmm-presets-moved-notice">
 			<h2>${LT.presetNoticePleaseRead()}</h2>
-			<p>${LT.presetNoticeBody()}</p>
+			<p>${LT.presetNoticeBody_0_6_5()}</p>
 		</div>
 	`;
 
@@ -933,7 +959,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 				if (action === "bbmm-mod-export") {
 					const FN = "settings.js | BBMMImportExportDialog._onRender(): module preset export chooser:";
 					try {
-						const url = `modules/${BBMM_ID}/storage/presets/module-presets.json`;
+						const url = `bbmm-data/module-presets.json`;
 						const res = await fetch(url, { cache: "no-store" });
 						if (!res.ok) {
 							DL(3, `${FN} fetch not ok`, { url, status: res.status });
@@ -1014,7 +1040,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 				if (action === "bbmm-set-export") {
 					const FN = "settings.js | BBMMImportExportDialog._onRender(): settings preset export chooser:";
 					try {
-						const url = `modules/${BBMM_ID}/storage/presets/settings-presets.json`;
+						const url = `bbmm-data/settings-presets.json`;
 						const res = await fetch(url, { cache: "no-store" });
 						if (!res.ok) {
 							DL(3, `${FN} fetch not ok`, { url, status: res.status });
@@ -1167,7 +1193,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 
 // Export a storage list file (inclusions/exclusions)
 async function bbmm_exportListFile(storageFile, exportName) {
-	const url = `modules/${BBMM_ID}/storage/lists/${storageFile}`;
+	const url = `bbmm-data/${storageFile}`;
 	const data = await fetch(url, { cache: "no-store" }).then(r => r.json());
 
 	const d = new Date();
@@ -1195,18 +1221,16 @@ async function bbmm_importListFile(storageFile) {
 	const payload = JSON.stringify(data ?? {}, null, 2);
 	const f = new File([payload], storageFile, { type: "application/json" });
 
-	const res = await FilePicker.uploadPersistent(
-		BBMM_ID,
-		"lists",
+	const res = await FilePicker.upload(
+		"data",
+		"bbmm-data",
 		f,
-		{},
 		{ notify: false }
 	);
 
 	DL("settings.js | bbmm_importListFile(): imported list file", { storageFile, res });
 	ui.notifications.info(LT._importExport.importedList());
 }
-
 
 Hooks.once("init", () => {
 
@@ -1705,8 +1729,19 @@ Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
 
+	// Ensure bbmm-data folder exists (Data/bbmm-data)
+	try {
+		await FilePicker.createDirectory("data", "bbmm-data");
+		DL("settings.js | Directory 'bbmm-data' exists!");
+	} catch (err) {
+		const msg = String(err?.message ?? err);
+		if (!msg.toLowerCase().includes("exist")) { // ignore "already exists" errors
+			DL(2, "settings.js | createDirectory failed for bbmm-data", err);
+		}
+	}
+
 	// migrate inclusions/exclusions to storage - Remove after version 0.8.0
-	try { await hlp_loadPresets(); DL(`settings.js | Inclusions/Exclusions migrated`)} catch (err) { DL(3, "settings.js | Inclusions/Exclusions migration failed:", err?.message ?? err); }
+	try { await hlp_migrateLists(); DL(`settings.js | Inclusions/Exclusions migrated`)} catch (err) { DL(3, "settings.js | Inclusions/Exclusions migration failed:", err?.message ?? err); }
 
 	// Prime exclusions cache for getSkipMap() users
 	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }1

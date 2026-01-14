@@ -340,7 +340,7 @@ export function hlp_injectHeaderHelpButton(app, opts = {}) {
 export async function bbmm_exportModulePresetsAll() {
 	const FN = "helpers.js | bbmm_exportModulePresetsAll():";
 	const storageFile = "module-presets.json";
-	const url = `modules/${BBMM_ID}/storage/presets/${storageFile}`;
+	const url = `bbmm-data/${storageFile}`;
 
 	try {
 		const res = await fetch(url, { cache: "no-store" });
@@ -367,9 +367,8 @@ export async function bbmm_exportModulePresetsAll() {
 // import Module presets
 export async function bbmm_importModulePresetsAll() {
 	const FN = "helpers.js | bbmm_importModulePresetsAll():";
-	const storageSubdir = "presets";
 	const storageFile = "module-presets.json";
-	const url = `modules/${BBMM_ID}/storage/presets/${storageFile}`;
+	const url = `bbmm-data/${storageFile}`;
 
 	const file = await hlp_pickLocalJSONFile();
 	if (!file) return;
@@ -444,7 +443,7 @@ export async function bbmm_importModulePresetsAll() {
 	try {
 		const payload = JSON.stringify(current ?? {}, null, 2);
 		const f = new File([payload], storageFile, { type: "application/json" });
-		const res = await FilePicker.uploadPersistent(BBMM_ID, storageSubdir, f, {}, { notify: false });
+		const res = await FilePicker.upload("data", `bbmm-data`, f, { notify: false });
 
 		if (!res || (!res.path && !res.url)) {
 			DL(3, `${FN} upload returned no path/url`, res);
@@ -464,7 +463,7 @@ export async function bbmm_importModulePresetsAll() {
 export async function bbmm_exportSettingsPresetsAll() {
 	const FN = "helpers.js | bbmm_exportSettingsPresetsAll():";
 	const storageFile = "settings-presets.json";
-	const url = `modules/${BBMM_ID}/storage/presets/${storageFile}`;
+	const url = `bbmm-data/${storageFile}`;
 
 	try {
 		const res = await fetch(url, { cache: "no-store" });
@@ -490,9 +489,8 @@ export async function bbmm_exportSettingsPresetsAll() {
 // import Settings presets (merge into existing + convert old single-preset format)
 export async function bbmm_importSettingsPresetsAll() {
 	const FN = "helpers.js | bbmm_importSettingsPresetsAll():";
-	const storageSubdir = "presets";
 	const storageFile = "settings-presets.json";
-	const url = `modules/${BBMM_ID}/storage/presets/${storageFile}`;
+	const url = `bbmm-data/${storageFile}`;
 
 	const file = await hlp_pickLocalJSONFile();
 	if (!file) return;
@@ -613,7 +611,7 @@ export async function bbmm_importSettingsPresetsAll() {
 	try {
 		const payload = JSON.stringify(current ?? {}, null, 2);
 		const f = new File([payload], storageFile, { type: "application/json" });
-		const res = await FilePicker.uploadPersistent(BBMM_ID, storageSubdir, f, {}, { notify: false });
+		const res = await FilePicker.upload("data", `bbmm-data`, f, { notify: false });
 
 		if (!res || (!res.path && !res.url)) {
 			DL(3, `${FN} upload returned no path/url`, res);

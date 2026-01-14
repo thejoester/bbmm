@@ -11,7 +11,6 @@ import { copyPlainText } from "./macros.js";
 import { hlp_injectHeaderHelpButton, invalidateSkipMap } from "./helpers.js";
 
 // CONSTANTS
-const EXC_STORAGE_SUBDIR = "lists";
 const EXC_STORAGE_FILE = "user-exclusions.json";
 let _excCache = null;
 
@@ -31,7 +30,7 @@ Object.assign(globalThis.bbmm, {
 
 // returns a Promise resolving to {settings: Array, modules: Array}
 function _excStorageUrl() {
-	return `modules/${BBMM_ID}/storage/${EXC_STORAGE_SUBDIR}/${EXC_STORAGE_FILE}`;
+	return foundry.utils.getRoute(`bbmm-data/${EXC_STORAGE_FILE}`);
 }
 
 // Read exclusions from persistent storage (FilePicker)
@@ -73,7 +72,7 @@ export async function hlp_writeUserExclusions(obj) {
 	const file = new File([payload], EXC_STORAGE_FILE, { type: "application/json" });
 
 	try {
-		const res = await FilePicker.uploadPersistent(BBMM_ID, EXC_STORAGE_SUBDIR, file, {}, { notify: false });
+		const res = await FilePicker.upload("data", "bbmm-data", file, { notify: false });
 		if (!res || (!res.path && !res.url)) {
 			DL(3, "exclusions.js | hlp_writeUserExclusions(): upload returned no path/url", res);
 			return false;
@@ -1403,7 +1402,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				<div class="bbmm-x-scroller">
 					<table class="bbmm-x-table">
 						<thead><tr><th>${LT.type()}</th><th>${LT.identifier()}</th><th></th></tr></thead>
-						<tbody>${rows || `<tr><td colspan="3" class="c-empty" style="text-align:center;opacity:.8;padding:18px 0">${LT.exclusions.none?.() ?? "No exclusions"}.</td></tr>`}</tbody>
+						<tbody>${rows || `<tr><td colspan="3" class="c-empty" style="text-align:center;opacity:.8;padding:18px 0">${LT.debugLevelNone()}.</td></tr>`}</tbody>
 					</table>
 				</div>
 

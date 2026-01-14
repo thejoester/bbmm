@@ -1,7 +1,7 @@
 /* BBMM Inclusions (Hidden Settings) =========================================
 	- Lets GM include specific *hidden* settings (config:false) in preset saves
 	- Mirrors the UX of exclusions manager but scoped to settings-only
-	- Persistent storage: modules/bbmm/storage/lists/user-inclusions.json
+	- Persistent storage: bbmm-data/user-inclusions.json
 ============================================================================ */
 
 import { DL, BBMM_README_UUID  } from './settings.js';
@@ -19,7 +19,6 @@ const MENU_TO_SETTINGS = {
 };
 
 // Persistent storage (lists)
-const LISTS_SUBDIR = "lists";
 const FILE_USER_INCLUSIONS = "user-inclusions.json";
 
 let _incCache = null;
@@ -57,7 +56,7 @@ function _sanitizeInclusions(raw) {
 
 // Get storage URL for user inclusions file
 function _inclusionsStorageUrl() {
-	return `modules/${BBMM_ID}/storage/${LISTS_SUBDIR}/${FILE_USER_INCLUSIONS}`;
+	return foundry.utils.getRoute(`bbmm-data/${FILE_USER_INCLUSIONS}`);
 }
 
 // Read user inclusions from storage (with caching)
@@ -100,7 +99,7 @@ async function hlp_writeUserInclusions(obj) {
 	const file = new File([payload], FILE_USER_INCLUSIONS, { type: "application/json" });
 
 	try {
-		const res = await FilePicker.uploadPersistent(BBMM_ID, LISTS_SUBDIR, file, {}, { notify: false });
+		const res = await FilePicker.upload("data", `bbmm-data`, file, { notify: false });
 		if (!res || (!res.path && !res.url)) {
 			DL(3, `inclusions.js | hlp_writeUserInclusions(): upload returned no path/url`, res);
 			return false;

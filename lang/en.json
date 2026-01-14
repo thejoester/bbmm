@@ -198,7 +198,7 @@
 		"modListCustomNotesExist": "Custom notes exist",
 		"presetNoticeTitle": "Presets Moved to Persistent Storage",
 		"presetNoticePleaseRead": "IMPORTANT! Please read!",
-		"presetNoticeBody": "<p><strong>Big Bad Module Manager</strong> has migrated Settings Presets and Module Presets to persistent module storage.</p><p><h4>What does this mean?</h4> These settings are no longer stored in the FoundryVTT world data, and will now be shared across worlds, meaning you can save one preset and use it in any world!</p><p>Because of this change, any presets previously saved in a world will no longer show up in  the Preset Managers, however they can be migrated manually using provided macros. Click the Open README button for instructions or use the macros in the compendiums.</p>",
+		"presetNoticeBody_0_6_5": "<p><strong>If you updated to version 0.6.0+,</strong> there was an issue that caused data to be overwritten every update. The good news is that I was able to fix this, the bad news is that this latest update with the fix will, unfortnuately, once again clear out your data.</p><p>Because of this, the Settings and Module presets will once again need to be migrated manually using the provided macros in the compendium. Click the Open README button for instructions or use the macros in the compendiums.</p>",
 		"presetNoticeOpenDocs": "Open README",
 		"presetNoticeDontShowAgain": "Don't Show Again",
 		"presetNoticeClose": "Close",

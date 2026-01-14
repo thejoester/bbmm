@@ -60,7 +60,6 @@ export async function copyPlainText(text) {
 	Shared helpers (escaping / preview / pretty)
 ========================================================================== */
 
-
 // single-line preview
 function toPreview(v) { 
 	try {
@@ -711,7 +710,7 @@ function toPresetItems(preset) {
 
 // Retrieve all user-defined settings presets (persistent storage JSON)
 async function getAllSettingsPresets() {
-	const url = `modules/${BBMM_ID}/storage/presets/settings-presets.json`;
+	const url = foundry.utils.getRoute("bbmm-data/settings-presets.json");
 
 	try {
 		const res = await fetch(url, { cache: "no-store" });
@@ -1473,7 +1472,7 @@ export function openManualModulePresetMigration() {
 		}
 
 		async function readStorageModulePresets() {
-			const url = `modules/${BBMM_ID}/storage/presets/module-presets.json`;
+			const url = foundry.utils.getRoute("bbmm-data/module-presets.json");
 
 			try {
 				const res = await fetch(url, { cache: "no-store" });
@@ -1495,7 +1494,7 @@ export function openManualModulePresetMigration() {
 			const file = new File([payload], "module-presets.json", { type: "application/json" });
 
 			try {
-				const res = await FilePicker.uploadPersistent(BBMM_ID, "presets", file, {}, { notify: false });
+				const res = await FilePicker.upload("data", "bbmm-data", file, { notify: false });
 
 				if (!res || (!res.path && !res.url)) {
 					DL(3, `${FN} writeStorageModulePresets(): upload returned no path/url`, res);
@@ -1755,7 +1754,6 @@ export async function openManualSettingsPresetMigration() {
 		}
 
 		const STORAGE_FILE = "settings-presets.json";
-		const STORAGE_SUBDIR = "presets";
 		const suffix = String(LT.macro.manualMigrateManualSuffix?.() ?? " (manual)");
 
 		function sanitizeFlatMap(raw) {
@@ -1780,7 +1778,7 @@ export async function openManualSettingsPresetMigration() {
 		}
 
 		async function readStorageFlat(filename) {
-			const url = `modules/${BBMM_ID}/storage/${STORAGE_SUBDIR}/${filename}`;
+			const url = foundry.utils.getRoute(`bbmm-data/${filename}`);
 
 			try {
 				const res = await fetch(url, { cache: "no-store" });
@@ -1798,12 +1796,13 @@ export async function openManualSettingsPresetMigration() {
 			const file = new File([payload], filename, { type: "application/json" });
 
 			try {
-				const res = await FilePicker.uploadPersistent(BBMM_ID, STORAGE_SUBDIR, file, {}, { notify: false });
+				const res = await FilePicker.upload("data", `bbmm-data`, file, { notify: false });
+
 				if (!res || (!res.path && !res.url)) {
 					DL(3, `${FN} writeStorageFlat(): upload returned no path/url`, res);
 					return false;
 				}
-				DL(`${FN} writeStorageFlat(): wrote "${STORAGE_SUBDIR}/${filename}"`, res);
+				DL(`${FN} writeStorageFlat(): wrote "${filename}"`, res);
 				return true;
 			} catch (err) {
 				DL(3, `${FN} writeStorageFlat(): uploadPersistent failed`, err);
