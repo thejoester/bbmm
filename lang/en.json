@@ -196,7 +196,7 @@
 		"noSettingsFoundFor": "No configurable settings for {title}.",
 		"modListNotesDeleted": "Notes deleted.",
 		"modListCustomNotesExist": "Custom notes exist",
-		"presetNoticeTitle": "Presets Moved to Persistent Storage",
+		"presetNoticeTitle": "Big bad Module Manager Notice!",
 		"presetNoticePleaseRead": "IMPORTANT! Please read!",
 		"presetNoticeBody_0_6_5": "<p><strong>If you updated to version 0.6.0+,</strong> there was an issue that caused data to be overwritten every update. The good news is that I was able to fix this, the bad news is that this latest update with the fix will, unfortnuately, once again clear out your data.</p><p>Because of this, the Settings and Module presets will once again need to be migrated manually using the provided macros in the compendium. Click the Open README button for instructions or use the macros in the compendiums.</p>",
 		"presetNoticeOpenDocs": "Open README",
