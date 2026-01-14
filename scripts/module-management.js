@@ -1211,7 +1211,10 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				}
 
 				// Reload this client
-				try { (foundry.utils?.debouncedReload?.() || window.location.reload)(); }
+				try {
+					if (foundry.utils?.debouncedReload) foundry.utils.debouncedReload();
+					else window.location.reload();
+				}
 				catch (e) { DL(3, "BBMMModuleManagerApp::_saveViaCoreSettings(): reload failed", e); }
 			} else {
 				ui.notifications.info(LT.moduleManagement.reloadLaterNotice());

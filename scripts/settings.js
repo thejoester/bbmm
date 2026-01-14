@@ -475,7 +475,7 @@ async function showPresetsMovedNotice() {
 					try {
 						const current = game.settings.get(BBMM_ID, "bbmmFlags");
 						const next = (current && typeof current === "object") ? { ...current } : {};
-						next["0.6.0-hidepresetnotice"] = true;
+						next["0.6.5-hidepresetnotice"] = true;
 						await game.settings.set(BBMM_ID, "bbmmFlags", next);
 						DL("settings.js | showPresetsMovedNotice(): user hid preset notice");
 					} catch (err) {
