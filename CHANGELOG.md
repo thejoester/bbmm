@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5-test6] - 2026-01-15
+### Fixed
+- fixed importing settings preset from single .json from older export format. 
+
 ## [0.6.5-test5] - 2026-01-14
 ### Fixed
 - Fixed "Don't show again" on notice. 

@@ -364,7 +364,6 @@ export async function bbmm_exportModulePresetsAll() {
 }
 
 // import Module presets
-// import Module presets
 export async function bbmm_importModulePresetsAll() {
 	const FN = "helpers.js | bbmm_importModulePresetsAll():";
 	const storageFile = "module-presets.json";
@@ -498,6 +497,19 @@ export async function bbmm_importSettingsPresetsAll() {
 	let data;
 	try {
 		data = JSON.parse(await file.text());
+		
+		// If a user imports a SINGLE settings preset payload (type/created/world/client/user),
+		// wrap it into the expected map format using the filename as the preset name.
+		if (data && typeof data === "object" && !Array.isArray(data)
+			&& data.type === "bbmm-settings"
+			&& data.world && typeof data.world === "object"
+			&& data.client && typeof data.client === "object"
+			&& data.user && typeof data.user === "object"
+		) {
+			const presetName = (file?.name ?? "bbmm-settings-preset").replace(/\.json$/i, "");
+			data = { [presetName]: data };
+			DL(1, `${FN} wrapped single settings preset payload`, { presetName });
+		}
 	} catch (err) {
 		DL(3, `${FN} invalid json import file`, err);
 		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);

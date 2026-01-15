@@ -604,7 +604,7 @@ class BBMMAddHiddenClientSettingSyncAppV2 extends foundry.applications.api.Appli
 					<div class="bbmm-hcs-head">
 						<div>${LT.module()}</div>
 						<div>${LT.setting()}</div>
-						<div>${LT.value()}</div>
+						<div>${LT.dialogValue()}</div>
 						<div>${LT.macro.columnAction()}</div>
 					</div>
 					<div class="bbmm-hcs-body">${body}</div>

@@ -23,6 +23,90 @@ export const EXPORT_SKIP = new Map([
 	["pf2e-alchemist-remaster-ducttape", new Set(["alchIndex"])] // Known large set, excluding for performance
 ]);
 
+//	Function for debugging - Prints out colored and tagged debug lines
+export function DL(intLogType, stringLogMsg, objObject = null) {
+	
+	// Get Timestamps
+	const now = new Date();
+	const timestamp = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
+	
+	// Handle the case where the first argument is a string
+	if (typeof intLogType === "string") {
+		objObject = stringLogMsg; // Shift arguments
+		stringLogMsg = intLogType;
+		intLogType = 1; // Default log type to 'all'
+	}
+	let debugLevel = "all"; // default until setting exists
+	try {
+		// Only read after it’s registered
+		if (game?.settings?.settings?.has?.(`${BBMM_ID}.debugLevel`)) {
+			debugLevel = game.settings.get(BBMM_ID, "debugLevel");
+		}
+	} catch (e) {
+		// Swallow: setting not registered yet
+	}
+
+	// Map debugLevel setting to numeric value for comparison
+	const levelMap = {
+		"none": 4,
+		"error": 3,
+		"warn": 2,
+		"all": 1
+	};
+
+	const currentLevel = levelMap[debugLevel] || 4; // Default to 'none' if debugLevel is undefined
+
+	// Check if the log type should be logged based on the current debug level
+	if (intLogType < currentLevel) return;
+
+	// Capture stack trace to get file and line number
+	const stack = new Error().stack.split("\n");
+	let fileInfo = "";
+	for (let i = 2; i < stack.length; i++) {
+		const line = stack[i].trim();
+		const fileInfoMatch = line.match(/(\/[^)]+):(\d+):(\d+)/); // Match file path and line number
+		if (fileInfoMatch) {
+			const [, filePath, lineNumber] = fileInfoMatch;
+			const fileName = filePath.split("/").pop(); // Extract just the file name
+		}
+	}
+
+	// Prepend the file and line info to the log message
+	const formattedLogMsg = fileInfo === ""
+		? stringLogMsg
+		: `[${fileInfo}] ${stringLogMsg}`;
+	
+	if (objObject) {
+		switch (intLogType) {
+			case 1: // Info/Log (all)
+				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: LightGreen; font-weight: bold;", objObject);
+				break;
+			case 2: // Warning
+				console.log(`%cBBMM [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;", objObject);
+				break;
+			case 3: // Critical/Error
+				console.log(`%cBBMM [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;", objObject);
+				break;
+			default:
+				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;", objObject);
+		}
+	} else {
+		switch (intLogType) {
+			case 1: // Info/Log (all)
+				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: LightGreen; font-weight: bold;");
+				break;
+			case 2: // Warning
+				console.log(`%cBBMM [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;");
+				break;
+			case 3: // Critical/Error
+				console.log(`%cBBMM [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;");
+				break;
+			default:
+				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;");
+		}
+	}
+}
+
 // Preset Storage Migration =====================================================
 // !!! REMOVE after version 0.8.0 !!!
 async function hlp_migrateLists(){
@@ -494,90 +578,6 @@ async function showPresetsMovedNotice() {
 		rejectClose: false,
 		position: { width: 560, height: "auto" }
 	}).render(true);
-}
-
-//	Function for debugging - Prints out colored and tagged debug lines
-export function DL(intLogType, stringLogMsg, objObject = null) {
-	
-	// Get Timestamps
-	const now = new Date();
-	const timestamp = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
-	
-	// Handle the case where the first argument is a string
-	if (typeof intLogType === "string") {
-		objObject = stringLogMsg; // Shift arguments
-		stringLogMsg = intLogType;
-		intLogType = 1; // Default log type to 'all'
-	}
-	let debugLevel = "all"; // default until setting exists
-	try {
-		// Only read after it’s registered
-		if (game?.settings?.settings?.has?.(`${BBMM_ID}.debugLevel`)) {
-			debugLevel = game.settings.get(BBMM_ID, "debugLevel");
-		}
-	} catch (e) {
-		// Swallow: setting not registered yet
-	}
-
-	// Map debugLevel setting to numeric value for comparison
-	const levelMap = {
-		"none": 4,
-		"error": 3,
-		"warn": 2,
-		"all": 1
-	};
-
-	const currentLevel = levelMap[debugLevel] || 4; // Default to 'none' if debugLevel is undefined
-
-	// Check if the log type should be logged based on the current debug level
-	if (intLogType < currentLevel) return;
-
-	// Capture stack trace to get file and line number
-	const stack = new Error().stack.split("\n");
-	let fileInfo = "";
-	for (let i = 2; i < stack.length; i++) {
-		const line = stack[i].trim();
-		const fileInfoMatch = line.match(/(\/[^)]+):(\d+):(\d+)/); // Match file path and line number
-		if (fileInfoMatch) {
-			const [, filePath, lineNumber] = fileInfoMatch;
-			const fileName = filePath.split("/").pop(); // Extract just the file name
-		}
-	}
-
-	// Prepend the file and line info to the log message
-	const formattedLogMsg = fileInfo === ""
-		? stringLogMsg
-		: `[${fileInfo}] ${stringLogMsg}`;
-	
-	if (objObject) {
-		switch (intLogType) {
-			case 1: // Info/Log (all)
-				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: LightGreen; font-weight: bold;", objObject);
-				break;
-			case 2: // Warning
-				console.log(`%cBBMM [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;", objObject);
-				break;
-			case 3: // Critical/Error
-				console.log(`%cBBMM [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;", objObject);
-				break;
-			default:
-				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;", objObject);
-		}
-	} else {
-		switch (intLogType) {
-			case 1: // Info/Log (all)
-				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: LightGreen; font-weight: bold;");
-				break;
-			case 2: // Warning
-				console.log(`%cBBMM [${timestamp}] | WARNING: ${formattedLogMsg}`, "color: orange; font-weight: bold;");
-				break;
-			case 3: // Critical/Error
-				console.log(`%cBBMM [${timestamp}] | ERROR: ${formattedLogMsg}`, "color: red; font-weight: bold;");
-				break;
-			default:
-				console.log(`%cBBMM [${timestamp}] | ${formattedLogMsg}`, "color: aqua; font-weight: bold;");
-		}
-	}
 }
 
 //  Inject BBMM button into a Foundry window header

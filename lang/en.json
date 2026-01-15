@@ -205,6 +205,13 @@
 		"presetSaveCurrentModules": "Save current module state to preset",
 		"presetSaveCurrentSettings": "Save current Settings state to preset",
 		"selectPreset": "Select a preset to load.",
+		"client": "Client",
+		"user": "User",
+		"world": "World",
+		"hidden": "hidden",
+		"visible": "visible",
+		"unknown": "unknown",
+		"selectNamespace": "Select namespace...",
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",
