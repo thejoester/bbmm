@@ -1,4 +1,4 @@
-# Changelog
+# Big Bad Module Manager Changelog
 
 All notable changes to this project will be documented in this file.
 
