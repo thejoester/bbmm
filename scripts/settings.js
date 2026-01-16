@@ -608,7 +608,7 @@ export function injectBBMMHeaderButton(root) {
 	const btn = document.createElement("button");
 	btn.type = "button";
 	btn.className = "header-control bbmm-header-menu-btn";
-	btn.setAttribute("data-tooltip", LT.buttons.bbmmBtnToolTip());
+	// btn.setAttribute("data-tooltip", LT.buttons.bbmmBtnToolTip());
 	btn.setAttribute("aria-label", LT.buttons.bbmmBtnToolTip());
 	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i><span>BBMM</span><i class="fa-solid fa-caret-down"></i>`;
 
