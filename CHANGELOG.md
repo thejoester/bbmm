@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 - **Persistent Storage:** Due to an issue found in versions 0.6.0 - 0.6.4 causing persistent storage to be reset upon each update, major changes had to be made to the persistent storage. 
-  - This update will, unfortunately reset the module and settings presets. Data from prior to the v0.6.0 release will still be avalable to import in using the macros in the compendium. 
+  - This update will, unfortunately reset the module and settings presets. Data from prior to the v0.6.0 release will still be avaliable to import in using the macros in the compendium. 
   - Data will now be stored in a 'bbmm-data' folder in the `/Data` directory. 
 
 ### Changed
