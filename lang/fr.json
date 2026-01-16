@@ -194,10 +194,18 @@
     "openedSettingsFor": "Paramètres ouverts pour {title}.",
     "noSettingsFoundFor": "Aucun paramètre configurable pour {title}.",
     "modListNotesDeleted": "Notes supprimées.",
+    "modListCustomNotesExist": "Il existe des notes personnalisées",
+    "presetNoticeTitle": "Préréglages déplacés vers le stockage permanent",
+    "presetNoticePleaseRead": "IMPORTANT ! Veuillez lire !",
+    "presetNoticeBody": "<p><strong>Le Bon Gros Gestionnaire de modules </strong> a migré les préréglages de paramètres et les préréglages de modules vers un stockage de modules persistant.</p><p><h4>Qu'est-ce que cela signifie ?</h4> Ces paramètres ne sont plus stockés dans les données du monde FoundryVTT et seront désormais partagés entre les mondes. Vous pouvez ainsi enregistrer un préréglage et l'utiliser dans n'importe quel monde !</p><p>Suite à cette modification, les préréglages précédemment enregistrés dans un monde n'apparaîtront plus dans le Gestionnaire de préréglages. Toutefois, vous pouvez les migrer manuellement à l'aide des macros fournies. Cliquez sur le bouton « Ouvrir le fichier README » pour obtenir des instructions ou utilisez les macros dans les compendiums.</p>",
+    "presetNoticeOpenDocs": "Ouvrir le fichier README",
+    "presetNoticeDontShowAgain": "Ne plus afficher",
+    "presetNoticeClose": "Fermer",
     "buttons": {
       "yes": "Oui",
       "no": "Non",
       "ok": "OK",
+      "help": "Manuel",
       "cancel": "Annuler",
       "close": "Fermer",
       "save": "Sauvegarder",
@@ -335,7 +343,9 @@
       "moduleNotes_name": "Notes du module BGGM",
       "moduleNotes_hint": "Notes ajoutées aux modules.",
       "moduleLocksName": "Modules verrouillés",
-      "moduleLocksHint": "Les modules indiqués ici sont verrouillés dans BGGM et ne peuvent être activés ou désactivés (manuellement ou par actions groupées)."
+      "moduleLocksHint": "Les modules indiqués ici sont verrouillés dans BGGM et ne peuvent être activés ou désactivés (manuellement ou par actions groupées).",
+      "autoForceReloadName": "Forcer le rechargement du joueur",
+      "autoForceReloadHint": "Forcer le rechargement instantané pour les joueurs lorsque les nouveaux paramètres sont verrouillés/synchronisés"
     },
     "macro": {
       "columnName": "Nom",
@@ -358,6 +368,8 @@
       "search": "Rechercher…",
       "showing": "Afficher",
       "of": "de",
+      "selectAll": "Tout sélectionner",
+      "clear": "Effacer",
       "btnInspect": "Inspecter",
       "visibility": "Visibilité",
       "copiedValToClipboard": "Valeur copiée dans le presse-papiers.",
@@ -382,7 +394,22 @@
       "failedOpenKeybindInspector": "Échec de l'ouverture de l'inspecteur de raccourcis clavier (voir console).",
       "titleKeybindInspecor": "BGGM - Inspecter les raccourcis clavier",
       "keybindFilterPlaceholder": "Rechercher un espace de noms, une action, un nom, un indice, des clés…",
-      "selectPreset": "Sélectionnez un préréglage de paramètres."
+      "selectPreset": "Sélectionnez un préréglage de paramètres.",
+      "selectModuleToViewSettings": "Sélectionnez un module pour afficher ses paramètres.",
+      "manualMigrateWindowTitle": "BGGM — Migration manuelle des préréglages de modules",
+      "manualMigrateTitle": "Migration manuelle des préréglages de modules",
+      "manualMigrateDesc": "Sélectionnez un préréglage de module hérité dans les paramètres, puis enregistrez-le dans le stockage persistant.",
+      "manualMigrateLegacySource": "Source héritée",
+      "manualMigrateDestination": "Destination",
+      "manualMigrateLegacyPresetLabel": "Préréglage hérité",
+      "manualMigrateNewNameLabel": "Nouveau nom",
+      "manualMigrateManualSuffix": " (manuel)",
+      "manualMigrateNoLegacyFound": "Aucun préréglage de module hérité n'a été trouvé pour la migration.",
+      "manualMigrateNoUsablePresets": "Des données prédéfinies héritées existent, mais aucune préréglage utilisable n'a été trouvée.",
+      "manualMigrateSettingsWindowTitle": "BGGM — Migration des paramètres prédéfinis manuels",
+      "manualMigrateSettingsTitle": "Migration manuelle des paramètres prédéfinis",
+      "manualMigrateSettingsDesc": "Sélectionnez un préréglage de paramètres hérité dans les paramètres, puis enregistrez-le dans le stockage persistant.",
+      "manualMigrateImportNamingHint": "Les préréglages importés seront nommés <strong>&lt;legacy name&gt; (manuel)</strong> et rendus uniques en cas de besoin."
     },
     "moduleManagement": {
       "modListWindowTitle": "BGGM - Gestionnaire de modules",
@@ -431,6 +458,19 @@
       "disableDependentsPromptMulti": "Désactiver les modules suivants qui dépendent de celui-ci ? Décochez ceux que vous souhaitez conserver activés :",
       "disableOrphansPromptMulti": "Ces modules ne sont plus nécessaires. Voulez-vous également les désactiver ? Décochez ceux que vous souhaitez conserver activés :",
       "filterClear": "Effacer le filtrage"
+    },
+    "hiddenSettingSync": {
+      "title": "Synchronisation des paramètres cachés du client",
+      "titleAdd": "Ajouter la synchronisation des paramètres",
+      "menuName": "Synchronisation des paramètres cachés du client",
+      "menuLabel": "Gestionnaire de synchronisation des paramètres cachés",
+      "btnAdd": "Ajouter la synchronisation des paramètres",
+      "none": "Aucun paramètre client caché synchronisé.",
+      "noneEligible": "Aucun paramètre client caché éligible n'a été trouvé.",
+      "selectModule": "Sélectionnez le module...",
+      "filter": "Filtre...",
+      "softLock": "Verrouillage souple",
+      "lock": "Verrouillage"
     }
   }
 }
