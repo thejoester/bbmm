@@ -34,6 +34,7 @@ I would like to extend a thanks to the following people for helping contribute t
 ### Translations
 - French (fr): [Retculo](https://gitlocalize.com/users/rectulo)
 - Italian (it): [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+author%3AGregoryWarn)
+- Polish (pl): [Lioheart](https://gitlocalize.com/users/Lioheart)
 
 ## Contribute
 
