@@ -4,39 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.5-test6] - 2026-01-15
-### Fixed
-- fixed importing settings preset from single .json from older export format. 
+## [0.6.5] - 2026-01-15
 
-## [0.6.5-test5] - 2026-01-14
 ### Fixed
-- Fixed "Don't show again" on notice. 
-
-## [0.6.5-test4] - 2026-01-14
-### Fixed
-- This is just another test to ensure settings are not overwritten.
-
-## [0.6.5-test3] - 2026-01-14
-### Fixed
-- Due to an issue found in versions 0.6.0 - 0.6.4 causing persistent storage to be reset upon each update, major changes had to be made to the persistent storage. 
+- **Persistent Storage:** Due to an issue found in versions 0.6.0 - 0.6.4 causing persistent storage to be reset upon each update, major changes had to be made to the persistent storage. 
   - This update will, unfortunately reset the module and settings presets. Data from prior to the v0.6.0 release will still be avalable to import in using the macros in the compendium. 
   - Data will now be stored in a 'bbmm-data' folder in the `/Data` directory. 
-### Changed
-- **Import/Export:**
-  - Import/Export functionality moved from module/settings presets windows into consolidated settings menu.
-  - Export module/setting preset will prompt to select specific preset or export all presets in one .json file
-  - Importing a module/setting preset will allow to import a single preset or a group of presets (from the export all), and if a preset with the same name exists it will rename it to append "(imported on 2026-01-12 02:37)" to the preset name.
-  - Ability to import and export inclusions and exclusions. These will just import/export all and when importing will overwrite current lists.
-- **Module/Settings Presets:**
-  - Added rename functionality to module and setting presets. Will prompt for new name, if the new name already exists will prompt to overwrite or rename again. 
-  
-## [0.6.5-test2] - 2026-01-12
-### Fixed
-- clearing of inclusions and exclusions
-- Hidden settings sync manager button functionality
-- Help button on settings window
 
-## [0.6.5-test1] - 2026-01-12
 ### Changed
 - **Import/Export:**
   - Import/Export functionality moved from module/settings presets windows into consolidated settings menu.
@@ -45,8 +19,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Ability to import and export inclusions and exclusions. These will just import/export all and when importing will overwrite current lists.
 - **Module/Settings Presets:**
   - Added rename functionality to module and setting presets. Will prompt for new name, if the new name already exists will prompt to overwrite or rename again. 
+- **Inclusions / Exclusions:**
+  - Changed "Scope" column to display icons representing setting scope and visibility. 
+    - World icon = Global, Computer icon = Client, = User icon = User. 
+	- Eye icon = visible, Slashed Eye icon = hidden. 
+  - If value size is larger than 4kb the Setting column text will be colored dark orange indicating a setting with large size value. 
+- **Drop Down Menu:**
+  - Fixed styling on "BBMM" Dropdown button on settings and module management windows to work better with light ui. 
 
 ## [0.6.4] - 2026-01-11
+
 ### Changed
 - **BBMM Buttons:**
   - Changed "BBMM" buttons on settings and module management windows to display a drop-down menu instead of opening a separate window. 
@@ -69,6 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated Italian localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+is%3Aopen+author%3AGregoryWarn)!
 
 ## [0.6.1] - 2026-01-02
+
 ### Added
 - **Setting Sync:**
   - Added setting to force player reload when setting sync happens with setting that requires reload instead of prompting them. Default is disabled.
@@ -78,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
  - Fixed issue with saved inclusions / exclusions not migrating to the global persistent storage. 
 
 ## [0.6.0] - 2025-12-31
+
 ### Changed
 - **Presets:**
   - GM Setting presets and Module presets are now saved in persistent storage, and will be shared across worlds.
@@ -95,6 +79,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Moved "Mark Current Seen" and "Mark All Seen" buttons so they remain static even if window resizes. 
 
 ## [0.5.17] - 2025-12-06
+
 ### Changed
 - **Localization:**
   - [#71](https://github.com/thejoester/bbmm/issues/71): Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
@@ -103,6 +88,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Fixed bug causing inline text to be unreadable in light mode.
 
 ## [0.5.16] - 2025-12-04
+
 ### Changed
 - **Changelog Report:**
   - [#66](https://github.com/thejoester/bbmm/issues/66): When marking changelog entry as seen, will move to next unread entry.
@@ -111,26 +97,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - [#69](https://github.com/thejoester/bbmm/issues/69) (nice): Fixed CSS style for "All Modules" button so it shows properly in light and dark modes.
 
 ## [0.5.15] - 2025-11-19
+
 ### Changed
 - **Localization:**
   - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
 
 ## [0.5.14] - 2025-11-03
+
 ### Fixed
 - **Module Management:**
   - Fixed bug where `Manage Modules` button did not open the enhanced module management window when other core language was set. 
 
 ## [0.5.13] - 2025-11-02
+
 ### Fixed
 - **Localization:** 
   - Added Polish language to module.json. 
 
 ## [0.5.12] - 2025-10-31 
+
 ### Added
 - **Localization:** 
   - Added Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
 
 ## [0.5.11] - 2025-10-31
+
 ### Changed
 - **Module Management:**
   - Added "Clear" in filter field. 
@@ -139,10 +130,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
 
 ## [0.5.10] - 2025-10-29
+
 ### Fixed
 - **Module Management:** Fixed setting so that enhanced module management does not open if disabled in settings.  
 
 ## [0.5.9] - 2025-10-29
+
 ### Changed
 - **Module Management:** Complete overhaul of the Module Management window. 
   - Improved performance! Rebuilt as a separate ApplicationV2 window. 
@@ -161,11 +154,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Find The Culprit! Support.
 
 ## [0.5.8] - 2025-10-13
+
 ### Changed
 - **Localization:**
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
 
 ## [0.5.7] - 2025-10-11
+
 ### Changed
 - **Module Management:**
   - [Issue #48](https://github.com/thejoester/bbmm/issues/48): If there are no notes for a module, it will show the module description from the module.json if it exists when expanded. 
@@ -179,6 +174,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (Multiple) copy button in macros now functional to copy value to clipboard. 
 
 ## [0.5.6] - 2025-10-09
+
 ### Changed
 - **Controls Sync:**
   - When applying soft-sync icon changes to orange
@@ -188,6 +184,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Changed buttons on exclusion manager window to match inclusion manager. 
 
 ## [0.5.5] - 2025-10-07
+
 ### Changed
 - **Inclusion Manager:**
   - updated warning text when including module: fixed link so it works and localized the text.
@@ -196,22 +193,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Note: This module currently does not support user flags at this time, it may be something that will be supported later but this macro may help locate where something is saved.
 
 ## [0.5.4] - 2025-10-06
+
 ### Changed
 - **Localization:**
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
   - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
 
 ## [0.5.3] - 2025-10-02
+
 ### Added
 - **Module Management:**
   - Added gear icon in module list for modules with settings option, clicking will open settings to module settings tab. 
 
 ## [0.5.2] - 2025-09-30
+
 ### Fixed
 - **Module Management:**
   - Fixed bug where enabling/disabling module with dependencies did not show the module or dependency changed. 
 
 ## [0.5.1] - 2025-09-28
+
 ### Changed
 - **Localization:**
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
@@ -223,6 +224,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - suppressed false positive console errors about missing localization keys before localization was finished loading. 
 
 ## [0.5.0] - 2025-09-22
+
 ### Added 
 - **Module Management:**
   - Added enhanced module management
@@ -249,10 +251,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated Journal Documentation
 
 ## [0.4.1] - 2025-09-17
+
 ### Fixed
 - included assets/ folder for images in journal. 
 
 ## [0.4.0] - 2025-09-17
+
 ### Added
 - **Compendiums:**
   - Added Compendium folder "Big Bad Module Manager".
@@ -282,6 +286,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - When GM changes setting with lock (hard or soft), it will clear lock. 
 
 ## [0.3.3] - 2025-09-09
+
 ### Added
 - **Localization:** Added Italian (it) localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+author%3AGregoryWarn)
 ### Fixed
@@ -290,11 +295,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Settings:** Changed default debug level to none.
 
 ## [0.3.2] - 2025-09-07
+
 ### Fixed
 - **Settings Sync**
   - Fixed typo affecting hover text and missing entry in en.json
  
 ## [0.3.1] - 2025-09-03
+
 ### Changed
 - **Settings Sync**
   - Added settings lock toggle, this will lock setting value for players and hide setting from them. 
@@ -304,6 +311,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated styling and interaction settings of changelog window.
 
 ## [0.3.0] - 2025-09-03
+
 ### Added
 - **Settings Sync**
   - Added Sync icon next to user/client settings. 
@@ -316,6 +324,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Window will resize to smaller size if resolution is smaller
 
 ## [0.2.2] - 2025-09-02
+
 ### Changed
 - **Changelog report** 
   - Locked changelog window to fixed width
@@ -325,10 +334,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Fixed style of changelog on light interface settings.
 
 ## [0.2.1] - 2025-09-01
+
 ### Fixed
 - **Settings Preset Manager:** fixed bug preventing import of settings .json file
 
 ## [0.2.0] - 2025-08-31
+
 ### Added
 - **Changelog report** Upon GM login will show report of changelogs. 
   - Will only show if module includes changelog file in the root or 'docs/' directory
@@ -343,18 +354,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Module Preset Manager:** Fixed dual 'export to .json' buttons.
 
 ## [0.1.3] - 2025-08-30
+
 ### Added
 - **Localization:** Added French translation. Credit: @retculo
 
 ## [0.1.2] - 2025-08-29
+
 ### Fixed
 - **Localization:** fixed issue with en.json not being included in install. 
 
 ## [0.1.1] - 2025-08-28
+
 ### Added
 - Added Localization support. 
 
 ## [0.1.0] - 2025-08-25
+
 ### Added
 - **Exclusions:** Added exclusions manager allowing to add exclusions for settings presets/import/export. Supports adding by entire module or direct setting. 
 - **Player Support:** Settings Preset Manager accessible for users through Settings or View Active Modules screens. 
@@ -368,10 +383,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Settings Preset Manager:** fixed bug that overwrote module state when loading setting presets. 
 
 ## [0.0.7] - 2025-08-25
+
 ### Fixed 
 - **Settings Preset Manager:** Fixed bug with loading preset with recent changes. 
 
 ## [0.0.6] - 2025-08-24
+
 ### Added
 - **Settings Preset Manager:** When importing, you can now choose to import all settings, or specify which module, or specific setting. 
 ### Fixed
@@ -380,6 +397,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Macros:** Added macro to inspect preset and view values (click values to expand if needed).
 
 ## [0.0.5] - 2025-08-21
+
 ### Fixed
 - **Settings Preset Manager:** Fixed bug not saving settings on a separate template page. 
 - **Settings Preset Manager:** Blocking importing preset settings to prevent them being overwritten when importing, and siginificantly reducing the size of export. 
@@ -387,6 +405,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Settings Preset Manager:** 	
 
 ## [0.0.4] - 2025-08-21
+
 ### Added
 - **Settings Preset Manager:**
   - Save / Delete / Load presets,
@@ -396,16 +415,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **BBMM:** Changed "Preset Manager" button to "BBMM" on manage modules window, opens window to choose Module or Settings preset manager
 
 ## [0.0.3] - 2025-08-21
+
 ### Added
 - **Module Preset Manager:** Added "Preset Manager" button to manage modules window.
 - **Module Preset Manager:** Added overwrite protection for presets. 
   - If you try and save/import a preset with an existing name, it will prompt overwrite/rename.
 
 ## [0.0.2] - 2025-08-20
+
 ### Changed
 - Added manifest and github links to module.json.
 
 ## [0.0.1] - 2025-08-20
+
 ### Added
 - **Initial Upload:** Initial upload.
 - **Module Preset Manager:**

@@ -694,6 +694,47 @@ export function injectBBMMHeaderButton(root) {
 
 		menu.hidden = !menu.hidden;
 		if (!menu.hidden) {
+
+			// Pull actual computed UI colors from the window and apply to the dropdown (force opaque)
+			try {
+				const clampOpaque = (c) => {
+					if (!c) return c;
+					if (c === "transparent") return "rgba(0, 0, 0, 1)";
+					const m = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+)\s*)?\)$/i);
+					if (!m) return c;
+					const r = Number(m[1]);
+					const g = Number(m[2]);
+					const b = Number(m[3]);
+					const a = (m[4] === undefined) ? 1 : Number(m[4]);
+					if (!Number.isFinite(a) || a >= 0.999) return `rgb(${r}, ${g}, ${b})`;
+					return `rgb(${r}, ${g}, ${b})`;
+				};
+
+				const isTransparent = (c) => {
+					if (!c) return true;
+					if (c === "transparent") return true;
+					if (c === "rgba(0, 0, 0, 0)") return true;
+					return /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0(\.0+)?\s*\)$/i.test(c);
+				};
+
+				const src = root.querySelector(".window-content") || header || root;
+				let bg = getComputedStyle(src).backgroundColor;
+				let fg = getComputedStyle(src).color;
+
+				// If the content background is fully transparent, fall back to the header background
+				if (isTransparent(bg)) {
+					const src2 = header || root;
+					bg = getComputedStyle(src2).backgroundColor;
+					fg = getComputedStyle(src2).color;
+				}
+
+				menu.style.backgroundColor = clampOpaque(bg);
+				menu.style.color = fg;
+
+			} catch (e) {
+				DL(2, "settings.js | injectBBMMHeaderButton(): failed to resolve menu colors", e);
+			}
+
 			positionMenu();
 		}
 	});
@@ -754,28 +795,44 @@ export function injectBBMMHeaderButton(root) {
 			header.window-header .header-control.bbmm-header-menu-btn i {
 				font-size: 0.9em;
 			}
+
 			.bbmm-header-dropdown {
 				position: fixed;
 				z-index: 100000;
 				display: flex;
 				flex-direction: column;
+				gap: 0.25rem;
+
 				min-width: 260px;
 				padding: .75rem;
-				border: 1px solid var(--color-border-dark, #491313ff);
+
+				border: 1px solid var(--color-border-dark);
 				border-radius: 0.6rem;
-				background: var(--color-bg, #111);
-				box-shadow: 0 6px 16px rgba(0,0,0,0.45);
+
+				/* Background/text colors are set inline when opening (computed from the UI, forced opaque) */
+				box-shadow: 0 6px 16px rgba(0,0,0,0.25);
 			}
-			.bbmm-header-item {
+
+			.bbmm-header-dropdown .bbmm-header-item {
+				display: block;
+				width: 100%;
 				text-align: left;
+
 				padding: 0.5rem 0.75rem;
 				border-radius: 0.4rem;
+
+				background: transparent;
+				color: inherit;
+				border: 0;
+
+				cursor: pointer;
 				white-space: nowrap;
 				font-size: 0.95rem;
 				line-height: 1.2;
 			}
-			.bbmm-header-item:hover {
-				background: rgba(255,255,255,0.08);
+
+			.bbmm-header-dropdown .bbmm-header-item:hover {
+				background: rgba(255, 94, 0, 0.55);
 			}
 		`;
 		document.head.appendChild(style);
