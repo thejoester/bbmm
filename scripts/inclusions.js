@@ -1,7 +1,7 @@
 /* BBMM Inclusions (Hidden Settings) =========================================
 	- Lets GM include specific *hidden* settings (config:false) in preset saves
 	- Mirrors the UX of exclusions manager but scoped to settings-only
-	- Persistent storage: modules/bbmm/storage/lists/user-inclusions.json
+	- Persistent storage: bbmm-data/user-inclusions.json
 ============================================================================ */
 
 import { DL, BBMM_README_UUID  } from './settings.js';
@@ -19,8 +19,9 @@ const MENU_TO_SETTINGS = {
 };
 
 // Persistent storage (lists)
-const LISTS_SUBDIR = "lists";
 const FILE_USER_INCLUSIONS = "user-inclusions.json";
+// Size threshold to mark preview as "large"
+const LARGE_VALUE_THRESHOLD = 4096; // 4 KB
 
 let _incCache = null;
 let _incCacheLoaded = false;
@@ -57,7 +58,7 @@ function _sanitizeInclusions(raw) {
 
 // Get storage URL for user inclusions file
 function _inclusionsStorageUrl() {
-	return `modules/${BBMM_ID}/storage/${LISTS_SUBDIR}/${FILE_USER_INCLUSIONS}`;
+	return foundry.utils.getRoute(`bbmm-data/${FILE_USER_INCLUSIONS}`);
 }
 
 // Read user inclusions from storage (with caching)
@@ -100,7 +101,7 @@ async function hlp_writeUserInclusions(obj) {
 	const file = new File([payload], FILE_USER_INCLUSIONS, { type: "application/json" });
 
 	try {
-		const res = await FilePicker.uploadPersistent(BBMM_ID, LISTS_SUBDIR, file, {}, { notify: false });
+		const res = await FilePicker.upload("data", `bbmm-data`, file, { notify: false });
 		if (!res || (!res.path && !res.url)) {
 			DL(3, `inclusions.js | hlp_writeUserInclusions(): upload returned no path/url`, res);
 			return false;
@@ -165,7 +166,6 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		this._warmTimer = null;
 		this._warmRunning = false;
 	}
-
 
 	/* ============================================================================
 		{DATA HELPERS}
@@ -323,15 +323,45 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 					const v = game.settings.get(r.ns, r.key);
 					r.__value = v;
 					r.__preview = this._toPreview(v);
-					r.__pretty = this._toPretty(v);
+
+					const pretty = this._toPretty(v);
+					r.__pretty = pretty;
+
+					// Determine if large
+					let bytes = 0;
+					try {
+						bytes = (new TextEncoder().encode(pretty)).length;
+					} catch {}
+
+					r.__isLarge = bytes >= LARGE_VALUE_THRESHOLD;
+
+					
+					try {
+						const bytes = (new TextEncoder().encode(pretty)).length;
+						r.__size = bytes < 1024
+							? `${bytes} B`
+							: bytes < 1024 * 1024
+								? `${(bytes / 1024).toFixed(1)} KB`
+								: `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+					} catch {
+						r.__size = "";
+					}
+
 					r.__valLoaded = true;
 
-					const sel = `.row[data-ns="${CSS.escape(r.ns)}"][data-key="${CSS.escape(r.key)}"] .val-preview code`;
-					const codeEl = body.querySelector(sel);
+					const baseSel = `.row[data-ns="${CSS.escape(r.ns)}"][data-key="${CSS.escape(r.key)}"]`;
+					const keyEl = body.querySelector(`${baseSel} .c-key`);
+					if (keyEl && r.__isLarge) {
+						keyEl.classList.add("bbmm-large-value");
+					}
+					const codeEl = body.querySelector(`${baseSel} .val-preview code`);
 					if (codeEl) {
 						codeEl.textContent = r.__preview;
 						codeEl.title = r.__preview;
 					}
+
+					const sizeEl = body.querySelector(`${baseSel} .val-size`);
+					if (sizeEl) sizeEl.textContent = r.__size || "";
 				} catch (e) {
 					r.__value = undefined;
 					r.__preview = "error";
@@ -371,12 +401,40 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 		const key = String(r.key ?? "");
 		const pairTitle = `${ns}.${key}`;
 		const preview = foundry.utils.escapeHTML(String(r.__preview ?? ""));
+		const scope = String(r.scope ?? "");
+		const scopeIcon = scope === "world"
+			? "fa-globe"
+			: scope === "client"
+				? "fa-desktop"
+				: scope === "user"
+					? "fa-user"
+					: "fa-circle-question";
+		const scopeTitle = scope === "world"
+			? LT.world()
+			: scope === "client"
+				? LT.client()
+				: scope === "user"
+					? LT.user()
+					: LT.unknown();
+
+		const hidden = r.hidden === true;
+		const hiddenIcon = hidden ? "fa-eye-slash" : "fa-eye";
+		const size = foundry.utils.escapeHTML(String(r.__size ?? ""));
 
 		return `
 			<div class="row" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">
 				<div class="c-mod" title="${foundry.utils.escapeHTML(ns)}">${foundry.utils.escapeHTML(String(r.nsLabel ?? ns))}</div>
-				<div class="c-key" title="${foundry.utils.escapeHTML(pairTitle)}">${foundry.utils.escapeHTML(String(r.label ?? key))}</div>
-				<div class="c-scope" title="${foundry.utils.escapeHTML(String(r.scope ?? ""))}">${foundry.utils.escapeHTML(String(r.scope ?? ""))}</div>
+				<div class="c-key" title="${foundry.utils.escapeHTML(pairTitle)}">
+					<div class="bbmm-setting-title">${foundry.utils.escapeHTML(String(r.label ?? key))}</div>
+					${r.hint ? `<div class="bbmm-setting-hint">${foundry.utils.escapeHTML(String(r.hint))}</div>` : ""}
+				</div>
+
+				<div class="c-scope" title="${foundry.utils.escapeHTML(scope)}">
+					<span class="bbmm-scope-icons">
+						<i class="fas ${scopeIcon}" title="${scopeTitle}"></i>
+						<i class="fas ${hiddenIcon}" title="${hidden ? LT.hidden() : LT.visible()}"></i>
+					</span>
+				</div>
 
 				<div class="c-val">
 					<div class="val-preview" title="${preview}"><code>${preview}</code></div>
@@ -471,17 +529,28 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 					const label = rawName ? game.i18n.localize(String(rawName)) : key;
 					const scope = String(entry?.scope ?? "");
 
+					// Hint (optional)
+					let hint = "";
+					const rawHint = entry?.hint;
+					if (typeof rawHint === "string" && rawHint.trim().length) {
+						try { hint = game.i18n?.localize?.(rawHint) || rawHint; }
+						catch { hint = rawHint; }
+					}
+
 					rows.push({
 						ns,
 						key,
 						nsLabel,
 						label,
+						hint,
 						scope,
+						hidden: entry?.config === false,
 
 						// Lazy value (loaded only when visible)
 						__value: undefined,
 						__preview: "",
 						__pretty: "",
+						__size: "",
 						__valLoaded: false
 					});
 
@@ -612,6 +681,10 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 
 			.bbmm-grid-body .c-mod,.bbmm-grid-body .c-key{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 			.bbmm-grid-body .c-scope{text-transform:capitalize;opacity:.85;white-space:nowrap}
+			.bbmm-grid-body .c-scope{display:flex;align-items:center;justify-content:center;opacity:.9}
+			.bbmm-grid-body .bbmm-scope-icons{display:inline-flex;gap:.35rem;align-items:center}
+			.bbmm-grid-body .val-preview{display:flex;gap:.5rem;align-items:flex-start}
+			.bbmm-grid-body .val-size{opacity:.65;white-space:nowrap;font-size:.85em}
 
 			.bbmm-grid-body .c-val{cursor:pointer}
 			.bbmm-grid-body .c-val .val-preview{max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}
@@ -626,6 +699,18 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 			.bbmm-grid-body .bbmm-inc-act{display:inline-flex;align-items:center;justify-content:center;min-width:80px;height:32px;padding:0 12px;font-size:.95rem;line-height:1}
 			.bbmm-grid-body .bbmm-inc-act.bbmm-inc-done{pointer-events:none;opacity:.75;font-weight:700}
 
+			.bbmm-setting-hint{
+				font-size: .85em;
+				font-style: italic;
+				opacity: .85;
+				margin-top: .15rem;
+			}
+
+			.bbmm-large-value{
+				color: #cc7a00;
+				font-weight: 600;
+			}
+
 			/* FOOTER */
 			.bbmm-add-footer{
 				display:flex;
@@ -639,7 +724,7 @@ class BBMMAddSettingInclusionAppV2 extends foundry.applications.api.ApplicationV
 			.bbmm-add-footer button{min-width:160px}`;
 
 		const moduleList = this._buildModuleList();
-		const moduleOpts = ['<option value=""></option>']
+		const moduleOpts = [`<option value="" selected disabled>${LT.selectNamespace()}</option>`]
 			.concat(moduleList.map(m =>
 				`<option value="${foundry.utils.escapeHTML(m.ns)}"${this._moduleFilter===m.ns?" selected":""}>${foundry.utils.escapeHTML(m.title)}</option>`
 			))

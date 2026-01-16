@@ -25,8 +25,8 @@
         "scripts/setting-sync.js",
         "scripts/module-management.js",
         "scripts/changelogs.js",
-        "scripts/macros.js",
-        "scripts/hidden-setting-sync.js"
+        "scripts/hidden-setting-sync.js",
+        "scripts/macros.js"
     ],
     "socket": true,
     "persistentStorage": true,
@@ -82,8 +82,8 @@
     },
     "description": "Utility to manage modules and settings.",
     "url": "https://github.com/thejoester/bbmm/",
-    "manifest": "https://github.com/thejoester/bbmm/releases/latest/download/module.json",
-    "download": "https://github.com/thejoester/bbmm/releases/download/0.4.0/bbmm.zip",
+    "manifest": "https://github.com/thejoester/bbmm/releases/download/0.6.5-test1/module.json",
+    "download": "https://github.com/thejoester/bbmm/releases/download/0.6.5-test1/bbmm.zip",
     "readme": "https://github.com/thejoester/bbmm/blob/main/CHANGELOG.md",
     "bugs": "https://github.com/thejoester/bbmm/issues",
     "changelog": "https://github.com/thejoester/bbmm/blob/main/README.md"

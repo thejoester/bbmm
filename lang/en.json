@@ -90,7 +90,7 @@
 		"name_checkDisabledModules": "Changelog Report: Check Disabled Modules",
 		"hint_checkDisabledModules": "When enabled, BBMM will also look for changelogs in installed but disabled modules.",
 		"exclusionsMgr": "Exclusions Manager",
-		"exclusionsMgrBtn": "Exclusions Manager",
+		"exclusions": "Exclusions",
 		"lblExclusionsMgr": "Open Exclusions Manager",
 		"titleExclusionsMgr": "BBBM Exclusions Manager",
 		"titleAddModuleExclusion": "BBMM — Add Module Exclusion",
@@ -196,17 +196,27 @@
 		"noSettingsFoundFor": "No configurable settings for {title}.",
 		"modListNotesDeleted": "Notes deleted.",
 		"modListCustomNotesExist": "Custom notes exist",
-		"presetNoticeTitle": "Presets Moved to Persistent Storage",
+		"presetNoticeTitle": "Big bad Module Manager Notice!",
 		"presetNoticePleaseRead": "IMPORTANT! Please read!",
-		"presetNoticeBody": "<p><strong>Big Bad Module Manager</strong> has migrated Settings Presets and Module Presets to persistent module storage.</p><p><h4>What does this mean?</h4> These settings are no longer stored in the FoundryVTT world data, and will now be shared across worlds, meaning you can save one preset and use it in any world!</p><p>Because of this change, any presets previously saved in a world will no longer show up in  the Preset Managers, however they can be migrated manually using provided macros. Click the Open README button for instructions or use the macros in the compendiums.</p>",
+		"presetNoticeBody_0_6_5": "<p><strong>If you updated to version 0.6.0+,</strong> there was an issue that caused data to be overwritten every update. The good news is that I was able to fix this, the bad news is that this latest update with the fix will, unfortnuately, once again clear out your data.</p><p>Because of this, the Settings and Module presets will once again need to be migrated manually using the provided macros in the compendium. Click the Open README button for instructions or use the macros in the compendiums.</p>",
 		"presetNoticeOpenDocs": "Open README",
 		"presetNoticeDontShowAgain": "Don't Show Again",
 		"presetNoticeClose": "Close",
+		"presetSaveCurrentModules": "Save current module state to preset",
+		"presetSaveCurrentSettings": "Save current Settings state to preset",
+		"selectPreset": "Select a preset to load.",
+		"client": "Client",
+		"user": "User",
+		"world": "World",
+		"hidden": "hidden",
+		"visible": "visible",
+		"unknown": "unknown",
+		"selectNamespace": "Select namespace...",
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",
 			"ok": "OK",
-			"help": "Manual",
+			"help": "Read Me",
 			"cancel": "Cancel",
 			"close": "Close",
 			"save": "Save",
@@ -214,6 +224,7 @@
 			"reload": "Reload",
 			"export": "Export",
 			"import": "Import",
+			"importExport": "Import / Export",
 			"load": "Load",
 			"btnSync": "Sync",
 			"preview": "Preview",
@@ -260,7 +271,13 @@
 			"settingsExportFailed": "Settings Export failed (see console)",
 			"settingsRegUnavail": "Settings registry unavailable",
 			"failedOpenLegacyExport": "Failed to open legacy export dialog (See console)",
-			"failedModulestateExp": "Module state export failed (See console)"
+			"failedModulestateExp": "Module state export failed (See console)",
+			"failedReadSettingsPreset": "Failed to read settings presets.",
+			"failedReadModulePreset": "Failed to read module presets.",
+			"selectedPresetNotFound": "Selected preset not found.",
+			"importExportFailed": "Import/Export failed. See console.",
+			"notInstalled": "not installed",
+			"depMissing": "dependency missing"
 		},
 		"changelog": {
 			"window_title": "Module Changelogs",
@@ -346,7 +363,8 @@
 			"moduleLocksName": "Locked Modules",
 			"moduleLocksHint": "Modules listed here are locked in BBMM and cannot be enabled or disabled (manually or via bulk actions).",
 			"autoForceReloadName": "Force Player Reload",
-			"autoForceReloadHint": "Force instant reload to players when settings new settings are locked/synced"
+			"autoForceReloadHint": "Force instant reload to players when settings new settings are locked/synced",
+			"importExportHint": "Import/export presets and lists."
 		},	
 		"macro": {
 			"columnName": "Name",
@@ -472,6 +490,14 @@
 			"filter": "Filter...",
 			"softLock": "Soft Lock",
 			"lock": "Lock"
+		},
+		"_importExport": {
+			"allPresets": "All Presets",
+			"whichPreset": "Which preset do you want to export",
+			"exportedSettingsPreset": "Exported settings preset.",
+			"importedList": "Imported List.",
+			"exportModulePreset": "Export Module Preset",
+			"exportSettingsPreset": "Export Settings Preset"
 		}
 	}
 }

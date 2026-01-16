@@ -1,5 +1,6 @@
 import { DL } from './settings.js';
 import { EXPORT_SKIP } from './settings.js';
+import { LT, BBMM_ID } from "./localization.js";
 
 /* Cache the effective skip map until invalidated */
 let _skipMapCache = null;
@@ -328,6 +329,313 @@ export function hlp_injectHeaderHelpButton(app, opts = {}) {
 	} catch (e) {
 		DL(3, `${FN} fatal`, e);
 		return false;
+	}
+}
+
+/* ==========================================================================
+	Import / Export functions
+========================================================================== */
+
+// export Module presets
+export async function bbmm_exportModulePresetsAll() {
+	const FN = "helpers.js | bbmm_exportModulePresetsAll():";
+	const storageFile = "module-presets.json";
+	const url = `bbmm-data/${storageFile}`;
+
+	try {
+		const res = await fetch(url, { cache: "no-store" });
+		if (!res.ok) {
+			DL(3, `${FN} fetch not ok`, { url, status: res.status });
+			ui.notifications.error(`${LT.errors.errorOccured()}.`);
+			return;
+		}
+
+		const data = await res.json();
+		const d = new Date();
+		const pad = (n) => String(n).padStart(2, "0");
+		const fname = `${d.getFullYear()}-${pad(d.getDate())}-${pad(d.getMonth() + 1)}-bbmm-module-presets.json`;
+
+		await hlp_saveJSONFile(data ?? {}, fname);
+		DL(1, `${FN} exported module presets`, { url, fname, count: Object.keys(data ?? {}).length });
+	} catch (err) {
+		DL(3, `${FN} failed`, err);
+		ui.notifications.error(`${LT.errors.errorOccured()}.`);
+	}
+}
+
+// import Module presets
+export async function bbmm_importModulePresetsAll() {
+	const FN = "helpers.js | bbmm_importModulePresetsAll():";
+	const storageFile = "module-presets.json";
+	const url = `bbmm-data/${storageFile}`;
+
+	const file = await hlp_pickLocalJSONFile();
+	if (!file) return;
+
+	let data;
+	try {
+		data = JSON.parse(await file.text());
+	} catch (err) {
+		DL(3, `${FN} invalid json import file`, err);
+		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+		return;
+	}
+
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		DL(3, `${FN} invalid import shape`, data);
+		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+		return;
+	}
+
+	// Load current presets so we can MERGE instead of overwrite
+	let current = {};
+	try {
+		const res = await fetch(url, { cache: "no-store" });
+		if (res.ok) {
+			current = await res.json();
+			if (!current || typeof current !== "object" || Array.isArray(current)) current = {};
+		} else {
+			DL(2, `${FN} current presets fetch not ok, starting empty`, { url, status: res.status });
+			current = {};
+		}
+	} catch (err) {
+		DL(2, `${FN} current presets fetch failed, starting empty`, err);
+		current = {};
+	}
+
+	// Merge imported presets into current
+	let added = 0;
+	let renamed = 0;
+
+	for (const [name, preset] of Object.entries(data)) {
+		if (!name || typeof name !== "string") continue;
+
+		// Module preset format should be an array (module ids)
+		if (!Array.isArray(preset)) continue;
+
+		// Clean array: strings only, trimmed, unique
+		const clean = [...new Set(preset.filter(x => typeof x === "string" && x.trim()).map(x => x.trim()))];
+
+		let finalName = name;
+
+		// Only rename if there is a collision
+		if (Object.prototype.hasOwnProperty.call(current, finalName)) {
+			const d = new Date();
+			const pad = (n) => String(n).padStart(2, "0");
+			const dateStamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+			const timeStamp = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+			finalName = `${name} (imported on ${dateStamp} ${timeStamp})`;
+			renamed++;
+
+			let i = 2;
+			while (Object.prototype.hasOwnProperty.call(current, finalName)) {
+				finalName = `${name} (imported on ${dateStamp} ${timeStamp}) (${i})`;
+				i++;
+			}
+		}
+
+		current[finalName] = clean;
+		added++;
+	}
+
+	try {
+		const payload = JSON.stringify(current ?? {}, null, 2);
+		const f = new File([payload], storageFile, { type: "application/json" });
+		const res = await FilePicker.upload("data", `bbmm-data`, f, { notify: false });
+
+		if (!res || (!res.path && !res.url)) {
+			DL(3, `${FN} upload returned no path/url`, res);
+			ui.notifications.error(`${LT.errors.errorOccured()}.`);
+			return;
+		}
+
+		DL(1, `${FN} imported module presets (merged)`, { added, renamed, res });
+		ui.notifications.info(`Imported ${added} module preset(s).${renamed ? ` Renamed ${renamed}.` : ""}`);
+	} catch (err) {
+		DL(3, `${FN} uploadPersistent failed`, err);
+		ui.notifications.error(`${LT.errors.errorOccured()}.`);
+	}
+}
+
+// export Settings presets
+export async function bbmm_exportSettingsPresetsAll() {
+	const FN = "helpers.js | bbmm_exportSettingsPresetsAll():";
+	const storageFile = "settings-presets.json";
+	const url = `bbmm-data/${storageFile}`;
+
+	try {
+		const res = await fetch(url, { cache: "no-store" });
+		if (!res.ok) {
+			DL(3, `${FN} fetch not ok`, { url, status: res.status });
+			ui.notifications.error(`${LT.errors.errorOccured()}.`);
+			return;
+		}
+
+		const data = await res.json();
+		const d = new Date();
+		const pad = (n) => String(n).padStart(2, "0");
+		const fname = `${d.getFullYear()}-${pad(d.getDate())}-${pad(d.getMonth() + 1)}-bbmm-settings-presets.json`;
+
+		await hlp_saveJSONFile(data ?? {}, fname);
+		DL(1, `${FN} exported settings presets`, { url, fname, count: Object.keys(data ?? {}).length });
+	} catch (err) {
+		DL(3, `${FN} failed`, err);
+		ui.notifications.error(`${LT.errors.errorOccured()}.`);
+	}
+}
+
+// import Settings presets (merge into existing + convert old single-preset format)
+export async function bbmm_importSettingsPresetsAll() {
+	const FN = "helpers.js | bbmm_importSettingsPresetsAll():";
+	const storageFile = "settings-presets.json";
+	const url = `bbmm-data/${storageFile}`;
+
+	const file = await hlp_pickLocalJSONFile();
+	if (!file) return;
+
+	let data;
+	try {
+		data = JSON.parse(await file.text());
+		
+		// If a user imports a SINGLE settings preset payload (type/created/world/client/user),
+		// wrap it into the expected map format using the filename as the preset name.
+		if (data && typeof data === "object" && !Array.isArray(data)
+			&& data.type === "bbmm-settings"
+			&& data.world && typeof data.world === "object"
+			&& data.client && typeof data.client === "object"
+			&& data.user && typeof data.user === "object"
+		) {
+			const presetName = (file?.name ?? "bbmm-settings-preset").replace(/\.json$/i, "");
+			data = { [presetName]: data };
+			DL(1, `${FN} wrapped single settings preset payload`, { presetName });
+		}
+	} catch (err) {
+		DL(3, `${FN} invalid json import file`, err);
+		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+		return;
+	}
+
+	// Expect an object of presets: { [presetName]: presetObject }
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		DL(3, `${FN} invalid import shape`, data);
+		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+		return;
+	}
+
+	// Load current presets map from storage (if unreadable, start empty)
+	let current = {};
+	try {
+		const res = await fetch(url, { cache: "no-store" });
+		if (res.ok) {
+			current = await res.json();
+			if (!current || typeof current !== "object" || Array.isArray(current)) current = {};
+		} else {
+			DL(2, `${FN} current presets fetch not ok, starting empty`, { url, status: res.status });
+			current = {};
+		}
+	} catch (err) {
+		DL(2, `${FN} current presets fetch failed, starting empty`, err);
+		current = {};
+	}
+
+	// Date suffix used ONLY on collision
+	const now = new Date();
+	const pad = (n) => String(n).padStart(2, "0");
+	const dateStamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+	const timeStamp = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+	const suffixBase = ` (imported on ${dateStamp} ${timeStamp})`;
+
+	// track counts
+	let added = 0;
+	let renamed = 0;
+	let converted = 0;
+
+	for (const [name, presetRaw] of Object.entries(data)) {
+		if (!name || typeof name !== "string") continue;
+		if (!presetRaw || typeof presetRaw !== "object" || Array.isArray(presetRaw)) continue;
+
+		let preset = presetRaw;
+
+		// OLD FORMAT: { created, updated, items:[{ namespace,key,value,scope }] }
+		if (Array.isArray(presetRaw.items)) {
+			const out = {
+				type: "bbmm-settings",
+				created: null,
+				world: {},
+				client: {},
+				user: {}
+			};
+
+			// created/updated in old exports are often ms timestamps
+			const createdVal = presetRaw.created ?? presetRaw.updated ?? Date.now();
+			if (typeof createdVal === "number") out.created = new Date(createdVal).toISOString();
+			else if (typeof createdVal === "string" && createdVal.trim()) out.created = createdVal.trim();
+			else out.created = new Date().toISOString();
+
+			for (const it of presetRaw.items) {
+				const ns = it?.namespace;
+				const key = it?.key;
+				if (!ns || !key) continue;
+
+				const scope = String(it?.scope || "world").toLowerCase();
+				const bucket = (scope === "world" || scope === "client" || scope === "user") ? scope : "world";
+
+				if (!out[bucket][ns]) out[bucket][ns] = {};
+				out[bucket][ns][key] = it?.value;
+			}
+
+			preset = out;
+			converted++;
+		} else {
+			// NEW/EXPECTED FORMAT: ensure envelope fields exist if partially missing
+			const hasBuckets = presetRaw.world && presetRaw.client && presetRaw.user
+				&& typeof presetRaw.world === "object"
+				&& typeof presetRaw.client === "object"
+				&& typeof presetRaw.user === "object";
+
+			if (hasBuckets && presetRaw.type !== "bbmm-settings") {
+				preset = { ...presetRaw, type: "bbmm-settings" };
+			}
+			if (hasBuckets && !preset.created) {
+				preset = { ...preset, created: new Date().toISOString() };
+			}
+		}
+
+		let finalName = name;
+
+		// Only rename if name already exists
+		if (Object.prototype.hasOwnProperty.call(current, finalName)) {
+			finalName = `${name}${suffixBase}`;
+			renamed++;
+
+			let i = 2;
+			while (Object.prototype.hasOwnProperty.call(current, finalName)) {
+				finalName = `${name}${suffixBase} (${i})`;
+				i++;
+			}
+		}
+
+		current[finalName] = preset;
+		added++;
+	}
+
+	try {
+		const payload = JSON.stringify(current ?? {}, null, 2);
+		const f = new File([payload], storageFile, { type: "application/json" });
+		const res = await FilePicker.upload("data", `bbmm-data`, f, { notify: false });
+
+		if (!res || (!res.path && !res.url)) {
+			DL(3, `${FN} upload returned no path/url`, res);
+			ui.notifications.error(`${LT.errors.errorOccured()}.`);
+			return;
+		}
+
+		DL(1, `${FN} imported settings presets (merged)`, { added, renamed, converted, res });
+		ui.notifications.info(`Imported ${added} settings preset(s).${converted ? ` Converted ${converted}.` : ""}${renamed ? ` Renamed ${renamed}.` : ""}`);
+	} catch (err) {
+		DL(3, `${FN} uploadPersistent failed`, err);
+		ui.notifications.error(`${LT.errors.errorOccured()}.`);
 	}
 }
 
