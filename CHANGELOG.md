@@ -26,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - If value size is larger than 4kb the Setting column text will be colored dark orange indicating a setting with large size value. 
 - **Drop Down Menu:**
   - Fixed styling on "BBMM" Dropdown button on settings and module management windows to work better with light ui. 
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
 
 ## [0.6.4] - 2026-01-11
 
