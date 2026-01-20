@@ -1787,16 +1787,18 @@ Hooks.once("ready", async () => {
 	DL("settings.js | ready fired");
 
 	// Ensure bbmm-data folder exists (Data/bbmm-data)
-	try {
-		await FilePicker.createDirectory("data", "bbmm-data");
-		DL("settings.js | Directory 'bbmm-data' exists!");
-	} catch (err) {
-		const msg = String(err?.message ?? err);
-		if (!msg.toLowerCase().includes("exist")) { // ignore "already exists" errors
-			DL(2, "settings.js | createDirectory failed for bbmm-data", err);
+	if (game.user.isGM) {
+		try {
+			await FilePicker.createDirectory("data", "bbmm-data");
+			DL("settings.js | Directory 'bbmm-data' exists!");
+		} catch (err) {
+			const msg = String(err?.message ?? err);
+			if (!msg.toLowerCase().includes("exist")) { // ignore "already exists" errors
+				DL(2, "settings.js | createDirectory failed for bbmm-data", err);
+			}
 		}
 	}
-
+	
 	// migrate inclusions/exclusions to storage - Remove after version 0.8.0
 	try { await hlp_migrateLists(); } catch (err) { DL(3, "settings.js | Inclusions/Exclusions migration failed:", err?.message ?? err); }
 

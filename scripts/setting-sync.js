@@ -744,8 +744,6 @@ import { LT, BBMM_ID } from "./localization.js";
 		}
 	}
 
-
-
 	/* 	Class: BBMMUserPicker ======================================================
 		- Shows a per-user selection dialog for Lock/Sync
 		- preChecked: array of user IDs OR the string 
@@ -1995,7 +1993,7 @@ import { LT, BBMM_ID } from "./localization.js";
 						const targets = Array.isArray(msg?.targets) ? msg.targets : null;
 						if (targets && targets.length && !targets.includes(game.user.id)) return;
 
-						const ns = msg.namespace, action = msg.action;
+						const ns = msg.namespace ?? msg.ns, action = msg.action;
 						const arr = Array.isArray(msg.value) ? msg.value : [];
 
 						try {
@@ -2459,12 +2457,13 @@ import { LT, BBMM_ID } from "./localization.js";
 							const targets = Array.isArray(userIds) ? userIds : [];
 							// one-shot push (no lock) — players apply immediately
 							game.socket?.emit?.(BBMM_SYNC_CH, {
-							t: "bbmm-ctrl-push",
-							ns, action,
-							value: cur,
-							targets
+								t: "bbmm-ctrl-push",
+								namespace: ns,
+								action,
+								value: cur,
+								targets
 							});
-							ui.notifications?.info?.(LT.infoQueuedSync({ module: `${ns}.${action}`, count: targets.length }));
+							ui.notifications?.info?.(`Synced ${ns}.${action} to ${targets.length} users.`);
 						}
 						});
 						picker.show();
