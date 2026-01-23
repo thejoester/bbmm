@@ -3,7 +3,19 @@ import { openSettingsPresetManager, svc_loadSettingsPresets } from './settings-p
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp } from "./inclusions.js";
 import { hlp_readUserExclusions } from "./exclusions.js";
-import { hlp_openManualByUuid, hlp_injectHeaderHelpButton, hlp_saveJSONFile, hlp_pickLocalJSONFile, bbmm_exportSettingsPresetsAll, bbmm_importSettingsPresetsAll, bbmm_exportModulePresetsAll, bbmm_importModulePresetsAll, hlp_esc } from "./helpers.js";
+import { 
+	hlp_openManualByUuid, 
+	hlp_injectHeaderHelpButton, 
+	hlp_saveJSONFile, 
+	hlp_pickLocalJSONFile, 
+	bbmm_exportSettingsPresetsAll, 
+	bbmm_importSettingsPresetsAll, 
+	bbmm_exportModulePresetsAll, 
+	bbmm_importModulePresetsAll, 
+	bbmm_exportKeybindings, 
+	bbmm_importKeybindings, 
+	hlp_esc 
+} from "./helpers.js";
 
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
@@ -648,7 +660,27 @@ export function injectBBMMHeaderButton(root) {
 			{ action: "help", label: (LT.buttons.help?.() ?? "Help"), onClick: () => hlp_openManualByUuid(BBMM_README_UUID) }
 		]
 		: [
+			// Module Presets
 			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
+			// Import / Export
+			{
+				action: "importExport",
+				label: LT.buttons.importExport(),
+				onClick: () => {
+					try {
+						const menu = game.settings.menus.get(`${BBMM_ID}.importExport`);
+						if (!menu || !menu.type) {
+							DL(3, "settings.js | BBMM header dropdown: importExport menu not found", `${BBMM_ID}.importExport`);
+							return;
+						}
+
+						new menu.type().render(true);
+					} catch (err) {
+						DL(3, "settings.js | BBMM header dropdown: failed to open importExport menu", err);
+					}
+				}
+			},
+			// Help
 			{ action: "help", label: (LT.buttons.help?.() ?? "Help"), onClick: () => hlp_openManualByUuid(BBMM_README_UUID) }
 		];
 
@@ -945,6 +977,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 			window: { title: `${LT.moduleInit()} ${LT.buttons.importExport()}` },
 			content: `
 				<div style="display:flex;flex-direction:column;gap:.75rem;">
+					${game.user.isGM ? `
 					<div style="display:flex;align-items:center;gap:.75rem;">
 						<div style="min-width:160px;font-weight:700;">${LT.modulePresetsBtn()}:</div>
 						<div style="display:flex;gap:.5rem;">
@@ -976,8 +1009,18 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 							<button type="button" data-action="bbmm-exc-export" style="width:auto;">${LT.buttons.export()}</button>
 						</div>
 					</div>
+					` : ``}
+
+					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">Keybindings:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-kb-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-kb-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
 				</div>
 			`,
+
 			buttons: [
 				{ action: "close", label: LT.buttons.close(), default: true }
 			],
@@ -1013,6 +1056,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 			const action = btn.dataset.action;
 
 			try {
+				// Module Preset Export
 				if (action === "bbmm-mod-export") {
 					const FN = "settings.js | BBMMImportExportDialog._onRender(): module preset export chooser:";
 					try {
@@ -1091,9 +1135,9 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 					}
 					return;
 				}
-
+				// Module Preset Import
 				if (action === "bbmm-mod-import") return await bbmm_importModulePresetsAll();
-
+				// Settings Preset Import
 				if (action === "bbmm-set-export") {
 					const FN = "settings.js | BBMMImportExportDialog._onRender(): settings preset export chooser:";
 					try {
@@ -1237,9 +1281,86 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 				// Inclusions/Exclusions: all-only file export/import (storage/lists)
 				if (action === "bbmm-inc-export") return await bbmm_exportListFile("user-inclusions.json", "bbmm-inclusions.json");
 				if (action === "bbmm-inc-import") return await bbmm_importListFile("user-inclusions.json");
-
 				if (action === "bbmm-exc-export") return await bbmm_exportListFile("user-exclusions.json", "bbmm-exclusions.json");
 				if (action === "bbmm-exc-import") return await bbmm_importListFile("user-exclusions.json");
+				if (action === "bbmm-kb-export") {
+					const proceed = await new Promise((resolve) => {
+						const dlg = new foundry.applications.api.DialogV2({
+							window: { title: LT._importExport.exportKeybindings() },
+							content: `
+								<div style="display:flex;flex-direction:column;gap:.5rem;">
+									<p class="notes">${LT._importExport.exportKeybindingsNote()}</p>
+									<p class="notes">${LT._importExport.exportKeybindingsNote2()}</p>
+								</div>
+							`,
+							buttons: [
+								{ action: "export", label: LT.buttons.export(), default: true },
+								{ action: "cancel", label: LT.buttons.cancel() }
+							],
+							submit: (res) => resolve(res === "export"),
+							rejectClose: false,
+							position: { width: 520, height: "auto" }
+						});
+						dlg.render(true);
+					});
+					if (!proceed) return;
+
+					const data = foundry.utils.duplicate(game.settings.get("core", "keybindings") ?? {});
+					const d = new Date();
+					const pad = (n) => String(n).padStart(2, "0");
+					const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-bbmm-keybindings.json`;
+
+					await hlp_saveJSONFile(data, fname);
+					ui.notifications.info("Exported keybindings.");
+					DL(1, "settings.js | BBMMImportExportDialog._onRender(): exported keybindings", { fname });
+					return;
+				}
+
+				if (action === "bbmm-kb-import") {
+					const proceed = await new Promise((resolve) => {
+						const dlg = new foundry.applications.api.DialogV2({
+							window: { title: LT._importExport.importKeybindings() },
+							content: `
+								<div style="display:flex;flex-direction:column;gap:.5rem;">
+									<p class="notes">${LT._importExport.importKeybindingsNote()}</p>
+									<p class="notes">${LT._importExport.importKeybindingsNote2()}</p>
+								</div>
+							`,
+							buttons: [
+								{ action: "import", label: LT.buttons.import(), default: true },
+								{ action: "cancel", label: LT.buttons.cancel() }
+							],
+							submit: (res) => resolve(res === "import"),
+							rejectClose: false,
+							position: { width: 520, height: "auto" }
+						});
+						dlg.render(true);
+					});
+					if (!proceed) return;
+
+					const file = await hlp_pickLocalJSONFile();
+					if (!file) return;
+
+					let parsed;
+					try {
+						parsed = JSON.parse(await file.text());
+					} catch (e) {
+						DL(2, "settings.js | BBMMImportExportDialog._onRender(): keybindings import JSON parse failed", e);
+						ui.notifications.error("Invalid keybindings file.");
+						return;
+					}
+
+					if (!parsed || typeof parsed !== "object") {
+						ui.notifications.error("Invalid keybindings file.");
+						return;
+					}
+
+					await game.settings.set("core", "keybindings", parsed);
+					ui.notifications.info("Imported keybindings. Reload may be required.");
+					DL(1, "settings.js | BBMMImportExportDialog._onRender(): imported keybindings", { name: file.name });
+
+					return;
+				}
 			} catch (err) {
 				DL(3, "settings.js | BBMMImportExportDialog._onRender(): action failed", { action, name: err?.name, message: err?.message, stack: err?.stack });
 				ui.notifications.error(LT.errors.importExportFailed());
@@ -1630,7 +1751,7 @@ Hooks.once("init", () => {
 				hint: LT._settings.importExportHint(),
 				icon: "fas fa-file-import",
 				type: BBMMImportExportDialog,
-				restricted: true
+				restricted: false
 			});
 
 			// World toggle to Show changelog on GM login

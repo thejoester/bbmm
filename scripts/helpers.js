@@ -639,6 +639,63 @@ export async function bbmm_importSettingsPresetsAll() {
 	}
 }
 
+// export Keybindings (current user only)
+export async function bbmm_exportKeybindings() {
+	const FN = "helpers.js | bbmm_exportKeybindings():";
+	try {
+		const data = foundry.utils.duplicate(game.settings.get("core", "keybindings") ?? {});
+		const d = new Date();
+		const pad = (n) => String(n).padStart(2, "0");
+		const fname = `${d.getFullYear()}-${pad(d.getDate())}-${pad(d.getMonth() + 1)}-bbmm-keybindings.json`;
+
+		await hlp_saveJSONFile(data ?? {}, fname);
+		DL(1, `${FN} exported keybindings`, { fname, count: Object.keys(data ?? {}).length });
+	} catch (err) {
+		DL(3, `${FN} failed`, err);
+		ui.notifications.error(`${LT.errors.errorOccured()}.`);
+	}
+}
+
+// import Keybindings (current user only)
+export async function bbmm_importKeybindings() {
+	const FN = "helpers.js | bbmm_importKeybindings():";
+
+	const file = await hlp_pickLocalJSONFile();
+	if (!file) return;
+
+	let data;
+	try {
+		data = JSON.parse(await file.text());
+	} catch (err) {
+		DL(3, `${FN} invalid json import file`, err);
+		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+		return;
+	}
+
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		DL(3, `${FN} invalid import shape`, data);
+		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+		return;
+	}
+
+	try {
+		await game.settings.set("core", "keybindings", data);
+
+		// Try to apply immediately if possible, otherwise user reload will pick it up
+		try {
+			if (typeof game.keybindings?.initialize === "function") await game.keybindings.initialize();
+		} catch (err) {
+			DL(2, `${FN} keybindings.initialize failed (reload will apply)`, err);
+		}
+
+		ui.notifications.info("Imported keybindings for current user. Reload if you don't see changes immediately.");
+		DL(1, `${FN} imported keybindings`, { count: Object.keys(data ?? {}).length });
+	} catch (err) {
+		DL(3, `${FN} failed to set core.keybindings`, err);
+		ui.notifications.error(`${LT.errors.errorOccured()}.`);
+	}
+}
+
 Hooks.on("setSetting", (namespace, key, value) => {
 	if (namespace === "bbmm" && key === "userExclusions") {
 		invalidateSkipMap();

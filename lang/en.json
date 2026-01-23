@@ -497,7 +497,14 @@
 			"exportedSettingsPreset": "Exported settings preset.",
 			"importedList": "Imported List.",
 			"exportModulePreset": "Export Module Preset",
-			"exportSettingsPreset": "Export Settings Preset"
+			"exportSettingsPreset": "Export Settings Preset",
+			"keybindings": "Keybindings",
+			"exportKeybindings": "Export Keybindings",
+			"exportKeybindingsNote": "This will export <b>only</b> the current user's keybindings.",
+			"exportKeybindingsNote2": "It will not export world settings, presets, or any other user's keybindings.",
+			"importKeybindings": "Import Keybindings",
+			"importKeybindingsNote": "This will import <b>only</b> into the current user's keybindings and overwrite them.",
+			"importKeybindingsNote2": "Import will OVERWRITE your current keybinding configuration."
 		}
 	}
 }
