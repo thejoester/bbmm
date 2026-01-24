@@ -202,6 +202,16 @@
 		"presetNoticeOpenDocs": "Apri README",
 		"presetNoticeDontShowAgain": "Non mostrare più",
 		"presetNoticeClose": "Chiudi",
+		"presetSaveCurrentModules": "Salva lo stato attuale del modulo come predefinito",
+		"presetSaveCurrentSettings": "Salva lo stato delle impostazioni attuali come predefinito",
+		"selectPreset": "Seleziona un preset da caricare.",
+		"client": "Client",
+		"user": "Utente",
+		"world": "Mondo",
+		"hidden": "nascosto",
+		"visible": "visibile",
+		"unknown": "sconosciuto",
+		"selectNamespace": "Seleziona spazio nome...",
 		"buttons": {
 			"yes": "Sì",
 			"no": "No",
@@ -214,6 +224,7 @@
 			"reload": "Ricarica",
 			"export": "Esporta",
 			"import": "Importa",
+			"importExport": "Importa / Esporta",
 			"load": "Carica",
 			"btnSync": "Sincronizza",
 			"preview": "Anteprima",
@@ -230,7 +241,7 @@
 			"importToPreset": "Importa in preset",
 			"expSettingsJSON": "esporta impostazioni in .json",
 			"expModuleStateJSON": "esporta stato moduli in .json"
-		},		
+		},
 		"errors": {
 			"conflictTitleExists": "Preset esistente",
 			"dependencyMissing": "Dipendenze mancanti",
@@ -260,7 +271,13 @@
 			"settingsExportFailed": "Esportazione impostazioni fallita (vedi console)",
 			"settingsRegUnavail": "Registro impostazioni non disponibile",
 			"failedOpenLegacyExport": "Impossibile aprire finestra esportazione legacy (vedi console)",
-			"failedModulestateExp": "Esportazione stato moduli fallita (vedi console)"
+			"failedModulestateExp": "Esportazione stato moduli fallita (vedi console)",
+			"failedReadSettingsPreset": "Impossibile leggere le impostazioni predefinite.",
+			"failedReadModulePreset": "Impossibile leggere i preset del modulo.",
+			"selectedPresetNotFound": "Preimpostazione selezionata non trovata.",
+			"importExportFailed": "Importa/Esporta fallito. Vedi console.",
+			"notInstalled": "non installato",
+			"depMissing": "dipendenza mancante"
 		},
 		"changelog": {
 			"window_title": "Changelog moduli",
@@ -346,7 +363,8 @@
 			"moduleLocksName": "Moduli Bloccati",
 			"moduleLocksHint": "I moduli elencati qui sono bloccati in BBMM e non possono essere abilitati o disabilitati (manualmente o tramite azioni in blocco).",
 			"autoForceReloadName": "Forza Ricaricamento Giocatore",
-			"autoForceReloadHint": "Forza il ricaricamento immediato ai giocatori quando le nuove impostazioni sono bloccate/sincronizzate"
+			"autoForceReloadHint": "Forza il ricaricamento immediato ai giocatori quando le nuove impostazioni sono bloccate/sincronizzate",
+			"importExportHint": "Preset ed elenchi Importa/Esporta"
 		},
 		"macro": {
   			"columnName": "Nome",
@@ -472,6 +490,21 @@
 			"filter": "Filtra...",
 			"softLock": "Blocco Leggero",
 			"lock": "Blocco"
+		},
+		"_importExport": {
+			"allPresets": "Tutti i Presets",
+			"whichPreset": "Quale preset vuoi esportare?",
+			"exportedSettingsPreset": "Impostazioni predefinite esportate.",
+			"importedList": "Elenco Importato.",
+			"exportModulePreset": "Preset Modulo Esportazione",
+			"exportSettingsPreset": "Preset Impostazioni Esportazione",
+			"keybindings": "Combinazioni Tasti",
+			"exportKeybindings": "Esporta Combinazioni Tasti",
+			"exportKeybindingsNote": "Verranno esportati <b>solo</b> i tasti di scelta rapida dell'utente corrente.",
+			"exportKeybindingsNote2": "Non esporterà le impostazioni del mondo, i preset o le combinazioni di tasti di altri utenti.",
+			"importKeybindings": "Importa Combinazioni Tasti",
+			"importKeybindingsNote": "Questa operazione importerà <b>solo</b> le combinazioni di tasti dell'utente corrente e le sovrascriverà.",
+			"importKeybindingsNote2": "L'importazione SOVRASCRIVERÀ la configurazione attuale dei tasti di scelta rapida."
 		}
 	}
 }
