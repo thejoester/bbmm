@@ -90,7 +90,7 @@
     "name_checkDisabledModules": "Rapport du journal des modifications : vérifier les modules désactivés",
     "hint_checkDisabledModules": "Lorsque que l'option est activée, BGGM cherchera aussi le journal des changements des modules installés mais désactivés.",
     "exclusionsMgr": "Gestionnaire des exclusions",
-    "exclusionsMgrBtn": "Gestionnaire des exclusions",
+    "exclusions": "Exclusions",
     "lblExclusionsMgr": "Ouvrir le gestionnaire des exclusions",
     "titleExclusionsMgr": "Gestionnaire des exclusions de BGGM",
     "titleAddModuleExclusion": "BGGM — Ajouter une exclusion de module",
@@ -197,10 +197,20 @@
     "modListCustomNotesExist": "Il existe des notes personnalisées",
     "presetNoticeTitle": "Préréglages déplacés vers le stockage permanent",
     "presetNoticePleaseRead": "IMPORTANT ! Veuillez lire !",
-    "presetNoticeBody": "<p><strong>Le Bon Gros Gestionnaire de modules </strong> a migré les préréglages de paramètres et les préréglages de modules vers un stockage de modules persistant.</p><p><h4>Qu'est-ce que cela signifie ?</h4> Ces paramètres ne sont plus stockés dans les données du monde FoundryVTT et seront désormais partagés entre les mondes. Vous pouvez ainsi enregistrer un préréglage et l'utiliser dans n'importe quel monde !</p><p>Suite à cette modification, les préréglages précédemment enregistrés dans un monde n'apparaîtront plus dans le Gestionnaire de préréglages. Toutefois, vous pouvez les migrer manuellement à l'aide des macros fournies. Cliquez sur le bouton « Ouvrir le fichier README » pour obtenir des instructions ou utilisez les macros dans les compendiums.</p>",
+    "presetNoticeBody_0_6_5": "<p><strong>Si vous avez effectué la mise à jour vers la version 0.6.0 ou ultérieure,</strong> un problème entraînait l'écrasement des données à chaque mise à jour. La bonne nouvelle est que ce problème a été résolu. La mauvaise nouvelle est que cette dernière mise à jour, malgré le correctif, effacera malheureusement à nouveau vos données.</p><p>De ce fait, les paramètres et les préréglages des modules devront être migrés manuellement à l'aide des macros fournies dans le compendium. Cliquez sur le bouton « Ouvrir le fichier README » pour obtenir des instructions ou utilisez les macros du compendium.</p>",
     "presetNoticeOpenDocs": "Ouvrir le fichier README",
     "presetNoticeDontShowAgain": "Ne plus afficher",
     "presetNoticeClose": "Fermer",
+    "presetSaveCurrentModules": "Enregistrer l'état actuel du module dans le préréglage",
+    "presetSaveCurrentSettings": "Enregistrer l'état actuel des paramètres dans le préréglage",
+    "selectPreset": "Sélectionnez un préréglage à charger.",
+    "client": "Client",
+    "user": "Utilisateur",
+    "world": "Monde",
+    "hidden": "caché",
+    "visible": "visible",
+    "unknown": "inconnu",
+    "selectNamespace": "Sélectionnez l'espace de noms...",
     "buttons": {
       "yes": "Oui",
       "no": "Non",
@@ -213,6 +223,7 @@
       "reload": "Recharger",
       "export": "Exporter",
       "import": "Importer",
+      "importExport": "Importation / Exportation",
       "load": "Charger",
       "btnSync": "Synchroniser",
       "preview": "Prévisualiser",
@@ -259,7 +270,13 @@
       "settingsExportFailed": "L'exportation des paramètres a échoué (voir console)",
       "settingsRegUnavail": "Registre des paramètres indisponible",
       "failedOpenLegacyExport": "Échec de l'ouverture de l'exportation du dialogue legacy (Voir console)",
-      "failedModulestateExp": "Exportation de l'état du module a échoué (Voir console)"
+      "failedModulestateExp": "Exportation de l'état du module a échoué (Voir console)",
+      "failedReadSettingsPreset": "Impossible de lire les préréglages prédéfinis.",
+      "failedReadModulePreset": "Impossible de lire les préréglages du module.",
+      "selectedPresetNotFound": "Préréglage sélectionné introuvable.",
+      "importExportFailed": "L'importation/exportation a échoué. Consultez la console.",
+      "notInstalled": "pas installé",
+      "depMissing": "dépendance manquante"
     },
     "changelog": {
       "window_title": "Journaux des changement des modules",
@@ -345,7 +362,8 @@
       "moduleLocksName": "Modules verrouillés",
       "moduleLocksHint": "Les modules indiqués ici sont verrouillés dans BGGM et ne peuvent être activés ou désactivés (manuellement ou par actions groupées).",
       "autoForceReloadName": "Forcer le rechargement du joueur",
-      "autoForceReloadHint": "Forcer le rechargement instantané pour les joueurs lorsque les nouveaux paramètres sont verrouillés/synchronisés"
+      "autoForceReloadHint": "Forcer le rechargement instantané pour les joueurs lorsque les nouveaux paramètres sont verrouillés/synchronisés",
+      "importExportHint": "Importer/exporter des préréglages et des listes."
     },
     "macro": {
       "columnName": "Nom",
@@ -471,6 +489,21 @@
       "filter": "Filtre...",
       "softLock": "Verrouillage souple",
       "lock": "Verrouillage"
+    },
+    "_importExport": {
+      "allPresets": "Tous les préréglages",
+      "whichPreset": "Quel préréglage souhaitez-vous exporter",
+      "exportedSettingsPreset": "Préréglage des paramètres exportés.",
+      "importedList": "Liste importée.",
+      "exportModulePreset": "Exporter les paramètres du module",
+      "exportSettingsPreset": "Exporter les préréglages des paramètres",
+      "keybindings": "Raccourcis clavier",
+      "exportKeybindings": "Exporter les raccourcis clavier",
+      "exportKeybindingsNote": "Cela exportera <b>uniquement</b> les raccourcis clavier de l'utilisateur actuel.",
+      "exportKeybindingsNote2": "Cela n'exportera pas les paramètres du monde, les préréglages ni tout autre raccourci clavier de l'utilisateur.",
+      "importKeybindings": "Importer les raccourcis clavier",
+      "importKeybindingsNote": "Cela sera importé <b>uniquement</b> dans les raccourcis clavier de l'utilisateur actuel qui seront écrasés.",
+      "importKeybindingsNote2": "L'importation ÉCRASERA votre configuration de raccourcis clavier actuelle."
     }
   }
 }
