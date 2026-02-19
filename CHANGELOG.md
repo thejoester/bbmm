@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Added notification when new module(s) has been installed, prompting to enable. This feature can be disabled in settings. 
 
 ## [0.6.8] - 2026-01-20
+
 ### Changed
 - **Localization:**
   - Updated Italian localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+is%3Aopen+author%3AGregoryWarn)!
