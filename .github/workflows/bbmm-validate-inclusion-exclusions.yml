@@ -20,7 +20,6 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-
             const token = process.env.GITHUB_TOKEN;
 
             const extractCandidateUrls = (text) => {
@@ -37,7 +36,6 @@ jobs:
               const rawRe = /(https?:\/\/[^\s)]+)/g;
               while ((m = rawRe.exec(text)) !== null) urls.push(m[1]);
 
-              // Unique
               const unique = [...new Set(urls)];
 
               // Keep likely attachments:
@@ -96,14 +94,31 @@ jobs:
               return errors;
             };
 
-            const postComment = async (discussion_number, body) => {
-              await github.rest.discussions.createComment({
-                owner, repo, discussion_number,
-                body
-              });
+            // GraphQL comment helper (Discussions require GraphQL)
+            const postComment = async (discussionNumber, body) => {
+              // Fetch discussion node id
+              const q = `
+                query($owner:String!, $repo:String!, $number:Int!) {
+                  repository(owner:$owner, name:$repo) {
+                    discussion(number:$number) { id }
+                  }
+                }
+              `;
+              const qRes = await github.graphql(q, { owner, repo, number: discussionNumber });
+              const discussionId = qRes?.repository?.discussion?.id;
+              if (!discussionId) throw new Error(`Could not resolve discussion id for #${discussionNumber}`);
+
+              const m = `
+                mutation($discussionId:ID!, $body:String!) {
+                  addDiscussionComment(input:{discussionId:$discussionId, body:$body}) {
+                    comment { id url }
+                  }
+                }
+              `;
+              await github.graphql(m, { discussionId, body });
             };
 
-            // Determine which discussion we're dealing with and what text to scan
+            // Determine which discussion we're validating and what text to scan
             let discussionNumber = null;
             let bodiesToScan = [];
 
@@ -116,7 +131,7 @@ jobs:
               const commentBody = context.payload.comment.body || "";
               bodiesToScan = [commentBody];
 
-              // Also scan the discussion body as fallback (in case attachment was in the original post)
+              // Also scan the discussion body as fallback
               const disc = await github.rest.discussions.get({
                 owner, repo, discussion_number: discussionNumber
               });
@@ -133,7 +148,6 @@ jobs:
             const urls = [...new Set(candidates)];
 
             if (!urls.length) {
-              // Always comment on discussion events; on comment events, only comment if the comment looks like a submission attempt
               if (context.eventName === "discussion") {
                 const msg = [
                   "<!-- bbmm-validator -->",
@@ -187,7 +201,6 @@ jobs:
               return;
             }
 
-            // Validate structure
             const errors = validateBundle(parsed);
 
             if (errors.length) {
