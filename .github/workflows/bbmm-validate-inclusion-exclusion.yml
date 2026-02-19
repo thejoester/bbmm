@@ -1,0 +1,201 @@
+name: BBMM Validate Inclusion/Exclusion JSON (Discussions)
+
+on:
+  discussion:
+    types: [opened, edited]
+  discussion_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  discussions: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate attached JSON and comment result
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Helpers
+            const extractJsonUrls = (text) => {
+              if (!text) return [];
+              // Match markdown links/images: [name](url) or ![name](url)
+              const urls = [];
+              const mdLinkRe = /\]\((https?:\/\/[^\s)]+)\)/g;
+              let m;
+              while ((m = mdLinkRe.exec(text)) !== null) urls.push(m[1]);
+
+              // Also match raw URLs in text
+              const rawRe = /(https?:\/\/[^\s)]+\.json[^\s)]*)/g;
+              while ((m = rawRe.exec(text)) !== null) urls.push(m[1]);
+
+              // Keep only .json links (allow querystring)
+              return [...new Set(urls)].filter(u => /\.json(\?|$)/i.test(u));
+            };
+
+            const validateBundle = (data) => {
+              const errors = [];
+
+              if (!data || typeof data !== "object") {
+                errors.push("File is not a JSON object.");
+                return errors;
+              }
+
+              if (typeof data.schemaVersion !== "number") errors.push("Missing/invalid `schemaVersion` (must be a number).");
+              if (typeof data.target !== "string" || !data.target.trim()) errors.push("Missing/invalid `target` (must be a non-empty string).");
+              if (typeof data.targetVersion !== "string") errors.push("Missing/invalid `targetVersion` (must be a string; can be empty).");
+              if (typeof data.foundryVersion !== "string") errors.push("Missing/invalid `foundryVersion` (must be a string; can be empty).");
+              if (!Array.isArray(data.entries)) errors.push("Missing/invalid `entries` (must be an array).");
+
+              if (Array.isArray(data.entries)) {
+                data.entries.forEach((e, idx) => {
+                  if (!e || typeof e !== "object") {
+                    errors.push(`entries[${idx}] must be an object.`);
+                    return;
+                  }
+                  const t = String(e.type ?? "").toLowerCase();
+                  if (t !== "module" && t !== "setting") {
+                    errors.push(`entries[${idx}].type must be "module" or "setting".`);
+                    return;
+                  }
+                  if (t === "setting") {
+                    if (typeof e.key !== "string" || !e.key.trim()) {
+                      errors.push(`entries[${idx}].key is required for type "setting" (non-empty string).`);
+                    }
+                  }
+                });
+              }
+
+              return errors;
+            };
+
+            // Figure out what we're validating: discussion body, or comment body (if comment contains .json)
+            let discussionNumber = null;
+            let discussionBody = null;
+            let candidateBodies = [];
+
+            if (context.eventName === "discussion") {
+              discussionNumber = context.payload.discussion.number;
+              discussionBody = context.payload.discussion.body || "";
+              candidateBodies = [discussionBody];
+            } else if (context.eventName === "discussion_comment") {
+              discussionNumber = context.payload.discussion.number;
+              const commentBody = context.payload.comment.body || "";
+              // Only validate on comment events if the comment actually contains a .json link
+              if (extractJsonUrls(commentBody).length === 0) {
+                return;
+              }
+              // We'll validate the comment first, but fall back to discussion body
+              candidateBodies = [commentBody];
+              // Fetch the discussion body too (optional fallback)
+              const disc = await github.rest.discussions.get({
+                owner, repo, discussion_number: discussionNumber
+              });
+              discussionBody = disc.data.body || "";
+              candidateBodies.push(discussionBody);
+            } else {
+              return;
+            }
+
+            // Find first .json URL from candidate bodies
+            let jsonUrl = null;
+            for (const body of candidateBodies) {
+              const urls = extractJsonUrls(body);
+              if (urls.length) { jsonUrl = urls[0]; break; }
+            }
+
+            // If discussion opened/edited but no attachment, give a gentle nudge once
+            if (!jsonUrl) {
+              if (context.eventName === "discussion") {
+                const msg = [
+                  "<!-- bbmm-validator -->",
+                  "I didn’t find an attached `.json` file link in this discussion.",
+                  "",
+                  "Attach your inclusion/exclusion file by dragging it into the editor (or using the attachment button), then edit the post. I’ll validate it automatically."
+                ].join("\n");
+                await github.rest.discussions.createComment({
+                  owner, repo, discussion_number: discussionNumber, body: msg
+                });
+              }
+              return;
+            }
+
+            // Download JSON
+            let text;
+            try {
+              const res = await fetch(jsonUrl, { redirect: "follow" });
+              if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+              text = await res.text();
+            } catch (e) {
+              const msg = [
+                "<!-- bbmm-validator -->",
+                `❌ Could not download the attached JSON.`,
+                ``,
+                `URL: ${jsonUrl}`,
+                `Error: ${String(e?.message ?? e)}`
+              ].join("\n");
+              await github.rest.discussions.createComment({
+                owner, repo, discussion_number: discussionNumber, body: msg
+              });
+              return;
+            }
+
+            // Parse + validate
+            let data;
+            try {
+              data = JSON.parse(text);
+            } catch (e) {
+              const msg = [
+                "<!-- bbmm-validator -->",
+                "❌ Invalid JSON (parse error).",
+                "",
+                `URL: ${jsonUrl}`,
+                `Error: ${String(e?.message ?? e)}`
+              ].join("\n");
+              await github.rest.discussions.createComment({
+                owner, repo, discussion_number: discussionNumber, body: msg
+              });
+              return;
+            }
+
+            const errors = validateBundle(data);
+
+            if (errors.length) {
+              const msg = [
+                "<!-- bbmm-validator -->",
+                "❌ BBMM inclusion/exclusion file validation failed.",
+                "",
+                `URL: ${jsonUrl}`,
+                "",
+                "**Problems found:**",
+                ...errors.map(e => `- ${e}`),
+                "",
+                "Fix the JSON and re-attach (or attach a corrected file). I’ll re-check on edit/new comment with a `.json` link."
+              ].join("\n");
+              await github.rest.discussions.createComment({
+                owner, repo, discussion_number: discussionNumber, body: msg
+              });
+              return;
+            }
+
+            const msg = [
+              "<!-- bbmm-validator -->",
+              "✅ BBMM inclusion/exclusion file looks valid.",
+              "",
+              `URL: ${jsonUrl}`,
+              "",
+              "**Detected:**",
+              `- target: \`${String(data.target)}\``,
+              `- targetVersion: \`${String(data.targetVersion)}\``,
+              `- foundryVersion: \`${String(data.foundryVersion)}\``,
+              `- entries: \`${Array.isArray(data.entries) ? data.entries.length : 0}\``
+            ].join("\n");
+
+            await github.rest.discussions.createComment({
+              owner, repo, discussion_number: discussionNumber, body: msg
+            });
