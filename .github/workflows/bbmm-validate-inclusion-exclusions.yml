@@ -2,7 +2,7 @@ name: BBMM Validate Inclusion/Exclusion JSON (Discussions)
 
 on:
   discussion:
-    types: [opened, edited]
+    types: [opened, created, edited]
   discussion_comment:
     types: [created, edited]
 
