@@ -22,9 +22,8 @@ jobs:
             const repo = context.repo.repo;
             const token = process.env.GITHUB_TOKEN;
 
-            const extractCandidateUrls = (text) => {
+            function extractCandidateUrls(text) {
               if (!text) return [];
-
               const urls = [];
 
               // Markdown links/images: [text](url) or ![text](url)
@@ -36,27 +35,26 @@ jobs:
               const rawRe = /(https?:\/\/[^\s)]+)/g;
               while ((m = rawRe.exec(text)) !== null) urls.push(m[1]);
 
-              const unique = [...new Set(urls)];
+              const unique = Array.from(new Set(urls));
 
               // Likely attachments:
               // - ends with .json (optionally with querystring)
               // - GitHub user-attachments links (used for drag-drop uploads)
-              return unique.filter(u =>
-                /\.json(\?|$)/i.test(u) ||
-                /\/user-attachments\//i.test(u)
+              return unique.filter((u) =>
+                /\.json(\?|$)/i.test(u) || /\/user-attachments\//i.test(u)
               );
-            };
+            }
 
-            const tryDownloadText = async (url) => {
+            async function tryDownloadText(url) {
               const res = await fetch(url, {
                 redirect: "follow",
-                headers: token ? { Authorization: `Bearer ${token}` } : undefined
+                headers: token ? { Authorization: "Bearer " + token } : undefined
               });
-              if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+              if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
               return await res.text();
-            };
+            }
 
-            const validateBundle = (data) => {
+            function validateBundle(data) {
               const errors = [];
 
               if (!data || typeof data !== "object") {
@@ -73,57 +71,59 @@ jobs:
               if (Array.isArray(data.entries)) {
                 data.entries.forEach((e, idx) => {
                   if (!e || typeof e !== "object") {
-                    errors.push(`entries[${idx}] must be an object.`);
+                    errors.push("entries[" + idx + "] must be an object.");
                     return;
                   }
 
-                  const t = String(e.type ?? "").toLowerCase();
+                  const t = String(e.type || "").toLowerCase();
                   if (t !== "module" && t !== "setting") {
-                    errors.push(`entries[${idx}].type must be "module" or "setting".`);
+                    errors.push("entries[" + idx + "].type must be \"module\" or \"setting\".");
                     return;
                   }
 
                   if (t === "setting") {
                     if (typeof e.key !== "string" || !e.key.trim()) {
-                      errors.push(`entries[${idx}].key is required for type "setting" (non-empty string).`);
+                      errors.push("entries[" + idx + "].key is required for type \"setting\" (non-empty string).");
                     }
                   }
                 });
               }
 
               return errors;
-            };
+            }
 
-            // GraphQL helpers for Discussions (REST is missing here)
-            const getDiscussion = async (number) => {
-              const q = `
-                query($owner:String!, $repo:String!, $number:Int!) {
-                  repository(owner:$owner, name:$repo) {
-                    discussion(number:$number) {
-                      id
-                      body
-                    }
-                  }
-                }
-              `;
+            // GraphQL helpers (Discussions are best handled via GraphQL here)
+            async function getDiscussion(number) {
+              const q = [
+                "query($owner:String!, $repo:String!, $number:Int!) {",
+                "  repository(owner:$owner, name:$repo) {",
+                "    discussion(number:$number) {",
+                "      id",
+                "      body",
+                "    }",
+                "  }",
+                "}"
+              ].join("\n");
+
               const res = await github.graphql(q, { owner, repo, number });
-              return res?.repository?.discussion || null;
-            };
+              return (res && res.repository && res.repository.discussion) ? res.repository.discussion : null;
+            }
 
-            const postComment = async (discussionNumber, body) => {
+            async function postComment(discussionNumber, body) {
               const disc = await getDiscussion(discussionNumber);
-              const discussionId = disc?.id;
-              if (!discussionId) throw new Error(\`Could not resolve discussion id for #\${discussionNumber}\`);
+              const discussionId = disc && disc.id ? disc.id : null;
+              if (!discussionId) throw new Error("Could not resolve discussion id for #" + discussionNumber);
 
-              const m = `
-                mutation($discussionId:ID!, $body:String!) {
-                  addDiscussionComment(input:{discussionId:$discussionId, body:$body}) {
-                    comment { id url }
-                  }
-                }
-              `;
+              const m = [
+                "mutation($discussionId:ID!, $body:String!) {",
+                "  addDiscussionComment(input:{discussionId:$discussionId, body:$body}) {",
+                "    comment { id url }",
+                "  }",
+                "}"
+              ].join("\n");
+
               await github.graphql(m, { discussionId, body });
-            };
+            }
 
             // Determine which discussion and what content to scan
             let discussionNumber = null;
@@ -138,9 +138,9 @@ jobs:
               const commentBody = context.payload.comment.body || "";
               bodiesToScan = [commentBody];
 
-              // Fallback to discussion body (GraphQL)
+              // Fallback to discussion body
               const disc = await getDiscussion(discussionNumber);
-              bodiesToScan.push(disc?.body || "");
+              bodiesToScan.push((disc && disc.body) ? disc.body : "");
             } else {
               return;
             }
@@ -150,10 +150,9 @@ jobs:
             for (const b of bodiesToScan) {
               for (const u of extractCandidateUrls(b)) candidates.push(u);
             }
-            const urls = [...new Set(candidates)];
+            const urls = Array.from(new Set(candidates));
 
             if (!urls.length) {
-              // Only nag on discussion create/edit, not on random comments unless they include a link
               if (context.eventName === "discussion") {
                 const msg = [
                   "<!-- bbmm-validator -->",
@@ -196,18 +195,18 @@ jobs:
                 "❌ I found attachment links, but none could be downloaded and parsed as JSON.",
                 "",
                 "**Links found:**",
-                ...urls.map(u => `- ${u}`),
+                ...urls.map((u) => "- " + u),
                 "",
-                lastDownloadErr ? `**Last download error:** ${String(lastDownloadErr.message ?? lastDownloadErr)}` : "",
-                lastParseErr ? `**Last parse error:** ${String(lastParseErr.message ?? lastParseErr)}` : "",
+                lastDownloadErr ? ("**Last download error:** " + String(lastDownloadErr.message || lastDownloadErr)) : "",
+                lastParseErr ? ("**Last parse error:** " + String(lastParseErr.message || lastParseErr)) : "",
                 "",
                 "Make sure the attached file is a `.json` export from BBMM and try again."
               ].filter(Boolean).join("\n");
+
               await postComment(discussionNumber, msg);
               return;
             }
 
-            // Validate structure
             const errors = validateBundle(parsed);
 
             if (errors.length) {
@@ -215,28 +214,29 @@ jobs:
                 "<!-- bbmm-validator -->",
                 "❌ BBMM inclusion/exclusion file validation failed.",
                 "",
-                `**File:** ${chosenUrl}`,
+                "**File:** " + chosenUrl,
                 "",
                 "**Problems found:**",
-                ...errors.map(e => `- ${e}`),
+                ...errors.map((e) => "- " + e),
                 "",
                 "Fix the JSON and re-attach (or attach a corrected file). Editing the post will trigger validation again."
               ].join("\n");
+
               await postComment(discussionNumber, msg);
               return;
             }
 
-            const msg = [
+            const okMsg = [
               "<!-- bbmm-validator -->",
               "✅ BBMM inclusion/exclusion file looks valid.",
               "",
-              `**File:** ${chosenUrl}`,
+              "**File:** " + chosenUrl,
               "",
               "**Detected:**",
-              `- target: \`${String(parsed.target)}\``,
-              `- targetVersion: \`${String(parsed.targetVersion)}\``,
-              `- foundryVersion: \`${String(parsed.foundryVersion)}\``,
-              `- entries: \`${Array.isArray(parsed.entries) ? parsed.entries.length : 0}\``
+              "- target: `" + String(parsed.target) + "`",
+              "- targetVersion: `" + String(parsed.targetVersion) + "`",
+              "- foundryVersion: `" + String(parsed.foundryVersion) + "`",
+              "- entries: `" + (Array.isArray(parsed.entries) ? parsed.entries.length : 0) + "`"
             ].join("\n");
 
-            await postComment(discussionNumber, msg);
+            await postComment(discussionNumber, okMsg);
