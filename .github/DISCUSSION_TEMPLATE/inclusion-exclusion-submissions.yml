@@ -1,0 +1,78 @@
+title: "Inclusion / Exclusion Submission"
+labels:
+  - inclusion-exclusion
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Submit a BBMM Inclusion / Exclusion File
+
+        Attach your `.json` file to this discussion **before** posting:
+        - Drag and drop the file into the editor, or use the paperclip attachment button.
+        - The JSON must match the BBMM namespace format:
+          `schemaVersion`, `target`, `targetVersion`, `foundryVersion`, `entries`
+
+        Files missing required fields may be rejected by the validator.
+
+  - type: dropdown
+    id: fileType
+    attributes:
+      label: File Type
+      description: Is this an inclusions file or exclusions file?
+      options:
+        - inclusions
+        - exclusions
+    validations:
+      required: true
+
+  - type: input
+    id: target
+    attributes:
+      label: Target Namespace (Module/System ID)
+      description: Example: "pf2e-workbench" or "bbmm"
+      placeholder: "pf2e-workbench"
+    validations:
+      required: true
+
+  - type: input
+    id: targetVersion
+    attributes:
+      label: Target Version
+      description: Version of the module/system this file was built against.
+      placeholder: "0.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: foundryVersion
+    attributes:
+      label: Foundry Version
+      description: Foundry version this file was created/tested with.
+      placeholder: "13.351"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Optional. Briefly explain what this inclusion/exclusion file covers.
+      placeholder: ""
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ### Required: Attach your JSON file
+        Make sure the `.json` file is attached to this discussion.
+        The validator workflow (if enabled) will look for an attached file ending in `.json`.
+
+  - type: textarea
+    id: links
+    attributes:
+      label: Related Links (optional)
+      description: Optional. Link to module/system page or related discussion.
+      placeholder: "- Module page: …\n- Documentation: …"
+    validations:
+      required: false
