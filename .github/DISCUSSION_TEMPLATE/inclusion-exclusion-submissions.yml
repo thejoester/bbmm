@@ -1,9 +1,9 @@
-name: Inclusion / Exclusion Submission
-description: Submit a BBMM inclusion or exclusion JSON file
+name: "Inclusion / Exclusion Submissions"
+description: "Submit a BBMM inclusion or exclusion JSON file"
 title: "[Inclusion/Exclusion] "
-category: Inclusion/Exclusion submissions
+category: "Inclusion/Exclusion submissions"
 labels:
-  - inclusion-exclusion
+  - "inclusion-exclusion"
 
 body:
   - type: markdown
@@ -23,48 +23,48 @@ body:
         If no `.json` file is attached, the validator workflow will not pass.
 
   - type: dropdown
-    id: fileType
+    id: "fileType"
     attributes:
-      label: File Type
-      description: Is this an inclusions file or exclusions file?
+      label: "File Type"
+      description: "Is this an inclusions file or exclusions file?"
       options:
-        - inclusions
-        - exclusions
+        - "inclusions"
+        - "exclusions"
     validations:
       required: true
 
   - type: input
-    id: target
+    id: "target"
     attributes:
-      label: Target Namespace (Module/System ID)
-      description: Example: "pf2e-workbench" or "bbmm"
+      label: "Target Namespace (Module/System ID)"
+      description: "Example: pf2e-workbench or bbmm"
       placeholder: "pf2e-workbench"
     validations:
       required: true
 
   - type: input
-    id: targetVersion
+    id: "targetVersion"
     attributes:
-      label: Target Version
-      description: Version of the module/system this file was created for.
+      label: "Target Version"
+      description: "Version of the module/system this file was created for."
       placeholder: "6.5.3"
     validations:
       required: true
 
   - type: input
-    id: foundryVersion
+    id: "foundryVersion"
     attributes:
-      label: Foundry Version
-      description: Foundry version used when creating/testing this file.
+      label: "Foundry Version"
+      description: "Foundry version used when creating/testing this file."
       placeholder: "13.3.0"
     validations:
       required: true
 
   - type: textarea
-    id: description
+    id: "description"
     attributes:
-      label: Description (Optional)
-      description: Briefly describe what this inclusion/exclusion file covers.
+      label: "Description (Optional)"
+      description: "Briefly describe what this inclusion/exclusion file covers."
       placeholder: "Includes all hidden automation-related settings for PF2e Workbench."
     validations:
       required: false
@@ -78,10 +78,10 @@ body:
         The validator will automatically check it when posted or edited.
 
   - type: textarea
-    id: links
+    id: "links"
     attributes:
-      label: Related Links (Optional)
-      description: Optional links to the module/system page or documentation.
+      label: "Related Links (Optional)"
+      description: "Optional links to the module/system page or documentation."
       placeholder: |
         - Module page: ...
         - Documentation: ...
