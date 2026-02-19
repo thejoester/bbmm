@@ -23,6 +23,8 @@ const FILE_USER_INCLUSIONS = "user-inclusions.json";
 // Size threshold to mark preview as "large"
 const LARGE_VALUE_THRESHOLD = 4096; // 4 KB
 
+const INC_BUNDLE_SCHEMA_VERSION = 1; // Import/Export bundle schema version
+
 let _incCache = null;
 let _incCacheLoaded = false;
 
@@ -133,6 +135,101 @@ async function _resolveMenuIdsToPairs(menuNs, menuKey) {
 		return { namespace: sid.slice(0, d), key: sid.slice(d + 1) };
 	});
 }
+
+/* ============================================================================
+	{IMPORT / EXPORT HELPERS}
+============================================================================ */
+
+// Validate structure of imported inclusion bundle
+function _isValidInclusionBundle(data) {
+	if (!data || typeof data !== "object") return false;
+
+	if (typeof data.schemaVersion !== "number") return false;
+	if (!data.target || typeof data.target !== "string") return false;
+	if (typeof data.targetVersion !== "string") return false;
+	if (typeof data.foundryVersion !== "string") return false;
+	if (!Array.isArray(data.entries)) return false;
+
+	return true;
+}
+
+// Prompt user to pick a JSON file and read+parse it
+async function _pickAndReadJsonFile() {
+	return await new Promise((resolve) => {
+		const input = document.createElement("input");
+		input.type = "file";
+		input.accept = "application/json,.json";
+		input.style.display = "none";
+
+		input.addEventListener("change", async () => {
+			try {
+				const file = input.files?.[0];
+				if (!file) return resolve(null);
+
+				const txt = await file.text();
+				resolve({ name: file.name, text: txt });
+			} catch (e) {
+				DL(2, "inclusions.js | _pickAndReadJsonFile(): failed", e);
+				resolve(null);
+			} finally {
+				try { input.remove(); } catch {}
+			}
+		});
+
+		document.body.appendChild(input);
+		input.click();
+	});
+}
+
+// Show a dialog with buttons and return the key of the button clicked (or "close" if dismissed)
+async function _dialogV2Choice({ title, content, buttons }) {
+	return await new Promise((resolve) => {
+		const btns = Object.entries(buttons || {}).map(([action, b]) => ({
+			action,
+			label: b.label,
+			icon: b.icon,
+			default: !!b.default,
+			callback: (event, button, dialog) => {
+				try { resolve({ key: action, event, button, dialog }); }
+				catch { resolve({ key: action }); }
+			}
+		}));
+
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title },
+			content,
+			buttons: btns,
+			close: () => resolve({ key: "close" })
+		});
+
+		dlg.render(true);
+	});
+}
+
+// Get metadata about a target (system or module) for inclusion bundles
+function _getTargetMeta(targetNs) {
+	// system
+	if (targetNs === game.system?.id) {
+		return {
+			title: game.system?.title ?? targetNs,
+			version: String(game.system?.version ?? "")
+		};
+	}
+
+	// module
+	const mod = game.modules.get(targetNs);
+	return {
+		title: String(mod?.title ?? targetNs),
+		version: String(mod?.version ?? "")
+	};
+}
+
+// Get Foundry version string (with safety fallbacks for older versions)
+function _getFoundryVersionString() {
+	// v13 commonly has game.version; keep fallback for safety
+	return String(game.version ?? game.release?.version ?? "");
+}
+
 
 /* BBMMAddSettingInclusionAppV2 ===============================================
 	Add Setting Inclusion (hidden settings only)
@@ -1406,8 +1503,8 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 				.bbmm-x-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
 
-				.bbmm-x-toolbar{display:grid;grid-template-columns:auto auto 1fr max-content;align-items:center;column-gap:8px}
-				.bbmm-x-toolbar .bbmm-btn{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+				.bbmm-x-toolbar{display:grid;grid-template-columns:auto auto auto auto 1fr max-content;align-items:center;column-gap:8px}
+				.bbmm-x-toolbar .bbmm-btn{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;width:auto}
 
 				.bbmm-x-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
 				.bbmm-x-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:.95rem}
@@ -1449,6 +1546,16 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				<div class="bbmm-x-toolbar">
 					<button type="button" class="bbmm-btn bbmm-x-add-setting" data-action="add-setting">${LT.buttons.addSetting()}</button>
 					<button type="button" class="bbmm-btn bbmm-x-add-module" data-action="add-module">${LT.buttons.addModule()}</button>
+
+					${game.user.isGM ? `
+						<button type="button" class="bbmm-btn bbmm-x-export" data-action="export-inclusions">
+							${LT.buttons.export()}
+						</button>
+						<button type="button" class="bbmm-btn bbmm-x-import" data-action="import-inclusions">
+							${LT.buttons.import()}
+						</button>
+					` : ``}
+
 					<div></div>
 					<div class="bbmm-x-count">${LT.total()}: ${this._rows.length}</div>
 				</div>
@@ -1494,11 +1601,12 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			DL(2, "inclusions.js | _onRender(): help inject failed", e);
 		}
 
-		// avoid double-binding across re-renders
-		if (this._delegated) return;
-		this._delegated = true;
+		// Rebind delegated click handler each render (content may be replaced)
+		if (this._bbmmClickHandler) {
+			try { content.removeEventListener("click", this._bbmmClickHandler); } catch {}
+		}
 
-		content.addEventListener("click", async (ev) => {
+		this._bbmmClickHandler = async (ev) => {
 			const btn = ev.target.closest?.("button[data-action], .bbmm-x-del");
 			if (!(btn instanceof HTMLButtonElement)) return;
 
@@ -1524,7 +1632,6 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			}
 
 			if (action === "add-module") {
-				// Optional confirm flow to avoid accidental clicks
 				const addModuleBtn = ev.target.closest?.('button[data-action="add-module"]');
 				if (addModuleBtn instanceof HTMLButtonElement) {
 					try { this.close({ force: true }); } catch {}
@@ -1541,7 +1648,6 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				const id   = btn.dataset.id   || "";
 
 				if (type === "module" && ns) {
-					// Remove module inclusion
 					try {
 						btn.disabled = true;
 
@@ -1580,7 +1686,6 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				}
 
 				if (type === "setting" && ns && key) {
-					// Remove setting inclusion
 					try {
 						btn.disabled = true;
 						await this._remove(ns, key);
@@ -1593,8 +1698,214 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					return;
 				}
 			}
-		});
+
+			if (action === "export-inclusions") {
+				if (!game.user.isGM) return;
+
+				try {
+					const inc = await hlp_readUserInclusions({ force: true });
+					const mods = Array.isArray(inc.modules) ? inc.modules : [];
+					const sets = Array.isArray(inc.settings) ? inc.settings : [];
+
+					// Build target list: ONLY namespaces which currently have inclusions
+					const nsSet = new Set();
+
+					// Module-level inclusions
+					for (const m of mods) nsSet.add(String(m));
+
+					// Setting-level inclusions
+					for (const s of sets) {
+						const ns = String(s?.namespace ?? "");
+						if (ns) nsSet.add(ns);
+					}
+
+					const namespaces = Array.from(nsSet);
+					if (!namespaces.length) {
+						ui.notifications?.warn(LT._importExport.noNamespaces());
+						return;
+					}
+
+					const targets = namespaces.map((ns) => {
+						const meta = _getTargetMeta(ns);
+						return {
+							ns,
+							title: String(meta.title ?? ns),
+							version: String(meta.version ?? "")
+						};
+					});
+
+					targets.sort((a, b) => a.title.localeCompare(b.title, game.i18n.lang || undefined, { sensitivity: "base" }));
+
+					const options = targets.map(t =>
+						`<option value="${foundry.utils.escapeHTML(t.ns)}">${foundry.utils.escapeHTML(t.title)} (${foundry.utils.escapeHTML(t.ns)})</option>`
+					).join("");
+
+					const dlgContent = `
+						<form class="bbmm-ie-form">
+							<p style="margin:0 0 .5rem 0">${LT._importExport?.exportPrompt?.() ?? "Export inclusions for a single namespace"}</p>
+							<div style="display:flex;gap:8px;align-items:center">
+								<label style="min-width:120px">${LT.module()}</label>
+								<select name="target" style="flex:1">${options}</select>
+							</div>
+						</form>
+					`;
+
+					const choice = await _dialogV2Choice({
+						title: LT._importExport?.exportTitle?.() ?? "Export Inclusions",
+						content: dlgContent,
+						buttons: {
+							export: { label: LT.buttons.export(), icon: "fas fa-file-export" },
+							cancel: { label: LT.buttons.close(), icon: "fas fa-times" }
+						}
+					});
+
+					if (choice.key !== "export") return;
+
+					const target = String(choice.button?.form?.elements?.target?.value ?? "").trim();
+					if (!target) return;
+
+					const meta = _getTargetMeta(target);
+
+					const entries = [];
+
+					if (mods.includes(target)) {
+						entries.push({ type: "module" });
+					}
+
+					for (const s of sets) {
+						const ns = String(s?.namespace ?? "");
+						const key = String(s?.key ?? "");
+						if (ns === target && key) {
+							entries.push({ type: "setting", key });
+						}
+					}
+
+					const bundle = {
+						schemaVersion: INC_BUNDLE_SCHEMA_VERSION,
+						target,
+						targetVersion: String(meta.version ?? ""),
+						foundryVersion: _getFoundryVersionString(),
+						entries
+					};
+
+					const filename = `bbmm-inclusions-${target}.json`;
+					saveDataToFile(JSON.stringify(bundle, null, 2), "application/json", filename);
+
+					ui.notifications?.info(LT._importExport?.exported?.({ name: filename }) ?? `Exported ${filename}`);
+					DL("inclusions.js | export-inclusions: exported bundle", { target, entries: entries.length, filename });
+				} catch (e) {
+					DL(3, "inclusions.js | export-inclusions: failed", e);
+					ui.notifications?.error(LT._importExport?.failedExport?.() ?? "Export failed");
+				}
+				return;
+			}
+
+			if (action === "import-inclusions") {
+				if (!game.user.isGM) return;
+
+				try {
+					const picked = await _pickAndReadJsonFile();
+					if (!picked?.text) return;
+
+					let data;
+					try {
+						data = JSON.parse(picked.text);
+					} catch (eParse) {
+						DL(2, "inclusions.js | import-inclusions: JSON parse failed", eParse);
+						ui.notifications?.error(LT._importExport?.invalidJson?.() ?? "Invalid JSON");
+						return;
+					}
+
+					if (!_isValidInclusionBundle(data)) {
+						DL(2, "inclusions.js | import-inclusions: invalid schema", data);
+						ui.notifications?.error(LT._importExport?.invalidFormat?.() ?? "Invalid inclusion file format");
+						return;
+					}
+
+					const target = String(data.target ?? "").trim();
+					const importedTargetVersion = String(data.targetVersion ?? "");
+					const localMeta = _getTargetMeta(target);
+					const localVersion = String(localMeta.version ?? "");
+
+					if (localVersion && importedTargetVersion && foundry.utils.isNewerVersion(importedTargetVersion, localVersion)) {
+						const warnContent = `
+							<p style="margin:0 0 .5rem 0">
+								${LT._importExport?.newerVersionWarn?.({ target, imported: importedTargetVersion, local: localVersion }) ??
+								`The imported file is for a newer version of ${target}. Continue anyway?`}
+							</p>
+						`;
+
+						const warnChoice = await _dialogV2Choice({
+							title: LT._importExport?.newerVersionTitle?.() ?? "Newer Version Detected",
+							content: warnContent,
+							buttons: {
+								continue: { label: LT._importExport?.continue?.() ?? "Continue", icon: "fas fa-triangle-exclamation" },
+								cancel: { label: LT.buttons.close(), icon: "fas fa-times" }
+							}
+						});
+
+						if (warnChoice.key !== "continue") return;
+					}
+
+					const cur = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+					if (!Array.isArray(cur.settings)) cur.settings = [];
+					if (!Array.isArray(cur.modules)) cur.modules = [];
+
+					let addedModules = 0;
+					let addedSettings = 0;
+
+					for (const entry of data.entries) {
+						const type = String(entry?.type ?? "").toLowerCase();
+
+						if (type === "module") {
+							if (!cur.modules.includes(target)) {
+								cur.modules.push(target);
+								addedModules++;
+							}
+							continue;
+						}
+
+						if (type === "setting") {
+							const key = String(entry?.key ?? "").trim();
+							if (!key) continue;
+
+							const exists = cur.settings.some(s => s?.namespace === target && s?.key === key);
+							if (!exists) {
+								cur.settings.push({ namespace: target, key });
+								addedSettings++;
+							}
+							continue;
+						}
+					}
+
+					const ok = await hlp_writeUserInclusions(cur);
+					if (!ok) {
+						ui.notifications?.error(LT._importExport?.failedImport?.() ?? "Import failed");
+						return;
+					}
+
+					try { this._incData = cur; } catch {}
+					try { Hooks.callAll("bbmmInclusionsChanged", { type: "import", target, addedModules, addedSettings }); } catch {}
+
+					ui.notifications?.info(
+						LT._importExport?.imported?.({ target, added: addedModules + addedSettings }) ??
+						`Imported inclusions for ${target}`
+					);
+
+					DL("inclusions.js | import-inclusions: merged", { target, addedModules, addedSettings });
+					await this.render(true);
+				} catch (e) {
+					DL(3, "inclusions.js | import-inclusions: failed", e);
+					ui.notifications?.error(LT._importExport?.failedImport?.() ?? "Import failed");
+				}
+				return;
+			}
+
+		};
+
+		content.addEventListener("click", this._bbmmClickHandler);
 	}
+
 }
 
 /* ============================================================================

@@ -1978,6 +1978,219 @@ Hooks.on("ready", () => {
 		DL(2, "BBMM socket: failed to bind reload listener", e);
 	}
 
+	/* ======== New Modules Prompt on Ready ======= */
+	(async () => {
+		try {
+			if (!game.user.isGM) return; // only prompt GMs to avoid multiple prompts and confusion
+			if (!game.settings.get(BBMM_ID, "promptEnableNewModules")) return; // setting disabled, do not prompt
+
+			// Get current installed module IDs and previously known IDs
+			const current = Array.from(game.modules.keys()).sort();
+			let known = game.settings.get(BBMM_ID, "knownInstalledModules");
+			if (!Array.isArray(known)) known = [];
+
+			// First run: seed the list, do not prompt
+			if (known.length === 0) {
+				await game.settings.set(BBMM_ID, "knownInstalledModules", current);
+				DL("module-management.js | knownInstalledModules seeded", { count: current.length });
+				return;
+			}
+
+			const newIds = current.filter(id => !known.includes(id));
+
+			// No new modules: optionally keep the stored list tidy (handles uninstalls)
+			if (newIds.length === 0) {
+				if (known.length !== current.length) {
+					await game.settings.set(BBMM_ID, "knownInstalledModules", current);
+					DL("module-management.js | knownInstalledModules updated (no new modules)", { count: current.length });
+				}
+				return;
+			}
+
+			// Build dialog content
+			const content = document.createElement("div"); // root MUST have no attributes for DialogV2
+			const p = document.createElement("p");
+			p.textContent = LT.moduleManagement.newModulesIntro({ count: newIds.length });
+			content.appendChild(p);
+
+			const form = document.createElement("form");
+
+			// Select all / none controls (ABOVE the list)
+			const controlsRow = document.createElement("div");
+			controlsRow.style.display = "flex";
+			controlsRow.style.gap = "8px";
+			controlsRow.style.margin = "8px 0 8px 0";
+
+			const btnAll = document.createElement("button");
+			btnAll.type = "button";
+			btnAll.className = "bbmm-btn bbmm-newmods-all";
+			btnAll.textContent = LT.moduleManagement.newModulesSelectAll();
+
+			const btnNone = document.createElement("button");
+			btnNone.type = "button";
+			btnNone.className = "bbmm-btn bbmm-newmods-none";
+			btnNone.textContent = LT.moduleManagement.newModulesSelectNone();
+
+			controlsRow.appendChild(btnAll);
+			controlsRow.appendChild(btnNone);
+			form.appendChild(controlsRow);
+
+			// Scroll container for long lists
+			const listWrap = document.createElement("div");
+			listWrap.style.maxHeight = "60vh";
+			listWrap.style.overflowY = "auto";
+			listWrap.style.paddingRight = "6px";
+
+			for (const id of newIds) {
+				const mod = game.modules.get(id);
+				const title = mod?.title ?? id;
+
+				const row = document.createElement("label");
+				row.style.display = "flex";
+				row.style.alignItems = "center";
+				row.style.gap = "8px";
+				row.style.margin = "2px 0";
+
+				const cb = document.createElement("input");
+				cb.type = "checkbox";
+				cb.name = "bbmm-new-module";
+				cb.value = id;
+				cb.checked = true;
+
+				const txt = document.createElement("span");
+				txt.textContent = `${title} (${id})`;
+
+				row.appendChild(cb);
+				row.appendChild(txt);
+				listWrap.appendChild(row);
+			}
+
+			form.appendChild(listWrap);
+			content.appendChild(form);
+
+			// Show dialog
+			await new Promise((resolve) => {
+				let done = false;
+				const safe = () => { if (!done) { done = true; resolve(); } };
+
+				const dlg = new foundry.applications.api.DialogV2({
+					id: "bbmm-new-modules",
+					modal: false,
+					window: { title: LT.moduleManagement.newModulesTitle() },
+					content,
+					buttons: [
+						{
+							action: "enableReload",
+							label: LT.moduleManagement.newModulesEnableAndReload(),
+							icon: "fa-solid fa-rotate-right",
+							default: true,
+							callback: async () => {
+								try {
+									const selected = Array.from(dlg.element?.querySelectorAll('input[name="bbmm-new-module"]:checked') ?? []).map(el => el.value);
+
+									// Record that we've seen these modules
+									await game.settings.set(BBMM_ID, "knownInstalledModules", current);
+
+									if (selected.length === 0) {
+										ui.notifications.info(LT.moduleManagement.noneSelected());
+										DL("module-management.js | new modules prompt: enableReload clicked with none selected");
+										safe();
+										return;
+									}
+
+									const next = foundry.utils.duplicate(game.settings.get("core", "moduleConfiguration") || {});
+									for (const id of selected) next[id] = true;
+
+									DL("module-management.js | enabling newly installed modules", { selected });
+									await game.settings.set("core", "moduleConfiguration", next);
+
+									// Broadcast reload to all clients, then reload self
+									if (game.user.isGM) {
+										const channel = `module.${BBMM_ID}`;
+										const payload = { cmd: "bbmm:reload", ts: Date.now() };
+										DL("BBMM broadcast: sending reload to all clients (new modules enabled)", { channel, payload });
+										game.socket.emit(channel, payload);
+									}
+									(foundry.utils?.debouncedReload?.() || window.location.reload)();
+								} catch (e) {
+									DL(3, "module-management.js | enableReload failed", e);
+								} finally {
+									safe();
+								}
+							}
+						},
+						{
+							action: "dontAskAgain",
+							label: LT.moduleManagement.newModulesDontAskAgain(),
+							icon: "fa-solid fa-bell-slash",
+							callback: async () => {
+								try {
+									await game.settings.set(BBMM_ID, "knownInstalledModules", current);
+									DL("module-management.js | new modules prompt: marked current modules as known (dontAskAgain for these only)");
+								} catch (e) {
+									DL(2, "module-management.js | dontAskAgain failed", e);
+								} finally {
+									safe();
+								}
+							}
+						},
+						{
+							action: "askLater",
+							label: LT.moduleManagement.newModulesAskLater(),
+							icon: "fa-solid fa-clock",
+							callback: () => safe()
+						}
+					],
+					close: () => safe()
+				});
+
+				dlg.render(true);
+
+				// Bind Select All/None AFTER render
+				let tries = 0;
+				const bindTimer = setInterval(() => {
+					const el = dlg.element;
+					if (!el) {
+						tries++;
+						if (tries > 40) {
+							clearInterval(bindTimer);
+							DL(2, "module-management.js | new modules prompt: failed to bind select all/none (no dlg.element)");
+						}
+						return;
+					}
+
+					const allBtn = el.querySelector(".bbmm-newmods-all");
+					const noneBtn = el.querySelector(".bbmm-newmods-none");
+					if (!allBtn || !noneBtn) {
+						tries++;
+						if (tries > 40) {
+							clearInterval(bindTimer);
+							DL(2, "module-management.js | new modules prompt: failed to bind select all/none (buttons not found)");
+						}
+						return;
+					}
+
+					clearInterval(bindTimer);
+					DL("module-management.js | new modules prompt: bound select all/none buttons");
+
+					allBtn.addEventListener("click", (ev) => {
+						ev.preventDefault();
+						for (const cb of (dlg.element?.querySelectorAll('input[name="bbmm-new-module"]') ?? [])) cb.checked = true;
+					});
+
+					noneBtn.addEventListener("click", (ev) => {
+						ev.preventDefault();
+						for (const cb of (dlg.element?.querySelectorAll('input[name="bbmm-new-module"]') ?? [])) cb.checked = false;
+					});
+				}, 25);
+
+			});
+		} catch (err) {
+			DL(2, "module-management.js | new modules prompt block failed", err);
+		}
+	})();
+
+
 	DL("module-management.js | ready fired")
 });
 

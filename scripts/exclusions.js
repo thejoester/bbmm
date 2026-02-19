@@ -11,6 +11,7 @@ import { copyPlainText } from "./macros.js";
 import { hlp_injectHeaderHelpButton, invalidateSkipMap } from "./helpers.js";
 
 // CONSTANTS
+const EXC_BUNDLE_SCHEMA_VERSION = 1; // Import/Export bundle schema
 const EXC_STORAGE_FILE = "user-exclusions.json";
 let _excCache = null;
 // Size threshold to mark preview as "large"
@@ -90,6 +91,11 @@ export async function hlp_writeUserExclusions(obj) {
 	}
 }
 
+/* BBMMAddModuleExclusionAppV2 ==================================================
+	- Lists all modules not already excluded
+	- Columns: Module (title or namespace), State (enabled/disabled), Action
+	- Exclude adds module ID to userExclusions.modules, then reopens manager
+============================================================================== */
 class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({
@@ -333,7 +339,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 	- Lists all CONFIG settings not already excluded
 	- Columns: Module (title or namespace), Setting (friendly name or key), Action
 	- Exclude adds {namespace,key} to userExclusions.settings, then reopens manager
-   ========================================================================== */
+============================================================================ */
 class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({
@@ -1189,6 +1195,246 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 	}
 	
 	/* ============================================================================
+		{IMPORT / EXPORT}
+	============================================================================ */
+
+	async _exportExclusionsNamespace() {
+		const exc = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+		const mods = Array.isArray(exc.modules) ? exc.modules : [];
+		const sets = Array.isArray(exc.settings) ? exc.settings : [];
+
+		// Build namespace list from current exclusions
+		const nsSet = new Set();
+		for (const m of mods) nsSet.add(String(m));
+		for (const s of sets) {
+			const ns = String(s?.namespace ?? "");
+			if (ns) nsSet.add(ns);
+		}
+		const namespaces = Array.from(nsSet).sort((a, b) => a.localeCompare(b, game.i18n.lang || undefined, { sensitivity: "base" }));
+
+		if (!namespaces.length) {
+			ui.notifications?.warn(game.i18n.localize("bbmm._importExport.noNamespaces"));
+			return;
+		}
+
+		// DialogV2: pick namespace
+		const chosen = await new Promise((resolve) => {
+			const host = document.createElement("div");
+
+			const p = document.createElement("p");
+			p.textContent = game.i18n.localize("bbmm._importExport.chooseNamespace");
+			host.appendChild(p);
+
+			const sel = document.createElement("select");
+			sel.style.width = "100%";
+			for (const ns of namespaces) {
+				const opt = document.createElement("option");
+				opt.value = ns;
+				opt.textContent = this._getModuleTitle(ns) || ns;
+				sel.appendChild(opt);
+			}
+			host.appendChild(sel);
+
+			const dlg = new foundry.applications.api.DialogV2({
+				window: { title: game.i18n.localize("bbmm._importExport.exportExclusionsTitle") },
+				content: host,
+				buttons: [
+					{
+						action: "export",
+						label: LT.buttons.export(),
+						default: true,
+						callback: () => {
+							try { dlg.close(); } catch {}
+							const v = dlg.element?.querySelector("select")?.value ?? sel.value;
+							resolve(v);
+						}
+					},
+					{
+						action: "cancel",
+						label: LT.buttons.cancel(),
+						callback: () => { try { dlg.close(); } catch {} resolve(null); }
+					}
+				],
+				submit: () => { try { dlg.close(); } catch {} resolve(null); },
+				rejectClose: () => resolve(null)
+			});
+
+			dlg.render(true);
+		});
+
+		if (!chosen) return;
+
+		const mod = game.modules.get(chosen);
+		const targetVersion = String(mod?.version ?? mod?.data?.version ?? "");
+
+		const entries = [];
+
+		// If module itself is excluded, include a module marker entry
+		if (mods.includes(chosen)) {
+			entries.push({ type: "module" });
+		}
+
+		// Include setting keys for this namespace
+		for (const s of sets) {
+			const ns = String(s?.namespace ?? "");
+			const key = String(s?.key ?? "");
+			if (ns === chosen && key) {
+				entries.push({ type: "setting", key });
+			}
+		}
+
+		const bundle = {
+			schemaVersion: EXC_BUNDLE_SCHEMA_VERSION,
+			target: chosen,
+			targetVersion,
+			foundryVersion: String(game.version ?? ""),
+			entries
+		};
+
+		try {
+			const filename = `bbmm-exclusions-${chosen}.json`;
+			saveDataToFile(JSON.stringify(bundle, null, 2), "application/json", filename);
+
+			ui.notifications?.info(game.i18n.format("bbmm._importExport.exportSuccess", { target: chosen }));
+			DL(`exclusions.js | export: exported ${chosen}`, bundle);
+		} catch (e) {
+			DL(3, "exclusions.js | export: blob/download failed", e);
+			throw e;
+		}
+	}
+
+	async _importExclusionsNamespace() {
+		// Pick local file
+		const file = await new Promise((resolve) => {
+			const input = document.createElement("input");
+			input.type = "file";
+			input.accept = "application/json,.json";
+			input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true });
+			input.click();
+		});
+
+		if (!file) return;
+
+		let raw;
+		try {
+			raw = JSON.parse(await file.text());
+		} catch (e) {
+			DL(3, "exclusions.js | import: JSON parse failed", e);
+			ui.notifications?.error(game.i18n.localize("bbmm._importExport.invalidFile"));
+			return;
+		}
+
+		// Basic validation
+		const schemaVersion = raw?.schemaVersion;
+		const target = String(raw?.target ?? "").trim();
+		const targetVersion = String(raw?.targetVersion ?? "").trim();
+		const foundryVersion = String(raw?.foundryVersion ?? "").trim();
+		const entries = Array.isArray(raw?.entries) ? raw.entries : null;
+
+		if (typeof schemaVersion !== "number" || !target || !entries) {
+			ui.notifications?.error(game.i18n.localize("bbmm._importExport.invalidFile"));
+			return;
+		}
+
+		// Version warning: file targetVersion newer than installed
+		const mod = game.modules.get(target);
+		const installedVersion = String(mod?.version ?? mod?.data?.version ?? "");
+
+		let isFileNewer = false;
+		try {
+			if (targetVersion && installedVersion) {
+				isFileNewer = foundry.utils.isNewerVersion(targetVersion, installedVersion);
+			}
+		} catch {}
+
+		if (isFileNewer) {
+			const proceed = await new Promise((resolve) => {
+				const host = document.createElement("div");
+
+				const p = document.createElement("p");
+				p.innerHTML = game.i18n.format("bbmm._importExport.newerVersionWarn", {
+					target,
+					fileVersion: targetVersion || "?",
+					installedVersion: installedVersion || "?"
+				});
+				host.appendChild(p);
+
+				const dlg = new foundry.applications.api.DialogV2({
+					window: { title: game.i18n.localize("bbmm._importExport.newerVersionTitle") },
+					content: host,
+					buttons: [
+						{
+							action: "continue",
+							label: LT.buttons.continue?.() ?? LT.buttons.yes(),
+							default: true,
+							callback: () => { try { dlg.close(); } catch {} resolve(true); }
+						},
+						{
+							action: "cancel",
+							label: LT.buttons.cancel(),
+							callback: () => { try { dlg.close(); } catch {} resolve(false); }
+						}
+					],
+					submit: () => { try { dlg.close(); } catch {} resolve(false); },
+					rejectClose: () => resolve(false)
+				});
+
+				dlg.render(true);
+			});
+
+			if (!proceed) return;
+		}
+
+		const current = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+		if (!Array.isArray(current.modules)) current.modules = [];
+		if (!Array.isArray(current.settings)) current.settings = [];
+
+		// Merge entries
+		for (const ent of entries) {
+			// allow string entries as shorthand for setting keys
+			if (typeof ent === "string") {
+				const key = ent.trim();
+				if (!key) continue;
+				if (!current.settings.some(s => s?.namespace === target && s?.key === key)) {
+					current.settings.push({ namespace: target, key });
+				}
+				continue;
+			}
+
+			if (!ent || typeof ent !== "object") continue;
+
+			const type = String(ent.type ?? "").trim();
+			if (type === "module") {
+				if (!current.modules.includes(target)) current.modules.push(target);
+				continue;
+			}
+
+			if (type === "setting") {
+				const key = String(ent.key ?? "").trim();
+				if (!key) continue;
+				if (!current.settings.some(s => s?.namespace === target && s?.key === key)) {
+					current.settings.push({ namespace: target, key });
+				}
+				continue;
+			}
+		}
+
+		const ok = await hlp_writeUserExclusions(current);
+		if (!ok) {
+			ui.notifications?.error(game.i18n.localize("bbmm._importExport.importFailed"));
+			return;
+		}
+
+		try { this._excData = current; } catch {}
+		try { Hooks.callAll("bbmmExclusionsChanged", { type: "import", target, targetVersion, foundryVersion }); } catch {}
+
+		ui.notifications?.info(game.i18n.format("bbmm._importExport.importSuccess", { target }));
+		DL(`exclusions.js | import: imported ${target}`, { schemaVersion, target, targetVersion, foundryVersion, entriesCount: entries.length });
+
+		await this.render(true);
+	}
+
+	/* ============================================================================
 		{LABEL HELPERS}
 	============================================================================ */
 	
@@ -1443,7 +1689,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 				.bbmm-x-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
 
-				.bbmm-x-toolbar{display:grid;grid-template-columns:auto auto 1fr max-content;align-items:center;column-gap:8px}
+				.bbmm-x-toolbar{display:grid;grid-template-columns:auto auto auto auto 1fr max-content;align-items:center;column-gap:8px}
 				.bbmm-x-toolbar .bbmm-btn{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
 
 				.bbmm-x-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
@@ -1485,6 +1731,10 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				<div class="bbmm-x-toolbar">
 					<button type="button" class="bbmm-btn bbmm-x-add-setting" data-action="add-setting">${LT.buttons.addSetting()}</button>
 					<button type="button" class="bbmm-btn bbmm-x-add-module" data-action="add-module">${LT.buttons.addModule()}</button>
+
+					<button type="button" class="bbmm-btn bbmm-x-export" data-action="export">${LT.buttons.export()}</button>
+					<button type="button" class="bbmm-btn bbmm-x-import" data-action="import">${LT.buttons.import()}</button>
+
 					<div></div>
 					<div class="bbmm-x-count">${LT.total()}: ${this._rows.length}</div>
 				</div>
@@ -1644,6 +1894,32 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 						btn.disabled = false;
 						DL(3, "exclusions.js | delete: failed", e);
 						ui.notifications?.error("Failed to remove exclusion. See console.");
+					}
+					return;
+				}
+
+				// Export (GM only)
+				if (action === "export") {
+					if (!game.user?.isGM) return;
+
+					try {
+						await this._exportExclusionsNamespace();
+					} catch (e) {
+						DL(3, "exclusions.js | export: failed", e);
+						ui.notifications?.error(game.i18n.localize("bbmm._importExport.exportFailed"));
+					}
+					return;
+				}
+
+				// Import (GM only)
+				if (action === "import") {
+					if (!game.user?.isGM) return;
+
+					try {
+						await this._importExclusionsNamespace();
+					} catch (e) {
+						DL(3, "exclusions.js | import: failed", e);
+						ui.notifications?.error(game.i18n.localize("bbmm._importExport.importFailed"));
 					}
 					return;
 				}

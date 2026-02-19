@@ -1552,8 +1552,8 @@ Hooks.once("init", () => {
 
 			// Module Management - Module Locks
 			game.settings.register(BBMM_ID, "moduleLocks", {
-				name: game.i18n.localize("bbmm.settings.moduleLocksName"),
-				hint: game.i18n.localize("bbmm.settings.moduleLocksHint"),
+				name: game.i18n.localize("bbmm._settings.moduleLocksName"),
+				hint: game.i18n.localize("bbmm._settings.moduleLocksHint"),
 				scope: "world",
 				config: false,
 				type: Object,			
@@ -1567,10 +1567,19 @@ Hooks.once("init", () => {
 				}
 			});
 
+			// List of installed modules we’ve detected (used for change detection and changelog display)
+			game.settings.register(BBMM_ID, "knownInstalledModules", {
+				scope: "world",
+				config: false,
+				type: Array,
+				default: [],
+				restricted: true
+			});
+
 		// ===== SETTINGS ITEMS =====
 		// These DO need to be localized
 
-			// About BBMM menu button
+			// MENU: About BBMM menu button
 			game.settings.registerMenu(BBMM_ID, "menuAboutBBMM", {
 				name: LT.aboutName(),
 				label: LT.aboutName(),
@@ -1606,7 +1615,7 @@ Hooks.once("init", () => {
 				}
 			});
 
-			// Add a menu entry in Configure Settings to open the Preset Manager
+			// MENU: open the Preset Manager
 			game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
 				name: LT.modulePresetsBtn(),
 				label: LT.lblOpenModulePresets(),
@@ -1630,7 +1639,7 @@ Hooks.once("init", () => {
 				}
 			});
 			
-			// Add a menu entry in Configure Settings to open the Preset Manager
+			// MENU: open the Preset Manager
 			game.settings.registerMenu(BBMM_ID, "settingsPresetManager", {
 				name: LT.settingsPresetsBtn(),
 				label: LT.lblOpenSettingsPresets(),
@@ -1654,7 +1663,7 @@ Hooks.once("init", () => {
 				}
 			});
 			
-			// Add a  menu entry for Exclusions manager
+			// MENU: Exclusions manager
 			game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
 				name: LT.exclusionsMgr(),
 				label: LT.lblExclusionsMgr(),
@@ -1678,7 +1687,7 @@ Hooks.once("init", () => {
 				}
 			});
 			
-			//  Inclusions Manager menu 
+			//  MENU:Inclusions Manager
 			game.settings.registerMenu(BBMM_ID, "menuInclusionsManager", {
 				name: LT.inclusions.btnInclusionMgr(),
 				label: LT.inclusions.btnInclusionMgr(),
@@ -1708,7 +1717,7 @@ Hooks.once("init", () => {
 				}
 			});
 
-			// Hidden Client Setting Sync Manager menu
+			// MENU: Hidden Client Setting Sync Manager
 			game.settings.registerMenu(BBMM_ID, "hiddenSettingSyncManager", {
 				name: LT.hiddenSettingSync?.menuName?.() ?? "Hidden Client Setting Sync",
 				label: LT.hiddenSettingSync?.menuLabel?.() ?? "Open Manager",
@@ -1744,7 +1753,7 @@ Hooks.once("init", () => {
 				}
 			});
 
-			// Import / Export menu
+			// MENU: Import / Export
 			game.settings.registerMenu(BBMM_ID, "importExport", {
 				name: LT.buttons.importExport(),
 				label: LT.buttons.importExport(),
@@ -1772,6 +1781,17 @@ Hooks.once("init", () => {
 				default: false,
 				name: LT.name_checkDisabledModules(),
 				hint: LT.hint_checkDisabledModules()
+			});
+
+			// Prompt to enable newly added modules 
+			game.settings.register(BBMM_ID, "promptEnableNewModules", {
+				name: LT.moduleManagement.promptEnableNewModulesName(),
+				hint: LT.moduleManagement.promptEnableNewModulesHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: true,
+				restricted: true
 			});
 
 			// Enable/disable "enhanced" module manager
