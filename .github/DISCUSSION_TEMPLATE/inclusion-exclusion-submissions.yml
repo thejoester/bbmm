@@ -1,18 +1,26 @@
-title: "Inclusion / Exclusion Submission"
+name: Inclusion / Exclusion Submission
+description: Submit a BBMM inclusion or exclusion JSON file
+title: "[Inclusion/Exclusion] "
+category: Inclusion/Exclusion submissions
 labels:
   - inclusion-exclusion
+
 body:
   - type: markdown
     attributes:
       value: |
         ## Submit a BBMM Inclusion / Exclusion File
 
-        Attach your `.json` file to this discussion **before** posting:
-        - Drag and drop the file into the editor, or use the paperclip attachment button.
-        - The JSON must match the BBMM namespace format:
-          `schemaVersion`, `target`, `targetVersion`, `foundryVersion`, `entries`
+        Please attach your `.json` file to this discussion before posting:
+        - Drag and drop the file into the editor, or use the attachment button.
+        - The JSON must include:
+          - `schemaVersion`
+          - `target`
+          - `targetVersion`
+          - `foundryVersion`
+          - `entries`
 
-        Files missing required fields may be rejected by the validator.
+        If no `.json` file is attached, the validator workflow will not pass.
 
   - type: dropdown
     id: fileType
@@ -38,8 +46,8 @@ body:
     id: targetVersion
     attributes:
       label: Target Version
-      description: Version of the module/system this file was built against.
-      placeholder: "0.0.0"
+      description: Version of the module/system this file was created for.
+      placeholder: "6.5.3"
     validations:
       required: true
 
@@ -47,32 +55,35 @@ body:
     id: foundryVersion
     attributes:
       label: Foundry Version
-      description: Foundry version this file was created/tested with.
-      placeholder: "13.351"
+      description: Foundry version used when creating/testing this file.
+      placeholder: "13.3.0"
     validations:
       required: true
 
   - type: textarea
     id: description
     attributes:
-      label: Description
-      description: Optional. Briefly explain what this inclusion/exclusion file covers.
-      placeholder: ""
+      label: Description (Optional)
+      description: Briefly describe what this inclusion/exclusion file covers.
+      placeholder: "Includes all hidden automation-related settings for PF2e Workbench."
     validations:
       required: false
 
   - type: markdown
     attributes:
       value: |
-        ### Required: Attach your JSON file
-        Make sure the `.json` file is attached to this discussion.
-        The validator workflow (if enabled) will look for an attached file ending in `.json`.
+        ### Required: Attach Your JSON File
+
+        Make sure your `.json` file is attached to this discussion.
+        The validator will automatically check it when posted or edited.
 
   - type: textarea
     id: links
     attributes:
-      label: Related Links (optional)
-      description: Optional. Link to module/system page or related discussion.
-      placeholder: "- Module page: …\n- Documentation: …"
+      label: Related Links (Optional)
+      description: Optional links to the module/system page or documentation.
+      placeholder: |
+        - Module page: ...
+        - Documentation: ...
     validations:
       required: false
