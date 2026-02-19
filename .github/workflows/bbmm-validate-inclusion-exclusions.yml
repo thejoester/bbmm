@@ -2,7 +2,7 @@ name: BBMM Validate Inclusion/Exclusion JSON (Discussions)
 
 on:
   discussion:
-    types: [opened, created, edited]
+    types: [created, edited]
   discussion_comment:
     types: [created, edited]
 
@@ -38,9 +38,9 @@ jobs:
 
               const unique = [...new Set(urls)];
 
-              // Keep likely attachments:
+              // Likely attachments:
               // - ends with .json (optionally with querystring)
-              // - GitHub user-attachments links (often used for drag-drop uploads)
+              // - GitHub user-attachments links (used for drag-drop uploads)
               return unique.filter(u =>
                 /\.json(\?|$)/i.test(u) ||
                 /\/user-attachments\//i.test(u)
@@ -94,19 +94,26 @@ jobs:
               return errors;
             };
 
-            // GraphQL comment helper (Discussions require GraphQL)
-            const postComment = async (discussionNumber, body) => {
-              // Fetch discussion node id
+            // GraphQL helpers for Discussions (REST is missing here)
+            const getDiscussion = async (number) => {
               const q = `
                 query($owner:String!, $repo:String!, $number:Int!) {
                   repository(owner:$owner, name:$repo) {
-                    discussion(number:$number) { id }
+                    discussion(number:$number) {
+                      id
+                      body
+                    }
                   }
                 }
               `;
-              const qRes = await github.graphql(q, { owner, repo, number: discussionNumber });
-              const discussionId = qRes?.repository?.discussion?.id;
-              if (!discussionId) throw new Error(`Could not resolve discussion id for #${discussionNumber}`);
+              const res = await github.graphql(q, { owner, repo, number });
+              return res?.repository?.discussion || null;
+            };
+
+            const postComment = async (discussionNumber, body) => {
+              const disc = await getDiscussion(discussionNumber);
+              const discussionId = disc?.id;
+              if (!discussionId) throw new Error(\`Could not resolve discussion id for #\${discussionNumber}\`);
 
               const m = `
                 mutation($discussionId:ID!, $body:String!) {
@@ -118,7 +125,7 @@ jobs:
               await github.graphql(m, { discussionId, body });
             };
 
-            // Determine which discussion we're validating and what text to scan
+            // Determine which discussion and what content to scan
             let discussionNumber = null;
             let bodiesToScan = [];
 
@@ -131,11 +138,9 @@ jobs:
               const commentBody = context.payload.comment.body || "";
               bodiesToScan = [commentBody];
 
-              // Also scan the discussion body as fallback
-              const disc = await github.rest.discussions.get({
-                owner, repo, discussion_number: discussionNumber
-              });
-              bodiesToScan.push(disc.data.body || "");
+              // Fallback to discussion body (GraphQL)
+              const disc = await getDiscussion(discussionNumber);
+              bodiesToScan.push(disc?.body || "");
             } else {
               return;
             }
@@ -148,6 +153,7 @@ jobs:
             const urls = [...new Set(candidates)];
 
             if (!urls.length) {
+              // Only nag on discussion create/edit, not on random comments unless they include a link
               if (context.eventName === "discussion") {
                 const msg = [
                   "<!-- bbmm-validator -->",
@@ -201,6 +207,7 @@ jobs:
               return;
             }
 
+            // Validate structure
             const errors = validateBundle(parsed);
 
             if (errors.length) {
