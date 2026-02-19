@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0-test1] - 2026-02-19
+### Added
+- **Inclusions / Exclusions:**
+  - Added functionality to export and import inslusions and exclusion list per module. 
+- **Module management:**
+  - Added notification when new module(s) has been installed, prompting to enable. This feature can be disabled in settings. 
+
 ## [0.6.8] - 2026-01-20
 ### Changed
 - **Localization:**
