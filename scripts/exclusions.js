@@ -9,6 +9,7 @@ import { DL, BBMM_README_UUID } from './settings.js';
 import { LT } from "./localization.js";
 import { copyPlainText } from "./macros.js";
 import { hlp_injectHeaderHelpButton, invalidateSkipMap } from "./helpers.js";
+import { hlp_readUserInclusions, hlp_writeUserInclusions } from "./inclusions.js";
 
 // CONSTANTS
 const EXC_BUNDLE_SCHEMA_VERSION = 1; // Import/Export bundle schema
@@ -112,23 +113,74 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		this._maxH = 720;
 	}
 
-	// Get Set of excluded module IDs
-	_getExcludedIds() {
+	// Get Set of existing module IDs across BOTH lists no duplicates
+	_getExistingIds() {
 		const ex = this._excData || { modules: [] };
-		return new Set(Array.isArray(ex.modules) ? ex.modules : []);
+		const inc = this._incData || { modules: [] };
+
+		const out = new Set();
+
+		for (const id of (Array.isArray(ex.modules) ? ex.modules : [])) out.add(String(id));
+		for (const id of (Array.isArray(inc.modules) ? inc.modules : [])) out.add(String(id));
+
+		return out;
 	}
 
-	// Build list of modules not already excluded
+	// Build list of modules not already present in EITHER list
 	_collectCandidates() {
-		const excluded = this._getExcludedIds();
+		const existing = this._getExistingIds();
 		const out = [];
+
 		for (const m of game.modules.values()) {
-			if (m.id === "bbmm") continue; //  self-skip
-			if (excluded.has(m.id)) continue; // skip already excluded
+			if (m.id === "bbmm") continue; // self-skip
+			if (existing.has(m.id)) continue; // skip already in inclusions OR exclusions
 			out.push({ id: m.id, title: String(m.title ?? m.id), active: !!m.active });
 		}
+
 		out.sort((a,b)=>a.title.localeCompare(b.title, game.i18n.lang || undefined, {sensitivity:"base"}));
 		this._mods = out;
+	}
+
+	// Add module ID to userInclusions.modules
+	async _include(id) {
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+		if (!Array.isArray(data.modules)) data.modules = [];
+
+		if (!data.modules.includes(id)) {
+			data.modules.push(id);
+
+			const ok = await hlp_writeUserInclusions(data);
+			if (!ok) {
+				DL(3, `exclusions.js | BBMMAddModuleExclusionAppV2._include(): FAILED writing inclusions for ${id}`);
+				return;
+			}
+
+			try { this._incData = data; } catch {}
+			try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", id }); } catch {}
+			DL(`exclusions.js | BBMMAddModuleExclusionAppV2._include(): stored ${id}`);
+		}
+	}
+
+	// Choose Include/Exclude/Cancel
+	async _chooseIncludeExclude(id) {
+		const choice = await new Promise((resolve) => {
+			const dlg = new foundry.applications.api.DialogV2({
+				window: { title: LT.buttons.addModule?.() ?? LT.buttons.addModule() },
+				content: `<p>${foundry.utils.escapeHTML(id)}</p>`,
+				buttons: [
+					{ action: "include", label: LT.inclusions?.include(), default: true },
+					{ action: "exclude", label: LT.buttons.exclude() },
+					{ action: "cancel", label: LT.buttons.cancel() }
+				],
+				submit: (res) => resolve(res ?? "cancel"),
+				rejectClose: false,
+				position: { width: 420, height: "auto" }
+			});
+			dlg.render(true);
+		});
+
+		if (choice === "include") return await this._include(id);
+		if (choice === "exclude") return await this._exclude(id);
 	}
 
 	// Add module ID to userExclusions.modules
@@ -154,13 +206,14 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 	async _renderHTML(_context, _options) {
 
 		this._excData = await hlp_readUserExclusions();
+		this._incData = await hlp_readUserInclusions();
 		this._collectCandidates();
 
 		const rows = this._mods.map(m => `
 			<tr>
 				<td class="c-title">${foundry.utils.escapeHTML(m.title)}</td>
 				<td class="c-state">${m.active ? LT.enabled() : LT.disabled()}</td>
-				<td class="c-act"><button type="button" class="bbmm-exc-act" data-id="${m.id}">${LT.buttons.exclude()}</button></td>
+				<td class="c-act"><button type="button" class="bbmm-exc-act" data-id="${m.id}">${LT.buttons.add()}</button></td>
 			</tr>
 		`).join("");
 
@@ -307,7 +360,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 
 				try {
 					btn.disabled = true;
-					await this._exclude(id);
+					await this._chooseIncludeExclude(id); 
 
 					// Keep dialog open; mark on success
 					btn.classList.add("bbmm-exc-done");
@@ -692,17 +745,28 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				</div>
 
 				<div class="c-act">
-					<button type="button" class="bbmm-exc-act" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">${LT.buttons.exclude()}</button>
+					<button type="button" class="bbmm-exc-act" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">${LT.buttons.add()}</button>
 				</div>
 			</div>
 		`;
 	}
 
-	// Get Set of excluded {namespace,key} pairs
-	_getExcludedPairsSet() {
+	// Get Set of existing {namespace,key} pairs across BOTH lists
+	_getExistingPairsSet() {
 		const ex = this._excData || {};
-		const arr = Array.isArray(ex.settings) ? ex.settings : [];
-		return new Set(arr.map(s => `${s?.namespace ?? ""}::${s?.key ?? ""}`));
+		const inc = this._incData || {};
+
+		const out = new Set();
+
+		for (const s of (Array.isArray(ex.settings) ? ex.settings : [])) {
+			out.add(`${s?.namespace ?? ""}::${s?.key ?? ""}`);
+		}
+
+		for (const s of (Array.isArray(inc.settings) ? inc.settings : [])) {
+			out.add(`${s?.namespace ?? ""}::${s?.key ?? ""}`);
+		}
+
+		return out;
 	}
 
 	// Build list of settings not already excluded
@@ -710,7 +774,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		// Build the table model for Add Setting Exclusion
 		try {
 			// Already-excluded pairs as a Set of "ns::key"
-			const excluded = this._getExcludedPairsSet();
+			const excluded = this._getExistingPairsSet();
 			const rows = [];
 
 			for (const s of game.settings.settings.values()) {
@@ -806,6 +870,51 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		DL(`exclusions.js | AddSetting._exclude(): stored ${namespace}.${key}`);
 	}
 
+	// Add {namespace,key} to userInclusions.settings
+	async _include(namespace, key) {
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+		if (!Array.isArray(data.settings)) data.settings = [];
+
+		const exists = data.settings.some(s => s?.namespace === namespace && s?.key === key);
+		if (!exists) data.settings.push({ namespace, key });
+
+		const ok = await hlp_writeUserInclusions(data);
+		if (!ok) {
+			DL(3, `exclusions.js | AddSetting._include(): FAILED writing inclusions for ${namespace}.${key}`);
+			throw new Error("Failed to write inclusions");
+		}
+
+		try { this._incData = data; } catch {}
+		try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace, key }); } catch {}
+		DL(`exclusions.js | AddSetting._include(): stored ${namespace}.${key}`);
+	}
+
+	// Prompt user to Include, Exclude, or Cancel for a given setting
+	async _chooseIncludeExclude(namespace, key, isMenu = false) {
+		const choice = await new Promise((resolve) => {
+			const dlg = new foundry.applications.api.DialogV2({
+				window: { title: LT.buttons.addSetting?.() ?? LT.buttons.addSetting() },
+				content: `<p>${foundry.utils.escapeHTML(`${namespace}.${key}`)}</p>`,
+				buttons: [
+					{ action: "include", label: LT.inclusions?.manager?.() ?? "Include", default: true },
+					{ action: "exclude", label: LT.buttons.exclude() },
+					{ action: "cancel", label: LT.buttons.cancel() }
+				],
+				submit: (res) => resolve(res ?? "cancel"),
+				rejectClose: false,
+				position: { width: 420, height: "auto" }
+			});
+			dlg.render(true);
+		});
+
+		if (choice === "include") return await this._include(namespace, key);
+
+		if (choice === "exclude") {
+			if (isMenu) return await this._excludeMenu(namespace, key);
+			return await this._exclude(namespace, key);
+		}
+	}
+
 	// Special case: exclude a menu placeholder
 	async _excludeMenu(namespace, key) {
 		try {
@@ -833,6 +942,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 	// Render main HTML
 	async _renderHTML(_context, _options) {
 		this._excData = await hlp_readUserExclusions();
+		this._incData = await hlp_readUserInclusions();
 		this._collectSettings();
 
 		const cols = "grid-template-columns: minmax(220px,1.2fr) minmax(240px,1.6fr) 90px minmax(320px,2fr) 96px;";
@@ -1020,8 +1130,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 						btn.disabled = true;
 
 						const row = this._rows?.find?.(r => r.namespace === ns && r.key === key);
-						if (row?.__isMenu) await this._excludeMenu(ns, key);
-						else await this._exclude(ns, key);
+						await this._chooseIncludeExclude(ns, key, !!row?.__isMenu);
 
 						// Remove row from data + DOM immediately
 						this._rows = (this._rows || []).filter(r => !(r.namespace === ns && r.key === key));
@@ -1625,71 +1734,167 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 	// Render main HTML
 	async _renderHTML() {
-		// Build rows (modules + settings)
-		const exc = this._excData ?? await hlp_readUserExclusions({ force: true });
+		// Read BOTH stores
+		const exc = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+		const inc = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+
 		this._excData = exc;
+		this._incData = inc;
 
-		const mods = Array.isArray(exc.modules)  ? exc.modules  : [];
-		const sets = Array.isArray(exc.settings) ? exc.settings : [];
+		const excMods = Array.isArray(exc.modules) ? exc.modules.map(String) : [];
+		const excSets = Array.isArray(exc.settings) ? exc.settings : [];
 
-		// Module rows
-		const modRows = mods.map(ns => {
+		const incMods = Array.isArray(inc.modules) ? inc.modules.map(String) : [];
+		const incSets = Array.isArray(inc.settings) ? inc.settings : [];
+
+		// Identity sets (for "exclusions trump" + legacy duplicates)
+		const excModSet = new Set(excMods);
+		const incModSet = new Set(incMods);
+
+		const excSetSet = new Set(excSets.map(s => `${String(s?.namespace ?? "")}::${String(s?.key ?? "")}`));
+		const incSetSet = new Set(incSets.map(s => `${String(s?.namespace ?? "")}::${String(s?.key ?? "")}`));
+
+		// Effective inclusions = inclusions NOT present in exclusions
+		const effIncMods = incMods.filter(id => !excModSet.has(id));
+		const effIncSets = incSets.filter(s => {
+			const ns = String(s?.namespace ?? "");
+			const key = String(s?.key ?? "");
+			if (!ns || !key) return false;
+			return !excSetSet.has(`${ns}::${key}`);
+		});
+
+		const modelRows = [];
+
+		// Group header: Included
+		modelRows.push({
+			__group: true,
+			_label: (LT.titleInclusions?.() ?? "Included")
+		});
+
+		// Included modules
+		for (const ns of effIncMods) {
 			const mod = game.modules.get(ns);
 			const title = String(mod?.title ?? ns);
-			return {
+
+			modelRows.push({
 				type: "Module",
 				identifier: title,
 				_ns: ns,
 				_key: "",
-				_id: ns
-			};
-		});
+				_id: ns,
+				_list: "inc",
+				_dupe: false
+			});
+		}
 
-		// Setting rows
-		const setRows = sets.map(s => {
+		// Included settings
+		for (const s of effIncSets) {
 			const ns = String(s?.namespace ?? "");
 			const key = String(s?.key ?? "");
+			if (!ns || !key) continue;
+
 			const mod = game.modules.get(ns);
 			const nsLabel = String(mod?.title ?? ns);
 			const settingLabel = this._getSettingLabel(ns, key);
 
-			return {
+			modelRows.push({
 				type: "Setting",
 				identifier: `${nsLabel}, ${settingLabel}`,
 				_ns: ns,
 				_key: key,
-				_id: `${ns}.${key}`
-			};
+				_id: `${ns}.${key}`,
+				_list: "inc",
+				_dupe: false
+			});
+		}
+
+		// Group header: Excluded
+		modelRows.push({
+			__group: true,
+			_label: (LT.titleExclusions?.() ?? "Excluded")
 		});
 
-		this._rows = [...modRows, ...setRows];
+		// Excluded modules (mark legacy duplicate if also in inclusions)
+		for (const ns of excMods) {
+			const mod = game.modules.get(ns);
+			const title = String(mod?.title ?? ns);
 
-		const rows = this._rows.map(r => `
-			<tr>
-				<td class="c-type">${r.type}</td>
-				<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">
-					${foundry.utils.escapeHTML(r.identifier)}
-				</td>
-				<td class="c-del">
-					<button type="button"
-						class="bbmm-x-del"
-						data-type="${r.type === "Module" ? "module" : "setting"}"
-						data-id="${r.type === "Module" ? (r._id ?? "") : ""}"
-						data-ns="${r._ns ?? ""}"
-						data-key="${r._key ?? ""}"
-						aria-label="${LT.inclusions.remove?.() ?? "Remove"}">
-						<i class="fas fa-trash"></i>
-					</button>
-				</td>
-			</tr>
-		`).join("");
+			modelRows.push({
+				type: "Module",
+				identifier: title,
+				_ns: ns,
+				_key: "",
+				_id: ns,
+				_list: "exc",
+				_dupe: incModSet.has(ns)
+			});
+		}
+
+		// Excluded settings (mark legacy duplicate if also in inclusions)
+		for (const s of excSets) {
+			const ns = String(s?.namespace ?? "");
+			const key = String(s?.key ?? "");
+			if (!ns || !key) continue;
+
+			const mod = game.modules.get(ns);
+			const nsLabel = String(mod?.title ?? ns);
+			const settingLabel = this._getSettingLabel(ns, key);
+			const sig = `${ns}::${key}`;
+
+			modelRows.push({
+				type: "Setting",
+				identifier: `${nsLabel}, ${settingLabel}`,
+				_ns: ns,
+				_key: key,
+				_id: `${ns}.${key}`,
+				_list: "exc",
+				_dupe: incSetSet.has(sig)
+			});
+		}
+
+		// Keep for later (delete handler uses this too)
+		this._rows = modelRows;
+
+		const entryCount = modelRows.filter(r => !r.__group).length;
+
+		const rows = modelRows.map(r => {
+			if (r.__group) {
+				return `
+					<tr class="bbmm-x-group">
+						<td colspan="3">${foundry.utils.escapeHTML(String(r._label ?? ""))}</td>
+					</tr>
+				`;
+			}
+
+			return `
+				<tr>
+					<td class="c-type">${r.type}</td>
+					<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">
+						${foundry.utils.escapeHTML(r.identifier)}
+					</td>
+					<td class="c-del">
+						<button type="button"
+							class="bbmm-x-del"
+							data-list="${r._list}"
+							data-dupe="${r._dupe ? "1" : "0"}"
+							data-type="${r.type === "Module" ? "module" : "setting"}"
+							data-id="${r.type === "Module" ? (r._id ?? "") : ""}"
+							data-ns="${r._ns ?? ""}"
+							data-key="${r._key ?? ""}"
+							aria-label="${LT.inclusions.remove?.() ?? "Remove"}">
+							<i class="fas fa-trash"></i>
+						</button>
+					</td>
+				</tr>
+			`;
+		}).join("");
 
 		const html = `
 			<style>
 				#${this.id} .window-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 				.bbmm-x-root{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto}
 
-				.bbmm-x-toolbar{display:grid;grid-template-columns:auto auto auto auto 1fr max-content;align-items:center;column-gap:8px}
+				.bbmm-x-toolbar{display:grid;grid-template-columns:auto auto 1fr max-content;align-items:center;column-gap:8px}
 				.bbmm-x-toolbar .bbmm-btn{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
 
 				.bbmm-x-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
@@ -1725,6 +1930,13 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					display:flex;justify-content:center;align-items:center;
 					width:100%;height:36px;padding:0 14px;border-radius:8px;font-weight:600;
 				}
+
+				.bbmm-x-group td{
+					font-weight:700;
+					opacity:.9;
+					background:rgba(255,255,255,.06);
+					border-bottom:1px solid var(--color-border-light-2);
+				}
 			</style>
 
 			<section class="bbmm-x-root">
@@ -1732,11 +1944,8 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					<button type="button" class="bbmm-btn bbmm-x-add-setting" data-action="add-setting">${LT.buttons.addSetting()}</button>
 					<button type="button" class="bbmm-btn bbmm-x-add-module" data-action="add-module">${LT.buttons.addModule()}</button>
 
-					<button type="button" class="bbmm-btn bbmm-x-export" data-action="export">${LT.buttons.export()}</button>
-					<button type="button" class="bbmm-btn bbmm-x-import" data-action="import">${LT.buttons.import()}</button>
-
 					<div></div>
-					<div class="bbmm-x-count">${LT.total()}: ${this._rows.length}</div>
+					<div class="bbmm-x-count">${LT.total()}: ${entryCount}</div>
 				</div>
 
 				<div class="bbmm-x-scroller">
@@ -1824,6 +2033,9 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 				// Immediate delete — NO PROMPT
 				if (btn.classList.contains("bbmm-x-del")) {
+					const list = btn.dataset.list || "exc"; // "inc" or "exc"
+					const dupe = (btn.dataset.dupe === "1"); // legacy duplicate flag (only matters for exclusions)
+
 					const type = btn.dataset.type || "";
 					const ns   = btn.dataset.ns   || "";
 					const key  = btn.dataset.key  || "";
@@ -1831,69 +2043,170 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					try {
 						btn.disabled = true;
 
-						const data = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+						// INCLUSIONS DELETE
+						if (list === "inc") {
+							const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 
-						if (type === "module" && ns) {
-							const list = Array.isArray(data.modules) ? data.modules : [];
-							const before = list.length;
-							data.modules = list.filter(x => x !== ns);
-							const removed = (data.modules.length !== before);
+							if (type === "module" && ns) {
+								const arr = Array.isArray(data.modules) ? data.modules : [];
+								const before = arr.length;
+								data.modules = arr.filter(x => String(x) !== String(ns));
+								const removed = (data.modules.length !== before);
 
-							if (!removed) {
-								btn.disabled = false;
-								DL(`exclusions.js | delete(module): nothing to remove for ${ns}`);
+								if (!removed) {
+									btn.disabled = false;
+									DL(`exclusions.js | delete(inclusion module): nothing to remove for ${ns}`);
+									return;
+								}
+
+								const ok = await hlp_writeUserInclusions(data);
+								if (!ok) {
+									btn.disabled = false;
+									DL(3, `exclusions.js | delete(inclusion module): FAILED writing inclusions for ${ns}`);
+									ui.notifications?.error("Failed to remove inclusion. See console.");
+									return;
+								}
+
+								try { this._incData = data; } catch {}
+								try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
+								DL(`exclusions.js | delete(inclusion module): ${ns}`);
+								await this.render(true);
 								return;
 							}
 
-							const ok = await hlp_writeUserExclusions(data);
+							if (type === "setting" && ns && key) {
+								const arr = Array.isArray(data.settings) ? data.settings : [];
+								const before = arr.length;
+								data.settings = arr.filter(s => !(s?.namespace === ns && s?.key === key));
+								const removed = (data.settings.length !== before);
+
+								if (!removed) {
+									btn.disabled = false;
+									DL(`exclusions.js | delete(inclusion setting): nothing to remove for ${ns}.${key}`);
+									return;
+								}
+
+								const ok = await hlp_writeUserInclusions(data);
+								if (!ok) {
+									btn.disabled = false;
+									DL(3, `exclusions.js | delete(inclusion setting): FAILED writing inclusions for ${ns}.${key}`);
+									ui.notifications?.error("Failed to remove inclusion. See console.");
+									return;
+								}
+
+								try { this._incData = data; } catch {}
+								try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
+								DL(`exclusions.js | delete(inclusion setting): ${ns}.${key}`);
+								await this.render(true);
+								return;
+							}
+
+							// Fallback (missing ids)
+							btn.disabled = false;
+							DL(2, "exclusions.js | delete(inclusion): unknown type or missing ids", { type, ns, key });
+							return;
+						}
+
+						// EXCLUSIONS DELETE (and if legacy duplicate, remove from BOTH)
+						const exData = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+
+						if (type === "module" && ns) {
+							const arr = Array.isArray(exData.modules) ? exData.modules : [];
+							const before = arr.length;
+							exData.modules = arr.filter(x => String(x) !== String(ns));
+							const removed = (exData.modules.length !== before);
+
+							if (!removed) {
+								btn.disabled = false;
+								DL(`exclusions.js | delete(exclusion module): nothing to remove for ${ns}`);
+								return;
+							}
+
+							const ok = await hlp_writeUserExclusions(exData);
 							if (!ok) {
 								btn.disabled = false;
-								DL(3, `exclusions.js | delete(module): FAILED writing exclusions for ${ns}`);
+								DL(3, `exclusions.js | delete(exclusion module): FAILED writing exclusions for ${ns}`);
 								ui.notifications?.error("Failed to remove exclusion. See console.");
 								return;
 							}
 
-							try { this._excData = data; } catch {}
+							try { this._excData = exData; } catch {}
 							try { Hooks.callAll("bbmmExclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
-							DL(`exclusions.js | delete(module): ${ns}`);
+							DL(`exclusions.js | delete(exclusion module): ${ns}`);
+
+							// Legacy duplicate: also remove from inclusions
+							if (dupe) {
+								const inData = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+								const inArr = Array.isArray(inData.modules) ? inData.modules : [];
+								inData.modules = inArr.filter(x => String(x) !== String(ns));
+
+								const ok2 = await hlp_writeUserInclusions(inData);
+								if (!ok2) {
+									DL(3, `exclusions.js | delete(dupe module): FAILED writing inclusions for ${ns}`);
+									ui.notifications?.error("Removed exclusion, but failed to remove duplicate inclusion. See console.");
+								} else {
+									try { this._incData = inData; } catch {}
+									try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
+									DL(`exclusions.js | delete(dupe module): removed inclusion ${ns}`);
+								}
+							}
+
 							await this.render(true);
 							return;
 						}
 
 						if (type === "setting" && ns && key) {
-							const list = Array.isArray(data.settings) ? data.settings : [];
-							const before = list.length;
-							data.settings = list.filter(s => !(s?.namespace === ns && s?.key === key));
-							const removed = (data.settings.length !== before);
+							const arr = Array.isArray(exData.settings) ? exData.settings : [];
+							const before = arr.length;
+							exData.settings = arr.filter(s => !(s?.namespace === ns && s?.key === key));
+							const removed = (exData.settings.length !== before);
 
 							if (!removed) {
 								btn.disabled = false;
-								DL(`exclusions.js | delete(setting): nothing to remove for ${ns}.${key}`);
+								DL(`exclusions.js | delete(exclusion setting): nothing to remove for ${ns}.${key}`);
 								return;
 							}
 
-							const ok = await hlp_writeUserExclusions(data);
+							const ok = await hlp_writeUserExclusions(exData);
 							if (!ok) {
 								btn.disabled = false;
-								DL(3, `exclusions.js | delete(setting): FAILED writing exclusions for ${ns}.${key}`);
+								DL(3, `exclusions.js | delete(exclusion setting): FAILED writing exclusions for ${ns}.${key}`);
 								ui.notifications?.error("Failed to remove exclusion. See console.");
 								return;
 							}
 
-							try { this._excData = data; } catch {}
+							try { this._excData = exData; } catch {}
 							try { Hooks.callAll("bbmmExclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
-							DL(`exclusions.js | delete(setting): ${ns}.${key}`);
+							DL(`exclusions.js | delete(exclusion setting): ${ns}.${key}`);
+
+							// Legacy duplicate: also remove from inclusions
+							if (dupe) {
+								const inData = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+								const inArr = Array.isArray(inData.settings) ? inData.settings : [];
+								inData.settings = inArr.filter(s => !(s?.namespace === ns && s?.key === key));
+
+								const ok2 = await hlp_writeUserInclusions(inData);
+								if (!ok2) {
+									DL(3, `exclusions.js | delete(dupe setting): FAILED writing inclusions for ${ns}.${key}`);
+									ui.notifications?.error("Removed exclusion, but failed to remove duplicate inclusion. See console.");
+								} else {
+									try { this._incData = inData; } catch {}
+									try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
+									DL(`exclusions.js | delete(dupe setting): removed inclusion ${ns}.${key}`);
+								}
+							}
+
 							await this.render(true);
 							return;
 						}
 
 						// Fallback (missing ids)
 						btn.disabled = false;
-						DL(2, "exclusions.js | delete: unknown type or missing ids", { type, ns, key });
+						DL(2, "exclusions.js | delete(exclusion): unknown type or missing ids", { type, ns, key });
 					} catch (e) {
 						btn.disabled = false;
 						DL(3, "exclusions.js | delete: failed", e);
-						ui.notifications?.error("Failed to remove exclusion. See console.");
+						ui.notifications?.error("Failed to remove entry. See console.");
 					}
 					return;
 				}

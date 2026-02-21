@@ -637,7 +637,7 @@ export function injectBBMMHeaderButton(root) {
 			{ action: "modules", label: LT.modulePresetMgr(), onClick: () => openPresetManager() },
 			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
 			{ action: "exclusions", label: LT.exclusionsMgr(), onClick: () => openExclusionsManager() },
-			{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },
+			/*{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },*/
 			{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel(), onClick: () => openhiddenSettingSyncManager() },
 			// Import / Export
 			{
@@ -995,18 +995,10 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 					</div>
 
 					<div style="display:flex;align-items:center;gap:.75rem;">
-						<div style="min-width:160px;font-weight:700;">${LT.inclusions.manager()}:</div>
+						<div style="min-width:160px;font-weight:700;">${LT.inclusions.manager()} / ${LT.exclusions()}:</div>
 						<div style="display:flex;gap:.5rem;">
 							<button type="button" data-action="bbmm-inc-import" style="width:auto;">${LT.buttons.import()}</button>
 							<button type="button" data-action="bbmm-inc-export" style="width:auto;">${LT.buttons.export()}</button>
-						</div>
-					</div>
-
-					<div style="display:flex;align-items:center;gap:.75rem;">
-						<div style="min-width:160px;font-weight:700;">${LT.exclusions()}:</div>
-						<div style="display:flex;gap:.5rem;">
-							<button type="button" data-action="bbmm-exc-import" style="width:auto;">${LT.buttons.import()}</button>
-							<button type="button" data-action="bbmm-exc-export" style="width:auto;">${LT.buttons.export()}</button>
 						</div>
 					</div>
 					` : ``}
@@ -1279,10 +1271,10 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 				}
 
 				// Inclusions/Exclusions: all-only file export/import (storage/lists)
-				if (action === "bbmm-inc-export") return await bbmm_exportListFile("user-inclusions.json", "bbmm-inclusions.json");
-				if (action === "bbmm-inc-import") return await bbmm_importListFile("user-inclusions.json");
-				if (action === "bbmm-exc-export") return await bbmm_exportListFile("user-exclusions.json", "bbmm-exclusions.json");
-				if (action === "bbmm-exc-import") return await bbmm_importListFile("user-exclusions.json");
+				if (action === "bbmm-inc-export") return await bbmm_exportIncExcBundle();
+				if (action === "bbmm-inc-import") return await bbmm_importIncExcBundle();
+				if (action === "bbmm-exc-export") return await bbmm_exportIncExcBundle();
+				if (action === "bbmm-exc-import") return await bbmm_importIncExcBundle();
 				if (action === "bbmm-kb-export") {
 					const proceed = await new Promise((resolve) => {
 						const dlg = new foundry.applications.api.DialogV2({
@@ -1369,45 +1361,236 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 	}
 }
 
-// Export a storage list file (inclusions/exclusions)
-async function bbmm_exportListFile(storageFile, exportName) {
-	const url = `bbmm-data/${storageFile}`;
-	const data = await fetch(url, { cache: "no-store" }).then(r => r.json());
+async function bbmm_exportIncExcBundle() {
+	const FN = "settings.js | bbmm_exportIncExcBundle():";
+
+	// Read both stores
+	let inc = {};
+	let exc = {};
+
+	try {
+		inc = await fetch(`bbmm-data/user-inclusions.json`, { cache: "no-store" }).then(r => r.json());
+	} catch (e) {
+		DL(2, `${FN} failed reading inclusions, using empty`, e);
+		inc = { modules: [], settings: [] };
+	}
+
+	try {
+		exc = await fetch(`bbmm-data/user-exclusions.json`, { cache: "no-store" }).then(r => r.json());
+	} catch (e) {
+		DL(2, `${FN} failed reading exclusions, using empty`, e);
+		exc = { modules: [], settings: [] };
+	}
+
+	const incModules = Array.isArray(inc?.modules) ? inc.modules.map(String) : [];
+	const excModules = Array.isArray(exc?.modules) ? exc.modules.map(String) : [];
+	const incSettings = Array.isArray(inc?.settings) ? inc.settings : [];
+	const excSettings = Array.isArray(exc?.settings) ? exc.settings : [];
+
+	// Namespace list (All first)
+	const nsSet = new Set();
+	for (const m of incModules) nsSet.add(String(m));
+	for (const m of excModules) nsSet.add(String(m));
+	for (const s of incSettings) if (s?.namespace) nsSet.add(String(s.namespace));
+	for (const s of excSettings) if (s?.namespace) nsSet.add(String(s.namespace));
+
+	const namespaces = Array.from(nsSet).sort((a, b) => a.localeCompare(b, game.i18n.lang || undefined, { sensitivity: "base" }));
+
+	const chosen = await new Promise((resolve) => {
+		const host = document.createElement("div");
+
+		const p = document.createElement("p");
+		p.textContent = "Export which namespace?";
+		host.appendChild(p);
+
+		const sel = document.createElement("select");
+		sel.style.width = "100%";
+
+		const optAll = document.createElement("option");
+		optAll.value = "__all";
+		optAll.textContent = "All";
+		sel.appendChild(optAll);
+
+		for (const ns of namespaces) {
+			const opt = document.createElement("option");
+			opt.value = ns;
+
+			const mod = game.modules.get(ns);
+			opt.textContent = String(mod?.title ?? ns);
+
+			sel.appendChild(opt);
+		}
+
+		host.appendChild(sel);
+
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: LT.buttons.export() },
+			content: host,
+			buttons: [
+				{ action: "export", label: LT.buttons.export(), default: true, callback: () => { try { dlg.close(); } catch {} resolve(sel.value); } },
+				{ action: "cancel", label: LT.buttons.cancel(), callback: () => { try { dlg.close(); } catch {} resolve(null); } }
+			],
+			submit: () => { try { dlg.close(); } catch {} resolve(null); },
+			rejectClose: false,
+			position: { width: 420, height: "auto" }
+		});
+
+		dlg.render(true);
+	});
+
+	if (!chosen) return;
+
+	const filterNs = (chosen === "__all") ? "" : String(chosen);
+
+	const filtered = {
+		schemaVersion: 1,
+		foundryVersion: String(game.version ?? ""),
+		filter: filterNs || "all",
+		inclusions: {
+			modules: filterNs ? incModules.filter(id => id === filterNs) : incModules,
+			settings: filterNs ? incSettings.filter(s => String(s?.namespace ?? "") === filterNs) : incSettings
+		},
+		exclusions: {
+			modules: filterNs ? excModules.filter(id => id === filterNs) : excModules,
+			settings: filterNs ? excSettings.filter(s => String(s?.namespace ?? "") === filterNs) : excSettings
+		}
+	};
 
 	const d = new Date();
 	const pad = (n) => String(n).padStart(2, "0");
-	const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${exportName}`;
+	const tag = filterNs ? filterNs.replace(/[^a-z0-9]+/gi, "-").toLowerCase() : "all";
+	const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-bbmm-inc-exc-${tag}.json`;
 
-	await hlp_saveJSONFile(data, fname);
-	DL("settings.js | bbmm_exportListFile(): exported list file", { storageFile, fname });
+	await hlp_saveJSONFile(filtered, fname);
+	DL(1, `${FN} exported`, { filter: filtered.filter, fname });
+	ui.notifications?.info(LT._importExport?.exportedList?.() ?? "Exported.");
 }
 
-// Import a storage list file (inclusions/exclusions)
-async function bbmm_importListFile(storageFile) {
+async function bbmm_importIncExcBundle() {
+	const FN = "settings.js | bbmm_importIncExcBundle():";
+
 	const file = await hlp_pickLocalJSONFile();
 	if (!file) return;
 
-	let data;
+	let raw;
 	try {
-		data = JSON.parse(await file.text());
+		raw = JSON.parse(await file.text());
 	} catch (err) {
-		DL(3, "settings.js | bbmm_importListFile(): invalid json import file", err);
-		ui.notifications.error(LT.errors.invalidJsonFile());
+		DL(3, `${FN} invalid json import file`, err);
+		ui.notifications?.error(LT.errors.invalidJsonFile());
 		return;
 	}
 
-	const payload = JSON.stringify(data ?? {}, null, 2);
-	const f = new File([payload], storageFile, { type: "application/json" });
+	const inInc = raw?.inclusions ?? {};
+	const inExc = raw?.exclusions ?? {};
 
-	const res = await FilePicker.upload(
-		"data",
-		"bbmm-data",
-		f,
-		{ notify: false }
-	);
+	const inIncModules = Array.isArray(inInc?.modules) ? inInc.modules.map(String) : [];
+	const inExcModules = Array.isArray(inExc?.modules) ? inExc.modules.map(String) : [];
+	const inIncSettings = Array.isArray(inInc?.settings) ? inInc.settings : [];
+	const inExcSettings = Array.isArray(inExc?.settings) ? inExc.settings : [];
 
-	DL("settings.js | bbmm_importListFile(): imported list file", { storageFile, res });
-	ui.notifications.info(LT._importExport.importedList());
+	// Read current stores
+	let curInc = {};
+	let curExc = {};
+
+	try {
+		curInc = await fetch(`bbmm-data/user-inclusions.json`, { cache: "no-store" }).then(r => r.json());
+	} catch (e) {
+		DL(2, `${FN} failed reading current inclusions, using empty`, e);
+		curInc = { modules: [], settings: [] };
+	}
+
+	try {
+		curExc = await fetch(`bbmm-data/user-exclusions.json`, { cache: "no-store" }).then(r => r.json());
+	} catch (e) {
+		DL(2, `${FN} failed reading current exclusions, using empty`, e);
+		curExc = { modules: [], settings: [] };
+	}
+
+	if (!Array.isArray(curInc.modules)) curInc.modules = [];
+	if (!Array.isArray(curInc.settings)) curInc.settings = [];
+	if (!Array.isArray(curExc.modules)) curExc.modules = [];
+	if (!Array.isArray(curExc.settings)) curExc.settings = [];
+
+	// Build identity sets (for "no new duplicates across lists")
+	const curIncModSet = new Set(curInc.modules.map(String));
+	const curExcModSet = new Set(curExc.modules.map(String));
+	const curIncSetSet = new Set(curInc.settings.map(s => `${s?.namespace ?? ""}::${s?.key ?? ""}`));
+	const curExcSetSet = new Set(curExc.settings.map(s => `${s?.namespace ?? ""}::${s?.key ?? ""}`));
+
+	// Legacy duplicates preserved
+	const legacyDupModSet = new Set([...curIncModSet].filter(x => curExcModSet.has(x)));
+	const legacyDupSetSet = new Set([...curIncSetSet].filter(x => curExcSetSet.has(x)));
+
+	// Merge exclusions first (they trump)
+	for (const id of inExcModules) {
+		if (!id) continue;
+		if (!curExcModSet.has(id)) {
+			curExc.modules.push(id);
+			curExcModSet.add(id);
+		}
+	}
+
+	for (const s of inExcSettings) {
+		const ns = String(s?.namespace ?? "").trim();
+		const key = String(s?.key ?? "").trim();
+		if (!ns || !key) continue;
+		const sig = `${ns}::${key}`;
+		if (!curExcSetSet.has(sig)) {
+			curExc.settings.push({ namespace: ns, key });
+			curExcSetSet.add(sig);
+		}
+	}
+
+	// Merge inclusions, but do NOT create new duplicates against exclusions
+	for (const id of inIncModules) {
+		if (!id) continue;
+
+		// If exclusion already has it, only allow inclusion if it was a legacy duplicate
+		if (curExcModSet.has(id) && !legacyDupModSet.has(id)) continue;
+
+		if (!curIncModSet.has(id)) {
+			curInc.modules.push(id);
+			curIncModSet.add(id);
+		}
+	}
+
+	for (const s of inIncSettings) {
+		const ns = String(s?.namespace ?? "").trim();
+		const key = String(s?.key ?? "").trim();
+		if (!ns || !key) continue;
+
+		const sig = `${ns}::${key}`;
+
+		if (curExcSetSet.has(sig) && !legacyDupSetSet.has(sig)) continue;
+
+		if (!curIncSetSet.has(sig)) {
+			curInc.settings.push({ namespace: ns, key });
+			curIncSetSet.add(sig);
+		}
+	}
+
+	// Write both stores back (still separate files)
+	{
+		const payload = JSON.stringify(curInc ?? { modules: [], settings: [] }, null, 2);
+		const f = new File([payload], "user-inclusions.json", { type: "application/json" });
+		await FilePicker.upload("data", "bbmm-data", f, { notify: false });
+	}
+
+	{
+		const payload = JSON.stringify(curExc ?? { modules: [], settings: [] }, null, 2);
+		const f = new File([payload], "user-exclusions.json", { type: "application/json" });
+		await FilePicker.upload("data", "bbmm-data", f, { notify: false });
+	}
+
+	DL(1, `${FN} imported + merged`, {
+		addedInclusionsModules: inIncModules.length,
+		addedInclusionsSettings: inIncSettings.length,
+		addedExclusionsModules: inExcModules.length,
+		addedExclusionsSettings: inExcSettings.length
+	});
+
+	ui.notifications?.info(LT._importExport?.importedList?.() ?? "Imported.");
 }
 
 Hooks.once("init", () => {
@@ -1688,6 +1871,7 @@ Hooks.once("init", () => {
 			});
 			
 			//  MENU:Inclusions Manager
+			/*
 			game.settings.registerMenu(BBMM_ID, "menuInclusionsManager", {
 				name: LT.inclusions.btnInclusionMgr(),
 				label: LT.inclusions.btnInclusionMgr(),
@@ -1716,6 +1900,7 @@ Hooks.once("init", () => {
 					async _updateObject() {}
 				}
 			});
+			*/
 
 			// MENU: Hidden Client Setting Sync Manager
 			game.settings.registerMenu(BBMM_ID, "hiddenSettingSyncManager", {

@@ -9,6 +9,7 @@ import { LT, BBMM_ID } from "./localization.js";
 import { getSkipMap, isExcludedWith, hlp_injectHeaderHelpButton } from './helpers.js';
 import { copyPlainText } from "./macros.js";
 
+export { hlp_readUserInclusions, hlp_writeUserInclusions };
 
 // CONSTANTS / PLACEHOLDERS ===================================================
 /* Menu -> Setting expansion (so presets include real settings) */
