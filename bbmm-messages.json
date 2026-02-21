@@ -1,7 +1,7 @@
 {
 	"messages": [
 		{
-			"rev": 1,
+			"rev": 2,
 			"title": "BBMM - Test Message!",
 			"message": "This is a test message to test the message pusing function. ",
 			"link": "https://github.com/thejoester/bbmm/discussions/categories/announcements"
