@@ -1,1 +1,10 @@
-
+{
+	"messages": [
+		{
+			"rev": 1,
+			"title": "Test Message!",
+			"message": "This is a test message to test the message pusing function. ",
+			"link": "https://github.com/thejoester/bbmm/discussions/categories/announcements"
+		}
+	]
+}
