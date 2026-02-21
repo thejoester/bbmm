@@ -4,7 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0-test3] - 2026-02-19
+
+### Fixed
+- **Inclusions / Exclusions:**
+  - Fixed some localization issues.
+  - Fixed bug when hitting cancel while adding an inclusion/exclusion it removed the setting or module from the list.
+
+### Added
+- **Module:**
+  - Added feature that will allow me to send a message to users, in cases of bugs or issues that they may need advanced notice on.
+
 ## [0.7.0-test2] - 2026-02-19
+
 ### Added
 - **Inclusions / Exclusions:**
   - Merged inclusion and Exclusion Manager
@@ -13,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Added "All" option to export one file will all inclusions / exclusions.
 
 ## [0.7.0-test1] - 2026-02-19
+
 ### Added
 - **Inclusions / Exclusions:**
   - Added functionality to export and import inslusions and exclusion list per module. 

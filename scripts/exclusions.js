@@ -146,18 +146,12 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 		if (!Array.isArray(data.modules)) data.modules = [];
 
-		if (!data.modules.includes(id)) {
-			data.modules.push(id);
+		if (!data.modules.includes(id)) data.modules.push(id);
 
-			const ok = await hlp_writeUserInclusions(data);
-			if (!ok) {
-				DL(3, `exclusions.js | BBMMAddModuleExclusionAppV2._include(): FAILED writing inclusions for ${id}`);
-				return;
-			}
-
-			try { this._incData = data; } catch {}
-			try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", id }); } catch {}
-			DL(`exclusions.js | BBMMAddModuleExclusionAppV2._include(): stored ${id}`);
+		const ok = await hlp_writeUserInclusions(data);
+		if (!ok) {
+			DL(3, `exclusions.js | AddModule._include(): FAILED writing inclusions for ${id}`);
+			throw new Error("Failed to write inclusions");
 		}
 	}
 
@@ -165,11 +159,11 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 	async _chooseIncludeExclude(id) {
 		const choice = await new Promise((resolve) => {
 			const dlg = new foundry.applications.api.DialogV2({
-				window: { title: LT.buttons.addModule?.() ?? LT.buttons.addModule() },
-				content: `<p><strong>${LT.moduleNamespace()}:</strong> ${foundry.utils.escapeHTML(id)}</p>`,
+				window: { title: LT.titleAddModuleExclusion() },
+				content: `<p>${foundry.utils.escapeHTML(id)}</p>`,
 				buttons: [
-					{ action: "include", label: LT.inclusions?.include(), default: true },
-					{ action: "exclude", label: LT.buttons.exclude() },
+					{ action: "include", label: "Include", default: true },
+					{ action: "exclude", label: "Exclude" },
 					{ action: "cancel", label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
@@ -179,8 +173,17 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 			dlg.render(true);
 		});
 
-		if (choice === "include") return await this._include(id);
-		if (choice === "exclude") return await this._exclude(id);
+		if (choice === "include") {
+			await this._include(id);
+			return "include";
+		}
+
+		if (choice === "exclude") {
+			await this._exclude(id);
+			return "exclude";
+		}
+
+		return null;
 	}
 
 	// Add module ID to userExclusions.modules
@@ -360,11 +363,20 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 
 				try {
 					btn.disabled = true;
-					await this._chooseIncludeExclude(id); 
 
-					// Keep dialog open; mark on success
+					// IMPORTANT: chooser returns "include" | "exclude" | null
+					const choice = await this._chooseIncludeExclude(id);
+
+					// Cancel means: do NOTHING
+					if (!choice) {
+						btn.disabled = false;
+						DL(`exclusions.js | AddModule: cancelled ${id}`);
+						return;
+					}
+
+					// Only mark done if we actually added it
 					btn.classList.add("bbmm-exc-done");
-					btn.setAttribute("aria-label", "Excluded");
+					btn.setAttribute("aria-label", "Added");
 					btn.innerHTML = "✓";
 					btn.disabled = true;
 					DL(`exclusions.js | AddModule: module ${id} marked as excluded`);
@@ -883,21 +895,17 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			DL(3, `exclusions.js | AddSetting._include(): FAILED writing inclusions for ${namespace}.${key}`);
 			throw new Error("Failed to write inclusions");
 		}
-
-		try { this._incData = data; } catch {}
-		try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace, key }); } catch {}
-		DL(`exclusions.js | AddSetting._include(): stored ${namespace}.${key}`);
 	}
 
 	// Prompt user to Include, Exclude, or Cancel for a given setting
 	async _chooseIncludeExclude(namespace, key, isMenu = false) {
 		const choice = await new Promise((resolve) => {
 			const dlg = new foundry.applications.api.DialogV2({
-				window: { title: LT.buttons.addSetting?.() ?? LT.buttons.addSetting() },
-				content: `<p><strong>${LT.setting()}:</strong> ${foundry.utils.escapeHTML(`${namespace}.${key}`)}</p>`,
+				window: { title: LT.titleAddSettingExclusion() },
+				content: `<p>${foundry.utils.escapeHTML(`${namespace}.${key}`)}</p>`,
 				buttons: [
-					{ action: "include", label: LT.inclusions?.manager?.() ?? "Include", default: true },
-					{ action: "exclude", label: LT.buttons.exclude() },
+					{ action: "include", label: "Include", default: true },
+					{ action: "exclude", label: "Exclude" },
 					{ action: "cancel", label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
@@ -907,12 +915,18 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			dlg.render(true);
 		});
 
-		if (choice === "include") return await this._include(namespace, key);
+		if (choice === "include") {
+			await this._include(namespace, key);
+			return "include";
+		}
 
 		if (choice === "exclude") {
-			if (isMenu) return await this._excludeMenu(namespace, key);
-			return await this._exclude(namespace, key);
+			if (isMenu) await this._excludeMenu(namespace, key);
+			else await this._exclude(namespace, key);
+			return "exclude";
 		}
+
+		return null;
 	}
 
 	// Special case: exclude a menu placeholder
@@ -1116,7 +1130,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 				const rowEl = target.closest(".row");
 
-				// Exclude button
+				// Include/Exclude button
 				const btn = target.closest?.(".bbmm-exc-act");
 				if (btn instanceof HTMLButtonElement) {
 					ev.preventDefault();
@@ -1130,17 +1144,26 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 						btn.disabled = true;
 
 						const row = this._rows?.find?.(r => r.namespace === ns && r.key === key);
-						await this._chooseIncludeExclude(ns, key, !!row?.__isMenu);
 
-						// Remove row from data + DOM immediately
+						// IMPORTANT: chooser returns "include" | "exclude" | null
+						const choice = await this._chooseIncludeExclude(ns, key, !!row?.__isMenu);
+
+						// Cancel means: do NOTHING and keep it in the list
+						if (!choice) {
+							btn.disabled = false;
+							DL(`exclusions.js | AddSetting: cancelled ${ns}.${key}`);
+							return;
+						}
+
+						// Only now do we remove the row from the list
 						this._rows = (this._rows || []).filter(r => !(r.namespace === ns && r.key === key));
 						rowEl?.remove?.();
 
-						DL(`exclusions.js | AddSetting: excluded ${ns}.${key} (removed from list)`);
+						DL(`exclusions.js | AddSetting: ${choice} ${ns}.${key} (removed from list)`);
 						this._applyFilterToDOM();
 					} catch (e) {
 						btn.disabled = false;
-						DL(3, "exclusions.js | AddSetting: exclude failed", e);
+						DL(3, "exclusions.js | AddSetting: add failed", e);
 						ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
 					}
 					return;
@@ -1768,7 +1791,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		// Group header: Included
 		modelRows.push({
 			__group: true,
-			_label: (LT.titleInclusions?.() ?? "Included")
+			_label: (LT.inclusions.manager())
 		});
 
 		// Included modules
@@ -1811,7 +1834,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		// Group header: Excluded
 		modelRows.push({
 			__group: true,
-			_label: (LT.titleExclusions?.() ?? "Excluded")
+			_label: (LT.exclusions())
 		});
 
 		// Excluded modules (mark legacy duplicate if also in inclusions)

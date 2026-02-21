@@ -12,14 +12,11 @@ import {
 	bbmm_importSettingsPresetsAll, 
 	bbmm_exportModulePresetsAll, 
 	bbmm_importModulePresetsAll, 
-	bbmm_exportKeybindings, 
-	bbmm_importKeybindings, 
 	hlp_esc 
 } from "./helpers.js";
 
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
-const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
 export const BBMM_README_UUID = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn";
 export const BBMM_MIGRATION_INSTRUCTIONS = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.fBhc3e12eZRtNnSd";
 
@@ -27,6 +24,12 @@ export const BBMM_MIGRATION_INSTRUCTIONS = "Compendium.bbmm.bbmm-journal.Journal
 export const CTRL_STORE_KEY = "userControlSync";				// world: { [id]: {rev, lock?, soft?} }
 export const CTRL_REV_STORE = "softLockRevMap_controls";		// world: { [id]: number }
 export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
+
+// folder name for compendium organization
+const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
+
+/* Remote Messages ============================================================*/
+const BBMM_MESSAGE_FEED_URL = "https://raw.githubusercontent.com/thejoester/bbmm/main/bbmm-messages.json"; 
 
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
@@ -119,8 +122,13 @@ export function DL(intLogType, stringLogMsg, objObject = null) {
 	}
 }
 
-// Preset Storage Migration =====================================================
 // !!! REMOVE after version 0.8.0 !!!
+/* 	Preset Storage Migration =====================================================
+		This function migrates user inclusions and exclusions from game settings 
+		to persistent storage files. It is designed to be run once after the 
+		update that introduces the new storage system, and it will set a flag 
+		when complete to avoid running again.
+*/
 async function hlp_migrateLists(){
 	if (!game.user.isGM) return; // GM Only	
 
@@ -450,65 +458,11 @@ async function hlp_migrateLists(){
 	}
 }
 
-// Check folder migration 
-// !!! REMOVE  after version 0.7.0 !!!
-async function checkFolderMigration(){
-	if (!game.user.isGM) return; // GM only
-
-	const BBMM_PACK_NAMES = [
-		"bbmm-macros",
-		"bbmm-journal"
-	];
-
-	// Get the full migrations object (always returns an object).
-	function getMigrations() {
-		const obj = game.settings.get(BBMM_ID, "bbmmFlags");
-		return obj && typeof obj === "object" ? { ...obj } : {};
-	}
-
-	// Set/merge a single flag without clobbering others.
-	async function setMigrationFlag(key, value) {
-		const current = getMigrations();
-		current[key] = value;
-		await game.settings.set(BBMM_ID, "bbmmFlags", current);
-	}
-
-	/** Check a flag; falsy if missing. */
-	function hasMigrationFlag(key) {
-		const current = getMigrations();
-		return Boolean(current[key]);
-	}
-
-	if (hasMigrationFlag("folderMigration")) return; // we already migrated
-
-	try {
-		let folder = game.folders.find((f) => f.type === "Compendium" && f.name === BBMM_COMP_FOLDER_NAME);
-		// If folder doesn't exist create it
-		if (!folder) { 
-			folder = await Folder.create({ name: BBMM_COMP_FOLDER_NAME, type: "Compendium", sorting: "a" });
-			DL("settings.js | Created compendium folder:", BBMM_COMP_FOLDER_NAME, folder?.id);
-		}
-
-		// move packs into folder
-		for (const name of BBMM_PACK_NAMES) {
-			const cid = `${BBMM_ID}.${name}`;
-			const pack = game.packs.get(cid);
-			if (!pack) { DL("settings.js | Pack not found, skipping:", cid); continue; }
-			await pack.configure({ folder: folder.id });
-			DL("settings.js | Moved pack into folder:", cid, "→", BBMM_COMP_FOLDER_NAME);
-		}
-
-		// update flag
-		await setMigrationFlag("folderMigration", true);
-		ui.compendium.render(true);
-		DL("settings.js | Compendium folder migration complete.");
-	} catch (err) {
-		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
-	}
-}
-
-// Show notice that presets have moved to their own module
 // !!! REMOVE  after version 0.8.0 !!!
+/* 	Presets Moved Notice ================================================================
+		Show notice that presets have moved to their own files, with link to 
+		documentation and option to not show again (flagged in bbmmFlags)
+*/
 async function showPresetsMovedNotice() {
 	
 	if (!game.user.isGM) return;
@@ -590,6 +544,62 @@ async function showPresetsMovedNotice() {
 		rejectClose: false,
 		position: { width: 560, height: "auto" }
 	}).render(true);
+}
+
+// Check folder migration for compendiums and move packs if needed
+async function checkFolderMigration(){
+	if (!game.user.isGM) return; // GM only
+
+	const BBMM_PACK_NAMES = [
+		"bbmm-macros",
+		"bbmm-journal"
+	];
+
+	// Get the full migrations object (always returns an object).
+	function getMigrations() {
+		const obj = game.settings.get(BBMM_ID, "bbmmFlags");
+		return obj && typeof obj === "object" ? { ...obj } : {};
+	}
+
+	// Set/merge a single flag without clobbering others.
+	async function setMigrationFlag(key, value) {
+		const current = getMigrations();
+		current[key] = value;
+		await game.settings.set(BBMM_ID, "bbmmFlags", current);
+	}
+
+	/** Check a flag; falsy if missing. */
+	function hasMigrationFlag(key) {
+		const current = getMigrations();
+		return Boolean(current[key]);
+	}
+
+	if (hasMigrationFlag("folderMigration")) return; // we already migrated
+
+	try {
+		let folder = game.folders.find((f) => f.type === "Compendium" && f.name === BBMM_COMP_FOLDER_NAME);
+		// If folder doesn't exist create it
+		if (!folder) { 
+			folder = await Folder.create({ name: BBMM_COMP_FOLDER_NAME, type: "Compendium", sorting: "a" });
+			DL("settings.js | Created compendium folder:", BBMM_COMP_FOLDER_NAME, folder?.id);
+		}
+
+		// move packs into folder
+		for (const name of BBMM_PACK_NAMES) {
+			const cid = `${BBMM_ID}.${name}`;
+			const pack = game.packs.get(cid);
+			if (!pack) { DL("settings.js | Pack not found, skipping:", cid); continue; }
+			await pack.configure({ folder: folder.id });
+			DL("settings.js | Moved pack into folder:", cid, "→", BBMM_COMP_FOLDER_NAME);
+		}
+
+		// update flag
+		await setMigrationFlag("folderMigration", true);
+		ui.compendium.render(true);
+		DL("settings.js | Compendium folder migration complete.");
+	} catch (err) {
+		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
+	}
 }
 
 //  Inject BBMM button into a Foundry window header
@@ -1361,6 +1371,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 	}
 }
 
+// Export inclusions/exclusions as a single file, with an optional filter by namespace (module)
 async function bbmm_exportIncExcBundle() {
 	const FN = "settings.js | bbmm_exportIncExcBundle():";
 
@@ -1466,6 +1477,7 @@ async function bbmm_exportIncExcBundle() {
 	ui.notifications?.info(LT._importExport?.exportedList?.() ?? "Exported.");
 }
 
+// import inclusions/exclusions from a file, merging with existing lists
 async function bbmm_importIncExcBundle() {
 	const FN = "settings.js | bbmm_importIncExcBundle():";
 
@@ -1591,6 +1603,173 @@ async function bbmm_importIncExcBundle() {
 	});
 
 	ui.notifications?.info(LT._importExport?.importedList?.() ?? "Imported.");
+}
+
+// Remote Message Feed Check
+async function bbmm_checkRemoteMessageFeed() {
+	const FN = "settings.js | bbmm_checkRemoteMessageFeed():";
+
+	// GM only
+	if (!game.user?.isGM) return;
+
+	// Read bbmmFlags object
+	let flags = game.settings.get(BBMM_ID, "bbmmFlags");
+	if (!flags || typeof flags !== "object") flags = {};
+
+	// Ensure defaults exist
+	let changed = false;
+
+	if (typeof flags.lastMessageRev !== "number") {
+		flags.lastMessageRev = 0;
+		changed = true;
+	}
+
+	if (typeof flags.lastMessageCheckTs !== "number") {
+		flags.lastMessageCheckTs = 0;
+		changed = true;
+	}
+
+	// Throttle checks to once per hour (world)
+	const now = Date.now();
+	if (flags.lastMessageCheckTs && (now - flags.lastMessageCheckTs) < 3600000) {
+		DL(1, `${FN} skipped (checked < 1 hour ago)`, { lastMessageCheckTs: flags.lastMessageCheckTs, now });
+		return;
+	}
+
+	// Update last check timestamp in bbmmFlags if needed
+	if (changed) {
+		try {
+			await game.settings.set(BBMM_ID, "bbmmFlags", flags);
+		} catch (e) {
+			DL(2, `${FN} failed to set bbmmFlags defaults/checkTs`, e);
+		}
+	}
+
+	const lastRev = Number(flags.lastMessageRev || 0);
+
+	// Fetch JSON
+	let data;
+	try {
+		const resp = await fetch(BBMM_MESSAGE_FEED_URL, { cache: "no-store" });
+		if (!resp?.ok) {
+			DL(2, `${FN} fetch failed`, { status: resp?.status, statusText: resp?.statusText });
+			return;
+		}
+		data = await resp.json();
+	} catch (e) {
+		DL(2, `${FN} fetch/json failed`, e);
+		return;
+	}
+
+	// Blank/invalid JSON -> do nothing
+	if (!data || typeof data !== "object") {
+		DL(1, `${FN} feed empty/invalid, skipping`);
+		return;
+	}
+
+	// Support either {messages:[...]} or a single message object
+	let msg = null;
+
+	if (Array.isArray(data?.messages)) {
+		let best = null;
+		for (const m of data.messages) {
+			const rev = Number(m?.rev ?? 0);
+			if (!rev || rev <= lastRev) continue;
+			if (!best || rev > Number(best?.rev ?? 0)) best = m;
+		}
+		if (best) {
+			msg = {
+				rev: Number(best.rev),
+				title: String(best?.title ?? "BBMM Message"),
+				message: String(best?.message ?? ""),
+				link: best?.link ? String(best.link) : ""
+			};
+		}
+	} else {
+		const rev = Number(data?.rev ?? 0);
+		if (rev && rev > lastRev) {
+			msg = {
+				rev,
+				title: String(data?.title ?? "BBMM Message"),
+				message: String(data?.message ?? ""),
+				link: data?.link ? String(data.link) : ""
+			};
+		}
+	}
+
+	if (!msg) {
+		DL(1, `${FN} no new messages`, { lastRev });
+
+		// update lastMessageCheckTs
+		try {
+			const current = game.settings.get(BBMM_ID, "bbmmFlags");
+			const next = (current && typeof current === "object") ? { ...current } : {};
+			next.lastMessageCheckTs = Date.now();
+			await game.settings.set(BBMM_ID, "bbmmFlags", next);
+		} catch (e) {
+			DL(2, `${FN} failed to update lastMessageCheckTs (no message)`, e);
+		}
+
+		return;
+	}
+
+	const safeTitle = foundry.utils.escapeHTML(msg.title);
+	const safeMsg = foundry.utils.escapeHTML(msg.message).replace(/\n/g, "<br>");
+
+	let linkHtml = "";
+	if (msg.link) {
+		const safeLink = foundry.utils.escapeHTML(msg.link);
+		linkHtml = `<p style="margin-top:.75rem;"><a href="${safeLink}" target="_blank" rel="noopener noreferrer">${safeLink}</a></p>`;
+	}
+
+	const html = `
+		<div class="bbmm-remote-message">
+			<p style="margin:0;">${safeMsg}</p>
+			${linkHtml}
+		</div>
+	`;
+
+	// Show dialog with "Don't show again" and "Remind me later" options
+	const result = await new Promise((resolve) => {
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: safeTitle },
+			content: html,
+			buttons: [
+				{
+					action: "ok",
+					label: (LT.presetNoticeDontShowAgain() ?? "Don't show again"),
+					default: true,
+					callback: () => resolve("ok")
+				},
+				{
+					action: "later",
+					label: (LT.remindMeLater() ?? "Remind me later"),
+					callback: () => resolve("later")
+				}
+			],
+			submit: (res) => resolve(res ?? "later"),
+			rejectClose: false,
+			position: { width: 560, height: "auto" }
+		});
+		dlg.render(true);
+	});
+
+	if (result !== "ok") {
+		DL(1, `${FN} dismissed (later)`, { rev: msg.rev });
+		return;
+	}
+
+	// Update lastMessageRev in bbmmFlags
+	try {
+		const current = game.settings.get(BBMM_ID, "bbmmFlags");
+		const next = (current && typeof current === "object") ? { ...current } : {};
+		next.lastMessageRev = Number(msg.rev);
+		next.lastMessageCheckTs = Date.now();
+		await game.settings.set(BBMM_ID, "bbmmFlags", next);
+		DL(`${FN} updated lastMessageRev`, { rev: msg.rev });
+	} catch (e) {
+		DL(2, `${FN} failed to update lastMessageRev`, e);
+	}
 }
 
 Hooks.once("init", () => {
@@ -1757,6 +1936,16 @@ Hooks.once("init", () => {
 				type: Array,
 				default: [],
 				restricted: true
+			});
+
+			// Remote message feed: last seen message revision (per-user)
+			game.settings.register(BBMM_ID, "lastMessageRev", {
+				name: "Last Message Revision",
+				hint: "Tracks the last BBMM remote message revision shown to this user.",
+				scope: "world",
+				config: false,
+				type: Number,
+				default: 0
 			});
 
 		// ===== SETTINGS ITEMS =====
@@ -2104,10 +2293,6 @@ Hooks.once("init", () => {
 	}
 });
 
-Hooks.on("setup", () => {
-	DL("settings.js | setup fired");
-});
-
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
@@ -2129,7 +2314,7 @@ Hooks.once("ready", async () => {
 	try { await hlp_migrateLists(); } catch (err) { DL(3, "settings.js | Inclusions/Exclusions migration failed:", err?.message ?? err); }
 
 	// Prime exclusions cache for getSkipMap() users
-	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }1
+	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }
 
 	// check folder migration - Remove after version 0.7.0
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
@@ -2152,6 +2337,9 @@ Hooks.once("ready", async () => {
 		
 	});
 	Hooks.on("renderModuleManagement", (app, html) => { try { injectBBMMHeaderButton(html) } catch (e) { DL(2, "settings.js | renderModuleManagement: menu injection failed", e); } });
+
+	// Remote update messages from GitHub feed
+	if (game.user?.isGM) { try { await bbmm_checkRemoteMessageFeed(); } catch (err) { DL(2, "settings.js | ready | remote message feed failed", err); } }
 	
 });
 
