@@ -211,6 +211,7 @@
 		"visible": "visible",
 		"unknown": "unknown",
 		"selectNamespace": "Select namespace...",
+		"moduleNamespace": "Module/Namespace",
 		"buttons": {
 			"yes": "Yes",
 			"no": "No",

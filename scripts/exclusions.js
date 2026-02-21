@@ -166,7 +166,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		const choice = await new Promise((resolve) => {
 			const dlg = new foundry.applications.api.DialogV2({
 				window: { title: LT.buttons.addModule?.() ?? LT.buttons.addModule() },
-				content: `<p>${foundry.utils.escapeHTML(id)}</p>`,
+				content: `<p><strong>${LT.moduleNamespace()}:</strong> ${foundry.utils.escapeHTML(id)}</p>`,
 				buttons: [
 					{ action: "include", label: LT.inclusions?.include(), default: true },
 					{ action: "exclude", label: LT.buttons.exclude() },
@@ -894,7 +894,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		const choice = await new Promise((resolve) => {
 			const dlg = new foundry.applications.api.DialogV2({
 				window: { title: LT.buttons.addSetting?.() ?? LT.buttons.addSetting() },
-				content: `<p>${foundry.utils.escapeHTML(`${namespace}.${key}`)}</p>`,
+				content: `<p><strong>${LT.setting()}:</strong> ${foundry.utils.escapeHTML(`${namespace}.${key}`)}</p>`,
 				buttons: [
 					{ action: "include", label: LT.inclusions?.manager?.() ?? "Include", default: true },
 					{ action: "exclude", label: LT.buttons.exclude() },
