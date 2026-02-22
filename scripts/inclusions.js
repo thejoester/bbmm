@@ -1752,7 +1752,7 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					`;
 
 					const choice = await _dialogV2Choice({
-						title: LT._importExport?.exportTitle?.() ?? "Export Inclusions",
+						title: LT._importExport.exportTitle(),
 						content: dlgContent,
 						buttons: {
 							export: { label: LT.buttons.export(), icon: "fas fa-file-export" },

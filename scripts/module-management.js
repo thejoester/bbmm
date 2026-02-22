@@ -2092,7 +2092,7 @@ Hooks.on("ready", () => {
 									await game.settings.set(BBMM_ID, "knownInstalledModules", current);
 
 									if (selected.length === 0) {
-										ui.notifications.info(LT.moduleManagement.noneSelected());
+										ui.notifications.info(LT.moduleManagement.newModulesNoneSelected());
 										DL("module-management.js | new modules prompt: enableReload clicked with none selected");
 										safe();
 										return;

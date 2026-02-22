@@ -5,7 +5,7 @@
 	- "Exclude" updates setting, closes, then re-opens manager
 ============================================================================ */
 
-import { DL, BBMM_README_UUID } from './settings.js';
+import { DL, BBMM_README_UUID, injectBBMMHeaderButton } from './settings.js';
 import { LT } from "./localization.js";
 import { copyPlainText } from "./macros.js";
 import { hlp_injectHeaderHelpButton, invalidateSkipMap } from "./helpers.js";
@@ -162,8 +162,8 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 				window: { title: LT.titleAddModuleExclusion() },
 				content: `<p>${foundry.utils.escapeHTML(id)}</p>`,
 				buttons: [
-					{ action: "include", label: "Include", default: true },
-					{ action: "exclude", label: "Exclude" },
+					{ action: "include", label: LT.inclusions.include(), default: true },
+					{ action: "exclude", label: LT.buttons.exclude() },
 					{ action: "cancel", label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
@@ -428,6 +428,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		this._moduleFilter = ""; // "" = none selected
 		this._matchRows = [];
 		this._delegated = false;
+		this._hiddenOnly = false;
 
 		// If true, hide everything until module chosen
 		this._requireModuleSelection = true;
@@ -451,7 +452,11 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		// Require module selection: show nothing until user picks one
 		if (this._requireModuleSelection && !mod) return false;
 
+		// If module filter set, filter by module
 		if (mod && r.namespace !== mod) return false;
+
+		// If hidden-only filter set, filter by hidden state
+		if (this._hiddenOnly && !r.hidden) return false;
 
 		const q = String(this._filterText ?? "").trim().toLowerCase();
 		if (!q) return true;
@@ -904,8 +909,8 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				window: { title: LT.titleAddSettingExclusion() },
 				content: `<p>${foundry.utils.escapeHTML(`${namespace}.${key}`)}</p>`,
 				buttons: [
-					{ action: "include", label: "Include", default: true },
-					{ action: "exclude", label: "Exclude" },
+					{ action: "include", label: LT.inclusions.include(), default: true },
+					{ action: "exclude", label: LT.inclusions.exclude() },
 					{ action: "cancel", label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
@@ -966,14 +971,17 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			.bbmm-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}
 			.bbmm-toolbar select{width:260px;min-width:260px;max-width:260px}
 			.bbmm-toolbar input[type="text"]{flex:1;min-width:260px}
+			.bbmm-toolbar .count{margin-left:auto;white-space:nowrap}
+			#bbmm-as-filter{flex:0 0 360px;min-width:360px;max-width:360px}
+			.bbmm-as-hiddenonly{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;font-size:.9em;opacity:.9}
+			.bbmm-as-hiddenonly input{margin:0}
 			.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}
-			.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}
+			.bbmm-grid-head .h{padding:.35rem .5rem;font-weight:600}
 			.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}
 			.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}
 			.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}
 			.bbmm-grid-body .c-mod,.bbmm-grid-body .c-key{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-			.bbmm-grid-body .c-scope{text-transform:capitalize;opacity:.85;white-space:nowrap}
-			.bbmm-grid-body .c-scope{display:flex;align-items:center;justify-content:center;opacity:.9}
+			.bbmm-grid-body .c-scope{display:flex;align-items:center;justify-content:center;text-transform:capitalize;white-space:nowrap;opacity:.9}
 			.bbmm-grid-body .bbmm-scope-icons{display:inline-flex;gap:.35rem;align-items:center}
 			.bbmm-grid-body .val-preview{display:flex;gap:.5rem;align-items:flex-start}
 			.bbmm-grid-body .val-size{opacity:.65;white-space:nowrap;font-size:.85em}
@@ -1026,6 +1034,10 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				<div class="bbmm-toolbar">
 					<select id="bbmm-as-module" title="${foundry.utils.escapeHTML(LT.module())}">${moduleOpts}</select>
 					<input id="bbmm-as-filter" type="text" placeholder="${foundry.utils.escapeHTML(LT.macro.search())}" value="${foundry.utils.escapeHTML(this._filterText ?? "")}" />
+					<label class="bbmm-as-hiddenonly">
+						<input id="bbmm-as-hiddenonly" type="checkbox"${this._hiddenOnly ? " checked" : ""} />
+						${foundry.utils.escapeHTML(LT.hiddenOnly?.() ?? "Hidden only")}
+					</label>
 					<span class="count" style="opacity:.85;font-weight:600">${LT.macro.showing()} <span id="bbmm-as-count">0</span> ${LT.macro.of()} <span id="bbmm-as-total">${(this._rows || []).length}</span></span>
 				</div>
 				${head}
@@ -1097,6 +1109,19 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 			this._moduleFilter = String(t.value ?? "");
 			DL(`exclusions.js | AddSetting: module filter changed to '${this._moduleFilter || "(none)"}'`);
+
+			this._applyFilterToDOM();
+			this._warmVisiblePreviews(50);
+		});
+
+		// Hidden-only toggle
+		this.element.addEventListener("change", (ev) => {
+			const t = ev.target;
+			if (!(t instanceof HTMLElement)) return;
+			if (t.id !== "bbmm-as-hiddenonly") return;
+
+			this._hiddenOnly = !!t.checked;
+			DL(`exclusions.js | AddSetting: hiddenOnly=${this._hiddenOnly}`);
 
 			this._applyFilterToDOM();
 			this._warmVisiblePreviews(50);
@@ -1376,8 +1401,8 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 						label: LT.buttons.export(),
 						default: true,
 						callback: () => {
+							const v = sel.value;
 							try { dlg.close(); } catch {}
-							const v = dlg.element?.querySelector("select")?.value ?? sel.value;
 							resolve(v);
 						}
 					},
@@ -2013,6 +2038,13 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			DL(2, "exclusions.js | _onRender(): help inject failed", e);
 		}
 
+		// Inject BBMM header menu
+		try {
+			injectBBMMHeaderButton(this.element);
+		} catch (e) {
+			DL(2, "exclusions.js | _replaceHTML(): bbmm header inject failed", e);
+		}
+
 		// avoid double-binding across re-renders
 		if (!this._delegated) {
 			this._delegated = true;
@@ -2266,18 +2298,15 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 }
 
 // PUBLIC LAUNCHERS
-export function openExclusionsManagerApp() {
-	// DL('openExclusionsManagerApp(): fired'); 
+export function openExclusionsManagerApp() { 
 	new BBMMExclusionsAppV2().render(true);
 }
 
 export function openAddModuleExclusionApp() {
-	// DL('openAddModuleExclusionApp(): fired');
 	new BBMMAddModuleExclusionAppV2().render(true);
 }
 
 export function openAddSettingExclusionApp() {
-	// DL('openAddSettingExclusionApp(): fired');
 	new BBMMAddSettingExclusionAppV2().render(true);
 }
 

@@ -924,7 +924,6 @@ export async function openBBMMLauncher() {
 					{ action: "settings", label: LT.settingsPresetMgr() },
 					// { action: "controls-presets", label: LT.controlsPresetMgr() },
 					{ action: "exclusions", label: LT.exclusionsMgr() },
-					{ action: "inclusions", label: LT.inclusionsMgr() },
 					{ action: "hiddenSettings",   label: LT.hiddenSettingSync.menuLabel() },
 					{ action: "importExport", label: LT.buttons.importExport() },
 					{ action: "cancel",   label: LT.buttons.cancel() }
@@ -1438,7 +1437,7 @@ async function bbmm_exportIncExcBundle() {
 			window: { title: LT.buttons.export() },
 			content: host,
 			buttons: [
-				{ action: "export", label: LT.buttons.export(), default: true, callback: () => { try { dlg.close(); } catch {} resolve(sel.value); } },
+				{ action: "export", label: LT.buttons.export(), default: true, callback: () => { const v = dlg.element?.querySelector("select")?.value ?? sel.value; try { dlg.close(); } catch {} resolve(v); } },
 				{ action: "cancel", label: LT.buttons.cancel(), callback: () => { try { dlg.close(); } catch {} resolve(null); } }
 			],
 			submit: () => { try { dlg.close(); } catch {} resolve(null); },
@@ -1602,7 +1601,7 @@ async function bbmm_importIncExcBundle() {
 		addedExclusionsSettings: inExcSettings.length
 	});
 
-	ui.notifications?.info(LT._importExport?.importedList?.() ?? "Imported.");
+	ui.notifications?.info(LT._importExport.importedList());
 }
 
 // Remote Message Feed Check
@@ -2058,43 +2057,11 @@ Hooks.once("init", () => {
 					async _updateObject() {}
 				}
 			});
-			
-			//  MENU:Inclusions Manager
-			/*
-			game.settings.registerMenu(BBMM_ID, "menuInclusionsManager", {
-				name: LT.inclusions.btnInclusionMgr(),
-				label: LT.inclusions.btnInclusionMgr(),
-				icon: "fas fa-list-check",
-				restricted: true,
-				type: class extends FormApplication {
-					constructor(...args){ super(...args); }
-					static get defaultOptions() {
-						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-inclusions-manager-opener",
-							title: LT.inclusions.btnInclusionMgr(),
-							template: null, // We'll open our own UI (DialogV2/App), no form tpl needed
-							width: 600
-						});
-					}
-					async render(...args) {
-						try {
-							DL("settings.js | Inclusions Manager button clicked");
-							await openInclusionsManagerApp();
-						} catch (err) {
-							DL(2, "settings.js | Inclusions Manager open failed", err);
-							ui.notifications?.error(LT.inclusionsOpenError());
-						}
-						return this;
-					}
-					async _updateObject() {}
-				}
-			});
-			*/
 
 			// MENU: Hidden Client Setting Sync Manager
 			game.settings.registerMenu(BBMM_ID, "hiddenSettingSyncManager", {
-				name: LT.hiddenSettingSync?.menuName?.() ?? "Hidden Client Setting Sync",
-				label: LT.hiddenSettingSync?.menuLabel?.() ?? "Open Manager",
+				name: LT.hiddenSettingSync.menuName(),
+				label: LT.hiddenSettingSync.menuLabel(),
 				icon: "fas fa-user-gear",
 				restricted: true,
 				type: class extends FormApplication {
