@@ -262,7 +262,8 @@
 			"failedRemoveInclusion": "Failed to remove inclusion",
 			"remove": "Remove",
 			"addModuleTitle": "Add Module Inclusion",
-			"active": "Active"
+			"active": "Active",
+			"exclude": "Exclude"
 		},
 		"_settings": {
 			"bbmmFlags_name": "BBMM Flags",
