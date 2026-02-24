@@ -4,56 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0-test5] - 2026-02-23
-
-### Changed
-- **Inclusions / Exclusions:**
-  - Changed workflow for adding inclusions / exclusions to have both buttons instead of first clicking "Add".
-  - Made hidden settings show hidden icon in orange. 
-  - Added note that this tool is an advanced feature with clickable link to Manual (journal. 
-  - Added "All" filter for namespace list to show all settigs (this may load slowly).
-  - Updated Manual (Journal).
-
-## [0.7.0-test4] - 2026-02-22
-
-### Fixed
-- **Inclusions / Exclusions:**
-  - Fixed issue when exporting single module it would still export all. 
-- **Localizations:**
-  - Cleaned up unused localization keys in en.json
-
-### Added
-- **Inclusions / Exclusions:**
-  - Added "Only Hidden Items" filter in "Add Setting Inclusion / Exclusion" window.
-  - Added "BBMM" Menu to Inclusions / Exclusions Manager.
-
-## [0.7.0-test3] - 2026-02-19
-
-### Fixed
-- **Inclusions / Exclusions:**
-  - Fixed some localization issues.
-  - Fixed bug when hitting cancel while adding an inclusion/exclusion it removed the setting or module from the list.
+## [0.7.0] - 2026-02-24
 
 ### Added
 - **Module:**
   - Added feature that will allow me to send a message to users, in cases of bugs or issues that they may need advanced notice on.
-
-## [0.7.0-test2] - 2026-02-19
-
-### Added
-- **Inclusions / Exclusions:**
-  - Merged inclusion and Exclusion Manager
-  - moved Export feature to the Import / Export window (In BBMM Settings screen).
-    - Export exports both inclusions and exclusion lists. 
-    - Added "All" option to export one file will all inclusions / exclusions.
-
-## [0.7.0-test1] - 2026-02-19
-
-### Added
-- **Inclusions / Exclusions:**
-  - Added functionality to export and import inslusions and exclusion list per module. 
+  - Updated Manual (Journal).
 - **Module management:**
-  - Added notification when new module(s) has been installed, prompting to enable. This feature can be disabled in settings. 
+  - Added notification when new module(s) has been installed, prompting to enable. This feature can be disabled in settings.
+- **Inclusions / Exclusions:**
+  - Merged inclusion and Exclusion Manager. 
+  - Moved Export feature to the Import / Export window (In BBMM Settings screen):
+    - Export exports both inclusions and exclusion lists. 
+    - Added functionality to export and import inslusions and exclusion list per module.
+    - Added "All" option to export one file will all inclusions / exclusions.
+  - Added "Only Hidden Items" filter in "Add Setting Inclusion / Exclusion" window.
+  - Added "BBMM" Menu to Inclusions / Exclusions Manager.
+  - Made hidden settings show hidden icon in orange. 
+  - Added note that this tool is an advanced feature with clickable link to Manual (journal). 
+
+### Changed
+- **Localizations:**
+  - Cleaned up unused localization keys in en.json.
+
+### Fixed
+- **Hidden Settings Sync:**
+  - Fixed bug causing only client scope settings to show when adding hidden setting to sync. 
 
 ## [0.6.8] - 2026-01-20
 
