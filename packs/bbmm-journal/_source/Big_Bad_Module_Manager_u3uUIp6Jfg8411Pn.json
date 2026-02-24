@@ -15,7 +15,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h3><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h3></div><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Rc4FRPurKuPwxhou]{Enhanced Module Management}</h3><ul><li><p>Add Notes per module</p></li><li><p>Click to expand and show notes</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / rename / delete preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / rename / delete preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.JBIsgjN4Vl79tU2Q]{Hidden Setting Sync Manager}</h3><ul><li><p>Allows GM to manually add a sync for a hidden client setting.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>Add modules to ignore on presets/imports/exports.</li><li>Add specific setting to ignore on presets/imports/exports.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Q3JVPh8ykzMc3kLS]{Include hidden Settings}</h3><ul><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Add hidden settings to always include in presets/imports/exports.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.w87gAp63EPHThdk4]{Import / Export}</h3><ul><li><p>*As of v0.6.5 the Import and Export functions for presets have moved to their own section under the settings menu.</p></li></ul><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
+        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h2><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h2></div><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Rc4FRPurKuPwxhou]{Enhanced Module Management}</h3><ul><li><p>Add Notes per module</p></li><li><p>Click to expand and show notes</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / rename / delete preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / rename / delete preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.JBIsgjN4Vl79tU2Q]{Hidden Setting Sync Manager}</h3><ul><li><p>Allows GM to manually add a sync for a hidden client setting.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Include / Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>*As of 0.7.0 the Inclusion and Exclusion managers have merged into one tool.</li><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Inclusions add hidden settings or modules to always include in presets/imports/exports.</p></li><li><p>Exclusions add specific settings to ignore on presets/imports/exports.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.w87gAp63EPHThdk4]{Import / Export}</h3><ul><li><p>*As of v0.6.5 the Import and Export functions for presets have moved to their own section under the settings menu.</p></li></ul><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
       },
       "video": {
         "controls": true,
@@ -36,7 +36,7 @@
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757732832081,
-        "modifiedTime": 1768212043783,
+        "modifiedTime": 1771834111547,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.LqdPKzBQbWas56RQ"
@@ -121,7 +121,7 @@
     },
     {
       "sort": 400000,
-      "name": "Exclusion Manager",
+      "name": "Inclusion / Exclusion Manager",
       "type": "text",
       "_id": "1mPrapuBoNRZTWXo",
       "system": {},
@@ -132,46 +132,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>The Exclusion Manager allows you to add modules or specific settings that will be excluded by this module when Saving Presets or Exporting / Importing from .json. </p><h3></h3>"
-      },
-      "video": {
-        "controls": true,
-        "volume": 0.5
-      },
-      "src": null,
-      "category": null,
-      "ownership": {
-        "default": -1,
-        "EpqDCtSCbVNM4wPj": 3
-      },
-      "flags": {},
-      "_stats": {
-        "compendiumSource": null,
-        "duplicateSource": null,
-        "exportSource": null,
-        "coreVersion": "13.348",
-        "systemId": "pf2e",
-        "systemVersion": "7.4.3",
-        "createdTime": 1757740071855,
-        "modifiedTime": 1757742505060,
-        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
-      },
-      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.1mPrapuBoNRZTWXo"
-    },
-    {
-      "sort": 500000,
-      "name": "Inclusion Manager",
-      "type": "text",
-      "_id": "Q3JVPh8ykzMc3kLS",
-      "system": {},
-      "title": {
-        "show": true,
-        "level": 1
-      },
-      "image": {},
-      "text": {
-        "format": 1,
-        "content": "<p></p><h3>⚠ USE THIS TOOL WITH CAUTION ⚠</h3><p>Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p><p></p><p>The Inclusion Manager will let you manually add Hidden settings to ensure they are saved in @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets} and exports.</p><p><br /><br /></p>"
+        "content": "<h3>⚠ USE THIS TOOL WITH CAUTION ⚠</h3><p>Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p><hr /><p>*As of v0.7.0 The Inclusions and Exclusions managers have been merged into one tool.</p><h3>Exclusions</h3><ul><li><p>Excluding a setting or module will ensure that these settings / modules will NOT be included in any export, or preset.</p></li><li><p>Excluding a module will exclude ALL settings for that module!</p></li><li><p>Exclusions will take priority! If you exclude a module, but add a setting from that module to inclusions, it will still be ignored.</p></li></ul><h3>Inclusions</h3><ul><li><p>Including a setting or module will ensure that those settings will be included in exports and presets.</p></li><li><p>By default, non-hidden settings are included and there is no reason to include, but doing so will not cause any issues. Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p></li><li><p>It is also not suggested to include a whole module unless you are <strong>very very sure</strong> that you want to include all settings in an export or preset. Restoring some hidden settings could potentially result in loss of data! Again, please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p></li></ul><h3>Other Notes</h3><ul><li><p>If a setting text is in Orange, that signals that the data for that setting is larger, indicating there is a higher chance that it contains data that may not be recommended to include. Please see @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings} for more information!</p></li></ul>"
       },
       "video": {
         "controls": true,
@@ -191,11 +152,11 @@
         "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
-        "createdTime": 1757740379508,
-        "modifiedTime": 1767347938372,
+        "createdTime": 1757740071855,
+        "modifiedTime": 1771833974574,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
-      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Q3JVPh8ykzMc3kLS"
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.1mPrapuBoNRZTWXo"
     },
     {
       "sort": 350000,
@@ -405,7 +366,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>This feature will let you click an edit button on the module list for each module and enter notes. You can then click any module to expand it and see those notes. </p><img src=\"modules/bbmm/assets/readme/enhanced-module-management1.png\" /><p></p><h3><strong><span style=\"text-decoration:underline\">Future features</span></strong></h3><p>I am working to add the following features to the Enhanced Module Management:</p><ul><li><p>Add Tags to modules</p></li><li><p>Ability to filter/sort by tags</p></li><li><p>Direct link to settings</p></li><li><p>Direct link to Change Logs if available</p></li><li><p>Direct link to README if available</p></li><li><p>Ability to rename module in list.</p></li></ul>"
+        "content": "<p>This feature will let you click an edit button on the module list for each module and enter notes. You can then click any module to expand it and see those notes.</p><img src=\"modules/bbmm/assets/readme/enhanced-module-management1.png\" /><p></p><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Future features</span></strong></span></h3><p>I am working to add the following features to the Enhanced Module Management:</p><ul><li><p>Add Tags to modules</p></li><li><p>Ability to filter/sort by tags</p></li><li><p>Ability to rename module in list.</p></li></ul>"
       },
       "video": {
         "controls": true,
@@ -422,11 +383,11 @@
         "compendiumSource": null,
         "duplicateSource": null,
         "exportSource": null,
-        "coreVersion": "13.348",
+        "coreVersion": "13.351",
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1758413865302,
-        "modifiedTime": 1758414193503,
+        "modifiedTime": 1771833554921,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Rc4FRPurKuPwxhou"
@@ -471,7 +432,7 @@
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.EWkK8UJBIc3junpJ"
     },
     {
-      "sort": 800000,
+      "sort": 650000,
       "name": "How To: Migrate presets",
       "type": "text",
       "_id": "fBhc3e12eZRtNnSd",
@@ -504,7 +465,7 @@
         "systemId": "pf2e",
         "systemVersion": "7.8.0",
         "createdTime": 1767008505790,
-        "modifiedTime": 1767679785111,
+        "modifiedTime": 1771834089421,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.fBhc3e12eZRtNnSd"
@@ -561,7 +522,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>*As of v0.6.5 the Import and Export functions for presets have moved to their own section under the settings menu.</p><ul><li><p><strong>Note:</strong> Importing a preset does not load it automatically. After importing you will have to load the preset.</p></li></ul><h2>Module/Setting Presets</h2><p><strong>Import:</strong></p><ul><li><p>Will import all presets from the selected exported .json file.</p></li><li><p>If importing a preset with a name that already exists it will be renamed.</p></li></ul><p><strong>Export:</strong></p><ul><li><p>When exporting you will be prompted to export all presets, or select a specific preset to export.</p></li></ul><h2>Inclusion / Exclusion lists</h2><ul><li><p>When exporting or importing inclusion/exclusion lists, the entire list will be imported/exported.</p></li><li><p>When importing, it will overwrite the current inclusion/exclusion list.</p></li></ul>"
+        "content": "<p>*As of v0.6.5 the Import and Export functions for presets have moved to their own section under the settings menu.</p><ul><li><p><strong>Note:</strong> Importing a preset does not load it automatically. After importing you will have to load the preset.</p></li></ul><h2>Module/Setting Presets</h2><p><strong>Import:</strong></p><ul><li><p>Will import all presets from the selected exported .json file.</p></li><li><p>If importing a preset with a name that already exists it will be renamed.</p></li></ul><p><strong>Export:</strong></p><ul><li><p>When exporting you will be prompted to export all presets, or select a specific preset to export.</p></li></ul><h2>Inclusion / Exclusion lists</h2><ul><li><p>When exporting inclusion/exclusion lists, you will be prompted to specify a module, or given the choice to export all. This will export both inclusions and exclusions for the selection made. </p></li><li><p>When importing, it will import inclusions and exclusions for the module (or all if selected on export) for that file. It will add to your existing inclusions / exclusions but not remove any. </p></li><li><p>You can submit, and also find others inclusion/exclusion lists on the <a href=\"https://github.com/thejoester/bbmm/discussions/categories/inclusion-exclusion-submissions\">Github Discussion page</a>! </p></li></ul>"
       },
       "video": {
         "controls": true,
@@ -582,7 +543,7 @@
         "systemId": "pf2e",
         "systemVersion": "7.8.0",
         "createdTime": 1768201087450,
-        "modifiedTime": 1768213815008,
+        "modifiedTime": 1771833401769,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.w87gAp63EPHThdk4"

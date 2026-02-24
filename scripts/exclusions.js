@@ -346,19 +346,23 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 						return;
 					}
 
-					// Mark both buttons in this row as done
-					const row = btn.closest("tr");
-					const buttons = row ? row.querySelectorAll("button.bbmm-exc-act") : [];
-					for (const b of buttons) {
-						if (b instanceof HTMLButtonElement) {
-							b.classList.add("bbmm-exc-done");
-							b.disabled = true;
-							b.innerHTML = "✓";
-							b.setAttribute("aria-label", "Added");
-						}
+					// Remove from in-memory list + remove row from DOM (match Add Setting behavior)
+					this._mods = (this._mods || []).filter(m => m?.id !== id);
+
+					const tr = btn.closest("tr");
+					tr?.remove?.();
+
+					// Update count
+					const countEl = this.element?.querySelector?.(".bbmm-am-count");
+					if (countEl) countEl.textContent = `${LT.available()}: ${(this._mods || []).length}`;
+
+					// If list is empty, show empty-state row
+					const tbody = this.element?.querySelector?.(".bbmm-am-table tbody");
+					if (tbody && !tbody.querySelector("tr")) {
+						tbody.innerHTML = `<tr><td colspan="3" class="c-empty" style="text-align:center;opacity:.8;padding:18px 0">${LT.allModulesAlreadyExcluded()}.</td></tr>`;
 					}
 
-					DL(`exclusions.js | AddModule: ${act} ${id} (marked done)`);
+					DL(`exclusions.js | AddModule: ${act} ${id} (removed from list)`);
 				} catch (e) {
 					btn.disabled = false;
 					DL(3, "exclusions.js | AddModule: include/exclude failed", e);
@@ -428,11 +432,11 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 	_matchesFilter(r) {
 		const mod = String(this._moduleFilter ?? "").trim();
 
-		// Require module selection: show nothing until user picks one
+		// Require module selection unless "__ALL__"
 		if (this._requireModuleSelection && !mod) return false;
 
-		// If module filter set, filter by module
-		if (mod && r.namespace !== mod) return false;
+		// If specific module selected (not ALL), filter by module
+		if (mod && mod !== "__ALL__" && r.namespace !== mod) return false;
 
 		// If hidden-only filter set, filter by hidden state
 		if (this._hiddenOnly && !r.hidden) return false;
@@ -968,9 +972,14 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			.bbmm-as-footer button{min-width:160px}`;
 
 		const moduleList = this._buildModuleList();
-		const moduleOpts = [`<option value="" selected disabled>${LT.selectNamespace()}</option>`]
-			.concat(moduleList.map(m => `<option value="${foundry.utils.escapeHTML(m.ns)}"${this._moduleFilter===m.ns?" selected":""}>${foundry.utils.escapeHTML(m.title)}</option>`))
-			.join("");
+		const moduleOpts = [
+			`<option value="" ${!this._moduleFilter ? "selected" : ""} disabled>${LT.selectNamespace()}</option>`,
+			`<option value="__ALL__"${this._moduleFilter==="__ALL__"?" selected":""}>All (slow)</option>`
+		]
+		.concat(moduleList.map(m =>
+			`<option value="${foundry.utils.escapeHTML(m.ns)}"${this._moduleFilter===m.ns?" selected":""}>${foundry.utils.escapeHTML(m.title)}</option>`
+		))
+		.join("");
 
 		const head = `<div class="bbmm-grid-head" id="bbmm-as-head">${this._renderHeader()}</div>`;
 		const rowsHtml = (Array.isArray(this._rows) ? this._rows : []).map(r => this._rowHTML(r)).join("");
@@ -1934,6 +1943,20 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					background:rgba(255,255,255,.06);
 					border-bottom:1px solid var(--color-border-light-2);
 				}
+
+				.bbmm-x-advanced{
+					display:flex;
+					align-items:center;
+					gap:6px;
+					white-space:nowrap;
+					opacity:.85;
+					font-size:1em;
+				}
+				.bbmm-x-advanced .bbmm-x-manual{
+					color:#cc7a00;
+					text-decoration:underline;
+					cursor:pointer;
+				}
 			</style>
 
 			<section class="bbmm-x-root">
@@ -1941,7 +1964,10 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					<button type="button" class="bbmm-btn bbmm-x-add-setting" data-action="add-setting">${LT.buttons.addSetting()}</button>
 					<button type="button" class="bbmm-btn bbmm-x-add-module" data-action="add-module">${LT.buttons.addModule()}</button>
 
-					<div></div>
+					<div class="bbmm-x-advanced">
+						<span>${LT.inclusions.advFeature()}</span>
+						<a class="bbmm-x-manual" data-uuid="Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn">${LT.inclusions.readManual()}</a>
+					</div>
 					<div class="bbmm-x-count">${LT.total()}: ${entryCount}</div>
 				</div>
 
@@ -2000,7 +2026,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 			content.addEventListener("click", async (ev) => {
 				// find the nearest button with either a data-action or the delete class
-				const btn = ev.target?.closest?.('button[data-action], button.bbmm-x-del');
+				const btn = ev.target?.closest?.('button[data-action], button.bbmm-x-del, a.bbmm-x-manual');
 				if (!btn) return;
 
 				ev.preventDefault();
@@ -2008,6 +2034,20 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 				const action = btn.dataset.action || "";
 				DL(`exclusions.js | Manager.click(): ${action || btn.className}`);
+
+				// Manual link
+				if (btn instanceof HTMLAnchorElement && btn.classList.contains("bbmm-x-manual")) {
+					const uuid = btn.dataset.uuid || "";
+					if (!uuid) return;
+
+					try {
+						const doc = await fromUuid(uuid);
+						doc?.sheet?.render(true);
+					} catch (e) {
+						DL(2, "exclusions.js | Manager: open manual link failed", { uuid, err: e });
+					}
+					return;
+				}
 
 				// Close (bottom button) or header X
 				if (action === "close" || action === "cancel" || btn.classList.contains("bbmm-close")) {

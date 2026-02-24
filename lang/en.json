@@ -263,7 +263,9 @@
 			"remove": "Remove",
 			"addModuleTitle": "Add Module Inclusion",
 			"active": "Active",
-			"exclude": "Exclude"
+			"exclude": "Exclude",
+			"advFeature": "This is an advanced feature!",
+			"readManual": "Please read the manual!"
 		},
 		"_settings": {
 			"bbmmFlags_name": "BBMM Flags",
