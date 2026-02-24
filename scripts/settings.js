@@ -12,14 +12,11 @@ import {
 	bbmm_importSettingsPresetsAll, 
 	bbmm_exportModulePresetsAll, 
 	bbmm_importModulePresetsAll, 
-	bbmm_exportKeybindings, 
-	bbmm_importKeybindings, 
 	hlp_esc 
 } from "./helpers.js";
 
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
-const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
 export const BBMM_README_UUID = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn";
 export const BBMM_MIGRATION_INSTRUCTIONS = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.fBhc3e12eZRtNnSd";
 
@@ -27,6 +24,12 @@ export const BBMM_MIGRATION_INSTRUCTIONS = "Compendium.bbmm.bbmm-journal.Journal
 export const CTRL_STORE_KEY = "userControlSync";				// world: { [id]: {rev, lock?, soft?} }
 export const CTRL_REV_STORE = "softLockRevMap_controls";		// world: { [id]: number }
 export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
+
+// folder name for compendium organization
+const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
+
+/* Remote Messages ============================================================*/
+const BBMM_MESSAGE_FEED_URL = "https://raw.githubusercontent.com/thejoester/bbmm/main/bbmm-messages.json"; 
 
 // Do not export these settings
 export const EXPORT_SKIP = new Map([
@@ -119,8 +122,13 @@ export function DL(intLogType, stringLogMsg, objObject = null) {
 	}
 }
 
-// Preset Storage Migration =====================================================
 // !!! REMOVE after version 0.8.0 !!!
+/* 	Preset Storage Migration =====================================================
+		This function migrates user inclusions and exclusions from game settings 
+		to persistent storage files. It is designed to be run once after the 
+		update that introduces the new storage system, and it will set a flag 
+		when complete to avoid running again.
+*/
 async function hlp_migrateLists(){
 	if (!game.user.isGM) return; // GM Only	
 
@@ -450,65 +458,11 @@ async function hlp_migrateLists(){
 	}
 }
 
-// Check folder migration 
-// !!! REMOVE  after version 0.7.0 !!!
-async function checkFolderMigration(){
-	if (!game.user.isGM) return; // GM only
-
-	const BBMM_PACK_NAMES = [
-		"bbmm-macros",
-		"bbmm-journal"
-	];
-
-	// Get the full migrations object (always returns an object).
-	function getMigrations() {
-		const obj = game.settings.get(BBMM_ID, "bbmmFlags");
-		return obj && typeof obj === "object" ? { ...obj } : {};
-	}
-
-	// Set/merge a single flag without clobbering others.
-	async function setMigrationFlag(key, value) {
-		const current = getMigrations();
-		current[key] = value;
-		await game.settings.set(BBMM_ID, "bbmmFlags", current);
-	}
-
-	/** Check a flag; falsy if missing. */
-	function hasMigrationFlag(key) {
-		const current = getMigrations();
-		return Boolean(current[key]);
-	}
-
-	if (hasMigrationFlag("folderMigration")) return; // we already migrated
-
-	try {
-		let folder = game.folders.find((f) => f.type === "Compendium" && f.name === BBMM_COMP_FOLDER_NAME);
-		// If folder doesn't exist create it
-		if (!folder) { 
-			folder = await Folder.create({ name: BBMM_COMP_FOLDER_NAME, type: "Compendium", sorting: "a" });
-			DL("settings.js | Created compendium folder:", BBMM_COMP_FOLDER_NAME, folder?.id);
-		}
-
-		// move packs into folder
-		for (const name of BBMM_PACK_NAMES) {
-			const cid = `${BBMM_ID}.${name}`;
-			const pack = game.packs.get(cid);
-			if (!pack) { DL("settings.js | Pack not found, skipping:", cid); continue; }
-			await pack.configure({ folder: folder.id });
-			DL("settings.js | Moved pack into folder:", cid, "→", BBMM_COMP_FOLDER_NAME);
-		}
-
-		// update flag
-		await setMigrationFlag("folderMigration", true);
-		ui.compendium.render(true);
-		DL("settings.js | Compendium folder migration complete.");
-	} catch (err) {
-		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
-	}
-}
-
-// Show notice that presets have moved to their own module
 // !!! REMOVE  after version 0.8.0 !!!
+/* 	Presets Moved Notice ================================================================
+		Show notice that presets have moved to their own files, with link to 
+		documentation and option to not show again (flagged in bbmmFlags)
+*/
 async function showPresetsMovedNotice() {
 	
 	if (!game.user.isGM) return;
@@ -592,6 +546,62 @@ async function showPresetsMovedNotice() {
 	}).render(true);
 }
 
+// Check folder migration for compendiums and move packs if needed
+async function checkFolderMigration(){
+	if (!game.user.isGM) return; // GM only
+
+	const BBMM_PACK_NAMES = [
+		"bbmm-macros",
+		"bbmm-journal"
+	];
+
+	// Get the full migrations object (always returns an object).
+	function getMigrations() {
+		const obj = game.settings.get(BBMM_ID, "bbmmFlags");
+		return obj && typeof obj === "object" ? { ...obj } : {};
+	}
+
+	// Set/merge a single flag without clobbering others.
+	async function setMigrationFlag(key, value) {
+		const current = getMigrations();
+		current[key] = value;
+		await game.settings.set(BBMM_ID, "bbmmFlags", current);
+	}
+
+	/** Check a flag; falsy if missing. */
+	function hasMigrationFlag(key) {
+		const current = getMigrations();
+		return Boolean(current[key]);
+	}
+
+	if (hasMigrationFlag("folderMigration")) return; // we already migrated
+
+	try {
+		let folder = game.folders.find((f) => f.type === "Compendium" && f.name === BBMM_COMP_FOLDER_NAME);
+		// If folder doesn't exist create it
+		if (!folder) { 
+			folder = await Folder.create({ name: BBMM_COMP_FOLDER_NAME, type: "Compendium", sorting: "a" });
+			DL("settings.js | Created compendium folder:", BBMM_COMP_FOLDER_NAME, folder?.id);
+		}
+
+		// move packs into folder
+		for (const name of BBMM_PACK_NAMES) {
+			const cid = `${BBMM_ID}.${name}`;
+			const pack = game.packs.get(cid);
+			if (!pack) { DL("settings.js | Pack not found, skipping:", cid); continue; }
+			await pack.configure({ folder: folder.id });
+			DL("settings.js | Moved pack into folder:", cid, "→", BBMM_COMP_FOLDER_NAME);
+		}
+
+		// update flag
+		await setMigrationFlag("folderMigration", true);
+		ui.compendium.render(true);
+		DL("settings.js | Compendium folder migration complete.");
+	} catch (err) {
+		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
+	}
+}
+
 //  Inject BBMM button into a Foundry window header
 export function injectBBMMHeaderButton(root) {
 	
@@ -637,7 +647,7 @@ export function injectBBMMHeaderButton(root) {
 			{ action: "modules", label: LT.modulePresetMgr(), onClick: () => openPresetManager() },
 			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
 			{ action: "exclusions", label: LT.exclusionsMgr(), onClick: () => openExclusionsManager() },
-			{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },
+			/*{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },*/
 			{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel(), onClick: () => openhiddenSettingSyncManager() },
 			// Import / Export
 			{
@@ -914,7 +924,6 @@ export async function openBBMMLauncher() {
 					{ action: "settings", label: LT.settingsPresetMgr() },
 					// { action: "controls-presets", label: LT.controlsPresetMgr() },
 					{ action: "exclusions", label: LT.exclusionsMgr() },
-					{ action: "inclusions", label: LT.inclusionsMgr() },
 					{ action: "hiddenSettings",   label: LT.hiddenSettingSync.menuLabel() },
 					{ action: "importExport", label: LT.buttons.importExport() },
 					{ action: "cancel",   label: LT.buttons.cancel() }
@@ -995,18 +1004,10 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 					</div>
 
 					<div style="display:flex;align-items:center;gap:.75rem;">
-						<div style="min-width:160px;font-weight:700;">${LT.inclusions.manager()}:</div>
+						<div style="min-width:160px;font-weight:700;">${LT.inclusions.manager()} / ${LT.exclusions()}:</div>
 						<div style="display:flex;gap:.5rem;">
 							<button type="button" data-action="bbmm-inc-import" style="width:auto;">${LT.buttons.import()}</button>
 							<button type="button" data-action="bbmm-inc-export" style="width:auto;">${LT.buttons.export()}</button>
-						</div>
-					</div>
-
-					<div style="display:flex;align-items:center;gap:.75rem;">
-						<div style="min-width:160px;font-weight:700;">${LT.exclusions()}:</div>
-						<div style="display:flex;gap:.5rem;">
-							<button type="button" data-action="bbmm-exc-import" style="width:auto;">${LT.buttons.import()}</button>
-							<button type="button" data-action="bbmm-exc-export" style="width:auto;">${LT.buttons.export()}</button>
 						</div>
 					</div>
 					` : ``}
@@ -1279,10 +1280,10 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 				}
 
 				// Inclusions/Exclusions: all-only file export/import (storage/lists)
-				if (action === "bbmm-inc-export") return await bbmm_exportListFile("user-inclusions.json", "bbmm-inclusions.json");
-				if (action === "bbmm-inc-import") return await bbmm_importListFile("user-inclusions.json");
-				if (action === "bbmm-exc-export") return await bbmm_exportListFile("user-exclusions.json", "bbmm-exclusions.json");
-				if (action === "bbmm-exc-import") return await bbmm_importListFile("user-exclusions.json");
+				if (action === "bbmm-inc-export") return await bbmm_exportIncExcBundle();
+				if (action === "bbmm-inc-import") return await bbmm_importIncExcBundle();
+				if (action === "bbmm-exc-export") return await bbmm_exportIncExcBundle();
+				if (action === "bbmm-exc-import") return await bbmm_importIncExcBundle();
 				if (action === "bbmm-kb-export") {
 					const proceed = await new Promise((resolve) => {
 						const dlg = new foundry.applications.api.DialogV2({
@@ -1369,45 +1370,405 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 	}
 }
 
-// Export a storage list file (inclusions/exclusions)
-async function bbmm_exportListFile(storageFile, exportName) {
-	const url = `bbmm-data/${storageFile}`;
-	const data = await fetch(url, { cache: "no-store" }).then(r => r.json());
+// Export inclusions/exclusions as a single file, with an optional filter by namespace (module)
+async function bbmm_exportIncExcBundle() {
+	const FN = "settings.js | bbmm_exportIncExcBundle():";
+
+	// Read both stores
+	let inc = {};
+	let exc = {};
+
+	try {
+		inc = await fetch(`bbmm-data/user-inclusions.json`, { cache: "no-store" }).then(r => r.json());
+	} catch (e) {
+		DL(2, `${FN} failed reading inclusions, using empty`, e);
+		inc = { modules: [], settings: [] };
+	}
+
+	try {
+		exc = await fetch(`bbmm-data/user-exclusions.json`, { cache: "no-store" }).then(r => r.json());
+	} catch (e) {
+		DL(2, `${FN} failed reading exclusions, using empty`, e);
+		exc = { modules: [], settings: [] };
+	}
+
+	const incModules = Array.isArray(inc?.modules) ? inc.modules.map(String) : [];
+	const excModules = Array.isArray(exc?.modules) ? exc.modules.map(String) : [];
+	const incSettings = Array.isArray(inc?.settings) ? inc.settings : [];
+	const excSettings = Array.isArray(exc?.settings) ? exc.settings : [];
+
+	// Namespace list (All first)
+	const nsSet = new Set();
+	for (const m of incModules) nsSet.add(String(m));
+	for (const m of excModules) nsSet.add(String(m));
+	for (const s of incSettings) if (s?.namespace) nsSet.add(String(s.namespace));
+	for (const s of excSettings) if (s?.namespace) nsSet.add(String(s.namespace));
+
+	const namespaces = Array.from(nsSet).sort((a, b) => a.localeCompare(b, game.i18n.lang || undefined, { sensitivity: "base" }));
+
+	const chosen = await new Promise((resolve) => {
+		const host = document.createElement("div");
+
+		const p = document.createElement("p");
+		p.textContent = "Export which namespace?";
+		host.appendChild(p);
+
+		const sel = document.createElement("select");
+		sel.style.width = "100%";
+
+		const optAll = document.createElement("option");
+		optAll.value = "__all";
+		optAll.textContent = "All";
+		sel.appendChild(optAll);
+
+		for (const ns of namespaces) {
+			const opt = document.createElement("option");
+			opt.value = ns;
+
+			const mod = game.modules.get(ns);
+			opt.textContent = String(mod?.title ?? ns);
+
+			sel.appendChild(opt);
+		}
+
+		host.appendChild(sel);
+
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: LT.buttons.export() },
+			content: host,
+			buttons: [
+				{ action: "export", label: LT.buttons.export(), default: true, callback: () => { const v = dlg.element?.querySelector("select")?.value ?? sel.value; try { dlg.close(); } catch {} resolve(v); } },
+				{ action: "cancel", label: LT.buttons.cancel(), callback: () => { try { dlg.close(); } catch {} resolve(null); } }
+			],
+			submit: () => { try { dlg.close(); } catch {} resolve(null); },
+			rejectClose: false,
+			position: { width: 420, height: "auto" }
+		});
+
+		dlg.render(true);
+	});
+
+	if (!chosen) return;
+
+	const filterNs = (chosen === "__all") ? "" : String(chosen);
+
+	const filtered = {
+		schemaVersion: 1,
+		foundryVersion: String(game.version ?? ""),
+		filter: filterNs || "all",
+		inclusions: {
+			modules: filterNs ? incModules.filter(id => id === filterNs) : incModules,
+			settings: filterNs ? incSettings.filter(s => String(s?.namespace ?? "") === filterNs) : incSettings
+		},
+		exclusions: {
+			modules: filterNs ? excModules.filter(id => id === filterNs) : excModules,
+			settings: filterNs ? excSettings.filter(s => String(s?.namespace ?? "") === filterNs) : excSettings
+		}
+	};
 
 	const d = new Date();
 	const pad = (n) => String(n).padStart(2, "0");
-	const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${exportName}`;
+	const tag = filterNs ? filterNs.replace(/[^a-z0-9]+/gi, "-").toLowerCase() : "all";
+	const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-bbmm-inc-exc-${tag}.json`;
 
-	await hlp_saveJSONFile(data, fname);
-	DL("settings.js | bbmm_exportListFile(): exported list file", { storageFile, fname });
+	await hlp_saveJSONFile(filtered, fname);
+	DL(1, `${FN} exported`, { filter: filtered.filter, fname });
+	ui.notifications?.info(LT._importExport?.exportedList?.() ?? "Exported.");
 }
 
-// Import a storage list file (inclusions/exclusions)
-async function bbmm_importListFile(storageFile) {
+// import inclusions/exclusions from a file, merging with existing lists
+async function bbmm_importIncExcBundle() {
+	const FN = "settings.js | bbmm_importIncExcBundle():";
+
 	const file = await hlp_pickLocalJSONFile();
 	if (!file) return;
 
-	let data;
+	let raw;
 	try {
-		data = JSON.parse(await file.text());
+		raw = JSON.parse(await file.text());
 	} catch (err) {
-		DL(3, "settings.js | bbmm_importListFile(): invalid json import file", err);
-		ui.notifications.error(LT.errors.invalidJsonFile());
+		DL(3, `${FN} invalid json import file`, err);
+		ui.notifications?.error(LT.errors.invalidJsonFile());
 		return;
 	}
 
-	const payload = JSON.stringify(data ?? {}, null, 2);
-	const f = new File([payload], storageFile, { type: "application/json" });
+	const inInc = raw?.inclusions ?? {};
+	const inExc = raw?.exclusions ?? {};
 
-	const res = await FilePicker.upload(
-		"data",
-		"bbmm-data",
-		f,
-		{ notify: false }
-	);
+	const inIncModules = Array.isArray(inInc?.modules) ? inInc.modules.map(String) : [];
+	const inExcModules = Array.isArray(inExc?.modules) ? inExc.modules.map(String) : [];
+	const inIncSettings = Array.isArray(inInc?.settings) ? inInc.settings : [];
+	const inExcSettings = Array.isArray(inExc?.settings) ? inExc.settings : [];
 
-	DL("settings.js | bbmm_importListFile(): imported list file", { storageFile, res });
-	ui.notifications.info(LT._importExport.importedList());
+	// Read current stores
+	let curInc = {};
+	let curExc = {};
+
+	try {
+		curInc = await fetch(`bbmm-data/user-inclusions.json`, { cache: "no-store" }).then(r => r.json());
+	} catch (e) {
+		DL(2, `${FN} failed reading current inclusions, using empty`, e);
+		curInc = { modules: [], settings: [] };
+	}
+
+	try {
+		curExc = await fetch(`bbmm-data/user-exclusions.json`, { cache: "no-store" }).then(r => r.json());
+	} catch (e) {
+		DL(2, `${FN} failed reading current exclusions, using empty`, e);
+		curExc = { modules: [], settings: [] };
+	}
+
+	if (!Array.isArray(curInc.modules)) curInc.modules = [];
+	if (!Array.isArray(curInc.settings)) curInc.settings = [];
+	if (!Array.isArray(curExc.modules)) curExc.modules = [];
+	if (!Array.isArray(curExc.settings)) curExc.settings = [];
+
+	// Build identity sets (for "no new duplicates across lists")
+	const curIncModSet = new Set(curInc.modules.map(String));
+	const curExcModSet = new Set(curExc.modules.map(String));
+	const curIncSetSet = new Set(curInc.settings.map(s => `${s?.namespace ?? ""}::${s?.key ?? ""}`));
+	const curExcSetSet = new Set(curExc.settings.map(s => `${s?.namespace ?? ""}::${s?.key ?? ""}`));
+
+	// Legacy duplicates preserved
+	const legacyDupModSet = new Set([...curIncModSet].filter(x => curExcModSet.has(x)));
+	const legacyDupSetSet = new Set([...curIncSetSet].filter(x => curExcSetSet.has(x)));
+
+	// Merge exclusions first (they trump)
+	for (const id of inExcModules) {
+		if (!id) continue;
+		if (!curExcModSet.has(id)) {
+			curExc.modules.push(id);
+			curExcModSet.add(id);
+		}
+	}
+
+	for (const s of inExcSettings) {
+		const ns = String(s?.namespace ?? "").trim();
+		const key = String(s?.key ?? "").trim();
+		if (!ns || !key) continue;
+		const sig = `${ns}::${key}`;
+		if (!curExcSetSet.has(sig)) {
+			curExc.settings.push({ namespace: ns, key });
+			curExcSetSet.add(sig);
+		}
+	}
+
+	// Merge inclusions, but do NOT create new duplicates against exclusions
+	for (const id of inIncModules) {
+		if (!id) continue;
+
+		// If exclusion already has it, only allow inclusion if it was a legacy duplicate
+		if (curExcModSet.has(id) && !legacyDupModSet.has(id)) continue;
+
+		if (!curIncModSet.has(id)) {
+			curInc.modules.push(id);
+			curIncModSet.add(id);
+		}
+	}
+
+	for (const s of inIncSettings) {
+		const ns = String(s?.namespace ?? "").trim();
+		const key = String(s?.key ?? "").trim();
+		if (!ns || !key) continue;
+
+		const sig = `${ns}::${key}`;
+
+		if (curExcSetSet.has(sig) && !legacyDupSetSet.has(sig)) continue;
+
+		if (!curIncSetSet.has(sig)) {
+			curInc.settings.push({ namespace: ns, key });
+			curIncSetSet.add(sig);
+		}
+	}
+
+	// Write both stores back (still separate files)
+	{
+		const payload = JSON.stringify(curInc ?? { modules: [], settings: [] }, null, 2);
+		const f = new File([payload], "user-inclusions.json", { type: "application/json" });
+		await FilePicker.upload("data", "bbmm-data", f, { notify: false });
+	}
+
+	{
+		const payload = JSON.stringify(curExc ?? { modules: [], settings: [] }, null, 2);
+		const f = new File([payload], "user-exclusions.json", { type: "application/json" });
+		await FilePicker.upload("data", "bbmm-data", f, { notify: false });
+	}
+
+	DL(1, `${FN} imported + merged`, {
+		addedInclusionsModules: inIncModules.length,
+		addedInclusionsSettings: inIncSettings.length,
+		addedExclusionsModules: inExcModules.length,
+		addedExclusionsSettings: inExcSettings.length
+	});
+
+	ui.notifications?.info(LT._importExport.importedList());
+}
+
+// Remote Message Feed Check
+async function bbmm_checkRemoteMessageFeed() {
+	const FN = "settings.js | bbmm_checkRemoteMessageFeed():";
+
+	// GM only
+	if (!game.user?.isGM) return;
+
+	// Read bbmmFlags object
+	let flags = game.settings.get(BBMM_ID, "bbmmFlags");
+	if (!flags || typeof flags !== "object") flags = {};
+
+	// Ensure defaults exist
+	let changed = false;
+
+	if (typeof flags.lastMessageRev !== "number") {
+		flags.lastMessageRev = 0;
+		changed = true;
+	}
+
+	if (typeof flags.lastMessageCheckTs !== "number") {
+		flags.lastMessageCheckTs = 0;
+		changed = true;
+	}
+
+	// Throttle checks to once per hour (world)
+	const now = Date.now();
+	if (flags.lastMessageCheckTs && (now - flags.lastMessageCheckTs) < 3600000) {
+		DL(1, `${FN} skipped (checked < 1 hour ago)`, { lastMessageCheckTs: flags.lastMessageCheckTs, now });
+		return;
+	}
+
+	// Update last check timestamp in bbmmFlags if needed
+	if (changed) {
+		try {
+			await game.settings.set(BBMM_ID, "bbmmFlags", flags);
+		} catch (e) {
+			DL(2, `${FN} failed to set bbmmFlags defaults/checkTs`, e);
+		}
+	}
+
+	const lastRev = Number(flags.lastMessageRev || 0);
+
+	// Fetch JSON
+	let data;
+	try {
+		const resp = await fetch(BBMM_MESSAGE_FEED_URL, { cache: "no-store" });
+		if (!resp?.ok) {
+			DL(2, `${FN} fetch failed`, { status: resp?.status, statusText: resp?.statusText });
+			return;
+		}
+		data = await resp.json();
+	} catch (e) {
+		DL(2, `${FN} fetch/json failed`, e);
+		return;
+	}
+
+	// Blank/invalid JSON -> do nothing
+	if (!data || typeof data !== "object") {
+		DL(1, `${FN} feed empty/invalid, skipping`);
+		return;
+	}
+
+	// Support either {messages:[...]} or a single message object
+	let msg = null;
+
+	if (Array.isArray(data?.messages)) {
+		let best = null;
+		for (const m of data.messages) {
+			const rev = Number(m?.rev ?? 0);
+			if (!rev || rev <= lastRev) continue;
+			if (!best || rev > Number(best?.rev ?? 0)) best = m;
+		}
+		if (best) {
+			msg = {
+				rev: Number(best.rev),
+				title: String(best?.title ?? "BBMM Message"),
+				message: String(best?.message ?? ""),
+				link: best?.link ? String(best.link) : ""
+			};
+		}
+	} else {
+		const rev = Number(data?.rev ?? 0);
+		if (rev && rev > lastRev) {
+			msg = {
+				rev,
+				title: String(data?.title ?? "BBMM Message"),
+				message: String(data?.message ?? ""),
+				link: data?.link ? String(data.link) : ""
+			};
+		}
+	}
+
+	if (!msg) {
+		DL(1, `${FN} no new messages`, { lastRev });
+
+		// update lastMessageCheckTs
+		try {
+			const current = game.settings.get(BBMM_ID, "bbmmFlags");
+			const next = (current && typeof current === "object") ? { ...current } : {};
+			next.lastMessageCheckTs = Date.now();
+			await game.settings.set(BBMM_ID, "bbmmFlags", next);
+		} catch (e) {
+			DL(2, `${FN} failed to update lastMessageCheckTs (no message)`, e);
+		}
+
+		return;
+	}
+
+	const safeTitle = foundry.utils.escapeHTML(msg.title);
+	const safeMsg = foundry.utils.escapeHTML(msg.message).replace(/\n/g, "<br>");
+
+	let linkHtml = "";
+	if (msg.link) {
+		const safeLink = foundry.utils.escapeHTML(msg.link);
+		linkHtml = `<p style="margin-top:.75rem;"><a href="${safeLink}" target="_blank" rel="noopener noreferrer">${safeLink}</a></p>`;
+	}
+
+	const html = `
+		<div class="bbmm-remote-message">
+			<p style="margin:0;">${safeMsg}</p>
+			${linkHtml}
+		</div>
+	`;
+
+	// Show dialog with "Don't show again" and "Remind me later" options
+	const result = await new Promise((resolve) => {
+		const dlg = new foundry.applications.api.DialogV2({
+			window: { title: safeTitle },
+			content: html,
+			buttons: [
+				{
+					action: "ok",
+					label: (LT.presetNoticeDontShowAgain() ?? "Don't show again"),
+					default: true,
+					callback: () => resolve("ok")
+				},
+				{
+					action: "later",
+					label: (LT.remindMeLater() ?? "Remind me later"),
+					callback: () => resolve("later")
+				}
+			],
+			submit: (res) => resolve(res ?? "later"),
+			rejectClose: false,
+			position: { width: 560, height: "auto" }
+		});
+		dlg.render(true);
+	});
+
+	if (result !== "ok") {
+		DL(1, `${FN} dismissed (later)`, { rev: msg.rev });
+		return;
+	}
+
+	// Update lastMessageRev in bbmmFlags
+	try {
+		const current = game.settings.get(BBMM_ID, "bbmmFlags");
+		const next = (current && typeof current === "object") ? { ...current } : {};
+		next.lastMessageRev = Number(msg.rev);
+		next.lastMessageCheckTs = Date.now();
+		await game.settings.set(BBMM_ID, "bbmmFlags", next);
+		DL(`${FN} updated lastMessageRev`, { rev: msg.rev });
+	} catch (e) {
+		DL(2, `${FN} failed to update lastMessageRev`, e);
+	}
 }
 
 Hooks.once("init", () => {
@@ -1552,8 +1913,8 @@ Hooks.once("init", () => {
 
 			// Module Management - Module Locks
 			game.settings.register(BBMM_ID, "moduleLocks", {
-				name: game.i18n.localize("bbmm.settings.moduleLocksName"),
-				hint: game.i18n.localize("bbmm.settings.moduleLocksHint"),
+				name: game.i18n.localize("bbmm._settings.moduleLocksName"),
+				hint: game.i18n.localize("bbmm._settings.moduleLocksHint"),
 				scope: "world",
 				config: false,
 				type: Object,			
@@ -1567,10 +1928,29 @@ Hooks.once("init", () => {
 				}
 			});
 
+			// List of installed modules we’ve detected (used for change detection and changelog display)
+			game.settings.register(BBMM_ID, "knownInstalledModules", {
+				scope: "world",
+				config: false,
+				type: Array,
+				default: [],
+				restricted: true
+			});
+
+			// Remote message feed: last seen message revision (per-user)
+			game.settings.register(BBMM_ID, "lastMessageRev", {
+				name: "Last Message Revision",
+				hint: "Tracks the last BBMM remote message revision shown to this user.",
+				scope: "world",
+				config: false,
+				type: Number,
+				default: 0
+			});
+
 		// ===== SETTINGS ITEMS =====
 		// These DO need to be localized
 
-			// About BBMM menu button
+			// MENU: About BBMM menu button
 			game.settings.registerMenu(BBMM_ID, "menuAboutBBMM", {
 				name: LT.aboutName(),
 				label: LT.aboutName(),
@@ -1606,7 +1986,7 @@ Hooks.once("init", () => {
 				}
 			});
 
-			// Add a menu entry in Configure Settings to open the Preset Manager
+			// MENU: open the Preset Manager
 			game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
 				name: LT.modulePresetsBtn(),
 				label: LT.lblOpenModulePresets(),
@@ -1630,7 +2010,7 @@ Hooks.once("init", () => {
 				}
 			});
 			
-			// Add a menu entry in Configure Settings to open the Preset Manager
+			// MENU: open the Preset Manager
 			game.settings.registerMenu(BBMM_ID, "settingsPresetManager", {
 				name: LT.settingsPresetsBtn(),
 				label: LT.lblOpenSettingsPresets(),
@@ -1654,7 +2034,7 @@ Hooks.once("init", () => {
 				}
 			});
 			
-			// Add a  menu entry for Exclusions manager
+			// MENU: Exclusions manager
 			game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
 				name: LT.exclusionsMgr(),
 				label: LT.lblExclusionsMgr(),
@@ -1677,41 +2057,11 @@ Hooks.once("init", () => {
 					async _updateObject() {}
 				}
 			});
-			
-			//  Inclusions Manager menu 
-			game.settings.registerMenu(BBMM_ID, "menuInclusionsManager", {
-				name: LT.inclusions.btnInclusionMgr(),
-				label: LT.inclusions.btnInclusionMgr(),
-				icon: "fas fa-list-check",
-				restricted: true,
-				type: class extends FormApplication {
-					constructor(...args){ super(...args); }
-					static get defaultOptions() {
-						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-inclusions-manager-opener",
-							title: LT.inclusions.btnInclusionMgr(),
-							template: null, // We'll open our own UI (DialogV2/App), no form tpl needed
-							width: 600
-						});
-					}
-					async render(...args) {
-						try {
-							DL("settings.js | Inclusions Manager button clicked");
-							await openInclusionsManagerApp();
-						} catch (err) {
-							DL(2, "settings.js | Inclusions Manager open failed", err);
-							ui.notifications?.error(LT.inclusionsOpenError());
-						}
-						return this;
-					}
-					async _updateObject() {}
-				}
-			});
 
-			// Hidden Client Setting Sync Manager menu
+			// MENU: Hidden Client Setting Sync Manager
 			game.settings.registerMenu(BBMM_ID, "hiddenSettingSyncManager", {
-				name: LT.hiddenSettingSync?.menuName?.() ?? "Hidden Client Setting Sync",
-				label: LT.hiddenSettingSync?.menuLabel?.() ?? "Open Manager",
+				name: LT.hiddenSettingSync.menuName(),
+				label: LT.hiddenSettingSync.menuLabel(),
 				icon: "fas fa-user-gear",
 				restricted: true,
 				type: class extends FormApplication {
@@ -1744,7 +2094,7 @@ Hooks.once("init", () => {
 				}
 			});
 
-			// Import / Export menu
+			// MENU: Import / Export
 			game.settings.registerMenu(BBMM_ID, "importExport", {
 				name: LT.buttons.importExport(),
 				label: LT.buttons.importExport(),
@@ -1772,6 +2122,17 @@ Hooks.once("init", () => {
 				default: false,
 				name: LT.name_checkDisabledModules(),
 				hint: LT.hint_checkDisabledModules()
+			});
+
+			// Prompt to enable newly added modules 
+			game.settings.register(BBMM_ID, "promptEnableNewModules", {
+				name: LT.moduleManagement.promptEnableNewModulesName(),
+				hint: LT.moduleManagement.promptEnableNewModulesHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: true,
+				restricted: true
 			});
 
 			// Enable/disable "enhanced" module manager
@@ -1899,10 +2260,6 @@ Hooks.once("init", () => {
 	}
 });
 
-Hooks.on("setup", () => {
-	DL("settings.js | setup fired");
-});
-
 Hooks.once("ready", async () => {
 	
 	DL("settings.js | ready fired");
@@ -1924,7 +2281,7 @@ Hooks.once("ready", async () => {
 	try { await hlp_migrateLists(); } catch (err) { DL(3, "settings.js | Inclusions/Exclusions migration failed:", err?.message ?? err); }
 
 	// Prime exclusions cache for getSkipMap() users
-	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }1
+	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }
 
 	// check folder migration - Remove after version 0.7.0
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
@@ -1947,6 +2304,9 @@ Hooks.once("ready", async () => {
 		
 	});
 	Hooks.on("renderModuleManagement", (app, html) => { try { injectBBMMHeaderButton(html) } catch (e) { DL(2, "settings.js | renderModuleManagement: menu injection failed", e); } });
+
+	// Remote update messages from GitHub feed
+	if (game.user?.isGM) { try { await bbmm_checkRemoteMessageFeed(); } catch (err) { DL(2, "settings.js | ready | remote message feed failed", err); } }
 	
 });
 

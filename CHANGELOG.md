@@ -4,7 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-02-24
+
+### Added
+- **Module:**
+  - Added feature that will allow me to send a message to users, in cases of bugs or issues that they may need advanced notice on.
+  - Updated Manual (Journal).
+- **Module management:**
+  - Added notification when new module(s) has been installed, prompting to enable. This feature can be disabled in settings.
+- **Inclusions / Exclusions:**
+  - Merged inclusion and Exclusion Manager. 
+  - Moved Export feature to the Import / Export window (In BBMM Settings screen):
+    - Export exports both inclusions and exclusion lists. 
+    - Added functionality to export and import inslusions and exclusion list per module.
+    - Added "All" option to export one file will all inclusions / exclusions.
+  - Added "Only Hidden Items" filter in "Add Setting Inclusion / Exclusion" window.
+  - Added "BBMM" Menu to Inclusions / Exclusions Manager.
+  - Made hidden settings show hidden icon in orange. 
+  - Added note that this tool is an advanced feature with clickable link to Manual (journal). 
+
+### Changed
+- **Localizations:**
+  - Cleaned up unused localization keys in en.json.
+
+### Fixed
+- **Hidden Settings Sync:**
+  - Fixed bug causing only client scope settings to show when adding hidden setting to sync. 
+
 ## [0.6.8] - 2026-01-20
+
 ### Changed
 - **Localization:**
   - Updated Italian localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+is%3Aopen+author%3AGregoryWarn)!

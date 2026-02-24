@@ -5,12 +5,14 @@
 	- "Exclude" updates setting, closes, then re-opens manager
 ============================================================================ */
 
-import { DL, BBMM_README_UUID } from './settings.js';
+import { DL, BBMM_README_UUID, injectBBMMHeaderButton } from './settings.js';
 import { LT } from "./localization.js";
 import { copyPlainText } from "./macros.js";
 import { hlp_injectHeaderHelpButton, invalidateSkipMap } from "./helpers.js";
+import { hlp_readUserInclusions, hlp_writeUserInclusions } from "./inclusions.js";
 
 // CONSTANTS
+const EXC_BUNDLE_SCHEMA_VERSION = 1; // Import/Export bundle schema
 const EXC_STORAGE_FILE = "user-exclusions.json";
 let _excCache = null;
 // Size threshold to mark preview as "large"
@@ -90,6 +92,11 @@ export async function hlp_writeUserExclusions(obj) {
 	}
 }
 
+/* BBMMAddModuleExclusionAppV2 ==================================================
+	- Lists all modules not already excluded
+	- Columns: Module (title or namespace), State (enabled/disabled), Action
+	- Exclude adds module ID to userExclusions.modules, then reopens manager
+============================================================================== */
 class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({
@@ -106,23 +113,46 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 		this._maxH = 720;
 	}
 
-	// Get Set of excluded module IDs
-	_getExcludedIds() {
+	// Get Set of existing module IDs across BOTH lists no duplicates
+	_getExistingIds() {
 		const ex = this._excData || { modules: [] };
-		return new Set(Array.isArray(ex.modules) ? ex.modules : []);
+		const inc = this._incData || { modules: [] };
+
+		const out = new Set();
+
+		for (const id of (Array.isArray(ex.modules) ? ex.modules : [])) out.add(String(id));
+		for (const id of (Array.isArray(inc.modules) ? inc.modules : [])) out.add(String(id));
+
+		return out;
 	}
 
-	// Build list of modules not already excluded
+	// Build list of modules not already present in EITHER list
 	_collectCandidates() {
-		const excluded = this._getExcludedIds();
+		const existing = this._getExistingIds();
 		const out = [];
+
 		for (const m of game.modules.values()) {
-			if (m.id === "bbmm") continue; //  self-skip
-			if (excluded.has(m.id)) continue; // skip already excluded
+			if (m.id === "bbmm") continue; // self-skip
+			if (existing.has(m.id)) continue; // skip already in inclusions OR exclusions
 			out.push({ id: m.id, title: String(m.title ?? m.id), active: !!m.active });
 		}
+
 		out.sort((a,b)=>a.title.localeCompare(b.title, game.i18n.lang || undefined, {sensitivity:"base"}));
 		this._mods = out;
+	}
+
+	// Add module ID to userInclusions.modules
+	async _include(id) {
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+		if (!Array.isArray(data.modules)) data.modules = [];
+
+		if (!data.modules.includes(id)) data.modules.push(id);
+
+		const ok = await hlp_writeUserInclusions(data);
+		if (!ok) {
+			DL(3, `exclusions.js | AddModule._include(): FAILED writing inclusions for ${id}`);
+			throw new Error("Failed to write inclusions");
+		}
 	}
 
 	// Add module ID to userExclusions.modules
@@ -148,13 +178,17 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 	async _renderHTML(_context, _options) {
 
 		this._excData = await hlp_readUserExclusions();
+		this._incData = await hlp_readUserInclusions();
 		this._collectCandidates();
 
 		const rows = this._mods.map(m => `
 			<tr>
 				<td class="c-title">${foundry.utils.escapeHTML(m.title)}</td>
 				<td class="c-state">${m.active ? LT.enabled() : LT.disabled()}</td>
-				<td class="c-act"><button type="button" class="bbmm-exc-act" data-id="${m.id}">${LT.buttons.exclude()}</button></td>
+				<td class="c-act">
+					<button type="button" class="bbmm-exc-act" data-act="include" data-id="${m.id}">${LT.inclusions.include()}</button>
+					<button type="button" class="bbmm-exc-act" data-act="exclude" data-id="${m.id}">${LT.buttons.exclude()}</button>
+				</td>
 			</tr>
 		`).join("");
 
@@ -173,7 +207,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 				/* Header */
 				.bbmm-am-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
 				.bbmm-am-table thead th:nth-child(2){width:110px}                  /* State */
-				.bbmm-am-table thead th:last-child{width:96px;text-align:right}    /* Action */
+				.bbmm-am-table thead th:last-child{width:220px;text-align:right}    /* Action */
 
 				/* Body */
 				.bbmm-am-table tbody td{padding:8px 10px;border-bottom:1px solid var(--color-border-light-2);vertical-align:middle}
@@ -183,8 +217,8 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 				.bbmm-am-table .c-title{width:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 				.bbmm-am-table .c-state{width:110px;white-space:nowrap;opacity:.85}
 				.bbmm-am-table .c-act{
-					width:96px;                                 /* match header */
-					display:flex;justify-content:flex-end;align-items:center;
+					width:220px;                                 /* match header */
+					display:flex;justify-content:flex-end;align-items:center;gap:8px;
 					text-align:right;padding-right:8px
 				}
 
@@ -293,25 +327,45 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 				return;
 			}
 
-			// Exclude button
+			// Include / Exclude buttons
 			const btn = ev.target.closest?.(".bbmm-exc-act");
 			if (btn instanceof HTMLButtonElement) {
 				const id = btn.dataset.id || "";
-				if (!id) return;
+				const act = btn.dataset.act || "";
+				if (!id || !act) return;
 
 				try {
 					btn.disabled = true;
-					await this._exclude(id);
 
-					// Keep dialog open; mark on success
-					btn.classList.add("bbmm-exc-done");
-					btn.setAttribute("aria-label", "Excluded");
-					btn.innerHTML = "✓";
-					btn.disabled = true;
-					DL(`exclusions.js | AddModule: module ${id} marked as excluded`);
+					if (act === "include") {
+						await this._include(id);
+					} else if (act === "exclude") {
+						await this._exclude(id);
+					} else {
+						btn.disabled = false;
+						return;
+					}
+
+					// Remove from in-memory list + remove row from DOM (match Add Setting behavior)
+					this._mods = (this._mods || []).filter(m => m?.id !== id);
+
+					const tr = btn.closest("tr");
+					tr?.remove?.();
+
+					// Update count
+					const countEl = this.element?.querySelector?.(".bbmm-am-count");
+					if (countEl) countEl.textContent = `${LT.available()}: ${(this._mods || []).length}`;
+
+					// If list is empty, show empty-state row
+					const tbody = this.element?.querySelector?.(".bbmm-am-table tbody");
+					if (tbody && !tbody.querySelector("tr")) {
+						tbody.innerHTML = `<tr><td colspan="3" class="c-empty" style="text-align:center;opacity:.8;padding:18px 0">${LT.allModulesAlreadyExcluded()}.</td></tr>`;
+					}
+
+					DL(`exclusions.js | AddModule: ${act} ${id} (removed from list)`);
 				} catch (e) {
 					btn.disabled = false;
-					DL(3, "exclude failed", e);
+					DL(3, "exclusions.js | AddModule: include/exclude failed", e);
 					ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
 				}
 				return;
@@ -333,7 +387,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 	- Lists all CONFIG settings not already excluded
 	- Columns: Module (title or namespace), Setting (friendly name or key), Action
 	- Exclude adds {namespace,key} to userExclusions.settings, then reopens manager
-   ========================================================================== */
+============================================================================ */
 class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({
@@ -357,6 +411,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		this._moduleFilter = ""; // "" = none selected
 		this._matchRows = [];
 		this._delegated = false;
+		this._hiddenOnly = false;
 
 		// If true, hide everything until module chosen
 		this._requireModuleSelection = true;
@@ -377,10 +432,14 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 	_matchesFilter(r) {
 		const mod = String(this._moduleFilter ?? "").trim();
 
-		// Require module selection: show nothing until user picks one
+		// Require module selection unless "__ALL__"
 		if (this._requireModuleSelection && !mod) return false;
 
-		if (mod && r.namespace !== mod) return false;
+		// If specific module selected (not ALL), filter by module
+		if (mod && mod !== "__ALL__" && r.namespace !== mod) return false;
+
+		// If hidden-only filter set, filter by hidden state
+		if (this._hiddenOnly && !r.hidden) return false;
 
 		const q = String(this._filterText ?? "").trim().toLowerCase();
 		if (!q) return true;
@@ -668,7 +727,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				<div class="c-scope" title="${foundry.utils.escapeHTML(scope)}">
 					<span class="bbmm-scope-icons">
 						<i class="fas ${scopeIcon}" title="${scopeTitle}"></i>
-						<i class="fas ${hiddenIcon}" title="${hidden ? LT.hidden() : LT.visible()}"></i>
+						<i class="fas ${hiddenIcon}" title="${hidden ? LT.hidden() : LT.visible()}"${hidden ? ' style="color:#cc7a00"' : ""}></i>
 					</span>
 				</div>
 
@@ -686,17 +745,29 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				</div>
 
 				<div class="c-act">
-					<button type="button" class="bbmm-exc-act" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">${LT.buttons.exclude()}</button>
+					<button type="button" class="bbmm-exc-act" data-act="include" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">${LT.inclusions.include()}</button>
+					<button type="button" class="bbmm-exc-act" data-act="exclude" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">${LT.inclusions.exclude()}</button>
 				</div>
 			</div>
 		`;
 	}
 
-	// Get Set of excluded {namespace,key} pairs
-	_getExcludedPairsSet() {
+	// Get Set of existing {namespace,key} pairs across BOTH lists
+	_getExistingPairsSet() {
 		const ex = this._excData || {};
-		const arr = Array.isArray(ex.settings) ? ex.settings : [];
-		return new Set(arr.map(s => `${s?.namespace ?? ""}::${s?.key ?? ""}`));
+		const inc = this._incData || {};
+
+		const out = new Set();
+
+		for (const s of (Array.isArray(ex.settings) ? ex.settings : [])) {
+			out.add(`${s?.namespace ?? ""}::${s?.key ?? ""}`);
+		}
+
+		for (const s of (Array.isArray(inc.settings) ? inc.settings : [])) {
+			out.add(`${s?.namespace ?? ""}::${s?.key ?? ""}`);
+		}
+
+		return out;
 	}
 
 	// Build list of settings not already excluded
@@ -704,7 +775,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		// Build the table model for Add Setting Exclusion
 		try {
 			// Already-excluded pairs as a Set of "ns::key"
-			const excluded = this._getExcludedPairsSet();
+			const excluded = this._getExistingPairsSet();
 			const rows = [];
 
 			for (const s of game.settings.settings.values()) {
@@ -800,6 +871,21 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		DL(`exclusions.js | AddSetting._exclude(): stored ${namespace}.${key}`);
 	}
 
+	// Add {namespace,key} to userInclusions.settings
+	async _include(namespace, key) {
+		const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+		if (!Array.isArray(data.settings)) data.settings = [];
+
+		const exists = data.settings.some(s => s?.namespace === namespace && s?.key === key);
+		if (!exists) data.settings.push({ namespace, key });
+
+		const ok = await hlp_writeUserInclusions(data);
+		if (!ok) {
+			DL(3, `exclusions.js | AddSetting._include(): FAILED writing inclusions for ${namespace}.${key}`);
+			throw new Error("Failed to write inclusions");
+		}
+	}
+
 	// Special case: exclude a menu placeholder
 	async _excludeMenu(namespace, key) {
 		try {
@@ -827,23 +913,27 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 	// Render main HTML
 	async _renderHTML(_context, _options) {
 		this._excData = await hlp_readUserExclusions();
+		this._incData = await hlp_readUserInclusions();
 		this._collectSettings();
 
-		const cols = "grid-template-columns: minmax(220px,1.2fr) minmax(240px,1.6fr) 90px minmax(320px,2fr) 96px;";
+		const cols = "grid-template-columns: minmax(220px,1.2fr) minmax(240px,1.6fr) 90px minmax(320px,2fr) 220px;";
 		const css =
 			`#${this.id} .window-content{display:flex;flex-direction:column;padding:.5rem !important;overflow:hidden}
 			.bbmm-as-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.5rem}
 			.bbmm-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}
 			.bbmm-toolbar select{width:260px;min-width:260px;max-width:260px}
 			.bbmm-toolbar input[type="text"]{flex:1;min-width:260px}
+			.bbmm-toolbar .count{margin-left:auto;white-space:nowrap}
+			#bbmm-as-filter{flex:0 0 360px;min-width:360px;max-width:360px}
+			.bbmm-as-hiddenonly{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;font-size:.9em;opacity:.9}
+			.bbmm-as-hiddenonly input{margin:0}
 			.bbmm-grid-head{display:grid;${cols}gap:0;border:1px solid var(--color-border,#444);border-radius:.5rem .5rem 0 0;background:var(--color-bg-header,#1e1e1e)}
-			.bbmm-grid-head .h{padding:.35rem .5rem;border-bottom:1px solid #444;font-weight:600}
+			.bbmm-grid-head .h{padding:.35rem .5rem;font-weight:600}
 			.bbmm-grid-body{display:block;flex:1 1 auto;min-height:0;max-height:100%;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .5rem .5rem}
 			.bbmm-grid-body .row{display:grid;${cols}gap:0;border-bottom:1px solid #333}
 			.bbmm-grid-body .row>div{padding:.3rem .5rem;min-width:0}
 			.bbmm-grid-body .c-mod,.bbmm-grid-body .c-key{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-			.bbmm-grid-body .c-scope{text-transform:capitalize;opacity:.85;white-space:nowrap}
-			.bbmm-grid-body .c-scope{display:flex;align-items:center;justify-content:center;opacity:.9}
+			.bbmm-grid-body .c-scope{display:flex;align-items:center;justify-content:center;text-transform:capitalize;white-space:nowrap;opacity:.9}
 			.bbmm-grid-body .bbmm-scope-icons{display:inline-flex;gap:.35rem;align-items:center}
 			.bbmm-grid-body .val-preview{display:flex;gap:.5rem;align-items:flex-start}
 			.bbmm-grid-body .val-size{opacity:.65;white-space:nowrap;font-size:.85em}
@@ -854,7 +944,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			.bbmm-grid-body .row.expanded .val-expand{display:block}
 			.bbmm-grid-body .val-toolbar{display:flex;gap:.5rem;margin-bottom:.25rem}
 			.bbmm-grid-body .val-pre{max-height:40vh;overflow:auto;margin:0;background:rgba(255,255,255,.03);padding:.4rem;border-radius:.35rem}
-			.bbmm-grid-body .c-act{display:flex;justify-content:flex-end;align-items:center;padding-right:8px}
+			.bbmm-grid-body .c-act{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding-right:8px}
 			.bbmm-grid-body .bbmm-exc-act{display:inline-flex;align-items:center;justify-content:center;min-width:80px;height:32px;padding:0 12px;font-size:.95rem;line-height:1}
 			.bbmm-grid-body .bbmm-exc-act.bbmm-exc-done{pointer-events:none;opacity:.75;font-weight:700}
 
@@ -882,9 +972,14 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			.bbmm-as-footer button{min-width:160px}`;
 
 		const moduleList = this._buildModuleList();
-		const moduleOpts = [`<option value="" selected disabled>${LT.selectNamespace()}</option>`]
-			.concat(moduleList.map(m => `<option value="${foundry.utils.escapeHTML(m.ns)}"${this._moduleFilter===m.ns?" selected":""}>${foundry.utils.escapeHTML(m.title)}</option>`))
-			.join("");
+		const moduleOpts = [
+			`<option value="" ${!this._moduleFilter ? "selected" : ""} disabled>${LT.selectNamespace()}</option>`,
+			`<option value="__ALL__"${this._moduleFilter==="__ALL__"?" selected":""}>All (slow)</option>`
+		]
+		.concat(moduleList.map(m =>
+			`<option value="${foundry.utils.escapeHTML(m.ns)}"${this._moduleFilter===m.ns?" selected":""}>${foundry.utils.escapeHTML(m.title)}</option>`
+		))
+		.join("");
 
 		const head = `<div class="bbmm-grid-head" id="bbmm-as-head">${this._renderHeader()}</div>`;
 		const rowsHtml = (Array.isArray(this._rows) ? this._rows : []).map(r => this._rowHTML(r)).join("");
@@ -896,12 +991,16 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				<div class="bbmm-toolbar">
 					<select id="bbmm-as-module" title="${foundry.utils.escapeHTML(LT.module())}">${moduleOpts}</select>
 					<input id="bbmm-as-filter" type="text" placeholder="${foundry.utils.escapeHTML(LT.macro.search())}" value="${foundry.utils.escapeHTML(this._filterText ?? "")}" />
+					<label class="bbmm-as-hiddenonly">
+						<input id="bbmm-as-hiddenonly" type="checkbox"${this._hiddenOnly ? " checked" : ""} />
+						${foundry.utils.escapeHTML(LT.hiddenOnly?.() ?? "Hidden only")}
+					</label>
 					<span class="count" style="opacity:.85;font-weight:600">${LT.macro.showing()} <span id="bbmm-as-count">0</span> ${LT.macro.of()} <span id="bbmm-as-total">${(this._rows || []).length}</span></span>
 				</div>
 				${head}
 				${body}
 				<div class="bbmm-as-footer">
-					<button type="button" id="bbmm-as-close">${foundry.utils.escapeHTML(LT.buttons.close())}</button>
+					<button type="button" id="bbmm-as-close">${LT.buttons.close()}</button>
 				</div>
 			</section>`
 		);
@@ -972,6 +1071,19 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			this._warmVisiblePreviews(50);
 		});
 
+		// Hidden-only toggle
+		this.element.addEventListener("change", (ev) => {
+			const t = ev.target;
+			if (!(t instanceof HTMLElement)) return;
+			if (t.id !== "bbmm-as-hiddenonly") return;
+
+			this._hiddenOnly = !!t.checked;
+			DL(`exclusions.js | AddSetting: hiddenOnly=${this._hiddenOnly}`);
+
+			this._applyFilterToDOM();
+			this._warmVisiblePreviews(50);
+		});
+
 		// Click handling: close + exclude + expand/collapse + copy
 		this.element.addEventListener("click", async (ev) => {
 			try {
@@ -1000,7 +1112,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 				const rowEl = target.closest(".row");
 
-				// Exclude button
+				// Include/Exclude button
 				const btn = target.closest?.(".bbmm-exc-act");
 				if (btn instanceof HTMLButtonElement) {
 					ev.preventDefault();
@@ -1014,18 +1126,27 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 						btn.disabled = true;
 
 						const row = this._rows?.find?.(r => r.namespace === ns && r.key === key);
-						if (row?.__isMenu) await this._excludeMenu(ns, key);
-						else await this._exclude(ns, key);
 
-						// Remove row from data + DOM immediately
+						const act = btn.dataset.act || "";
+						if (act === "include") {
+							await this._include(ns, key);
+						} else if (act === "exclude") {
+							if (row?.__isMenu) await this._excludeMenu(ns, key);
+							else await this._exclude(ns, key);
+						} else {
+							btn.disabled = false;
+							return;
+						}
+
+						// Only now do we remove the row from the list
 						this._rows = (this._rows || []).filter(r => !(r.namespace === ns && r.key === key));
 						rowEl?.remove?.();
 
-						DL(`exclusions.js | AddSetting: excluded ${ns}.${key} (removed from list)`);
+						DL(`exclusions.js | AddSetting: ${btn.dataset.act} ${ns}.${key} (removed from list)`);
 						this._applyFilterToDOM();
 					} catch (e) {
 						btn.disabled = false;
-						DL(3, "exclusions.js | AddSetting: exclude failed", e);
+						DL(3, "exclusions.js | AddSetting: add failed", e);
 						ui.notifications?.error(`${LT.errors.failedToAddExclusion()}.`);
 					}
 					return;
@@ -1188,6 +1309,246 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		this._maxH = 700;
 	}
 	
+	/* ============================================================================
+		{IMPORT / EXPORT}
+	============================================================================ */
+
+	async _exportExclusionsNamespace() {
+		const exc = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+		const mods = Array.isArray(exc.modules) ? exc.modules : [];
+		const sets = Array.isArray(exc.settings) ? exc.settings : [];
+
+		// Build namespace list from current exclusions
+		const nsSet = new Set();
+		for (const m of mods) nsSet.add(String(m));
+		for (const s of sets) {
+			const ns = String(s?.namespace ?? "");
+			if (ns) nsSet.add(ns);
+		}
+		const namespaces = Array.from(nsSet).sort((a, b) => a.localeCompare(b, game.i18n.lang || undefined, { sensitivity: "base" }));
+
+		if (!namespaces.length) {
+			ui.notifications?.warn(game.i18n.localize("bbmm._importExport.noNamespaces"));
+			return;
+		}
+
+		// DialogV2: pick namespace
+		const chosen = await new Promise((resolve) => {
+			const host = document.createElement("div");
+
+			const p = document.createElement("p");
+			p.textContent = game.i18n.localize("bbmm._importExport.chooseNamespace");
+			host.appendChild(p);
+
+			const sel = document.createElement("select");
+			sel.style.width = "100%";
+			for (const ns of namespaces) {
+				const opt = document.createElement("option");
+				opt.value = ns;
+				opt.textContent = this._getModuleTitle(ns) || ns;
+				sel.appendChild(opt);
+			}
+			host.appendChild(sel);
+
+			const dlg = new foundry.applications.api.DialogV2({
+				window: { title: game.i18n.localize("bbmm._importExport.exportExclusionsTitle") },
+				content: host,
+				buttons: [
+					{
+						action: "export",
+						label: LT.buttons.export(),
+						default: true,
+						callback: () => {
+							const v = sel.value;
+							try { dlg.close(); } catch {}
+							resolve(v);
+						}
+					},
+					{
+						action: "cancel",
+						label: LT.buttons.cancel(),
+						callback: () => { try { dlg.close(); } catch {} resolve(null); }
+					}
+				],
+				submit: () => { try { dlg.close(); } catch {} resolve(null); },
+				rejectClose: () => resolve(null)
+			});
+
+			dlg.render(true);
+		});
+
+		if (!chosen) return;
+
+		const mod = game.modules.get(chosen);
+		const targetVersion = String(mod?.version ?? mod?.data?.version ?? "");
+
+		const entries = [];
+
+		// If module itself is excluded, include a module marker entry
+		if (mods.includes(chosen)) {
+			entries.push({ type: "module" });
+		}
+
+		// Include setting keys for this namespace
+		for (const s of sets) {
+			const ns = String(s?.namespace ?? "");
+			const key = String(s?.key ?? "");
+			if (ns === chosen && key) {
+				entries.push({ type: "setting", key });
+			}
+		}
+
+		const bundle = {
+			schemaVersion: EXC_BUNDLE_SCHEMA_VERSION,
+			target: chosen,
+			targetVersion,
+			foundryVersion: String(game.version ?? ""),
+			entries
+		};
+
+		try {
+			const filename = `bbmm-exclusions-${chosen}.json`;
+			saveDataToFile(JSON.stringify(bundle, null, 2), "application/json", filename);
+
+			ui.notifications?.info(game.i18n.format("bbmm._importExport.exportSuccess", { target: chosen }));
+			DL(`exclusions.js | export: exported ${chosen}`, bundle);
+		} catch (e) {
+			DL(3, "exclusions.js | export: blob/download failed", e);
+			throw e;
+		}
+	}
+
+	async _importExclusionsNamespace() {
+		// Pick local file
+		const file = await new Promise((resolve) => {
+			const input = document.createElement("input");
+			input.type = "file";
+			input.accept = "application/json,.json";
+			input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true });
+			input.click();
+		});
+
+		if (!file) return;
+
+		let raw;
+		try {
+			raw = JSON.parse(await file.text());
+		} catch (e) {
+			DL(3, "exclusions.js | import: JSON parse failed", e);
+			ui.notifications?.error(game.i18n.localize("bbmm._importExport.invalidFile"));
+			return;
+		}
+
+		// Basic validation
+		const schemaVersion = raw?.schemaVersion;
+		const target = String(raw?.target ?? "").trim();
+		const targetVersion = String(raw?.targetVersion ?? "").trim();
+		const foundryVersion = String(raw?.foundryVersion ?? "").trim();
+		const entries = Array.isArray(raw?.entries) ? raw.entries : null;
+
+		if (typeof schemaVersion !== "number" || !target || !entries) {
+			ui.notifications?.error(game.i18n.localize("bbmm._importExport.invalidFile"));
+			return;
+		}
+
+		// Version warning: file targetVersion newer than installed
+		const mod = game.modules.get(target);
+		const installedVersion = String(mod?.version ?? mod?.data?.version ?? "");
+
+		let isFileNewer = false;
+		try {
+			if (targetVersion && installedVersion) {
+				isFileNewer = foundry.utils.isNewerVersion(targetVersion, installedVersion);
+			}
+		} catch {}
+
+		if (isFileNewer) {
+			const proceed = await new Promise((resolve) => {
+				const host = document.createElement("div");
+
+				const p = document.createElement("p");
+				p.innerHTML = game.i18n.format("bbmm._importExport.newerVersionWarn", {
+					target,
+					fileVersion: targetVersion || "?",
+					installedVersion: installedVersion || "?"
+				});
+				host.appendChild(p);
+
+				const dlg = new foundry.applications.api.DialogV2({
+					window: { title: game.i18n.localize("bbmm._importExport.newerVersionTitle") },
+					content: host,
+					buttons: [
+						{
+							action: "continue",
+							label: LT.buttons.continue?.() ?? LT.buttons.yes(),
+							default: true,
+							callback: () => { try { dlg.close(); } catch {} resolve(true); }
+						},
+						{
+							action: "cancel",
+							label: LT.buttons.cancel(),
+							callback: () => { try { dlg.close(); } catch {} resolve(false); }
+						}
+					],
+					submit: () => { try { dlg.close(); } catch {} resolve(false); },
+					rejectClose: () => resolve(false)
+				});
+
+				dlg.render(true);
+			});
+
+			if (!proceed) return;
+		}
+
+		const current = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+		if (!Array.isArray(current.modules)) current.modules = [];
+		if (!Array.isArray(current.settings)) current.settings = [];
+
+		// Merge entries
+		for (const ent of entries) {
+			// allow string entries as shorthand for setting keys
+			if (typeof ent === "string") {
+				const key = ent.trim();
+				if (!key) continue;
+				if (!current.settings.some(s => s?.namespace === target && s?.key === key)) {
+					current.settings.push({ namespace: target, key });
+				}
+				continue;
+			}
+
+			if (!ent || typeof ent !== "object") continue;
+
+			const type = String(ent.type ?? "").trim();
+			if (type === "module") {
+				if (!current.modules.includes(target)) current.modules.push(target);
+				continue;
+			}
+
+			if (type === "setting") {
+				const key = String(ent.key ?? "").trim();
+				if (!key) continue;
+				if (!current.settings.some(s => s?.namespace === target && s?.key === key)) {
+					current.settings.push({ namespace: target, key });
+				}
+				continue;
+			}
+		}
+
+		const ok = await hlp_writeUserExclusions(current);
+		if (!ok) {
+			ui.notifications?.error(game.i18n.localize("bbmm._importExport.importFailed"));
+			return;
+		}
+
+		try { this._excData = current; } catch {}
+		try { Hooks.callAll("bbmmExclusionsChanged", { type: "import", target, targetVersion, foundryVersion }); } catch {}
+
+		ui.notifications?.info(game.i18n.format("bbmm._importExport.importSuccess", { target }));
+		DL(`exclusions.js | import: imported ${target}`, { schemaVersion, target, targetVersion, foundryVersion, entriesCount: entries.length });
+
+		await this.render(true);
+	}
+
 	/* ============================================================================
 		{LABEL HELPERS}
 	============================================================================ */
@@ -1379,64 +1740,160 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 	// Render main HTML
 	async _renderHTML() {
-		// Build rows (modules + settings)
-		const exc = this._excData ?? await hlp_readUserExclusions({ force: true });
+		// Read BOTH stores
+		const exc = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+		const inc = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+
 		this._excData = exc;
+		this._incData = inc;
 
-		const mods = Array.isArray(exc.modules)  ? exc.modules  : [];
-		const sets = Array.isArray(exc.settings) ? exc.settings : [];
+		const excMods = Array.isArray(exc.modules) ? exc.modules.map(String) : [];
+		const excSets = Array.isArray(exc.settings) ? exc.settings : [];
 
-		// Module rows
-		const modRows = mods.map(ns => {
+		const incMods = Array.isArray(inc.modules) ? inc.modules.map(String) : [];
+		const incSets = Array.isArray(inc.settings) ? inc.settings : [];
+
+		// Identity sets (for "exclusions trump" + legacy duplicates)
+		const excModSet = new Set(excMods);
+		const incModSet = new Set(incMods);
+
+		const excSetSet = new Set(excSets.map(s => `${String(s?.namespace ?? "")}::${String(s?.key ?? "")}`));
+		const incSetSet = new Set(incSets.map(s => `${String(s?.namespace ?? "")}::${String(s?.key ?? "")}`));
+
+		// Effective inclusions = inclusions NOT present in exclusions
+		const effIncMods = incMods.filter(id => !excModSet.has(id));
+		const effIncSets = incSets.filter(s => {
+			const ns = String(s?.namespace ?? "");
+			const key = String(s?.key ?? "");
+			if (!ns || !key) return false;
+			return !excSetSet.has(`${ns}::${key}`);
+		});
+
+		const modelRows = [];
+
+		// Group header: Included
+		modelRows.push({
+			__group: true,
+			_label: (LT.inclusions.manager())
+		});
+
+		// Included modules
+		for (const ns of effIncMods) {
 			const mod = game.modules.get(ns);
 			const title = String(mod?.title ?? ns);
-			return {
+
+			modelRows.push({
 				type: "Module",
 				identifier: title,
 				_ns: ns,
 				_key: "",
-				_id: ns
-			};
-		});
+				_id: ns,
+				_list: "inc",
+				_dupe: false
+			});
+		}
 
-		// Setting rows
-		const setRows = sets.map(s => {
+		// Included settings
+		for (const s of effIncSets) {
 			const ns = String(s?.namespace ?? "");
 			const key = String(s?.key ?? "");
+			if (!ns || !key) continue;
+
 			const mod = game.modules.get(ns);
 			const nsLabel = String(mod?.title ?? ns);
 			const settingLabel = this._getSettingLabel(ns, key);
 
-			return {
+			modelRows.push({
 				type: "Setting",
 				identifier: `${nsLabel}, ${settingLabel}`,
 				_ns: ns,
 				_key: key,
-				_id: `${ns}.${key}`
-			};
+				_id: `${ns}.${key}`,
+				_list: "inc",
+				_dupe: false
+			});
+		}
+
+		// Group header: Excluded
+		modelRows.push({
+			__group: true,
+			_label: (LT.exclusions())
 		});
 
-		this._rows = [...modRows, ...setRows];
+		// Excluded modules (mark legacy duplicate if also in inclusions)
+		for (const ns of excMods) {
+			const mod = game.modules.get(ns);
+			const title = String(mod?.title ?? ns);
 
-		const rows = this._rows.map(r => `
-			<tr>
-				<td class="c-type">${r.type}</td>
-				<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">
-					${foundry.utils.escapeHTML(r.identifier)}
-				</td>
-				<td class="c-del">
-					<button type="button"
-						class="bbmm-x-del"
-						data-type="${r.type === "Module" ? "module" : "setting"}"
-						data-id="${r.type === "Module" ? (r._id ?? "") : ""}"
-						data-ns="${r._ns ?? ""}"
-						data-key="${r._key ?? ""}"
-						aria-label="${LT.inclusions.remove?.() ?? "Remove"}">
-						<i class="fas fa-trash"></i>
-					</button>
-				</td>
-			</tr>
-		`).join("");
+			modelRows.push({
+				type: "Module",
+				identifier: title,
+				_ns: ns,
+				_key: "",
+				_id: ns,
+				_list: "exc",
+				_dupe: incModSet.has(ns)
+			});
+		}
+
+		// Excluded settings (mark legacy duplicate if also in inclusions)
+		for (const s of excSets) {
+			const ns = String(s?.namespace ?? "");
+			const key = String(s?.key ?? "");
+			if (!ns || !key) continue;
+
+			const mod = game.modules.get(ns);
+			const nsLabel = String(mod?.title ?? ns);
+			const settingLabel = this._getSettingLabel(ns, key);
+			const sig = `${ns}::${key}`;
+
+			modelRows.push({
+				type: "Setting",
+				identifier: `${nsLabel}, ${settingLabel}`,
+				_ns: ns,
+				_key: key,
+				_id: `${ns}.${key}`,
+				_list: "exc",
+				_dupe: incSetSet.has(sig)
+			});
+		}
+
+		// Keep for later (delete handler uses this too)
+		this._rows = modelRows;
+
+		const entryCount = modelRows.filter(r => !r.__group).length;
+
+		const rows = modelRows.map(r => {
+			if (r.__group) {
+				return `
+					<tr class="bbmm-x-group">
+						<td colspan="3">${foundry.utils.escapeHTML(String(r._label ?? ""))}</td>
+					</tr>
+				`;
+			}
+
+			return `
+				<tr>
+					<td class="c-type">${r.type}</td>
+					<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">
+						${foundry.utils.escapeHTML(r.identifier)}
+					</td>
+					<td class="c-del">
+						<button type="button"
+							class="bbmm-x-del"
+							data-list="${r._list}"
+							data-dupe="${r._dupe ? "1" : "0"}"
+							data-type="${r.type === "Module" ? "module" : "setting"}"
+							data-id="${r.type === "Module" ? (r._id ?? "") : ""}"
+							data-ns="${r._ns ?? ""}"
+							data-key="${r._key ?? ""}"
+							aria-label="${LT.inclusions.remove?.() ?? "Remove"}">
+							<i class="fas fa-trash"></i>
+						</button>
+					</td>
+				</tr>
+			`;
+		}).join("");
 
 		const html = `
 			<style>
@@ -1479,14 +1936,39 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					display:flex;justify-content:center;align-items:center;
 					width:100%;height:36px;padding:0 14px;border-radius:8px;font-weight:600;
 				}
+
+				.bbmm-x-group td{
+					font-weight:700;
+					opacity:.9;
+					background:rgba(255,255,255,.06);
+					border-bottom:1px solid var(--color-border-light-2);
+				}
+
+				.bbmm-x-advanced{
+					display:flex;
+					align-items:center;
+					gap:6px;
+					white-space:nowrap;
+					opacity:.85;
+					font-size:1em;
+				}
+				.bbmm-x-advanced .bbmm-x-manual{
+					color:#cc7a00;
+					text-decoration:underline;
+					cursor:pointer;
+				}
 			</style>
 
 			<section class="bbmm-x-root">
 				<div class="bbmm-x-toolbar">
 					<button type="button" class="bbmm-btn bbmm-x-add-setting" data-action="add-setting">${LT.buttons.addSetting()}</button>
 					<button type="button" class="bbmm-btn bbmm-x-add-module" data-action="add-module">${LT.buttons.addModule()}</button>
-					<div></div>
-					<div class="bbmm-x-count">${LT.total()}: ${this._rows.length}</div>
+
+					<div class="bbmm-x-advanced">
+						<span>${LT.inclusions.advFeature()}</span>
+						<a class="bbmm-x-manual" data-uuid="Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn">${LT.inclusions.readManual()}</a>
+					</div>
+					<div class="bbmm-x-count">${LT.total()}: ${entryCount}</div>
 				</div>
 
 				<div class="bbmm-x-scroller">
@@ -1531,13 +2013,20 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			DL(2, "exclusions.js | _onRender(): help inject failed", e);
 		}
 
+		// Inject BBMM header menu
+		try {
+			injectBBMMHeaderButton(this.element);
+		} catch (e) {
+			DL(2, "exclusions.js | _replaceHTML(): bbmm header inject failed", e);
+		}
+
 		// avoid double-binding across re-renders
 		if (!this._delegated) {
 			this._delegated = true;
 
 			content.addEventListener("click", async (ev) => {
 				// find the nearest button with either a data-action or the delete class
-				const btn = ev.target?.closest?.('button[data-action], button.bbmm-x-del');
+				const btn = ev.target?.closest?.('button[data-action], button.bbmm-x-del, a.bbmm-x-manual');
 				if (!btn) return;
 
 				ev.preventDefault();
@@ -1545,6 +2034,20 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 				const action = btn.dataset.action || "";
 				DL(`exclusions.js | Manager.click(): ${action || btn.className}`);
+
+				// Manual link
+				if (btn instanceof HTMLAnchorElement && btn.classList.contains("bbmm-x-manual")) {
+					const uuid = btn.dataset.uuid || "";
+					if (!uuid) return;
+
+					try {
+						const doc = await fromUuid(uuid);
+						doc?.sheet?.render(true);
+					} catch (e) {
+						DL(2, "exclusions.js | Manager: open manual link failed", { uuid, err: e });
+					}
+					return;
+				}
 
 				// Close (bottom button) or header X
 				if (action === "close" || action === "cancel" || btn.classList.contains("bbmm-close")) {
@@ -1574,6 +2077,9 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 				// Immediate delete — NO PROMPT
 				if (btn.classList.contains("bbmm-x-del")) {
+					const list = btn.dataset.list || "exc"; // "inc" or "exc"
+					const dupe = (btn.dataset.dupe === "1"); // legacy duplicate flag (only matters for exclusions)
+
 					const type = btn.dataset.type || "";
 					const ns   = btn.dataset.ns   || "";
 					const key  = btn.dataset.key  || "";
@@ -1581,69 +2087,196 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					try {
 						btn.disabled = true;
 
-						const data = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+						// INCLUSIONS DELETE
+						if (list === "inc") {
+							const data = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
 
-						if (type === "module" && ns) {
-							const list = Array.isArray(data.modules) ? data.modules : [];
-							const before = list.length;
-							data.modules = list.filter(x => x !== ns);
-							const removed = (data.modules.length !== before);
+							if (type === "module" && ns) {
+								const arr = Array.isArray(data.modules) ? data.modules : [];
+								const before = arr.length;
+								data.modules = arr.filter(x => String(x) !== String(ns));
+								const removed = (data.modules.length !== before);
 
-							if (!removed) {
-								btn.disabled = false;
-								DL(`exclusions.js | delete(module): nothing to remove for ${ns}`);
+								if (!removed) {
+									btn.disabled = false;
+									DL(`exclusions.js | delete(inclusion module): nothing to remove for ${ns}`);
+									return;
+								}
+
+								const ok = await hlp_writeUserInclusions(data);
+								if (!ok) {
+									btn.disabled = false;
+									DL(3, `exclusions.js | delete(inclusion module): FAILED writing inclusions for ${ns}`);
+									ui.notifications?.error("Failed to remove inclusion. See console.");
+									return;
+								}
+
+								try { this._incData = data; } catch {}
+								try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
+								DL(`exclusions.js | delete(inclusion module): ${ns}`);
+								await this.render(true);
 								return;
 							}
 
-							const ok = await hlp_writeUserExclusions(data);
+							if (type === "setting" && ns && key) {
+								const arr = Array.isArray(data.settings) ? data.settings : [];
+								const before = arr.length;
+								data.settings = arr.filter(s => !(s?.namespace === ns && s?.key === key));
+								const removed = (data.settings.length !== before);
+
+								if (!removed) {
+									btn.disabled = false;
+									DL(`exclusions.js | delete(inclusion setting): nothing to remove for ${ns}.${key}`);
+									return;
+								}
+
+								const ok = await hlp_writeUserInclusions(data);
+								if (!ok) {
+									btn.disabled = false;
+									DL(3, `exclusions.js | delete(inclusion setting): FAILED writing inclusions for ${ns}.${key}`);
+									ui.notifications?.error("Failed to remove inclusion. See console.");
+									return;
+								}
+
+								try { this._incData = data; } catch {}
+								try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
+								DL(`exclusions.js | delete(inclusion setting): ${ns}.${key}`);
+								await this.render(true);
+								return;
+							}
+
+							// Fallback (missing ids)
+							btn.disabled = false;
+							DL(2, "exclusions.js | delete(inclusion): unknown type or missing ids", { type, ns, key });
+							return;
+						}
+
+						// EXCLUSIONS DELETE (and if legacy duplicate, remove from BOTH)
+						const exData = foundry.utils.duplicate(await hlp_readUserExclusions({ force: true }));
+
+						if (type === "module" && ns) {
+							const arr = Array.isArray(exData.modules) ? exData.modules : [];
+							const before = arr.length;
+							exData.modules = arr.filter(x => String(x) !== String(ns));
+							const removed = (exData.modules.length !== before);
+
+							if (!removed) {
+								btn.disabled = false;
+								DL(`exclusions.js | delete(exclusion module): nothing to remove for ${ns}`);
+								return;
+							}
+
+							const ok = await hlp_writeUserExclusions(exData);
 							if (!ok) {
 								btn.disabled = false;
-								DL(3, `exclusions.js | delete(module): FAILED writing exclusions for ${ns}`);
+								DL(3, `exclusions.js | delete(exclusion module): FAILED writing exclusions for ${ns}`);
 								ui.notifications?.error("Failed to remove exclusion. See console.");
 								return;
 							}
 
-							try { this._excData = data; } catch {}
+							try { this._excData = exData; } catch {}
 							try { Hooks.callAll("bbmmExclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
-							DL(`exclusions.js | delete(module): ${ns}`);
+							DL(`exclusions.js | delete(exclusion module): ${ns}`);
+
+							// Legacy duplicate: also remove from inclusions
+							if (dupe) {
+								const inData = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+								const inArr = Array.isArray(inData.modules) ? inData.modules : [];
+								inData.modules = inArr.filter(x => String(x) !== String(ns));
+
+								const ok2 = await hlp_writeUserInclusions(inData);
+								if (!ok2) {
+									DL(3, `exclusions.js | delete(dupe module): FAILED writing inclusions for ${ns}`);
+									ui.notifications?.error("Removed exclusion, but failed to remove duplicate inclusion. See console.");
+								} else {
+									try { this._incData = inData; } catch {}
+									try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
+									DL(`exclusions.js | delete(dupe module): removed inclusion ${ns}`);
+								}
+							}
+
 							await this.render(true);
 							return;
 						}
 
 						if (type === "setting" && ns && key) {
-							const list = Array.isArray(data.settings) ? data.settings : [];
-							const before = list.length;
-							data.settings = list.filter(s => !(s?.namespace === ns && s?.key === key));
-							const removed = (data.settings.length !== before);
+							const arr = Array.isArray(exData.settings) ? exData.settings : [];
+							const before = arr.length;
+							exData.settings = arr.filter(s => !(s?.namespace === ns && s?.key === key));
+							const removed = (exData.settings.length !== before);
 
 							if (!removed) {
 								btn.disabled = false;
-								DL(`exclusions.js | delete(setting): nothing to remove for ${ns}.${key}`);
+								DL(`exclusions.js | delete(exclusion setting): nothing to remove for ${ns}.${key}`);
 								return;
 							}
 
-							const ok = await hlp_writeUserExclusions(data);
+							const ok = await hlp_writeUserExclusions(exData);
 							if (!ok) {
 								btn.disabled = false;
-								DL(3, `exclusions.js | delete(setting): FAILED writing exclusions for ${ns}.${key}`);
+								DL(3, `exclusions.js | delete(exclusion setting): FAILED writing exclusions for ${ns}.${key}`);
 								ui.notifications?.error("Failed to remove exclusion. See console.");
 								return;
 							}
 
-							try { this._excData = data; } catch {}
+							try { this._excData = exData; } catch {}
 							try { Hooks.callAll("bbmmExclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
-							DL(`exclusions.js | delete(setting): ${ns}.${key}`);
+							DL(`exclusions.js | delete(exclusion setting): ${ns}.${key}`);
+
+							// Legacy duplicate: also remove from inclusions
+							if (dupe) {
+								const inData = foundry.utils.duplicate(await hlp_readUserInclusions({ force: true }));
+								const inArr = Array.isArray(inData.settings) ? inData.settings : [];
+								inData.settings = inArr.filter(s => !(s?.namespace === ns && s?.key === key));
+
+								const ok2 = await hlp_writeUserInclusions(inData);
+								if (!ok2) {
+									DL(3, `exclusions.js | delete(dupe setting): FAILED writing inclusions for ${ns}.${key}`);
+									ui.notifications?.error("Removed exclusion, but failed to remove duplicate inclusion. See console.");
+								} else {
+									try { this._incData = inData; } catch {}
+									try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
+									DL(`exclusions.js | delete(dupe setting): removed inclusion ${ns}.${key}`);
+								}
+							}
+
 							await this.render(true);
 							return;
 						}
 
 						// Fallback (missing ids)
 						btn.disabled = false;
-						DL(2, "exclusions.js | delete: unknown type or missing ids", { type, ns, key });
+						DL(2, "exclusions.js | delete(exclusion): unknown type or missing ids", { type, ns, key });
 					} catch (e) {
 						btn.disabled = false;
 						DL(3, "exclusions.js | delete: failed", e);
-						ui.notifications?.error("Failed to remove exclusion. See console.");
+						ui.notifications?.error("Failed to remove entry. See console.");
+					}
+					return;
+				}
+
+				// Export (GM only)
+				if (action === "export") {
+					if (!game.user?.isGM) return;
+
+					try {
+						await this._exportExclusionsNamespace();
+					} catch (e) {
+						DL(3, "exclusions.js | export: failed", e);
+						ui.notifications?.error(game.i18n.localize("bbmm._importExport.exportFailed"));
+					}
+					return;
+				}
+
+				// Import (GM only)
+				if (action === "import") {
+					if (!game.user?.isGM) return;
+
+					try {
+						await this._importExclusionsNamespace();
+					} catch (e) {
+						DL(3, "exclusions.js | import: failed", e);
+						ui.notifications?.error(game.i18n.localize("bbmm._importExport.importFailed"));
 					}
 					return;
 				}
@@ -1654,18 +2287,15 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 }
 
 // PUBLIC LAUNCHERS
-export function openExclusionsManagerApp() {
-	// DL('openExclusionsManagerApp(): fired'); 
+export function openExclusionsManagerApp() { 
 	new BBMMExclusionsAppV2().render(true);
 }
 
 export function openAddModuleExclusionApp() {
-	// DL('openAddModuleExclusionApp(): fired');
 	new BBMMAddModuleExclusionAppV2().render(true);
 }
 
 export function openAddSettingExclusionApp() {
-	// DL('openAddSettingExclusionApp(): fired');
 	new BBMMAddSettingExclusionAppV2().render(true);
 }
 

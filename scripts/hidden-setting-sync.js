@@ -42,12 +42,15 @@ export function openAddHiddenClientSettingSyncApp() {
 
 /* Helpers =================================================================== */
 
-// Is this a hidden client setting?
-function _hcsIsHiddenClientSetting(cfg) {
+// Determine if a setting config is a hidden client/user setting 
+function _hcsIsHiddenUserClientSetting(cfg) {
 	try {
 		if (!cfg) return false;
 		if (cfg.__isMenu) return false;
-		if (String(cfg.scope ?? "") !== "client") return false;
+
+		const scope = String(cfg.scope ?? "");
+		if (scope !== "client" && scope !== "user") return false;
+
 		if (cfg.config !== false) return false;
 		const ns = String(cfg.namespace ?? "");
 		const key = String(cfg.key ?? "");
@@ -156,7 +159,7 @@ class BBMMhiddenSettingSyncManagerAppV2 extends foundry.applications.api.Applica
 
 			for (const [id, entry] of Object.entries(map)) {
 				const cfg = game.settings.settings.get(id);
-				if (!_hcsIsHiddenClientSetting(cfg)) continue;
+				if (!_hcsIsHiddenUserClientSetting(cfg)) continue;
 
 				const ns = String(entry?.namespace ?? cfg?.namespace ?? "");
 				const key = String(entry?.key ?? cfg?.key ?? "");
@@ -446,7 +449,7 @@ class BBMMAddHiddenClientSettingSyncAppV2 extends foundry.applications.api.Appli
 			const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
 
 			for (const [id, cfg] of game.settings.settings.entries()) {
-				if (!_hcsIsHiddenClientSetting(cfg)) continue;
+				if (!_hcsIsHiddenUserClientSetting(cfg)) continue;
 
 				// skip if already in soft/hard state
 				if (map[id]) continue;

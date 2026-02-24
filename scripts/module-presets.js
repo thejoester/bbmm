@@ -358,7 +358,7 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 			if (!byMod.has(modId)) byMod.set(modId, []);
 			if (depId != null) byMod.get(modId).push(depId);
 		}
-		lines.push(`<p><b>${LT.dependencyMissing()}:</b></p>`);
+		lines.push(`<p><b>${LT.errors.dependencyMissing()}:</b></p>`);
 		lines.push(`<ul style="margin-top:.25rem;">${
 			[...byMod.entries()].map(([id, deps]) =>
 				`<li><code>${hlp_esc(id)}</code> → ${LT.errors.missing()}: ${deps.map(d => `<code>${hlp_esc(d)}</code>`).join(", ")}</li>`
