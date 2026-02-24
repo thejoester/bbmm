@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Merged inclusion and Exclusion Manager. 
   - Moved Export feature to the Import / Export window (In BBMM Settings screen):
     - Export exports both inclusions and exclusion lists. 
-    - Added functionality to export and import inslusions and exclusion list per module.
+    - Added functionality to export and import inclusions and exclusion list per module.
     - Added "All" option to export one file will all inclusions / exclusions.
   - Added "Only Hidden Items" filter in "Add Setting Inclusion / Exclusion" window.
   - Added "BBMM" Menu to Inclusions / Exclusions Manager.
@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Added note that this tool is an advanced feature with clickable link to Manual (journal). 
 
 ### Changed
-- **Localizations:**
+- **Localization:**
   - Cleaned up unused localization keys in en.json.
 
 ### Fixed
