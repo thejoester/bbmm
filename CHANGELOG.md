@@ -10,8 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Inclusions / Exclusions:**
   - Changed workflow for adding inclusions / exclusions to have both buttons instead of first clicking "Add".
   - Made hidden settings show hidden icon in orange. 
-  - Added note that this tool is an advanced feature with clickable link to journal. 
+  - Added note that this tool is an advanced feature with clickable link to Manual (journal. 
   - Added "All" filter for namespace list to show all settigs (this may load slowly).
+  - Updated Manual (Journal).
 
 ## [0.7.0-test4] - 2026-02-22
 
