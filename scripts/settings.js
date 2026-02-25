@@ -1715,16 +1715,12 @@ async function bbmm_checkRemoteMessageFeed() {
 	const safeTitle = foundry.utils.escapeHTML(msg.title);
 	const safeMsg = foundry.utils.escapeHTML(msg.message).replace(/\n/g, "<br>");
 
-	let linkHtml = "";
-	if (msg.link) {
-		const safeLink = foundry.utils.escapeHTML(msg.link);
-		linkHtml = `<p style="margin-top:.75rem;"><a href="${safeLink}" target="_blank" rel="noopener noreferrer">${safeLink}</a></p>`;
-	}
-
+	let CheckGH = "Check the GitHub page for more information.";
+	
 	const html = `
 		<div class="bbmm-remote-message">
 			<p style="margin:0;">${safeMsg}</p>
-			${linkHtml}
+			${CheckGH}
 		</div>
 	`;
 
@@ -2230,6 +2226,7 @@ Hooks.once("init", () => {
 				onChange: v => DL(`settings.js | gestureAction_shiftRight -> ${v}`)
 			});
 			
+			// Auto-force player reload 
 			game.settings.register(BBMM_ID, "autoForceReload", {
 				name: LT._settings.autoForceReloadName(),
 				hint: LT._settings.autoForceReloadHint(),
@@ -2237,6 +2234,16 @@ Hooks.once("init", () => {
 				config: true,
 				type: Boolean,
 				default: false
+			});
+
+			// Option to receive important messages from the module (like critical updates or announcements)
+			game.settings.register(BBMM_ID, "recieveImportantMessages", {
+				name: LT._settings.recieveImportantMessages(),
+				hint: LT._settings.recieveImportantMessagesHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: true
 			});
 
 			// Debug level for THIS module
@@ -2306,8 +2313,13 @@ Hooks.once("ready", async () => {
 	Hooks.on("renderModuleManagement", (app, html) => { try { injectBBMMHeaderButton(html) } catch (e) { DL(2, "settings.js | renderModuleManagement: menu injection failed", e); } });
 
 	// Remote update messages from GitHub feed
-	if (game.user?.isGM) { try { await bbmm_checkRemoteMessageFeed(); } catch (err) { DL(2, "settings.js | ready | remote message feed failed", err); } }
-	
+	if (game.settings.get(BBMM_ID, "recieveImportantMessages") === true) {
+		try {
+			if (game.user?.isGM) { try { await bbmm_checkRemoteMessageFeed(); } catch (err) { DL(2, "settings.js | ready | remote message feed failed", err); } }
+		} catch (err) {
+			DL(2, "settings.js | ready | remote message feed outer failed", err);
+		}
+	}
 });
 
 // For use in macro for easy testing
