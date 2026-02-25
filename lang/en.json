@@ -296,7 +296,9 @@
 			"moduleLocksHint": "List of locked modules",
 			"autoForceReloadName": "Force Player Reload",
 			"autoForceReloadHint": "Force instant reload to players when settings new settings are locked/synced",
-			"importExportHint": "Import/export presets and lists."			
+			"importExportHint": "Import/export presets and lists.",
+			"recieveImportantMessages": "Recieve important push messages:",	
+			"recieveImportantMessagesHint": "When enabled, you may receive important messages in the case of an urgent issue with BBMM or a module you have installed. These messages will only be sent when necessary and will include important information about the issue and how to resolve it. You can choose to disable these if you prefer, but it is recommended to keep them enabled to stay informed about critical issues that may affect your game."
 		},	
 		"macro": {
 			"columnName": "Name",
