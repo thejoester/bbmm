@@ -86,10 +86,49 @@ jobs:
                       errors.push("entries[" + idx + "].key is required for type \"setting\" (non-empty string).");
                     }
                   }
+
+                  if (t === "module") {
+                    const moduleId = (typeof e.id === "string" && e.id.trim()) ? e.id.trim()
+                      : (typeof e.key === "string" && e.key.trim()) ? e.key.trim()
+                      : (typeof e.moduleId === "string" && e.moduleId.trim()) ? e.moduleId.trim()
+                      : "";
+                    if (!moduleId) {
+                      errors.push("entries[" + idx + "] is type \"module\" but is missing a module id (`id`, `key`, or `moduleId`).");
+                    }
+                  }
                 });
               }
 
               return errors;
+            }
+
+            function computeNamespaceFilter(data) {
+              const ns = new Set();
+
+              if (!data || !Array.isArray(data.entries)) return [];
+
+              for (const e of data.entries) {
+                if (!e || typeof e !== "object") continue;
+
+                const t = String(e.type || "").toLowerCase();
+
+                if (t === "setting") {
+                  const k = (typeof e.key === "string") ? e.key.trim() : "";
+                  if (!k) continue;
+                  const dot = k.indexOf(".");
+                  if (dot > 0) ns.add(k.slice(0, dot));
+                }
+
+                if (t === "module") {
+                  const moduleId = (typeof e.id === "string" && e.id.trim()) ? e.id.trim()
+                    : (typeof e.key === "string" && e.key.trim()) ? e.key.trim()
+                    : (typeof e.moduleId === "string" && e.moduleId.trim()) ? e.moduleId.trim()
+                    : "";
+                  if (moduleId) ns.add(moduleId);
+                }
+              }
+
+              return Array.from(ns).sort((a, b) => a.localeCompare(b));
             }
 
             // GraphQL helpers (Discussions are best handled via GraphQL here)
@@ -226,6 +265,8 @@ jobs:
               return;
             }
 
+            const nsFilter = computeNamespaceFilter(parsed);
+
             const okMsg = [
               "<!-- bbmm-validator -->",
               "✅ BBMM inclusion/exclusion file looks valid.",
@@ -233,10 +274,13 @@ jobs:
               "**File:** " + chosenUrl,
               "",
               "**Detected:**",
-              "- target: `" + String(parsed.target) + "`",
+              "- target (namespace): `" + String(parsed.target) + "`",
               "- targetVersion: `" + String(parsed.targetVersion) + "`",
               "- foundryVersion: `" + String(parsed.foundryVersion) + "`",
-              "- entries: `" + (Array.isArray(parsed.entries) ? parsed.entries.length : 0) + "`"
+              "- entries: `" + (Array.isArray(parsed.entries) ? parsed.entries.length : 0) + "`",
+              "",
+              "**Namespace filter (derived):**",
+              nsFilter.length ? nsFilter.map((n) => "- `" + n + "`").join("\n") : "_(none)_"
             ].join("\n");
 
             await postComment(discussionNumber, okMsg);
