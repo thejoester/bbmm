@@ -46,91 +46,116 @@ jobs:
             }
 
             async function tryDownloadText(url) {
-              const res = await fetch(url, {
-                redirect: "follow",
-                headers: token ? { Authorization: "Bearer " + token } : undefined
-              });
-              if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
-              return await res.text();
+              // For GitHub drag-drop attachments, sending Authorization can cause 404.
+              // Try no-auth first, then fall back to auth.
+              const isUserAttachment = /\/\/github\.com\/user-attachments\//i.test(url);
+
+              const attempt = async (useAuth) => {
+                const headers = {
+                  "User-Agent": "bbmm-validator",
+                  "Accept": "application/octet-stream"
+                };
+
+                if (useAuth && token) headers.Authorization = "Bearer " + token;
+
+                const res = await fetch(url, { redirect: "follow", headers });
+                if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
+                return await res.text();
+              };
+
+              if (isUserAttachment) {
+                try {
+                  return await attempt(false);
+                } catch (e1) {
+                  return await attempt(true);
+                }
+              }
+
+              // Non-attachment URLs: auth first (if available), then no-auth fallback
+              try {
+                return await attempt(true);
+              } catch (e2) {
+                return await attempt(false);
+              }
             }
 
             function validateBundle(data) {
-            	const errors = [];
-            
-            	if (!data || typeof data !== "object") {
-            		errors.push("File is not a JSON object.");
-            		return errors;
-            	}
-            
-            	// Required top-level fields (newest combined format)
-            	if (typeof data.schemaVersion !== "number") errors.push("Missing/invalid `schemaVersion` (must be a number).");
-            	if (typeof data.foundryVersion !== "string") errors.push("Missing/invalid `foundryVersion` (must be a string; can be empty).");
-            	if (typeof data.filter !== "string" || !data.filter.trim()) errors.push("Missing/invalid `filter` (must be a non-empty string).");
-            
-            	if (!data.inclusions || typeof data.inclusions !== "object") errors.push("Missing/invalid `inclusions` (must be an object).");
-            	if (!data.exclusions || typeof data.exclusions !== "object") errors.push("Missing/invalid `exclusions` (must be an object).");
-            
-            	if (data.inclusions && typeof data.inclusions === "object") {
-            		if (!Array.isArray(data.inclusions.modules)) errors.push("Missing/invalid `inclusions.modules` (must be an array).");
-            		if (!Array.isArray(data.inclusions.settings)) errors.push("Missing/invalid `inclusions.settings` (must be an array).");
-            	}
-            
-            	if (data.exclusions && typeof data.exclusions === "object") {
-            		if (!Array.isArray(data.exclusions.modules)) errors.push("Missing/invalid `exclusions.modules` (must be an array).");
-            		if (!Array.isArray(data.exclusions.settings)) errors.push("Missing/invalid `exclusions.settings` (must be an array).");
-            	}
-            
-            	// Validate settings entries (both inclusions + exclusions)
-            	for (const bucketName of ["inclusions", "exclusions"]) {
-            		const bucket = data[bucketName];
-            		if (!bucket || typeof bucket !== "object") continue;
-            
-            		const settings = bucket.settings;
-            		if (!Array.isArray(settings)) continue;
-            
-            		settings.forEach((s, idx) => {
-            			if (!s || typeof s !== "object") {
-            				errors.push(`${bucketName}.settings[${idx}] must be an object.`);
-            				return;
-            			}
-            			if (typeof s.namespace !== "string" || !s.namespace.trim()) errors.push(`${bucketName}.settings[${idx}].namespace must be a non-empty string.`);
-            			if (typeof s.key !== "string" || !s.key.trim()) errors.push(`${bucketName}.settings[${idx}].key must be a non-empty string.`);
-            		});
-            	}
-            
-            	return errors;
+              const errors = [];
+
+              if (!data || typeof data !== "object") {
+                errors.push("File is not a JSON object.");
+                return errors;
+              }
+
+              // Required top-level fields (newest combined format)
+              if (typeof data.schemaVersion !== "number") errors.push("Missing/invalid `schemaVersion` (must be a number).");
+              if (typeof data.foundryVersion !== "string") errors.push("Missing/invalid `foundryVersion` (must be a string; can be empty).");
+              if (typeof data.filter !== "string" || !data.filter.trim()) errors.push("Missing/invalid `filter` (must be a non-empty string).");
+
+              if (!data.inclusions || typeof data.inclusions !== "object") errors.push("Missing/invalid `inclusions` (must be an object).");
+              if (!data.exclusions || typeof data.exclusions !== "object") errors.push("Missing/invalid `exclusions` (must be an object).");
+
+              if (data.inclusions && typeof data.inclusions === "object") {
+                if (!Array.isArray(data.inclusions.modules)) errors.push("Missing/invalid `inclusions.modules` (must be an array).");
+                if (!Array.isArray(data.inclusions.settings)) errors.push("Missing/invalid `inclusions.settings` (must be an array).");
+              }
+
+              if (data.exclusions && typeof data.exclusions === "object") {
+                if (!Array.isArray(data.exclusions.modules)) errors.push("Missing/invalid `exclusions.modules` (must be an array).");
+                if (!Array.isArray(data.exclusions.settings)) errors.push("Missing/invalid `exclusions.settings` (must be an array).");
+              }
+
+              // Validate settings entries (both inclusions + exclusions)
+              for (const bucketName of ["inclusions", "exclusions"]) {
+                const bucket = data[bucketName];
+                if (!bucket || typeof bucket !== "object") continue;
+
+                const settings = bucket.settings;
+                if (!Array.isArray(settings)) continue;
+
+                settings.forEach((s, idx) => {
+                  if (!s || typeof s !== "object") {
+                    errors.push(`${bucketName}.settings[${idx}] must be an object.`);
+                    return;
+                  }
+                  if (typeof s.namespace !== "string" || !s.namespace.trim()) errors.push(`${bucketName}.settings[${idx}].namespace must be a non-empty string.`);
+                  if (typeof s.key !== "string" || !s.key.trim()) errors.push(`${bucketName}.settings[${idx}].key must be a non-empty string.`);
+                });
+              }
+
+              return errors;
             }
-            
+
             function computeNamespaceFilter(data) {
-            	const ns = new Set();
-            
-            	if (!data || typeof data !== "object") return [];
-            
-            	// Always include the top-level filter (primary namespace)
-            	if (typeof data.filter === "string" && data.filter.trim()) ns.add(data.filter.trim());
-            
-            	for (const bucketName of ["inclusions", "exclusions"]) {
-            		const bucket = data[bucketName];
-            		if (!bucket || typeof bucket !== "object") continue;
-            
-            		// modules: array of module ids (strings)
-            		if (Array.isArray(bucket.modules)) {
-            			for (const m of bucket.modules) {
-            				if (typeof m === "string" && m.trim()) ns.add(m.trim());
-            			}
-            		}
-            
-            		// settings: array of { namespace, key }
-            		if (Array.isArray(bucket.settings)) {
-            			for (const s of bucket.settings) {
-            				if (s && typeof s === "object" && typeof s.namespace === "string" && s.namespace.trim()) {
-            					ns.add(s.namespace.trim());
-            				}
-            			}
-            		}
-            	}
-            
-            	return Array.from(ns).sort((a, b) => a.localeCompare(b));
+              const ns = new Set();
+
+              if (!data || typeof data !== "object") return [];
+
+              // Always include the top-level filter (primary namespace)
+              if (typeof data.filter === "string" && data.filter.trim()) ns.add(data.filter.trim());
+
+              for (const bucketName of ["inclusions", "exclusions"]) {
+                const bucket = data[bucketName];
+                if (!bucket || typeof bucket !== "object") continue;
+
+                // modules: array of module ids (strings)
+                if (Array.isArray(bucket.modules)) {
+                  for (const m of bucket.modules) {
+                    if (typeof m === "string" && m.trim()) ns.add(m.trim());
+                  }
+                }
+
+                // settings: array of { namespace, key }
+                if (Array.isArray(bucket.settings)) {
+                  for (const s of bucket.settings) {
+                    if (s && typeof s === "object" && typeof s.namespace === "string" && s.namespace.trim()) {
+                      ns.add(s.namespace.trim());
+                    }
+                  }
+                }
+              }
+
+              return Array.from(ns).sort((a, b) => a.localeCompare(b));
             }
 
             // GraphQL helpers (Discussions are best handled via GraphQL here)
@@ -273,21 +298,21 @@ jobs:
             const incSettings = (parsed.inclusions && Array.isArray(parsed.inclusions.settings)) ? parsed.inclusions.settings.length : 0;
             const excModules = (parsed.exclusions && Array.isArray(parsed.exclusions.modules)) ? parsed.exclusions.modules.length : 0;
             const excSettings = (parsed.exclusions && Array.isArray(parsed.exclusions.settings)) ? parsed.exclusions.settings.length : 0;
-            
+
             const okMsg = [
-            	"<!-- bbmm-validator -->",
-            	"✅ BBMM inclusion/exclusion file looks valid.",
-            	"",
-            	"**File:** " + chosenUrl,
-            	"",
-            	"**Detected:**",
-            	"- filter (namespace): `" + String(parsed.filter) + "`",
-            	"- foundryVersion: `" + String(parsed.foundryVersion) + "`",
-            	"- inclusions: `" + (incModules + incSettings) + "` (modules: " + incModules + ", settings: " + incSettings + ")",
-            	"- exclusions: `" + (excModules + excSettings) + "` (modules: " + excModules + ", settings: " + excSettings + ")",
-            	"",
-            	"**Namespace filter (derived):**",
-            	nsFilter.length ? nsFilter.map((n) => "- `" + n + "`").join("\n") : "_(none)_"
+              "<!-- bbmm-validator -->",
+              "✅ BBMM inclusion/exclusion file looks valid.",
+              "",
+              "**File:** " + chosenUrl,
+              "",
+              "**Detected:**",
+              "- filter (namespace): `" + String(parsed.filter) + "`",
+              "- foundryVersion: `" + String(parsed.foundryVersion) + "`",
+              "- inclusions: `" + (incModules + incSettings) + "` (modules: " + incModules + ", settings: " + incSettings + ")",
+              "- exclusions: `" + (excModules + excSettings) + "` (modules: " + excModules + ", settings: " + excSettings + ")",
+              "",
+              "**Namespace filter (derived):**",
+              nsFilter.length ? nsFilter.map((n) => "- `" + n + "`").join("\n") : "_(none)_"
             ].join("\n");
-            
+
             await postComment(discussionNumber, okMsg);
