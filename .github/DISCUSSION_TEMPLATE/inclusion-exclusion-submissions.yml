@@ -12,49 +12,14 @@ body:
         - Drag and drop the file into the editor (or use the attachment button)
         - The JSON must include: `schemaVersion`, `target`, `targetVersion`, `foundryVersion`, `entries`
 
-  - type: dropdown
-    id: fileType
-    attributes:
-      label: "File Type"
-      description: "Is this an inclusions file or exclusions file?"
-      options:
-        - "inclusions"
-        - "exclusions"
-    validations:
-      required: true
-
-  - type: input
-    id: target
-    attributes:
-      label: "Target Namespace (Module/System ID)"
-      description: "Example: pf2e-workbench or bbmm"
-      placeholder: "pf2e-workbench"
-    validations:
-      required: true
-
-  - type: input
-    id: targetVersion
-    attributes:
-      label: "Target Version"
-      description: "Version of the module/system this file was created for."
-      placeholder: "0.0.0"
-    validations:
-      required: true
-
-  - type: input
-    id: foundryVersion
-    attributes:
-      label: "Foundry Version"
-      description: "Foundry version used when creating/testing this file."
-      placeholder: "13.351"
-    validations:
-      required: true
+        You do NOT need to type module/system namespace, versions, etc.
+        The validator will read those from the file and post them back automatically.
 
   - type: textarea
     id: description
     attributes:
       label: "Description (Optional)"
-      description: "Briefly describe what this inclusion/exclusion file covers."
+      description: "Briefly describe what this file covers."
       placeholder: "Includes hidden settings keys used by PF2e Workbench."
     validations:
       required: false
