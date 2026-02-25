@@ -48,13 +48,12 @@ function _hcsIsHiddenUserClientSetting(cfg) {
 		if (!cfg) return false;
 		if (cfg.__isMenu) return false;
 
-		const scope = String(cfg.scope ?? "");
-		if (scope !== "client" && scope !== "user") return false;
-
-		if (cfg.config !== false) return false;
-		const ns = String(cfg.namespace ?? "");
-		const key = String(cfg.key ?? "");
-		if (!ns || !key) return false;
+		const scope = String(cfg.scope ?? ""); // default to empty string if not set
+		if (scope !== "client" && scope !== "user") return false; // must be client or user scope
+		if (cfg.config !== false) return false; // must be hidden from normal config UI
+		const ns = String(cfg.namespace ?? ""); // must have a namespace
+		const key = String(cfg.key ?? ""); // must have a key
+		if (!ns || !key) return false; // must have non-empty namespace and key
 		return true;
 	} catch {
 		return false;

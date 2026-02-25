@@ -579,11 +579,11 @@ import { LT, BBMM_ID } from "./localization.js";
 		- Centralizes write logic so UI doesn't duplicate setting-sync rules
 	============================================================================ */
 
-	function _bbmmIsClientHiddenSetting(cfg) {
+	function _bbmmIsUserClientHiddenSetting(cfg) {
 		try {
 			if (!cfg) return false;
 			if (cfg.__isMenu) return false;
-			if (String(cfg.scope ?? "") !== "client") return false;
+			if (String(cfg.scope ?? "") !== "client" && String(cfg.scope ?? "") !== "user") return false;
 			if (cfg.config !== false) return false; // hidden setting (not shown in normal config UI)
 			const ns = String(cfg.namespace ?? "");
 			const key = String(cfg.key ?? "");
@@ -610,7 +610,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 			const id = _bbmmMakeSettingId(ns, key);
 			const cfg = game.settings.settings.get(id);
-			if (!_bbmmIsClientHiddenSetting(cfg)) {
+			if (!_bbmmIsUserClientHiddenSetting(cfg)) {
 				DL(2, "setting-sync.js | bbmmAddUserSettingSoftLock(): not a hidden client setting", { id });
 				return false;
 			}
@@ -688,7 +688,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 			const id = _bbmmMakeSettingId(ns, key);
 			const cfg = game.settings.settings.get(id);
-			if (!_bbmmIsClientHiddenSetting(cfg)) {
+			if (!_bbmmIsUserClientHiddenSetting(cfg)) {
 				DL(2, "setting-sync.js | bbmmAddUserSettingLockAll(): not a hidden client setting", { id });
 				return false;
 			}
@@ -1031,7 +1031,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 				// Only user/client settings are enforced
 				const cfg = game.settings.settings.get(id);
-				if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
+				if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client" && cfg.scope !== "user")) continue;
 
 				// If an unlock is queued for this id, remove it and skip resnap
 				if (_bbmmIsUnlockQueued?.(id)) {
