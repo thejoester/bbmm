@@ -3,8 +3,14 @@
 		{
 			"rev": 0,
 			"title": "",
-			"message": "",
-			"link": ""
+			"message": ""
+		}
+	],
+	"messages": [
+		{
+			"rev": 1,
+			"title": "test",
+			"message": "this is a test"
 		}
 	]
 }
