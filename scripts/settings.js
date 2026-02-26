@@ -1450,12 +1450,25 @@ async function bbmm_exportIncExcBundle() {
 
 	if (!chosen) return;
 
-	const filterNs = (chosen === "__all") ? "" : String(chosen);
+	const filterNs = (String(chosen) === "__all") ? "" : String(chosen);
+
+	let moduleTitle = "";
+	let moduleVersion = "";
+
+	if (filterNs) {
+		const mod = game.modules.get(filterNs);
+		moduleTitle = String(mod?.title ?? "");
+		moduleVersion = String(mod?.version ?? mod?.data?.version ?? "");
+	}
 
 	const filtered = {
-		schemaVersion: 1,
+		schemaVersion: 2,
 		foundryVersion: String(game.version ?? ""),
 		filter: filterNs || "all",
+
+		// Rev 2: optional metadata (not required for import)
+		...(filterNs ? { moduleTitle, moduleVersion } : {}),
+
 		inclusions: {
 			modules: filterNs ? incModules.filter(id => id === filterNs) : incModules,
 			settings: filterNs ? incSettings.filter(s => String(s?.namespace ?? "") === filterNs) : incSettings
