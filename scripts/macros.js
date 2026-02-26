@@ -2040,6 +2040,7 @@ export function registerApi() {
 		DL(3, "macros.js | registerApi(): error", err);
 	}
 }
+
 Hooks.once("init", () => {
 	try {
 		registerApi();
