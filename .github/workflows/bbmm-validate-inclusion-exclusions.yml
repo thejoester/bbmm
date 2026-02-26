@@ -22,6 +22,8 @@ jobs:
             const repo = context.repo.repo;
             const token = process.env.GITHUB_TOKEN;
 
+            const TARGET_CATEGORY_SLUG = "inclusion-exclusion-submissions";
+
             function extractCandidateUrls(text) {
               if (!text) return [];
               const urls = [];
@@ -166,6 +168,10 @@ jobs:
                 "    discussion(number:$number) {",
                 "      id",
                 "      body",
+                "      category {",
+                "        slug",
+                "        name",
+                "      }",
                 "    }",
                 "  }",
                 "}"
@@ -211,6 +217,11 @@ jobs:
               return;
             }
 
+            // Category gate: only run in the desired Discussions category
+            const discForCategory = await getDiscussion(discussionNumber);
+            const catSlug = String(discForCategory?.category?.slug ?? "");
+            if (!catSlug || catSlug !== TARGET_CATEGORY_SLUG) return;
+
             // Find candidate attachment URLs
             const candidates = [];
             for (const b of bodiesToScan) {
@@ -218,18 +229,8 @@ jobs:
             }
             const urls = Array.from(new Set(candidates));
 
-            if (!urls.length) {
-              if (context.eventName === "discussion") {
-                const msg = [
-                  "<!-- bbmm-validator -->",
-                  "❌ I didn’t find an attached JSON file link in this discussion post.",
-                  "",
-                  "Attach your exported `.json` by dragging it into the editor, then edit the post to trigger validation."
-                ].join("\n");
-                await postComment(discussionNumber, msg);
-              }
-              return;
-            }
+            // If no attachment links, skip silently (no comment)
+            if (!urls.length) return;
 
             // Try each candidate URL until one parses as JSON
             let chosenUrl = null;
@@ -313,11 +314,11 @@ jobs:
               "**File:** " + chosenUrl,
               "",
               "**Detected:**",
-              "- Filter (namespace / module): `" + String(parsed.filter) + "`",
-              "- FoundryVTT Version: `" + String(parsed.foundryVersion) + "`",
               ...(modMetaLines.length ? modMetaLines : []),
-              "- inclusions: `" + (incModulesCount + incSettingsCount) + "` (modules: " + incModulesCount + ", settings: " + incSettingsCount + ")",
-              "- exclusions: `" + (excModulesCount + excSettingsCount) + "` (modules: " + excModulesCount + ", settings: " + excSettingsCount + ")",
+              "- Filter (namespace/module): `" + String(parsed.filter) + "`",
+              "- FoundryVTT Version: `" + String(parsed.foundryVersion) + "`",
+              "- Inclusions: `" + (incModulesCount + incSettingsCount) + "` (modules: " + incModulesCount + ", settings: " + incSettingsCount + ")",
+              "- Exclusions: `" + (excModulesCount + excSettingsCount) + "` (modules: " + excModulesCount + ", settings: " + excSettingsCount + ")",
               "",
               "**Namespace filter (derived):**",
               nsFilter.length ? nsFilter.map((n) => "- `" + n + "`").join("\n") : "_(none)_"
