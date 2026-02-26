@@ -294,6 +294,11 @@ jobs:
 
             const nsFilter = computeNamespaceFilter(parsed);
 
+            const incModulesCount = (parsed.inclusions && Array.isArray(parsed.inclusions.modules)) ? parsed.inclusions.modules.length : 0;
+            const incSettingsCount = (parsed.inclusions && Array.isArray(parsed.inclusions.settings)) ? parsed.inclusions.settings.length : 0;
+            const excModulesCount = (parsed.exclusions && Array.isArray(parsed.exclusions.modules)) ? parsed.exclusions.modules.length : 0;
+            const excSettingsCount = (parsed.exclusions && Array.isArray(parsed.exclusions.settings)) ? parsed.exclusions.settings.length : 0;
+
             const hasModTitle = (typeof parsed.moduleTitle === "string" && parsed.moduleTitle.trim());
             const hasModVersion = (typeof parsed.moduleVersion === "string" && parsed.moduleVersion.trim());
             const modMetaLines = [];
@@ -311,8 +316,8 @@ jobs:
               "- filter (namespace): `" + String(parsed.filter) + "`",
               "- foundryVersion: `" + String(parsed.foundryVersion) + "`",
               ...(modMetaLines.length ? modMetaLines : []),
-              "- inclusions: `" + (incModules + incSettings) + "` (modules: " + incModules + ", settings: " + incSettings + ")",
-              "- exclusions: `" + (excModules + excSettings) + "` (modules: " + excModules + ", settings: " + excSettings + ")",
+              "- inclusions: `" + (incModulesCount + incSettingsCount) + "` (modules: " + incModulesCount + ", settings: " + incSettingsCount + ")",
+              "- exclusions: `" + (excModulesCount + excSettingsCount) + "` (modules: " + excModulesCount + ", settings: " + excSettingsCount + ")",
               "",
               "**Namespace filter (derived):**",
               nsFilter.length ? nsFilter.map((n) => "- `" + n + "`").join("\n") : "_(none)_"
