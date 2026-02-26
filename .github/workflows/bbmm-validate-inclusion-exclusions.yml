@@ -294,10 +294,12 @@ jobs:
 
             const nsFilter = computeNamespaceFilter(parsed);
 
-            const incModules = (parsed.inclusions && Array.isArray(parsed.inclusions.modules)) ? parsed.inclusions.modules.length : 0;
-            const incSettings = (parsed.inclusions && Array.isArray(parsed.inclusions.settings)) ? parsed.inclusions.settings.length : 0;
-            const excModules = (parsed.exclusions && Array.isArray(parsed.exclusions.modules)) ? parsed.exclusions.modules.length : 0;
-            const excSettings = (parsed.exclusions && Array.isArray(parsed.exclusions.settings)) ? parsed.exclusions.settings.length : 0;
+            const hasModTitle = (typeof parsed.moduleTitle === "string" && parsed.moduleTitle.trim());
+            const hasModVersion = (typeof parsed.moduleVersion === "string" && parsed.moduleVersion.trim());
+            const modMetaLines = [];
+
+            if (hasModTitle) modMetaLines.push("- moduleTitle: `" + String(parsed.moduleTitle) + "`");
+            if (hasModVersion) modMetaLines.push("- moduleVersion: `" + String(parsed.moduleVersion) + "`");
 
             const okMsg = [
               "<!-- bbmm-validator -->",
@@ -308,6 +310,7 @@ jobs:
               "**Detected:**",
               "- filter (namespace): `" + String(parsed.filter) + "`",
               "- foundryVersion: `" + String(parsed.foundryVersion) + "`",
+              ...(modMetaLines.length ? modMetaLines : []),
               "- inclusions: `" + (incModules + incSettings) + "` (modules: " + incModules + ", settings: " + incSettings + ")",
               "- exclusions: `" + (excModules + excSettings) + "` (modules: " + excModules + ", settings: " + excSettings + ")",
               "",
