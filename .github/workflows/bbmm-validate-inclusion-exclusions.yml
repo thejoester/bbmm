@@ -303,8 +303,8 @@ jobs:
             const hasModVersion = (typeof parsed.moduleVersion === "string" && parsed.moduleVersion.trim());
             const modMetaLines = [];
 
-            if (hasModTitle) modMetaLines.push("- moduleTitle: `" + String(parsed.moduleTitle) + "`");
-            if (hasModVersion) modMetaLines.push("- moduleVersion: `" + String(parsed.moduleVersion) + "`");
+            if (hasModTitle) modMetaLines.push("- Module Title: `" + String(parsed.moduleTitle) + "`");
+            if (hasModVersion) modMetaLines.push("- Module Version: `" + String(parsed.moduleVersion) + "`");
 
             const okMsg = [
               "<!-- bbmm-validator -->",
@@ -313,8 +313,8 @@ jobs:
               "**File:** " + chosenUrl,
               "",
               "**Detected:**",
-              "- filter (namespace): `" + String(parsed.filter) + "`",
-              "- foundryVersion: `" + String(parsed.foundryVersion) + "`",
+              "- Filter (namespace / module): `" + String(parsed.filter) + "`",
+              "- FoundryVTT Version: `" + String(parsed.foundryVersion) + "`",
               ...(modMetaLines.length ? modMetaLines : []),
               "- inclusions: `" + (incModulesCount + incSettingsCount) + "` (modules: " + incModulesCount + ", settings: " + incSettingsCount + ")",
               "- exclusions: `" + (excModulesCount + excSettingsCount) + "` (modules: " + excModulesCount + ", settings: " + excSettingsCount + ")",
