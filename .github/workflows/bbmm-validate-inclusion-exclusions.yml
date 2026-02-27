@@ -317,8 +317,8 @@ jobs:
               ...(modMetaLines.length ? modMetaLines : []),
               "- Filter (namespace/module): `" + String(parsed.filter) + "`",
               "- FoundryVTT Version: `" + String(parsed.foundryVersion) + "`",
-              "- Inclusions: `" + (incModulesCount + incSettingsCount) + "` (modules: " + incModulesCount + ", settings: " + incSettingsCount + ")",
-              "- Exclusions: `" + (excModulesCount + excSettingsCount) + "` (modules: " + excModulesCount + ", settings: " + excSettingsCount + ")",
+              "- Inclusions: `" + (incModulesCount + incSettingsCount),
+              "- Exclusions: `" + (excModulesCount + excSettingsCount),
 
               "",
               "**Namespace filter (derived):**",
