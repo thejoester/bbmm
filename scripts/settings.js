@@ -1914,6 +1914,8 @@ Hooks.once("init", () => {
 
 			// temp config store
 			game.settings.register(BBMM_ID, "tempModConfig", {
+				name: LT._settings.tempModConfig_name(),
+				hint: LT._settings.tempModConfig_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
