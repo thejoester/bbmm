@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.4] - 2026-03-01
+
+### Added
+- Added Brazilian Portuguese (pt-BR) localization. Credit: [FarenRavirar](https://github.com/FarenRavirar)!
+
+### Changed 
+- Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
 ## [0.7.3] - 2026-02-26
 
 ### Changed
