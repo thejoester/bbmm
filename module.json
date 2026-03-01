@@ -76,6 +76,11 @@
             "name": "Polish",
             "path": "lang/pl.json"
         }
+        {
+            "lang": "pt-BR",
+            "name": "Português (Brasil)",
+            "path": "lang/pt-BR.json"
+        }
     ],
     "flags": {
         "canUpload": true
