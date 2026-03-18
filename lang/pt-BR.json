@@ -230,8 +230,8 @@
 			"mark_all": "Marcar Tudo Como Visto",
 			"marked_seen_single": "Marcado {title} v{version} como visto.",
 			"marked_seen_all": "Marcou {count} Nota(s) de Atualização como vista(s).",
-			"mark_current_unseen": "Marcar Esta Como Invisível",
-			"mark_all_unseen": "Marcar Tudo Como Invisível",
+			"mark_current_unseen": "Marcar Atual Como Não-Visto",
+			"mark_all_unseen": "Marcar Tudo Como Não-Visto",
 			"dontShowAgain": "Não mostrar novamente para esta versão",
 			"noneFound": "Nenhuma nova Nota de Atualização encontrada."
 		},
