@@ -233,7 +233,15 @@
 			"mark_current_unseen": "Mark Current Unseen",
 			"mark_all_unseen": "Mark All Unseen",
 			"dontShowAgain": "Don’t show again for this version",
-			"noneFound": "No new changelogs found."
+			"noneFound": "No new changelogs found.",
+			"filesMgrName": "Changelog Filename Manager",
+			"filesMgrLabel": "Manage Changelog Filenames",
+			"filesMgrTitle": "BBMM — Changelog Filename Manager",
+			"filesListLabel": "Files to check: <br />- First match wins per module <br />- case-insensitive <br />- Supports subfolders",
+			"filesEmpty": "No filenames configured.",
+			"filesPlaceholder": "e.g. changelog.md or docs/CHANGELOG.txt",
+			"filesReset": "Reset to Defaults",
+			"filesDuplicate": "That filename is already in the list."
 		},
 		"sync": {
 			"ToggleHint": "Lock Player settings",

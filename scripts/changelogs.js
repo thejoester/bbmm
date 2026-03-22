@@ -10,13 +10,14 @@ import { hlp_esc, hlp_injectHeaderHelpButton } from "./helpers.js";
 /* ============================================================================
         {GLOBALS}
 ============================================================================ */
-const _BBMM_DIR_CACHE = new Map(); // Cache directory listings 
-const CHANGELOG_CANDIDATES = [
-	"CHANGELOG.md","CHANGELOG.txt","CHANGELOG",
-	"Changelog.md","Changelog.txt","Changelog",
-	"changelog.md","changelog.txt","changelog",
-	"docs/CHANGELOG.md","docs/Changelog.md","docs/changelog.md","docs/CHANGELOG.txt"
+const _BBMM_DIR_CACHE = new Map(); // Cache directory listings
+const CHANGELOG_DEFAULT_FILENAMES = [
+	"changelog.md", "changelog.txt", "CHANGELOG",
+	"docs/changelog.md", "docs/changelog.txt"
 ];
+
+globalThis.bbmm ??= {};
+Object.assign(globalThis.bbmm, { openChangelogFilesManager });
 
 /* ============================================================================
 		{ HOOK: init } 
@@ -941,10 +942,11 @@ async function _bbmmFindChangelogURL(mod) {
 	try {
 		const files = await _bbmmListModuleFilesCached(mod.id);
 		if (files && files.size) {
-			for (const name of CHANGELOG_CANDIDATES) {
-				if (files.has(name)) {
-					return `./modules/${mod.id}/${name}`;
-				}
+			const candidates = game.settings.get(BBMM_ID, "changelogFilenames") ?? CHANGELOG_DEFAULT_FILENAMES;
+			const lcFiles = new Map([...files].map(f => [f.toLowerCase(), f]));
+			for (const name of candidates) {
+				const actual = lcFiles.get(name.toLowerCase());
+				if (actual) return `./modules/${mod.id}/${actual}`;
 			}
 		}
 	} catch (err) {
@@ -1079,6 +1081,141 @@ async function _bbmmUnmarkChangelogSeen(moduleId) {
 	{HELPER}
 	manually open a specific module's changelog
 ============================================================================ */
+/* ============================================================================
+	{APP}
+	Changelog Filename Manager — lets users add/remove filename patterns
+	that BBMM searches for when detecting a module's changelog file.
+============================================================================ */
+class BBMMChangelogFilesApp extends foundry.applications.api.ApplicationV2 {
+	constructor() {
+		super({
+			id: "bbmm-changelog-files-manager",
+			window: { title: LT.changelog.filesMgrTitle() },
+			width: 480,
+			resizable: false,
+			classes: ["bbmm-changelog-files-app"]
+		});
+	}
+
+	async _renderHTML(_context, _options) {
+		const filenames = game.settings.get(BBMM_ID, "changelogFilenames") ?? CHANGELOG_DEFAULT_FILENAMES;
+		const rows = filenames.map((f, i) => `
+			<div class="bbmm-clf-row">
+				<span class="bbmm-clf-name">${foundry.utils.escapeHTML(f)}</span>
+				<button type="button" class="bbmm-clf-remove" data-index="${i}" title="${LT.buttons.delete()}">
+					<i class="fas fa-times"></i>
+				</button>
+			</div>
+		`).join("") || `<p class="bbmm-clf-empty">${LT.changelog.filesEmpty()}</p>`;
+
+		return `
+			<style>
+				#bbmm-changelog-files-manager .window-content { display:flex; flex-direction:column; }
+				.bbmm-clf-root { display:flex; flex-direction:column; gap:12px; }
+				.bbmm-clf-list { display:flex; flex-direction:column; gap:4px; border:1px solid var(--color-border-light-2); border-radius:6px; padding:8px; min-height:40px; max-height:300px; overflow-y:auto; }
+				.bbmm-clf-row { display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:4px; }
+				.bbmm-clf-row:nth-child(odd) { background:rgba(255,255,255,.03); }
+				.bbmm-clf-name { flex:1; font-family:monospace; font-size:.9rem; word-break:break-all; }
+				.bbmm-clf-remove { flex-shrink:0; width:28px; height:28px; padding:0; }
+				.bbmm-clf-empty { text-align:center; opacity:.7; margin:8px 0; }
+				.bbmm-clf-add-row { display:flex; gap:8px; align-items:center; }
+				.bbmm-clf-add-row input { flex:1; }
+			</style>
+			<section class="bbmm-clf-root">
+				<div>
+					<label style="font-weight:600;display:block;margin-bottom:6px;">${LT.changelog.filesListLabel()}</label>
+					<div class="bbmm-clf-list">${rows}</div>
+				</div>
+				<div class="bbmm-clf-add-row">
+					<input type="text" id="bbmm-clf-input" placeholder="${LT.changelog.filesPlaceholder()}" />
+					<button type="button" id="bbmm-clf-add-btn">${LT.buttons.add()}</button>
+				</div>
+			</section>
+		`;
+	}
+
+	async _replaceHTML(result, _options) {
+		const content = this.element.querySelector(".window-content") || this.element;
+		content.innerHTML = result;
+
+		// Footer
+		const footer = document.createElement("footer");
+		footer.className = "form-footer";
+		footer.style.cssText = "display:flex;justify-content:space-between;margin-top:.75rem;";
+
+		const resetBtn = document.createElement("button");
+		resetBtn.type = "button";
+		resetBtn.textContent = LT.changelog.filesReset();
+		resetBtn.addEventListener("click", async () => {
+			const def = foundry.utils.duplicate(
+				game.settings.settings.get(`${BBMM_ID}.changelogFilenames`)?.default ?? CHANGELOG_DEFAULT_FILENAMES
+			);
+			await game.settings.set(BBMM_ID, "changelogFilenames", def);
+			DL("changelogs.js | BBMMChangelogFilesApp: reset to defaults");
+			this.render(true);
+		});
+
+		const closeBtn = document.createElement("button");
+		closeBtn.type = "button";
+		closeBtn.textContent = LT.buttons.close();
+		closeBtn.addEventListener("click", () => this.close());
+
+		footer.append(resetBtn, closeBtn);
+		content.appendChild(footer);
+
+		// Delegated click handler
+		content.addEventListener("click", async (ev) => {
+
+			// Remove a filename
+			const removeBtn = ev.target.closest?.(".bbmm-clf-remove");
+			if (removeBtn instanceof HTMLButtonElement) {
+				const idx = parseInt(removeBtn.dataset.index, 10);
+				if (isNaN(idx)) return;
+				const list = foundry.utils.duplicate(game.settings.get(BBMM_ID, "changelogFilenames") ?? []);
+				list.splice(idx, 1);
+				await game.settings.set(BBMM_ID, "changelogFilenames", list);
+				DL(`changelogs.js | BBMMChangelogFilesApp: removed index ${idx}`);
+				this.render(true);
+				return;
+			}
+
+			// Add a filename
+			const addBtn = ev.target.closest?.("#bbmm-clf-add-btn");
+			if (addBtn instanceof HTMLButtonElement) {
+				const input = content.querySelector("#bbmm-clf-input");
+				const value = input?.value?.trim();
+				if (!value) return;
+				const list = foundry.utils.duplicate(game.settings.get(BBMM_ID, "changelogFilenames") ?? []);
+				if (list.includes(value)) {
+					ui.notifications?.warn(LT.changelog.filesDuplicate());
+					return;
+				}
+				list.push(value);
+				await game.settings.set(BBMM_ID, "changelogFilenames", list);
+				DL(`changelogs.js | BBMMChangelogFilesApp: added "${value}"`);
+				this.render(true);
+				return;
+			}
+		});
+
+		// Enter key submits add
+		content.querySelector("#bbmm-clf-input")?.addEventListener("keydown", (ev) => {
+			if (ev.key === "Enter") {
+				ev.preventDefault();
+				content.querySelector("#bbmm-clf-add-btn")?.click();
+			}
+		});
+	}
+}
+
+export function openChangelogFilesManager() {
+	try {
+		new BBMMChangelogFilesApp().render(true);
+	} catch (err) {
+		DL(3, `changelogs.js | openChangelogFilesManager(): ${err?.message || err}`, err);
+	}
+}
+
 export async function BBMM_openChangelogFor(moduleId) {
 	try {
 		const mod = game.modules.get(moduleId);

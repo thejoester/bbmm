@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.5] - 2026-03-21
+
+### Added
+- **Changelog Report:**
+  - Added "Changelog Filename Manager" in settings. Allows adding or removing filenames that BBMM searches for when detecting a module's changelog file (e.g. for modules with non-standard changelog filenames).
+
+### Changed
+- **Changelog Report:**
+  - Changelog file detection is now case-insensitive (`changelog.md`, `CHANGELOG.MD`, `ChangeLog.Md`, etc. all match).
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Credit: [Kharmans](https://github.com/Kharmans)!
+
 ## [0.7.4] - 2026-03-01
 
 ### Added

@@ -897,6 +897,18 @@ export function openExclusionsManager() {
 	}
 }
 
+// Open Changelog Filename Manager
+export function openChangelogFilesManager() {
+	DL("settings.js | openChangelogFilesManager(): fired");
+	try {
+		const fn = globalThis.bbmm?.openChangelogFilesManager;
+		if (typeof fn === "function") return fn();
+		DL(3, "settings.js | openChangelogFilesManager(): launcher not found");
+	} catch (e) {
+		DL(3, "settings.js | openChangelogFilesManager(): error", e);
+	}
+}
+
 // Open Hidden Client Setting Sync Manager
 export function openhiddenSettingSyncManager() {
 	DL("settings.js | openhiddenSettingSyncManager(): fired");
@@ -2105,6 +2117,30 @@ Hooks.once("init", () => {
 				}
 			});
 
+			// MENU: Changelog Filename Manager
+			game.settings.registerMenu(BBMM_ID, "changelogFilesManager", {
+				name: LT.changelog.filesMgrName(),
+				label: LT.changelog.filesMgrLabel(),
+				icon: "fas fa-file-lines",
+				restricted: true,
+				type: class extends FormApplication {
+					constructor(...args){ super(...args); }
+					static get defaultOptions() {
+						return foundry.utils.mergeObject(super.defaultOptions, {
+							id: "bbmm-changelog-files-manager-opener",
+							title: LT.changelog.filesMgrTitle(),
+							template: null,
+							width: 500
+						});
+					}
+					async render(...args) {
+						openChangelogFilesManager();
+						return this;
+					}
+					async _updateObject() {}
+				}
+			});
+
 			// MENU: Import / Export
 			game.settings.registerMenu(BBMM_ID, "importExport", {
 				name: LT.buttons.importExport(),
@@ -2125,6 +2161,14 @@ Hooks.once("init", () => {
 				default: true
 			});
 			
+			// Hidden list of filename patterns BBMM searches for when detecting a module's changelog
+			game.settings.register(BBMM_ID, "changelogFilenames", {
+				scope: "world",
+				config: false,
+				type: Array,
+				default: ["changelog.md", "changelog.txt", "CHANGELOG", "docs/changelog.md", "docs/changelog.txt"]
+			});
+
 			// toggle to check disabled modules
 			game.settings.register("bbmm", "checkDisabledModules", {
 				scope: "world",
