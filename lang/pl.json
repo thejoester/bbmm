@@ -232,7 +232,15 @@
       "mark_current_unseen": "Oznacz bieżące jako nieprzeczytane",
       "mark_all_unseen": "Oznacz wszystkie jako nieprzeczytane\n",
       "dontShowAgain": "Nie pokazuj ponownie dla tej wersji",
-      "noneFound": "Nie znaleziono żadnych nowych dzienników zmian."
+      "noneFound": "Nie znaleziono żadnych nowych dzienników zmian.",
+      "filesMgrName": "Lista zmian w menedżerze nazw plików",
+      "filesMgrLabel": "Zarządzaj nazwami plików dziennika zmian",
+      "filesMgrTitle": "BBMM — Lista zmian w menedżerze nazw plików",
+      "filesListLabel": "Pliki do sprawdzenia: <br />- Liczba zwycięstw w pierwszym meczu w podziale na moduły <br />- Bez rozróżniania wielkości liter <br />- Obsługa podfolderów",
+      "filesEmpty": "Nie skonfigurowano żadnych nazw plików.",
+      "filesPlaceholder": "np. changelog.md lub docs/CHANGELOG.txt",
+      "filesReset": "Przywróć ustawienia domyślne",
+      "filesDuplicate": "Ta nazwa pliku znajduje się już na liście."
     },
     "sync": {
       "ToggleHint": "Zablokuj ustawienia gracza",
