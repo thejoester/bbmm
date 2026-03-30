@@ -148,6 +148,7 @@
     "modListCustomNotesExist": "Il existe des notes personnalisées",
     "presetNoticeTitle": "Préréglages déplacés vers le stockage permanent",
     "presetNoticePleaseRead": "IMPORTANT ! Veuillez lire !",
+    "presetNoticeBody_0_6_5": "<p><strong>Si vous avez effectué la mise à jour vers la version 0.6.0 ou supérieure,</strong> un problème entraînait l'écrasement des données à chaque mise à jour. La bonne nouvelle est que ce problème a été résolu. La mauvaise est que cette dernière mise à jour, malgré le correctif, effacera malheureusement à nouveau vos données.</p><p>De ce fait, les paramètres et les préréglages des modules devront être migrés manuellement à l'aide des macros fournies dans le compendium. Cliquez sur le bouton « Ouvrir le fichier README » pour obtenir des instructions ou utilisez les macros du compendium.</p>",
     "presetNoticeOpenDocs": "Ouvrir le fichier README",
     "presetNoticeDontShowAgain": "Ne plus afficher",
     "remindMeLater": "Me le rappeler plus tard",
