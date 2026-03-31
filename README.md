@@ -35,7 +35,7 @@ I would like to extend a thanks to the following people for helping contribute t
 - French (fr): [Retculo](https://gitlocalize.com/users/rectulo)
 - Italian (it): [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+author%3AGregoryWarn)
 - Polish (pl): [Lioheart](https://gitlocalize.com/users/Lioheart)
-- Brazilian Portuguese (pt-BR): [FarenRavirar](https://github.com/FarenRavirar)!
+- Brazilian Portuguese (pt-BR): [FarenRavirar](https://github.com/FarenRavirar) / [Kharmans](https://github.com/Kharmans)!
 
 ## Contribute
 
