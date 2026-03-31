@@ -1970,6 +1970,14 @@ Hooks.once("init", () => {
 				default: 0
 			});
 
+			// list of filename patterns BBMM searches for when detecting a module's changelog
+			game.settings.register(BBMM_ID, "changelogFilenames", {
+				scope: "world",
+				config: false,
+				type: Array,
+				default: ["changelog.md", "changelog.txt", "CHANGELOG", "docs/changelog.md", "docs/changelog.txt"]
+			});
+
 		// ===== SETTINGS ITEMS =====
 		// These DO need to be localized
 
@@ -2160,14 +2168,6 @@ Hooks.once("init", () => {
 				type: Boolean,
 				default: true
 			});
-			
-			// Hidden list of filename patterns BBMM searches for when detecting a module's changelog
-			game.settings.register(BBMM_ID, "changelogFilenames", {
-				scope: "world",
-				config: false,
-				type: Array,
-				default: ["changelog.md", "changelog.txt", "CHANGELOG", "docs/changelog.md", "docs/changelog.txt"]
-			});
 
 			// toggle to check disabled modules
 			game.settings.register("bbmm", "checkDisabledModules", {
@@ -2296,9 +2296,9 @@ Hooks.once("init", () => {
 			});
 
 			// Option to receive important messages from the module (like critical updates or announcements)
-			game.settings.register(BBMM_ID, "recieveImportantMessages", {
-				name: LT._settings.recieveImportantMessages(),
-				hint: LT._settings.recieveImportantMessagesHint(),
+			game.settings.register(BBMM_ID, "receiveImportantMessages", {
+				name: LT._settings.receiveImportantMessages(),
+				hint: LT._settings.receiveImportantMessagesHint(),
 				scope: "world",
 				config: true,
 				type: Boolean,
@@ -2372,7 +2372,7 @@ Hooks.once("ready", async () => {
 	Hooks.on("renderModuleManagement", (app, html) => { try { injectBBMMHeaderButton(html) } catch (e) { DL(2, "settings.js | renderModuleManagement: menu injection failed", e); } });
 
 	// Remote update messages from GitHub feed
-	if (game.settings.get(BBMM_ID, "recieveImportantMessages") === true) {
+	if (game.settings.get(BBMM_ID, "receiveImportantMessages") === true) {
 		try {
 			if (game.user?.isGM) { try { await bbmm_checkRemoteMessageFeed(); } catch (err) { DL(2, "settings.js | ready | remote message feed failed", err); } }
 		} catch (err) {
