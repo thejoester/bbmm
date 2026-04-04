@@ -304,8 +304,8 @@
       "autoForceReloadName": "Wymuś ponowne załadowanie gracza",
       "autoForceReloadHint": "Wymuś natychmiastowe ponowne załadowanie graczy, gdy nowe ustawienia są zablokowane / zsynchronizowane.",
       "importExportHint": "Import / eksport ustawień wstępnych i list.",
-      "recieveImportantMessages": "Otrzymuj ważne powiadomienia push:",
-      "recieveImportantMessagesHint": "Po włączeniu tej opcji możesz otrzymywać ważne wiadomości w przypadku pilnych problemów z BBMM lub zainstalowanym modułem. Wiadomości te będą wysyłane tylko w razie potrzeby i będą zawierały ważne informacje na temat problemu oraz sposobu jego rozwiązania. Możesz wyłączyć tę opcję, jeśli chcesz, ale zaleca się pozostawienie jej włączonej, aby być na bieżąco z krytycznymi problemami, które mogą mieć wpływ na grę.",
+      "receiveImportantMessages": "Otrzymuj ważne powiadomienia push:",
+      "receiveImportantMessagesHint": "Po włączeniu tej opcji możesz otrzymywać ważne wiadomości w przypadku pilnych problemów z BBMM lub zainstalowanym modułem. Wiadomości te będą wysyłane tylko w razie potrzeby i będą zawierały ważne informacje na temat problemu oraz sposobu jego rozwiązania. Możesz wyłączyć tę opcję, jeśli chcesz, ale zaleca się pozostawienie jej włączonej, aby być na bieżąco z krytycznymi problemami, które mogą mieć wpływ na grę.",
       "tempModConfig_name": "Tymczasowa konfiguracja modułu",
       "tempModConfig_hint": "Oczekujące zmiany są tutaj przechowywane i nie zastąpią aktualnych ustawień, dopóki nie zostaną zapisane."
     },
