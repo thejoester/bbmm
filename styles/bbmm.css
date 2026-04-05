@@ -1,3 +1,9 @@
+/* Settings section headers */
+.bbmm-settings-header {
+	border-bottom: 1px solid var(--color-border-light-tertiary);
+	padding-bottom: 0.25em;
+}
+
 /* BBMM Exclusions dialog */
 .bbmm-exclusions-dialog .window-content {
 	/* make sure our content can lay out as intended */

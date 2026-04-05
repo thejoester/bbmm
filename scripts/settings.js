@@ -602,6 +602,32 @@ async function checkFolderMigration(){
 	}
 }
 
+// Section headers for the BBMM settings tab (targets regular settings only, not menus)
+const SETTINGS_SECTIONS = [
+	{ header: "Changelogs",        firstKey: "showChangelogsOnLogin" },
+	{ header: "Module Management", firstKey: "enableModuleManagement" },
+	{ header: "Sync",              firstKey: "enableUserSettingSync" },
+	{ header: "Advanced",          firstKey: "autoForceReload" },
+];
+
+function injectSettingsSectionHeaders(html) {
+	const tab = html.querySelector(`[data-tab="bbmm"][data-category="bbmm"]`);
+	if (!tab) return;
+
+	for (const { header, firstKey } of SETTINGS_SECTIONS) {
+		const firstEl = tab.querySelector(`[name="bbmm.${firstKey}"]`);
+		const formGroup = firstEl?.closest(".form-group");
+		if (!formGroup) {
+			DL(1, `settings.js | injectSettingsSectionHeaders: no form-group found for "${firstKey}", skipping`);
+			continue;
+		}
+		const h = document.createElement("h3");
+		h.textContent = header;
+		h.classList.add("bbmm-settings-header");
+		formGroup.before(h);
+	}
+}
+
 //  Inject BBMM button into a Foundry window header
 export function injectBBMMHeaderButton(root) {
 	
@@ -2179,17 +2205,6 @@ Hooks.once("init", () => {
 				hint: LT.hint_checkDisabledModules()
 			});
 
-			// Prompt to enable newly added modules 
-			game.settings.register(BBMM_ID, "promptEnableNewModules", {
-				name: LT.moduleManagement.promptEnableNewModulesName(),
-				hint: LT.moduleManagement.promptEnableNewModulesHint(),
-				scope: "world",
-				config: true,
-				type: Boolean,
-				default: true,
-				restricted: true
-			});
-
 			// Enable/disable "enhanced" module manager
 			game.settings.register(BBMM_ID, "enableModuleManagement", {
 				name: LT.enableModuleManagementName(),
@@ -2202,13 +2217,17 @@ Hooks.once("init", () => {
 				requiresReload: true,
 			});
 
-			// Enable/disable BBMM Controls Sync
-			game.settings.register?.(BBMM_ID, CTRL_TOGGLE, {
-				name: LT.controlsToggleName(),
-				hint: LT.controlsToggleHint(),
-				scope: "world", config: true, type: Boolean, default: true
+			// Prompt to enable newly added modules 
+			game.settings.register(BBMM_ID, "promptEnableNewModules", {
+				name: LT.moduleManagement.promptEnableNewModulesName(),
+				hint: LT.moduleManagement.promptEnableNewModulesHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: true,
+				restricted: true
 			});
-			
+
 			// Enable/disable BBMM user/client setting sync
 			game.settings.register(BBMM_ID, "enableUserSettingSync", {
 				name: LT.sync.EnableName(),
@@ -2229,6 +2248,13 @@ Hooks.once("init", () => {
 				}
 			});
 
+			// Enable/disable BBMM Controls Sync
+			game.settings.register?.(BBMM_ID, CTRL_TOGGLE, {
+				name: LT.controlsToggleName(),
+				hint: LT.controlsToggleHint(),
+				scope: "world", config: true, type: Boolean, default: true
+			});
+			
 			// Choices for lock-gestures 
 			const GESTURE_ACTION_CHOICES = {
 				"lockSelected": LT.name_LockSelected(),
@@ -2355,7 +2381,7 @@ Hooks.once("ready", async () => {
 	// show presets moved notice - Remove after version 0.8.0
 	try { await showPresetsMovedNotice(); } catch (err) { DL(2, "settings.js | ready | presets moved notice failed", err); }
 	
-	// Hook into settings and manage modules window to add app button in header 
+	// Hook into settings and manage modules window to add app button in header
 	Hooks.on("renderSettingsConfig", (app, html) => {
 		try {
 			hlp_injectHeaderHelpButton(app, {
@@ -2367,7 +2393,11 @@ Hooks.once("ready", async () => {
 		} catch (e) {
 			DL(2, "settings.js | renderSettingsConfig: help or menu injection failed", e);
 		}
-		
+		try {
+			injectSettingsSectionHeaders(html);
+		} catch (e) {
+			DL(2, "settings.js | renderSettingsConfig: section headers injection failed", e);
+		}
 	});
 	Hooks.on("renderModuleManagement", (app, html) => { try { injectBBMMHeaderButton(html) } catch (e) { DL(2, "settings.js | renderModuleManagement: menu injection failed", e); } });
 
