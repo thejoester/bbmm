@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0-test1] - 2026-04-06
+## [0.8.0] - 2026-04-06
 
   ### Added
   - **Module Management**: 
@@ -23,7 +23,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   ### Changed
   - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
-
 
 ## [0.7.6] - 2026-03-30
 
