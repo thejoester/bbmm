@@ -2659,6 +2659,11 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
                 const on = (b.dataset.scope === this.scope);
                 if (on) b.classList.add("on"); else b.classList.remove("on");
 			}
+
+			const groupTagsBtn = root.querySelector("#bbmm-mm-group-tags");
+			if (groupTagsBtn) groupTagsBtn.classList.toggle("on", this.groupByTags);
+			const groupSubtagsBtn = root.querySelector("#bbmm-mm-group-subtags");
+			if (groupSubtagsBtn) groupSubtagsBtn.classList.toggle("on", this.groupBySubtags);
 		} catch {}
 
 		// body list

@@ -153,8 +153,9 @@
 }
 
 .bbmm-mm-toolbar-row2 button.on {
-	background: var(--color-bg-btn-active, #4a7c5e);
-	color: var(--color-text-light-primary, #fff);
+	background: var(--button-hover-background-color);
+	color: var(--button-hover-text-color);
+	border-color: var(--button-hover-border-color);
 }
 
 /* ── Bulk Tag Assign window ──────────────────────────────────────────────────── */
@@ -874,6 +875,11 @@
 #bbmm-module-manager .bbmm-mm-toolbar input { flex: 1; }
 
 #bbmm-module-manager .bbmm-mm-scopes { display: flex; gap: .25rem; }
+#bbmm-module-manager .bbmm-mm-scopes button.on {
+	background: var(--button-hover-background-color);
+	color: var(--button-hover-text-color);
+	border-color: var(--button-hover-border-color);
+}
 
 #bbmm-module-manager .bbmm-mm-diff {
 	margin-left: auto;
