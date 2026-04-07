@@ -4,6 +4,218 @@
 	padding-bottom: 0.25em;
 }
 
+/* ── Tag Manager ─────────────────────────────────────────────────────────── */
+.bbmm-tag-manager-content {
+	padding: 0.5em;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+	height: 100%;
+	overflow: hidden;
+}
+
+.bbmm-tag-manager-content .bbmm-tag-list {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
+}
+
+.bbmm-tag-block {
+	border: 1px solid var(--color-border-light-tertiary);
+	border-radius: 4px;
+	padding: 0.4em 0.6em;
+	margin-bottom: 0.3em;
+}
+
+.bbmm-tag-row,
+.bbmm-subtag-row {
+	display: flex;
+	align-items: center;
+	gap: 0.4em;
+}
+
+.bbmm-tag-label {
+	flex: 1;
+	font-weight: bold;
+}
+
+.bbmm-subtag-label {
+	flex: 1;
+	padding-left: 1em;
+	font-size: 0.9em;
+}
+
+.bbmm-subtag-add-row {
+	display: flex;
+	gap: 0.4em;
+	margin-top: 0.3em;
+	padding-left: 1em;
+}
+
+.bbmm-subtag-add-row input,
+.bbmm-tag-add-row input {
+	flex: 1;
+}
+
+.bbmm-tag-add-row {
+	display: flex;
+	gap: 0.4em;
+	margin-top: 0.4em;
+}
+
+.bbmm-tag-empty {
+	color: var(--color-text-dark-secondary);
+	font-style: italic;
+}
+
+/* ── Module Tags App ─────────────────────────────────────────────────────── */
+.bbmm-module-tags-content {
+	padding: 0.5em;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+}
+
+.bbmm-module-tags-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5em;
+	padding: 1em 0.5em;
+	text-align: center;
+}
+
+.bbmm-chip-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3em;
+	min-height: 2em;
+}
+
+.bbmm-tag-none {
+	color: var(--color-text-dark-secondary);
+	font-style: italic;
+}
+
+.bbmm-tag-add-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3em;
+}
+
+.bbmm-tag-selects {
+	display: flex;
+	gap: 0.4em;
+	align-items: center;
+}
+
+/* ── Tag chips (shared) ──────────────────────────────────────────────────── */
+.bbmm-tag-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25em;
+	background: var(--color-bg-option);
+	border: 1px solid var(--color-border-light-tertiary);
+	border-radius: 3px;
+	padding: 0.1em 0.4em;
+	font-size: 0.8em;
+	white-space: nowrap;
+}
+
+.bbmm-chip-remove {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	line-height: 1;
+}
+
+/* ── Module row tag chips ────────────────────────────────────────────────── */
+.bbmm-row-tag-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.2em;
+	margin-top: 0.15em;
+}
+
+/* ── Toolbar rows ────────────────────────────────────────────────────────────── */
+.bbmm-mm-toolbar-row1,
+.bbmm-mm-toolbar-row2 {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	flex-wrap: wrap;
+}
+
+.bbmm-mm-toolbar-row2 {
+	border-top: 1px solid var(--color-border-light-tertiary);
+	padding-top: 0.3em;
+}
+
+.bbmm-mm-toolbar-row2 button.on {
+	background: var(--button-hover-background-color);
+	color: var(--button-hover-text-color);
+	border-color: var(--button-hover-border-color);
+}
+
+/* ── Bulk Tag Assign window ──────────────────────────────────────────────────── */
+.bbmm-bulk-assign-content {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4em;
+	height: 100%;
+	overflow: hidden;
+	padding: 0.5em;
+}
+
+.bbmm-bulk-header {
+	font-size: 0.95em;
+}
+
+.bbmm-bulk-list {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
+	border: 1px solid var(--color-border-light-tertiary);
+	border-radius: 4px;
+	padding: 0.25em;
+}
+
+.bbmm-bulk-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding: 0.2em 0.3em;
+	cursor: pointer;
+}
+
+.bbmm-bulk-row:hover {
+	background: var(--color-bg-option);
+}
+
+.bbmm-bulk-mod-title {
+	flex: 1;
+}
+
+.bbmm-bulk-footer,
+.bbmm-module-tags-footer {
+	display: flex;
+	justify-content: space-between;
+	padding: 0.5em;
+	border-top: 1px solid var(--color-border-light-tertiary);
+}
+
+/* ── Tag group headers in module list ───────────────────────────────────── */
+.bbmm-tag-group-header {
+	padding: 0.3em 0.6em;
+	font-weight: bold;
+	font-size: 0.85em;
+	background: var(--color-bg-header, rgba(0,0,0,0.1));
+	border-bottom: 1px solid var(--color-border-light-tertiary);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
 /* BBMM Exclusions dialog */
 .bbmm-exclusions-dialog .window-content {
 	/* make sure our content can lay out as intended */
@@ -656,13 +868,18 @@
 
 #bbmm-module-manager .bbmm-mm-toolbar {
 	display: flex;
-	gap: .5rem;
-	align-items: center;
+	flex-direction: column;
+	gap: .3rem;
 }
 
 #bbmm-module-manager .bbmm-mm-toolbar input { flex: 1; }
 
 #bbmm-module-manager .bbmm-mm-scopes { display: flex; gap: .25rem; }
+#bbmm-module-manager .bbmm-mm-scopes button.on {
+	background: var(--button-hover-background-color);
+	color: var(--button-hover-text-color);
+	border-color: var(--button-hover-border-color);
+}
 
 #bbmm-module-manager .bbmm-mm-diff {
 	margin-left: auto;

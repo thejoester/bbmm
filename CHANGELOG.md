@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0-test1] - 2026-04-06
+
+  ### Added
+  - **Module Management**: 
+    - New tag/subtag system for organizing modules
+      - Create and manage tags and subtags via the Tag Manager (Settings menu or GM toolbar dropdown)
+      - Assign tags to individual modules from the module notes edit window
+      - Bulk-assign a tag/subtag combination to multiple modules at once using the "+" button in Tag Manager
+      - Filter the module list by tag in Module Management
+      - Group modules by tag or by subtag in Module Management
+      - Tag and subtag assignments persist across worlds via file storage (`bbmm-data/module-tags.json`)
+      - Tags and subtags are sorted alphabetically
+  - **Settings**: 
+  - Added section headers (Changelogs, Module Management, Sync, Advanced) to settings page for nicer UX
+  - Added "Manage Tags" and "Changelog Filenames" entries to the GM toolbar dropdown
+  
+  ### Changed
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+
 ## [0.7.6] - 2026-03-30
 
 ### Changed

@@ -675,6 +675,8 @@ export function injectBBMMHeaderButton(root) {
 			{ action: "exclusions", label: LT.exclusionsMgr(), onClick: () => openExclusionsManager() },
 			/*{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },*/
 			{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel(), onClick: () => openhiddenSettingSyncManager() },
+			{ action: "tags", label: LT.moduleManagement.tagMgrLabel(), onClick: () => openTagManager() },
+			{ action: "changelogFiles", label: LT.changelog.filesMgrLabel(), onClick: () => openChangelogFilesManager() },
 			// Import / Export
 			{
 				action: "importExport",
@@ -948,6 +950,18 @@ export function openhiddenSettingSyncManager() {
 }
 
 // Open a small chooser dialog, then launch the selected manager
+export function openTagManager() {
+	DL("settings.js | openTagManager(): fired");
+	try {
+		const fn = globalThis.bbmm?.openTagManager;
+		if (typeof fn === "function") return fn();
+		DL(3, "settings.js | openTagManager(): launcher not found on globalThis.bbmm");
+	} catch (e) {
+		DL(3, "settings.js | openTagManager(): error", e);
+	}
+}
+
+// Open BBMM Launcher Dialog
 export async function openBBMMLauncher() {
 	DL("settings.js | openBBMMLauncher()");
 
@@ -1934,6 +1948,8 @@ Hooks.once("init", () => {
 
 			// Ledger of soft-locked compendium entries per user
 			game.settings.register(BBMM_ID, "controlSoftLedger", {
+				name: LT._settings.controlSoftLedger_name(),
+				hint: LT._settings.controlSoftLedger_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -1949,6 +1965,7 @@ Hooks.once("init", () => {
 				type: Object,
 				default: {}
 			});
+
 
 			// temp config store
 			game.settings.register(BBMM_ID, "tempModConfig", {
@@ -2171,6 +2188,27 @@ Hooks.once("init", () => {
 						openChangelogFilesManager();
 						return this;
 					}
+					async _updateObject() {}
+				}
+			});
+
+			// MENU: Module Tag Manager
+			game.settings.registerMenu(BBMM_ID, "tagManager", {
+				name: LT.moduleManagement.tagMgrName(),
+				label: LT.moduleManagement.tagMgrLabel(),
+				icon: "fas fa-tags",
+				restricted: true,
+				type: class extends FormApplication {
+					constructor(...args){ super(...args); }
+					static get defaultOptions() {
+						return foundry.utils.mergeObject(super.defaultOptions, {
+							id: "bbmm-tag-manager-opener",
+							title: LT.moduleManagement.tagMgrTitle(),
+							template: null,
+							width: 500
+						});
+					}
+					async render(...args) { openTagManager(); return this; }
 					async _updateObject() {}
 				}
 			});

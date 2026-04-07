@@ -5,9 +5,123 @@
 		• Whole row visually selectable (does not toggle enable/disable yet)
 		• Keep this purely presentational (no core behavior changes)
 ============================================================================== */
-import { DL, BBMM_README_UUID, injectBBMMHeaderButton } from "./settings.js";
+import { DL, BBMM_README_UUID, injectBBMMHeaderButton, openTagManager as _openTagManagerFromSettings } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 import { hlp_esc, hlp_injectHeaderHelpButton } from "./helpers.js";
+
+// ── Tag data helpers ──────────────────────────────────────────────────────────
+
+const TAGS_DEFAULT = { tags: [], subtags: [], assignments: {} };
+const TAGS_FILE  = "module-tags.json";
+const NOTES_FILE = "module-notes.json";
+
+// ── in-memory caches (null = not yet loaded) ──────────────────────────────────
+let _tagsCache  = null;   // { tags, subtags, assignments }
+let _notesCache = null;   // { [moduleId]: htmlString }
+
+// ── shared low-level read/write ───────────────────────────────────────────────
+
+async function _bbmmFetchJSON(filename) {
+	try {
+		const browse = await FilePicker.browse("data", "bbmm-data", { extensions: ["json"] });
+		const match = (browse?.files ?? []).find(f => String(f).endsWith(`/${filename}`));
+		if (match) {
+			const res = await fetch(match, { cache: "no-store" });
+			if (res.ok) return await res.json();
+		}
+	} catch (e) {
+		const msg = String(e?.message ?? e);
+		if (!msg.includes("does not exist") && !msg.includes("not accessible"))
+			DL(2, `module-management.js | _bbmmFetchJSON(${filename}): browse failed`, e);
+	}
+	// fallback direct fetch
+	try {
+		const url = foundry.utils.getRoute(`bbmm-data/${filename}`);
+		const res = await fetch(url, { cache: "no-store" });
+		if (res.ok) return await res.json();
+	} catch (_) { /* file not yet created */ }
+	return null;
+}
+
+async function _bbmmWriteJSON(filename, data) {
+	const payload = JSON.stringify(data ?? {}, null, 2);
+	const file = new File([payload], filename, { type: "application/json" });
+	try {
+		await FilePicker.upload("data", "bbmm-data", file, { notify: false });
+		return true;
+	} catch (e) {
+		DL(3, `module-management.js | _bbmmWriteJSON(${filename}): upload failed`, e);
+		return false;
+	}
+}
+
+// ── tag data ──────────────────────────────────────────────────────────────────
+
+export async function loadTagData() {
+	try {
+		const raw = await _bbmmFetchJSON(TAGS_FILE);
+		_tagsCache = (raw && typeof raw === "object" && !Array.isArray(raw)) ? raw : foundry.utils.duplicate(TAGS_DEFAULT);
+		_tagsCache.tags      ??= [];
+		_tagsCache.subtags   ??= [];
+		_tagsCache.assignments ??= {};
+		DL(`module-management.js | loadTagData(): loaded (${_tagsCache.tags.length} tags)`);
+	} catch (e) {
+		DL(3, "module-management.js | loadTagData(): failed", e);
+		_tagsCache = foundry.utils.duplicate(TAGS_DEFAULT);
+	}
+}
+
+function _getTagData() {
+	if (_tagsCache === null) {
+		DL(2, "module-management.js | _getTagData(): cache not loaded, returning default");
+		return foundry.utils.duplicate(TAGS_DEFAULT);
+	}
+	return foundry.utils.duplicate(_tagsCache);
+}
+
+async function _saveTagData(data) {
+	data.tags?.sort((a, b) => a.label.localeCompare(b.label));
+	data.subtags?.sort((a, b) => a.label.localeCompare(b.label));
+	_tagsCache = foundry.utils.duplicate(data);
+	await _bbmmWriteJSON(TAGS_FILE, data);
+}
+
+// ── notes data ────────────────────────────────────────────────────────────────
+
+export async function loadNotesData() {
+	try {
+		const raw = await _bbmmFetchJSON(NOTES_FILE);
+		_notesCache = (raw && typeof raw === "object" && !Array.isArray(raw)) ? raw : {};
+		DL(`module-management.js | loadNotesData(): loaded (${Object.keys(_notesCache).length} entries)`);
+	} catch (e) {
+		DL(3, "module-management.js | loadNotesData(): failed", e);
+		_notesCache = {};
+	}
+}
+
+function _getNotesData() {
+	if (_notesCache === null) {
+		DL(2, "module-management.js | _getNotesData(): cache not loaded, returning empty");
+		return {};
+	}
+	return foundry.utils.duplicate(_notesCache);
+}
+
+async function _saveNotesData(notes) {
+	_notesCache = foundry.utils.duplicate(notes);
+	await _bbmmWriteJSON(NOTES_FILE, notes);
+}
+
+function _slugify(str) {
+	return str.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function _uniqueSlug(base, existingIds) {
+	if (!existingIds.includes(base)) return base;
+	let n = 2;
+	while (existingIds.includes(`${base}-${n}`)) n++;
+	return `${base}-${n}`;
+}
 
 /* Return true if the module has at least one configurable setting (config === true). */
 function _bbmmModuleHasConfigSettings(modId) {
@@ -76,10 +190,7 @@ async function _bbmmOpenModuleSettingsTab(modId) {
 /* Render saved notes HTML for display in the expanded panel */
 async function _bbmmRenderSavedNotesHTML(moduleId) {
 	try {
-		const KEY = "moduleNotes";
-
-		// Use the correct namespace id (BBMM_ID), not a string literal.
-		const all = game.settings.get(BBMM_ID, KEY) || {};
+		const all = _getNotesData();
 		const raw = _bbmmExtractEditorContent(all[moduleId] || "").trim();
 
 		// If we have user notes, those take priority.
@@ -185,6 +296,534 @@ function _bbmmIsEmptyNoteHTML(html) {
 	}
 }
 
+// ── BBMMTagManagerApp ─────────────────────────────────────────────────────────
+
+class BBMMTagManagerApp extends foundry.applications.api.ApplicationV2 {
+	constructor() {
+		super({
+			id: "bbmm-tag-manager",
+			window: { title: LT.moduleManagement.tagMgrTitle(), resizable: true },
+			position: { width: 560, height: 500 }
+		});
+	}
+
+	async _renderHTML() {
+		const data = _getTagData();
+		const noTags = !data.tags.length;
+		let tagsHTML = noTags
+			? `<p class="bbmm-tag-empty">${hlp_esc(LT.moduleManagement.tagMgrNoTags())}</p>`
+			: data.tags.map(tag => {
+				const subs = data.subtags.filter(s => s.tagId === tag.id);
+				const subsHTML = subs.map(sub => `
+					<div class="bbmm-subtag-row" data-subtag-id="${hlp_esc(sub.id)}">
+						<span class="bbmm-subtag-label"><i class="fa-solid fa-circle-dot fa-xs"></i> ${hlp_esc(sub.label)}</span>
+						<button type="button" class="bbmm-bulk-assign" data-tag-id="${hlp_esc(tag.id)}" data-subtag-id="${hlp_esc(sub.id)}" title="${hlp_esc(LT.moduleManagement.tagMgrAssignToModules())}"><i class="fa-solid fa-plus"></i></button>
+						<button type="button" class="bbmm-subtag-rename" data-subtag-id="${hlp_esc(sub.id)}" title="Rename">${hlp_esc(LT.errors.rename())}</button>
+						<button type="button" class="bbmm-subtag-delete" data-subtag-id="${hlp_esc(sub.id)}" title="Delete"><i class="fa-solid fa-xmark"></i></button>
+					</div>
+				`).join("");
+				return `
+					<div class="bbmm-tag-block" data-tag-id="${hlp_esc(tag.id)}">
+						<div class="bbmm-tag-row">
+							<span class="bbmm-tag-label"><i class="fa-solid fa-tag fa-sm"></i> ${hlp_esc(tag.label)}</span>
+							<button type="button" class="bbmm-bulk-assign" data-tag-id="${hlp_esc(tag.id)}" title="${hlp_esc(LT.moduleManagement.tagMgrAssignToModules())}"><i class="fa-solid fa-plus"></i></button>
+							<button type="button" class="bbmm-tag-rename" data-tag-id="${hlp_esc(tag.id)}" title="Rename">${hlp_esc(LT.errors.rename())}</button>
+							<button type="button" class="bbmm-tag-delete" data-tag-id="${hlp_esc(tag.id)}" title="Delete"><i class="fa-solid fa-xmark"></i></button>
+						</div>
+						${subsHTML}
+						<div class="bbmm-subtag-add-row">
+							<input type="text" class="bbmm-subtag-input" data-tag-id="${hlp_esc(tag.id)}" placeholder="${hlp_esc(LT.moduleManagement.tagMgrSubtagPlaceholder())}">
+							<button type="button" class="bbmm-subtag-add-btn" data-tag-id="${hlp_esc(tag.id)}">${hlp_esc(LT.moduleManagement.tagMgrAddSubtag())}</button>
+						</div>
+					</div>
+				`;
+			}).join("");
+
+		const root = document.createElement("div");
+		root.className = "bbmm-tag-manager-content";
+		root.innerHTML = `
+			<div class="bbmm-tag-list">${tagsHTML}</div>
+			<div class="bbmm-tag-add-row">
+				<input type="text" id="bbmm-tag-input" placeholder="${hlp_esc(LT.moduleManagement.tagMgrTagPlaceholder())}">
+				<button type="button" id="bbmm-tag-add-btn">${hlp_esc(LT.moduleManagement.tagMgrAddTag())}</button>
+			</div>
+		`;
+		return root;
+	}
+
+	_replaceHTML(result, content) {
+		content.replaceChildren(result);
+		this._attachListeners(result);
+	}
+
+	_attachListeners(content) {
+		// Add tag (button or Enter)
+		const tagInput = content.querySelector("#bbmm-tag-input");
+		content.querySelector("#bbmm-tag-add-btn")?.addEventListener("click", () => this._addTag(tagInput));
+		tagInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this._addTag(tagInput); }});
+
+		// Tag: rename / delete
+		content.addEventListener("click", async (ev) => {
+			const bulkBtn = ev.target.closest?.(".bbmm-bulk-assign[data-tag-id]");
+			if (bulkBtn) return openBulkTagAssignApp(bulkBtn.dataset.tagId, bulkBtn.dataset.subtagId || undefined);
+
+			const renameBtn = ev.target.closest?.(".bbmm-tag-rename[data-tag-id]");
+			if (renameBtn) return this._renameTag(renameBtn.dataset.tagId);
+
+			const deleteBtn = ev.target.closest?.(".bbmm-tag-delete[data-tag-id]");
+			if (deleteBtn) return this._deleteTag(deleteBtn.dataset.tagId);
+
+			const addSubBtn = ev.target.closest?.(".bbmm-subtag-add-btn[data-tag-id]");
+			if (addSubBtn) {
+				const input = content.querySelector(`.bbmm-subtag-input[data-tag-id="${addSubBtn.dataset.tagId}"]`);
+				return this._addSubtag(addSubBtn.dataset.tagId, input);
+			}
+
+			const renameSubBtn = ev.target.closest?.(".bbmm-subtag-rename[data-subtag-id]");
+			if (renameSubBtn) return this._renameSubtag(renameSubBtn.dataset.subtagId);
+
+			const deleteSubBtn = ev.target.closest?.(".bbmm-subtag-delete[data-subtag-id]");
+			if (deleteSubBtn) return this._deleteSubtag(deleteSubBtn.dataset.subtagId);
+		});
+
+		// Subtag: add on Enter
+		content.querySelectorAll(".bbmm-subtag-input").forEach(input => {
+			input.addEventListener("keydown", (e) => {
+				if (e.key === "Enter") { e.preventDefault(); this._addSubtag(input.dataset.tagId, input); }
+			});
+		});
+	}
+
+	async _addTag(input) {
+		const label = input?.value?.trim();
+		if (!label) return;
+		const data = _getTagData();
+		const id = _uniqueSlug(_slugify(label), data.tags.map(t => t.id));
+		data.tags.push({ id, label });
+		await _saveTagData(data);
+		input.value = "";
+		this.render();
+	}
+
+	async _renameTag(tagId) {
+		const data = _getTagData();
+		const tag = data.tags.find(t => t.id === tagId);
+		if (!tag) return;
+		const val = await foundry.applications.api.DialogV2.prompt({
+			window: { title: LT.moduleManagement.tagMgrRenameTag() },
+			content: `<input type="text" name="label" value="${hlp_esc(tag.label)}" style="width:100%">`,
+			ok: { label: LT.buttons.save(), callback: (_ev, btn) => btn.form?.elements?.label?.value?.trim() ?? "" }
+		});
+		if (!val || val === tag.label) return;
+		tag.label = val;
+		await _saveTagData(data);
+		this.render();
+		_bbmmRefreshModuleManagerApp();
+	}
+
+	async _deleteTag(tagId) {
+		const data = _getTagData();
+		const tag = data.tags.find(t => t.id === tagId);
+		if (!tag) return;
+		const subCount = data.subtags.filter(s => s.tagId === tagId).length;
+		const confirm = await foundry.applications.api.DialogV2.confirm({
+			window: { title: LT.moduleManagement.tagMgrDeleteTagTitle() },
+			content: `<p>${hlp_esc(LT.moduleManagement.tagMgrDeleteTagConfirm({ label: tag.label, subtags: subCount }))}</p>`
+		});
+		if (!confirm) return;
+		data.tags = data.tags.filter(t => t.id !== tagId);
+		data.subtags = data.subtags.filter(s => s.tagId !== tagId);
+		for (const [modId, arr] of Object.entries(data.assignments)) {
+			data.assignments[modId] = arr.filter(a => a.tagId !== tagId);
+			if (!data.assignments[modId].length) delete data.assignments[modId];
+		}
+		await _saveTagData(data);
+		this.render();
+		_bbmmRefreshModuleManagerApp();
+	}
+
+	async _addSubtag(tagId, input) {
+		const label = input?.value?.trim();
+		if (!label) return;
+		const data = _getTagData();
+		const id = _uniqueSlug(_slugify(label), data.subtags.map(s => s.id));
+		data.subtags.push({ id, label, tagId });
+		await _saveTagData(data);
+		input.value = "";
+		this.render();
+	}
+
+	async _renameSubtag(subtagId) {
+		const data = _getTagData();
+		const sub = data.subtags.find(s => s.id === subtagId);
+		if (!sub) return;
+		const val = await foundry.applications.api.DialogV2.prompt({
+			window: { title: LT.moduleManagement.tagMgrRenameSubtag() },
+			content: `<input type="text" name="label" value="${hlp_esc(sub.label)}" style="width:100%">`,
+			ok: { label: LT.buttons.save(), callback: (_ev, btn) => btn.form?.elements?.label?.value?.trim() ?? "" }
+		});
+		if (!val || val === sub.label) return;
+		sub.label = val;
+		await _saveTagData(data);
+		this.render();
+		_bbmmRefreshModuleManagerApp();
+	}
+
+	async _deleteSubtag(subtagId) {
+		const data = _getTagData();
+		const sub = data.subtags.find(s => s.id === subtagId);
+		if (!sub) return;
+		const confirm = await foundry.applications.api.DialogV2.confirm({
+			window: { title: LT.moduleManagement.tagMgrDeleteSubtagTitle() },
+			content: `<p>${hlp_esc(LT.moduleManagement.tagMgrDeleteSubtagConfirm({ label: sub.label }))}</p>`
+		});
+		if (!confirm) return;
+		data.subtags = data.subtags.filter(s => s.id !== subtagId);
+		// Demote assignments: remove subtagId reference, keep tagId
+		for (const [modId, arr] of Object.entries(data.assignments)) {
+			data.assignments[modId] = arr.map(a =>
+				a.subtagId === subtagId ? { tagId: a.tagId } : a
+			);
+		}
+		await _saveTagData(data);
+		this.render();
+		_bbmmRefreshModuleManagerApp();
+	}
+
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+		try { injectBBMMHeaderButton(this.element); } catch (e) { DL(2, "BBMMTagManagerApp | header button inject failed", e); }
+	}
+}
+
+// ── BBMMModuleTagsApp ─────────────────────────────────────────────────────────
+
+class BBMMModuleTagsApp extends foundry.applications.api.ApplicationV2 {
+	constructor(moduleId) {
+		super({
+			id: `bbmm-module-tags-${moduleId}`,
+			window: { title: `${LT.moduleManagement.editTags()} — ${game.modules.get(moduleId)?.title ?? moduleId}`, resizable: false },
+			position: { width: 440, height: "auto" }
+		});
+		this.moduleId = moduleId;
+	}
+
+	async _renderHTML() {
+		const data = _getTagData();
+		const root = document.createElement("div");
+		root.className = "bbmm-module-tags-content";
+
+		// No-tags empty state
+		if (!data.tags.length) {
+			root.innerHTML = `
+				<div class="bbmm-module-tags-empty">
+					<p>${hlp_esc(LT.moduleManagement.tagMgrNoTags())}</p>
+					<button type="button" id="bbmm-mt-open-manager">${hlp_esc(LT.moduleManagement.tagMgrOpenTagManager())}</button>
+				</div>
+			`;
+			return root;
+		}
+
+		const assignments = data.assignments[this.moduleId] ?? [];
+
+		// Current assignment chips
+		const chipsHTML = assignments.length
+			? assignments.map((a, idx) => {
+				const tag = data.tags.find(t => t.id === a.tagId);
+				const sub = a.subtagId ? data.subtags.find(s => s.id === a.subtagId) : null;
+				const label = sub ? `${tag?.label ?? a.tagId} / ${sub.label}` : (tag?.label ?? a.tagId);
+				return `<span class="bbmm-tag-chip">
+					${hlp_esc(label)}
+					<button type="button" class="bbmm-chip-remove" data-idx="${idx}" title="Remove"><i class="fa-solid fa-xmark fa-xs"></i></button>
+				</span>`;
+			}).join("")
+			: `<span class="bbmm-tag-none">${hlp_esc(LT.moduleManagement.tagMgrNoTags())}</span>`;
+
+		// Tag dropdown (alphabetical)
+		const sortedTags = [...data.tags].sort((a, b) => a.label.localeCompare(b.label));
+		const tagOptions = sortedTags.map(t =>
+			`<option value="${hlp_esc(t.id)}">${hlp_esc(t.label)}</option>`
+		).join("");
+
+		// Subtag options sorted alphabetically within each tag group
+		const sortedSubtags = [...data.subtags].sort((a, b) => a.label.localeCompare(b.label));
+		const allSubtagOptions = sortedSubtags.map(s =>
+			`<option value="${hlp_esc(s.id)}" data-tag-id="${hlp_esc(s.tagId)}">${hlp_esc(s.label)}</option>`
+		).join("");
+
+		root.innerHTML = `
+			<div class="bbmm-chip-list">${chipsHTML}</div>
+			<hr>
+			<div class="bbmm-tag-add-form">
+				<label>${hlp_esc(LT.moduleManagement.tagMgrAddTag())}:</label>
+				<div class="bbmm-tag-selects">
+					<select id="bbmm-mt-tag">${tagOptions}</select>
+					<select id="bbmm-mt-subtag"><option value="">${hlp_esc(LT.moduleManagement.tagMgrSubtagNone())}</option>${allSubtagOptions}</select>
+					<button type="button" id="bbmm-mt-add">${hlp_esc(LT.buttons.add())}</button>
+				</div>
+			</div>
+		`;
+		return root;
+	}
+
+	_replaceHTML(result, content) {
+		content.replaceChildren(result);
+		this._attachListeners(result);
+	}
+
+	_attachListeners(content) {
+		// Empty state: open tag manager button
+		content.querySelector("#bbmm-mt-open-manager")?.addEventListener("click", () => {
+			openTagManager();
+		});
+
+		// Filter subtag dropdown when tag changes
+		const tagSel = content.querySelector("#bbmm-mt-tag");
+		const subSel = content.querySelector("#bbmm-mt-subtag");
+		const filterSubs = () => {
+			if (!tagSel || !subSel) return;
+			const tagId = tagSel.value;
+			for (const opt of subSel.querySelectorAll("option")) {
+				if (!opt.value) continue; // keep (none)
+				opt.hidden = opt.dataset.tagId !== tagId;
+			}
+			// Reset to (none) if current selection is now hidden
+			if (subSel.selectedOptions[0]?.hidden) subSel.value = "";
+		};
+		tagSel?.addEventListener("change", filterSubs);
+		filterSubs();
+
+		// Add assignment
+		content.querySelector("#bbmm-mt-add")?.addEventListener("click", () => {
+			const tagId = tagSel?.value;
+			const subtagId = subSel?.value || undefined;
+			if (!tagId) return;
+			this._addAssignment(tagId, subtagId);
+		});
+
+		// Remove assignment chip
+		content.addEventListener("click", (ev) => {
+			const btn = ev.target.closest?.(".bbmm-chip-remove[data-idx]");
+			if (!btn) return;
+			this._removeAssignment(parseInt(btn.dataset.idx, 10));
+		});
+	}
+
+	async _addAssignment(tagId, subtagId) {
+		const data = _getTagData();
+		const arr = data.assignments[this.moduleId] ?? [];
+		// Skip duplicate
+		const isDupe = arr.some(a => a.tagId === tagId && (a.subtagId ?? undefined) === (subtagId ?? undefined));
+		if (!isDupe) {
+			arr.push(subtagId ? { tagId, subtagId } : { tagId });
+			data.assignments[this.moduleId] = arr;
+			await _saveTagData(data);
+		}
+		this.render();
+		_bbmmRefreshModuleManagerApp();
+	}
+
+	async _removeAssignment(idx) {
+		const data = _getTagData();
+		const arr = data.assignments[this.moduleId] ?? [];
+		arr.splice(idx, 1);
+		if (arr.length) data.assignments[this.moduleId] = arr;
+		else delete data.assignments[this.moduleId];
+		await _saveTagData(data);
+		this.render();
+		_bbmmRefreshModuleManagerApp();
+	}
+
+	async _renderFrame(options) {
+		const frame = await super._renderFrame(options);
+		const footer = document.createElement("footer");
+		footer.className = "bbmm-module-tags-footer";
+		footer.innerHTML = `<button type="button" id="bbmm-mt-close">${hlp_esc(LT.buttons.close())}</button>`;
+		frame.appendChild(footer);
+		footer.querySelector("#bbmm-mt-close")?.addEventListener("click", () => {
+			this.close();
+			// Return focus to the notes dialog for this module if it's still open
+			try {
+				const notesDlg = foundry.applications.instances.get(`bbmm-notes-${this.moduleId}`);
+				notesDlg?.bringToTop?.();
+			} catch (e) { DL(2, "BBMMModuleTagsApp | failed to focus notes dialog", e); }
+		});
+		return frame;
+	}
+
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+		try { injectBBMMHeaderButton(this.element); } catch (e) { DL(2, "BBMMModuleTagsApp | header button inject failed", e); }
+	}
+}
+
+// ── BBMMBulkTagAssignApp ──────────────────────────────────────────────────────
+
+class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
+	constructor(tagId, subtagId) {
+		const suffix = subtagId ? `${tagId}-${subtagId}` : tagId;
+		super({
+			id: `bbmm-bulk-tag-assign-${suffix}`,
+			window: { resizable: true },
+			position: { width: 500, height: 560 }
+		});
+		this.tagId    = tagId;
+		this.subtagId = subtagId ?? null;
+		this.filter   = "";
+	}
+
+	get _title() {
+		const data = _getTagData();
+		const tag  = data.tags.find(t => t.id === this.tagId);
+		const sub  = this.subtagId ? data.subtags.find(s => s.id === this.subtagId) : null;
+		const label = sub ? `${tag?.label ?? this.tagId} / ${sub.label}` : (tag?.label ?? this.tagId);
+		return `Assign: ${label}`;
+	}
+
+	async _renderHTML() {
+		const data = _getTagData();
+		const tag  = data.tags.find(t => t.id === this.tagId);
+		const sub  = this.subtagId ? data.subtags.find(s => s.id === this.subtagId) : null;
+		const label = sub ? `${tag?.label ?? this.tagId} / ${sub.label}` : (tag?.label ?? this.tagId);
+
+		// All installed modules sorted alphabetically
+		const allMods = [...game.modules.values()]
+			.filter(m => m.active !== undefined) // installed
+			.sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id));
+
+		const q = this.filter.toLowerCase().trim();
+		const visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
+
+		const rows = visible.map(m => {
+			const assignments = data.assignments[m.id] ?? [];
+			const checked = assignments.some(a =>
+				a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
+			);
+			return `
+				<label class="bbmm-bulk-row">
+					<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${checked ? "checked" : ""}>
+					<span class="bbmm-bulk-mod-title">${hlp_esc(m.title ?? m.id)}</span>
+				</label>
+			`;
+		}).join("");
+
+		const root = document.createElement("div");
+		root.className = "bbmm-bulk-assign-content";
+		root.innerHTML = `
+			<div class="bbmm-bulk-header">${hlp_esc(LT.moduleManagement.tagMgrAssigning())} <strong>${hlp_esc(label)}</strong></div>
+			<input type="text" id="bbmm-bulk-filter" placeholder="${hlp_esc(LT.moduleManagement.tagMgrFilterPlaceholder())}" value="${hlp_esc(this.filter)}">
+			<div class="bbmm-bulk-list">${rows || `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`}</div>
+		`;
+		return root;
+	}
+
+	_replaceHTML(result, content) {
+		content.replaceChildren(result);
+		this._attachListeners(result);
+	}
+
+	_attachListeners(content) {
+		content.querySelector("#bbmm-bulk-filter")?.addEventListener("input", (e) => {
+			this.filter = e.target.value ?? "";
+			this._updateList(content);
+		});
+	}
+
+	_updateList(content) {
+		const data = _getTagData();
+		const q = this.filter.toLowerCase().trim();
+		const allMods = [...game.modules.values()]
+			.filter(m => m.active !== undefined)
+			.sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id));
+		const visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
+
+		// Snapshot current checkbox state from live DOM so user changes survive filter updates
+		const currentState = new Map(
+			[...content.querySelectorAll('input[name="mod"]')].map(el => [el.value, el.checked])
+		);
+
+		const rows = visible.map(m => {
+			// Use live DOM state if we have it, otherwise fall back to saved assignments
+			const isChecked = currentState.has(m.id)
+				? currentState.get(m.id)
+				: (data.assignments[m.id] ?? []).some(a =>
+					a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
+				);
+			return `
+				<label class="bbmm-bulk-row">
+					<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${isChecked ? "checked" : ""}>
+					<span class="bbmm-bulk-mod-title">${hlp_esc(m.title ?? m.id)}</span>
+				</label>
+			`;
+		}).join("");
+
+		const list = content.querySelector(".bbmm-bulk-list");
+		if (list) list.innerHTML = rows || `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`;
+	}
+
+	async _renderFrame(options) {
+		const frame = await super._renderFrame(options);
+		// Inject footer with Cancel / Save
+		const footer = document.createElement("footer");
+		footer.className = "bbmm-bulk-footer";
+		footer.innerHTML = `
+			<button type="button" id="bbmm-bulk-cancel">${hlp_esc(LT.buttons.cancel())}</button>
+			<button type="button" id="bbmm-bulk-save">${hlp_esc(LT.buttons.save())}</button>
+		`;
+		frame.appendChild(footer);
+		footer.querySelector("#bbmm-bulk-cancel")?.addEventListener("click", () => this.close());
+		footer.querySelector("#bbmm-bulk-save")?.addEventListener("click", () => this._save());
+		return frame;
+	}
+
+	async _save() {
+		const data  = _getTagData();
+		const boxes = this.element?.querySelectorAll('input[name="mod"]') ?? [];
+
+		for (const box of boxes) {
+			const modId = box.value;
+			const arr   = data.assignments[modId] ?? [];
+			const hasIt = arr.some(a => a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId);
+
+			if (box.checked && !hasIt) {
+				arr.push(this.subtagId ? { tagId: this.tagId, subtagId: this.subtagId } : { tagId: this.tagId });
+				data.assignments[modId] = arr;
+			} else if (!box.checked && hasIt) {
+				data.assignments[modId] = arr.filter(a =>
+					!(a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId)
+				);
+				if (!data.assignments[modId].length) delete data.assignments[modId];
+			}
+		}
+
+		await _saveTagData(data);
+		_bbmmRefreshModuleManagerApp();
+		this.close();
+	}
+
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+		try { injectBBMMHeaderButton(this.element); } catch (e) { DL(2, "BBMMBulkTagAssignApp | header button inject failed", e); }
+	}
+}
+
+// ── Tag app openers (exposed on globalThis.bbmm) ──────────────────────────────
+
+function openTagManager() {
+	try { new BBMMTagManagerApp().render(true); }
+	catch (err) { DL(3, `module-management.js | openTagManager(): ${err?.message ?? err}`, err); }
+}
+
+function openModuleTagsApp(moduleId) {
+	try { new BBMMModuleTagsApp(moduleId).render(true); }
+	catch (err) { DL(3, `module-management.js | openModuleTagsApp(): ${err?.message ?? err}`, err); }
+}
+
+function openBulkTagAssignApp(tagId, subtagId) {
+	try { new BBMMBulkTagAssignApp(tagId, subtagId).render(true); }
+	catch (err) { DL(3, `module-management.js | openBulkTagAssignApp(): ${err?.message ?? err}`, err); }
+}
+
 // Refresh the Module Manager after notes edit
 function _bbmmRefreshModuleManagerApp() {
 	try {
@@ -204,8 +843,7 @@ function _bbmmRefreshModuleManagerApp() {
 /* Open the notes editor dialog for a specific module */
 async function _bbmmOpenNotesDialog(moduleId) {
     try {
-        const KEY = "moduleNotes";
-        const allNotes = game.settings.get(BBMM_ID, KEY) || {};
+        const allNotes = _getNotesData();
         const saved = typeof allNotes === "object" ? (allNotes[moduleId] || "") : "";
         const seed = _bbmmExtractEditorContent(saved);
 
@@ -343,6 +981,12 @@ async function _bbmmOpenNotesDialog(moduleId) {
             buttons: [
                 { action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark" },
                 {
+					action: "tags",
+					label: LT.moduleManagement.editTags(),
+					icon: "fa-solid fa-tags",
+					callback: () => { openModuleTagsApp(moduleId); return false; }
+				},
+                {
 					action: "save",
 					label: LT.buttons.save(),
 					icon: "fa-solid fa-floppy-disk",
@@ -358,19 +1002,11 @@ async function _bbmmOpenNotesDialog(moduleId) {
 						html = html.replace(/(<(p|div)>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+$/gi, "");
 
 						// If effectively empty (including ProseMirror-trailingBreak cases) -> delete entry
-						const notes = foundry.utils.duplicate(game.settings.get(BBMM_ID, KEY) || {});
+						const notes = _getNotesData();
 						if (_bbmmIsEmptyNoteHTML(html)) {
 							if (moduleId in notes) delete notes[moduleId];
-
-							// If nothing left, store {} to keep setting small
-							if (!Object.keys(notes).length) {
-								await game.settings.set(BBMM_ID, KEY, {});
-								_bbmmRefreshModuleManagerApp();
-							} else {
-								await game.settings.set(BBMM_ID, KEY, notes);
-								_bbmmRefreshModuleManagerApp();
-							}
-
+							await _saveNotesData(notes);
+							_bbmmRefreshModuleManagerApp();
 							ui.notifications.info(LT.modListNotesDeleted());
 							DL(`module-management | cleared empty note for ${moduleId}`);
 							return;
@@ -378,7 +1014,7 @@ async function _bbmmOpenNotesDialog(moduleId) {
 
 						// Non-empty -> save/update
 						notes[moduleId] = html;
-						await game.settings.set(BBMM_ID, KEY, notes);
+						await _saveNotesData(notes);
 						_bbmmRefreshModuleManagerApp();
 
 						ui.notifications.info(LT.modListNotesSaved());
@@ -427,7 +1063,10 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		this.plan = new Map();
 		// filter state
 		this.query = "";
-		this.scope = "all"; 
+		this.scope = "all";
+		this.tagFilter = new Set();  // tagIds to filter by (empty = show all)
+		this.groupByTags = false;
+		this.groupBySubtags = false;
 		/* runtime lock state */
 		this.locks = new Set();
 
@@ -574,14 +1213,109 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	_getFiltered() {
 		const q = (this.query ?? "").toLowerCase().trim();
 		const scope = this.scope;
+		const tagFilter = this.tagFilter;
+		const tagData = tagFilter.size > 0 ? _getTagData() : null;
 		return (this._mods ?? []).filter(m => {
 			const planned = !!this._getTempActive(m.id);
 			if (scope === "active" && !planned)   return false;
 			if (scope === "inactive" && planned)  return false;
+			if (tagFilter.size > 0) {
+				const assignments = tagData.assignments[m.id] ?? [];
+				if (!assignments.some(a => tagFilter.has(a.tagId))) return false;
+			}
 			if (!q) return true;
 			const blob = (m.title + " " + m.id + " " + (m.version || "")).toLowerCase();
 			return blob.includes(q);
 		});
+	}
+
+	_getGrouped() {
+		const filtered = this._getFiltered();
+		const tagData = _getTagData();
+		const groups = [];
+		const placed = new Set();
+		for (const tag of tagData.tags) {
+			const mods = filtered.filter(m =>
+				(tagData.assignments[m.id] ?? []).some(a => a.tagId === tag.id)
+			);
+			if (mods.length) {
+				groups.push({ tag, mods });
+				for (const m of mods) placed.add(m.id);
+			}
+		}
+		const untagged = filtered.filter(m => !placed.has(m.id));
+		if (untagged.length) groups.push({ tag: null, mods: untagged });
+		return groups;
+	}
+
+	_getGroupedBySubtag() {
+		const filtered = this._getFiltered();
+		const tagData = _getTagData();
+		const groups = new Map(); // label -> Set of mods
+		const placed = new Set();
+
+		for (const m of filtered) {
+			const assignments = tagData.assignments[m.id] ?? [];
+			for (const a of assignments) {
+				const tag = tagData.tags.find(t => t.id === a.tagId);
+				const sub = a.subtagId ? tagData.subtags.find(s => s.id === a.subtagId) : null;
+				const label = sub
+					? `${tag?.label ?? a.tagId} / ${sub.label}`
+					: (tag?.label ?? a.tagId);
+				if (!groups.has(label)) groups.set(label, []);
+				groups.get(label).push(m);
+				placed.add(m.id);
+			}
+		}
+
+		const result = [...groups.entries()]
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([label, mods]) => ({ label, mods }));
+
+		const untagged = filtered.filter(m => !placed.has(m.id));
+		if (untagged.length) result.push({ label: LT.moduleManagement.untagged(), mods: untagged });
+		return result;
+	}
+
+	async _openTagFilterDialog() {
+		const tagData = _getTagData();
+		if (!tagData.tags.length) {
+			ui.notifications?.info(LT.moduleManagement.tagMgrFilterNone());
+			return;
+		}
+		const rows = tagData.tags.map(t => `
+			<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+				<input type="checkbox" name="tag" value="${hlp_esc(t.id)}" ${this.tagFilter.has(t.id) ? "checked" : ""}>
+				${hlp_esc(t.label)}
+			</label>
+		`).join("");
+
+		let dlgEl = null;
+		await new Promise(resolve => {
+			const dlg = new foundry.applications.api.DialogV2({
+				window: { title: LT.moduleManagement.tagMgrFilterTitle() },
+				content: `<div style="display:flex;flex-direction:column;padding:0.5em;">${rows}</div>`,
+				buttons: [
+					{
+						action: "apply",
+						label: LT.buttons.apply(),
+						default: true,
+						callback: () => {
+							const checked = dlg.element?.querySelectorAll?.('input[name="tag"]:checked') ?? [];
+							this.tagFilter = new Set([...checked].map(el => el.value));
+							resolve();
+						}
+					},
+					{ action: "clear", label: LT.moduleManagement.tagMgrClearFilter(), callback: () => { this.tagFilter = new Set(); resolve(); } },
+					{ action: "cancel", label: LT.buttons.cancel(), callback: () => resolve() }
+				],
+				rejectClose: false,
+				close: resolve
+			});
+			dlg.render(true).then(() => { dlgEl = dlg; });
+		});
+
+		this._rerender({ keepFocus: true });
 	}
 
 	/* Current totals from the planned (temp) state */
@@ -1289,6 +2023,17 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		}
 	}
 
+	_buildUserTagChips(modId, tagData) {
+		const assignments = tagData?.assignments?.[modId] ?? [];
+		if (!assignments.length) return "";
+		return assignments.map(a => {
+			const tag = tagData.tags.find(t => t.id === a.tagId);
+			const sub = a.subtagId ? tagData.subtags.find(s => s.id === a.subtagId) : null;
+			const label = sub ? `${tag?.label ?? a.tagId} / ${sub.label}` : (tag?.label ?? a.tagId);
+			return `<span class="bbmm-tag-chip">${hlp_esc(label)}</span>`;
+		}).join("");
+	}
+
 	/* Fallback: synthesize a core-like tag strip when native <li> is not available */
 	_bbmmBuildTagStripFallback(mod) {
 		try {
@@ -1358,20 +2103,36 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		const filterLabel = LT.moduleManagement.filterModules();
 		return `
 			<div class="bbmm-mm-toolbar" id="bbmm-mm-toolbar">
-				<div class="bbmm-filter-wrap">
-					<input id="bbmm-mm-q" type="text" placeholder="${hlp_esc(filterLabel)}" value="${hlp_esc(this.query)}" />
-					<button type="button" class="bbmm-filter-clear" title="${hlp_esc(LT.moduleManagement.filterClear())}">
-						<i class="fa-solid fa-xmark fa-fw"></i>
+				<div class="bbmm-mm-toolbar-row1">
+					<div class="bbmm-filter-wrap">
+						<input id="bbmm-mm-q" type="text" placeholder="${hlp_esc(filterLabel)}" value="${hlp_esc(this.query)}" />
+						<button type="button" class="bbmm-filter-clear" title="${hlp_esc(LT.moduleManagement.filterClear())}">
+							<i class="fa-solid fa-xmark fa-fw"></i>
+						</button>
+					</div>
+					<div class="bbmm-mm-scopes">
+						<button type="button" data-scope="all" class="${this.scope==="all"?"on":""}">${LT.moduleManagement.allModules()}</button>
+						<button type="button" data-scope="active" class="${this.scope==="active"?"on":""}">${LT.moduleManagement.activeModules()}</button>
+						<button type="button" data-scope="inactive" class="${this.scope==="inactive"?"on":""}">${LT.moduleManagement.inactiveModules()}</button>
+					</div>
+					<div class="bbmm-mm-diff">
+						<span class="ena">${LT.moduleManagement.enabled()}: <b id="bbmm-mm-cnt-enable">${enable}</b></span>
+						<span class="dis">${LT.moduleManagement.disabled()}: <b id="bbmm-mm-cnt-disable">${disable}</b></span>
+					</div>
+				</div>
+				<div class="bbmm-mm-toolbar-row2">
+					<button type="button" id="bbmm-mm-filter-tags" class="${this.tagFilter.size > 0 ? "on" : ""}">
+						<i class="fas fa-tags"></i> ${hlp_esc(LT.moduleManagement.filterByTags())}
 					</button>
-				</div>
-				<div class="bbmm-mm-scopes">
-					<button type="button" data-scope="all" class="${this.scope==="all"?"on":""}">${LT.moduleManagement.allModules()}</button>
-					<button type="button" data-scope="active" class="${this.scope==="active"?"on":""}">${LT.moduleManagement.activeModules()}</button>
-					<button type="button" data-scope="inactive" class="${this.scope==="inactive"?"on":""}">${LT.moduleManagement.inactiveModules()}</button>
-				</div>
-				<div class="bbmm-mm-diff">
-					<span class="ena">${LT.moduleManagement.enabled()}: <b id="bbmm-mm-cnt-enable">${enable}</b></span>
-					<span class="dis">${LT.moduleManagement.disabled()}: <b id="bbmm-mm-cnt-disable">${disable}</b></span>
+					<button type="button" id="bbmm-mm-group-tags" class="${this.groupByTags ? "on" : ""}">
+						<i class="fas fa-layer-group"></i> ${hlp_esc(LT.moduleManagement.groupByTags())}
+					</button>
+					<button type="button" id="bbmm-mm-group-subtags" class="${this.groupBySubtags ? "on" : ""}">
+						<i class="fas fa-layer-group"></i> ${hlp_esc(LT.moduleManagement.groupBySubtags())}
+					</button>
+					<button type="button" id="bbmm-mm-manage-tags">
+						<i class="fas fa-tag"></i> ${hlp_esc(LT.moduleManagement.tagMgrLabel())}
+					</button>
 				</div>
 			</div>
 		`;
@@ -1397,10 +2158,11 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				return `<div class="bbmm-mm-empty">${LT.moduleManagement.noResults()}</div>`;
 			}
 
-			// Pull all saved notes once (avoid re-reading per row)
-			const allNotes = game.settings.get(BBMM_ID, "moduleNotes") || {};
+			// Pull all saved notes and tag data once (avoid re-reading per row)
+			const allNotes = _getNotesData();
+			const tagData = _getTagData();
 
-			return rows.map((m) => {
+			const renderRow = (m) => {
 				const planned = !!this._getTempActive(m.id);
 				const changed = planned !== !!this._coreSnap?.[m.id];
 				const verTxt  = m.version ? String(m.version) : "";
@@ -1469,6 +2231,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					? `<span class="tag rec" title="${hlp_esc(m.recommends.join(", "))}">${LT.moduleManagement.recommendations()}: ${m.recommends.length}</span>`
 					: "";
 
+				const userTagChips = this._buildUserTagChips(m.id, tagData);
 				return `
 					<div class="row ${planned ? "on" : "off"} ${changed ? "chg" : ""} ${this.locks.has(m.id) ? "bbmm-locked" : ""}" data-id="${hlp_esc(m.id)}">
 					<label class="toggle" onclick="event.stopPropagation()">
@@ -1477,6 +2240,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 					<div class="main">
 						<div class="title" title="${hlp_esc(m.title)}">${hlp_esc(m.title)}</div>
+						${userTagChips ? `<div class="bbmm-row-tag-chips">${userTagChips}</div>` : ""}
 					</div>
 
 					<div class="actions">
@@ -1498,7 +2262,24 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					</div>
 					</div>
 				`;
-			}).join("");
+			};
+
+			if (this.groupByTags) {
+				const groups = this._getGrouped();
+				return groups.map(({ tag, mods }) => {
+					const label = tag ? hlp_esc(tag.label) : hlp_esc(LT.moduleManagement.untagged());
+					return `<div class="bbmm-tag-group-header">${label}</div>` + mods.map(renderRow).join("");
+				}).join("");
+			}
+
+			if (this.groupBySubtags) {
+				const groups = this._getGroupedBySubtag();
+				return groups.map(({ label, mods }) => {
+					return `<div class="bbmm-tag-group-header">${hlp_esc(label)}</div>` + mods.map(renderRow).join("");
+				}).join("");
+			}
+
+			return rows.map(renderRow).join("");
 		} catch (e) {
 			DL(2, "BBMMModuleManagerApp::_renderRowsHTML(): error", e);
 			return `<div class="bbmm-mm-empty">Error rendering list.</div>`;
@@ -1726,6 +2507,34 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				this._rerender({ keepFocus: true });
 			}, true);
 
+			// Group by Tags toggle
+			this._root.addEventListener("click", (ev) => {
+				if (!ev.target.closest?.("#bbmm-mm-group-tags")) return;
+				this.groupByTags = !this.groupByTags;
+				if (this.groupByTags) this.groupBySubtags = false;
+				this._rerender({ keepFocus: true });
+			}, true);
+
+			// Group by Subtags toggle
+			this._root.addEventListener("click", (ev) => {
+				if (!ev.target.closest?.("#bbmm-mm-group-subtags")) return;
+				this.groupBySubtags = !this.groupBySubtags;
+				if (this.groupBySubtags) this.groupByTags = false;
+				this._rerender({ keepFocus: true });
+			}, true);
+
+			// Manage Tags button
+			this._root.addEventListener("click", (ev) => {
+				if (!ev.target.closest?.("#bbmm-mm-manage-tags")) return;
+				openTagManager();
+			}, true);
+
+			// Filter by Tags
+			this._root.addEventListener("click", async (ev) => {
+				if (!ev.target.closest?.("#bbmm-mm-filter-tags")) return;
+				await this._openTagFilterDialog();
+			}, true);
+
 			// row toggle
 			this._root.addEventListener("change", async (ev) => {
 				const row = ev.target.closest?.(".row");
@@ -1850,6 +2659,11 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
                 const on = (b.dataset.scope === this.scope);
                 if (on) b.classList.add("on"); else b.classList.remove("on");
 			}
+
+			const groupTagsBtn = root.querySelector("#bbmm-mm-group-tags");
+			if (groupTagsBtn) groupTagsBtn.classList.toggle("on", this.groupByTags);
+			const groupSubtagsBtn = root.querySelector("#bbmm-mm-group-subtags");
+			if (groupSubtagsBtn) groupSubtagsBtn.classList.toggle("on", this.groupBySubtags);
 		} catch {}
 
 		// body list
@@ -1940,6 +2754,10 @@ Hooks.on("renderSettings", (_app, rootEl) => {
 });
 
 Hooks.on("ready", () => {
+	// Load persistent data caches (fire-and-forget; reads are fast and sync callers fall back gracefully)
+	loadTagData().catch(e => DL(3, "module-management.js | ready: loadTagData failed", e));
+	loadNotesData().catch(e => DL(3, "module-management.js | ready: loadNotesData failed", e));
+
 	try {
 		// Safely register the app class on the module API once the game is ready
 		const MODID = (typeof BBMM_ID === "string" && BBMM_ID) ? BBMM_ID : "bbmm";
@@ -2190,6 +3008,10 @@ Hooks.on("ready", () => {
 		}
 	})();
 
+
+	// Expose tag app openers on globalThis.bbmm
+	globalThis.bbmm ??= {};
+	Object.assign(globalThis.bbmm, { openTagManager, openModuleTagsApp });
 
 	DL("module-management.js | ready fired")
 });
