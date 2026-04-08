@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   ### Fixed
   - **Module Management:**
     - Module search now includes author names in addition to module name and ID.
-  - When using Tag Manager to bulk tag modules: selecting modules, then changing the filter no longer clears previously selected modules.
+    - When using Tag Manager to bulk tag modules: selecting modules, then changing the filter no longer clears previously selected modules.
 
 ## [0.8.0] - 2026-04-07
 
