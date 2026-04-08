@@ -670,6 +670,7 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 		this.tagId    = tagId;
 		this.subtagId = subtagId ?? null;
 		this.filter   = "";
+		this.selected = null; // null = not yet initialized; populated on first _updateList
 	}
 
 	get _title() {
@@ -737,18 +738,25 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 			.sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id));
 		const visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
 
-		// Snapshot current checkbox state from live DOM so user changes survive filter updates
-		const currentState = new Map(
-			[...content.querySelectorAll('input[name="mod"]')].map(el => [el.value, el.checked])
-		);
+		// On first call, initialize selected from saved assignments.
+		// On subsequent calls, sync any visible checkbox changes into selected before re-rendering.
+		if (this.selected === null) {
+			this.selected = new Set(
+				allMods.filter(m =>
+					(data.assignments[m.id] ?? []).some(a =>
+						a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
+					)
+				).map(m => m.id)
+			);
+		} else {
+			for (const el of content.querySelectorAll('input[name="mod"]')) {
+				if (el.checked) this.selected.add(el.value);
+				else this.selected.delete(el.value);
+			}
+		}
 
 		const rows = visible.map(m => {
-			// Use live DOM state if we have it, otherwise fall back to saved assignments
-			const isChecked = currentState.has(m.id)
-				? currentState.get(m.id)
-				: (data.assignments[m.id] ?? []).some(a =>
-					a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
-				);
+			const isChecked = this.selected.has(m.id);
 			return `
 				<label class="bbmm-bulk-row">
 					<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${isChecked ? "checked" : ""}>
@@ -777,18 +785,25 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 	}
 
 	async _save() {
-		const data  = _getTagData();
-		const boxes = this.element?.querySelectorAll('input[name="mod"]') ?? [];
+		const data = _getTagData();
 
-		for (const box of boxes) {
-			const modId = box.value;
+		// Sync final visible checkbox state into this.selected before saving
+		for (const el of (this.element?.querySelectorAll('input[name="mod"]') ?? [])) {
+			if (el.checked) this.selected.add(el.value);
+			else this.selected.delete(el.value);
+		}
+
+		const allMods = [...game.modules.values()].filter(m => m.active !== undefined);
+		for (const m of allMods) {
+			const modId = m.id;
 			const arr   = data.assignments[modId] ?? [];
 			const hasIt = arr.some(a => a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId);
+			const want  = this.selected?.has(modId) ?? false;
 
-			if (box.checked && !hasIt) {
+			if (want && !hasIt) {
 				arr.push(this.subtagId ? { tagId: this.tagId, subtagId: this.subtagId } : { tagId: this.tagId });
 				data.assignments[modId] = arr;
-			} else if (!box.checked && hasIt) {
+			} else if (!want && hasIt) {
 				data.assignments[modId] = arr.filter(a =>
 					!(a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId)
 				);
@@ -1199,7 +1214,8 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				const recIds = [];
 				for (const o of rec) if (o?.id && (o.type ?? "module") === "module") recIds.push(o.id);
 
-				data.push({ id, title, version, requires, recommends: recIds, conflicts: confIds });
+				const authors = Array.from(mod.authors ?? []).map(a => a.name ?? "").join(" ");
+				data.push({ id, title, version, authors, requires, recommends: recIds, conflicts: confIds });
 			}
 			data.sort((a, b) => a.title.localeCompare(b.title));
 			this._mods = data;
@@ -1224,7 +1240,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				if (!assignments.some(a => tagFilter.has(a.tagId))) return false;
 			}
 			if (!q) return true;
-			const blob = (m.title + " " + m.id + " " + (m.version || "")).toLowerCase();
+			const blob = (m.title + " " + m.id + " " + (m.version || "") + " " + (m.authors || "")).toLowerCase();
 			return blob.includes(q);
 		});
 	}
