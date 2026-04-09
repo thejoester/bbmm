@@ -2147,6 +2147,12 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					<button type="button" id="bbmm-mm-group-subtags" class="${this.groupBySubtags ? "on" : ""}">
 						<i class="fas fa-layer-group"></i> ${hlp_esc(LT.moduleManagement.groupBySubtags())}
 					</button>
+					<button type="button" id="bbmm-mm-collapse-all" title="${hlp_esc(LT.moduleManagement.collapseAll())}" style="${this.groupByTags || this.groupBySubtags ? "" : "display:none"}">
+						<i class="fa-solid fa-angles-up"></i>
+					</button>
+					<button type="button" id="bbmm-mm-expand-all" title="${hlp_esc(LT.moduleManagement.expandAll())}" style="${this.groupByTags || this.groupBySubtags ? "" : "display:none"}">
+						<i class="fa-solid fa-angles-down"></i>
+					</button>
 					<button type="button" id="bbmm-mm-manage-tags">
 						<i class="fas fa-tag"></i> ${hlp_esc(LT.moduleManagement.tagMgrLabel())}
 					</button>
@@ -2413,6 +2419,23 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				}
 				group.classList.toggle("collapsed", this._collapsedGroups.has(groupId));
 			});
+
+			// Collapse All groups
+			this._root.addEventListener("click", (ev) => {
+				if (!ev.target.closest?.("#bbmm-mm-collapse-all")) return;
+				this._root.querySelectorAll(".bbmm-tag-group").forEach(g => {
+					const id = g.getAttribute("data-group-id");
+					if (id) this._collapsedGroups.add(id);
+					g.classList.add("collapsed");
+				});
+			}, true);
+
+			// Expand All groups
+			this._root.addEventListener("click", (ev) => {
+				if (!ev.target.closest?.("#bbmm-mm-expand-all")) return;
+				this._collapsedGroups.clear();
+				this._root.querySelectorAll(".bbmm-tag-group").forEach(g => g.classList.remove("collapsed"));
+			}, true);
 
 			// Lock toggle (button in the row's actions/tags)
 			this._root.addEventListener("click", (ev) => {
@@ -2709,6 +2732,9 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			if (groupTagsBtn) groupTagsBtn.classList.toggle("on", this.groupByTags);
 			const groupSubtagsBtn = root.querySelector("#bbmm-mm-group-subtags");
 			if (groupSubtagsBtn) groupSubtagsBtn.classList.toggle("on", this.groupBySubtags);
+			const groupingActive = this.groupByTags || this.groupBySubtags;
+			root.querySelector("#bbmm-mm-collapse-all")?.style.setProperty("display", groupingActive ? "" : "none");
+			root.querySelector("#bbmm-mm-expand-all")?.style.setProperty("display", groupingActive ? "" : "none");
 		} catch {}
 
 		// body list

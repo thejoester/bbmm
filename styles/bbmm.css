@@ -235,6 +235,12 @@
 	display: none;
 }
 
+#bbmm-mm-collapse-all,
+#bbmm-mm-expand-all {
+	padding: 0.3em 0.5em;
+	min-width: unset;
+}
+
 /* BBMM Exclusions dialog */
 .bbmm-exclusions-dialog .window-content {
 	/* make sure our content can lay out as intended */
