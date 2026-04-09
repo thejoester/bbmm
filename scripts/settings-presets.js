@@ -365,6 +365,9 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
         if (foundry?.utils?.duplicate) {
             const dup = foundry.utils.duplicate(value);
             if (dup && dup !== value) {
+                // duplicate() may return a primitive (e.g. Color -> "#rrggbb" via toJSON)
+                // returning it directly prevents Object.entries() treating a string as array-like
+                if (typeof dup !== "object") return dup;
                 if (Array.isArray(dup))
                     out = dup.map((v, i) =>
                         hlp_toJsonSafe(v, seen, `${here}[${i}]`, depth + 1)
@@ -1056,10 +1059,11 @@ async function svc_planSettingsChanges(env) {
                         continue;
                     }
 
-                    // compare
+                    // compare — normalize through hlp_toJsonSafe so non-plain types
+                    // (e.g. Foundry Color objects) serialize the same way as stored values
                     let current;
                     try {
-                        current = game.settings.get(ns, key);
+                        current = hlp_toJsonSafe(game.settings.get(ns, key));
                     } catch {}
 
                     if (!hlp_valuesEqual(current, next)) {

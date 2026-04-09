@@ -1082,6 +1082,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		this.tagFilter = new Set();  // tagIds to filter by (empty = show all)
 		this.groupByTags = false;
 		this.groupBySubtags = false;
+		this._collapsedGroups = new Set();
 		/* runtime lock state */
 		this.locks = new Set();
 
@@ -2284,14 +2285,24 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				const groups = this._getGrouped();
 				return groups.map(({ tag, mods }) => {
 					const label = tag ? hlp_esc(tag.label) : hlp_esc(LT.moduleManagement.untagged());
-					return `<div class="bbmm-tag-group-header">${label}</div>` + mods.map(renderRow).join("");
+					const groupId = tag?.id ?? "__untagged__";
+					const collapsed = this._collapsedGroups.has(groupId);
+					return `<div class="bbmm-tag-group${collapsed ? " collapsed" : ""}" data-group-id="${hlp_esc(groupId)}">` +
+						`<div class="bbmm-tag-group-header"><i class="fa-solid fa-chevron-right bbmm-collapse-icon"></i>${label}</div>` +
+						mods.map(renderRow).join("") +
+						`</div>`;
 				}).join("");
 			}
 
 			if (this.groupBySubtags) {
 				const groups = this._getGroupedBySubtag();
 				return groups.map(({ label, mods }) => {
-					return `<div class="bbmm-tag-group-header">${hlp_esc(label)}</div>` + mods.map(renderRow).join("");
+					const escapedLabel = hlp_esc(label);
+					const collapsed = this._collapsedGroups.has(label);
+					return `<div class="bbmm-tag-group${collapsed ? " collapsed" : ""}" data-group-id="${escapedLabel}">` +
+						`<div class="bbmm-tag-group-header"><i class="fa-solid fa-chevron-right bbmm-collapse-icon"></i>${escapedLabel}</div>` +
+						mods.map(renderRow).join("") +
+						`</div>`;
 				}).join("");
 			}
 
@@ -2386,6 +2397,22 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		// wire events once
 		if (!this._bound) {
 			this._bound = true;
+
+			// Tag group collapse/expand toggle
+			this._root.addEventListener("click", (ev) => {
+				const header = ev.target.closest?.(".bbmm-tag-group-header");
+				if (!header) return;
+				const group = header.closest(".bbmm-tag-group");
+				if (!group) return;
+				const groupId = group.getAttribute("data-group-id");
+				if (!groupId) return;
+				if (this._collapsedGroups.has(groupId)) {
+					this._collapsedGroups.delete(groupId);
+				} else {
+					this._collapsedGroups.add(groupId);
+				}
+				group.classList.toggle("collapsed", this._collapsedGroups.has(groupId));
+			});
 
 			// Lock toggle (button in the row's actions/tags)
 			this._root.addEventListener("click", (ev) => {
@@ -2528,6 +2555,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				if (!ev.target.closest?.("#bbmm-mm-group-tags")) return;
 				this.groupByTags = !this.groupByTags;
 				if (this.groupByTags) this.groupBySubtags = false;
+				this._collapsedGroups.clear();
 				this._rerender({ keepFocus: true });
 			}, true);
 
@@ -2536,6 +2564,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				if (!ev.target.closest?.("#bbmm-mm-group-subtags")) return;
 				this.groupBySubtags = !this.groupBySubtags;
 				if (this.groupBySubtags) this.groupByTags = false;
+				this._collapsedGroups.clear();
 				this._rerender({ keepFocus: true });
 			}, true);
 
