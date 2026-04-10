@@ -6,7 +6,6 @@
 ============================================================================== */
 
 import { DL } from "./settings.js";
-import { CTRL_STORE_KEY, CTRL_REV_STORE, CTRL_TOGGLE } from "./settings.js"; // Controls-Sync consts
 import { LT, BBMM_ID } from "./localization.js";
 
 
@@ -98,12 +97,58 @@ import { LT, BBMM_ID } from "./localization.js";
 					break;
 				default:
 					iconEl.className = "fa-solid fa-lock-open";
-					iconEl.title = LT.sync?.ToggleHint();
+					iconEl.title = _bbmmBuildLockTooltip();
 					break;
 			}
 			iconEl.dataset.lockState = state || "unlocked";
 		} catch (err) {
 			DL(2, "_bbmmSetLockIconState(): failed", err);
+		}
+	}
+
+	/* Build lock icon tooltip ====================================================
+		Builds a multi-line tooltip describing the current gesture action mappings.
+		Example:
+			Click: Lock Selected
+			Right-Click: Lock All
+			Shift+Click: Soft Lock
+			Shift+Right-Click: Clear Locks
+	============================================================================ */
+	function _bbmmBuildLockTooltip() {
+		try {
+			const actionLabel = {
+				lockAll:      LT.name_LockAll(),
+				lockSelected: LT.name_LockSelected(),
+				softLock:     LT.name_SoftLock(),
+				clearLocks:   LT.name_ClearLocks()
+			};
+			const get = (key, def) => { try { return game.settings.get(BBMM_ID, `gestureAction_${key}`); } catch { return def; } };
+			const lbl = (v) => actionLabel[v] ?? v;
+
+			const click      = get("click",      "lockSelected");
+			const right      = get("right",      "lockAll");
+			const shift      = get("shift",      "softLock");
+			const shiftRight = get("shiftRight", "clearLocks");
+
+			return `${LT.click()}: ${lbl(click)}\n${LT.rightClick()}: ${lbl(right)}\n${LT.shiftClick()}: ${lbl(shift)}\n${LT.shiftRightClick()}: ${lbl(shiftRight)}`;
+		} catch (err) {
+			DL(2, "_bbmmBuildLockTooltip(): error", err);
+			return LT.lockNoneTip();
+		}
+	}
+
+	/* Build sync icon tooltip ====================================================
+		Builds a fixed two-line tooltip describing sync icon gestures.
+		Example:
+			Click: Sync setting to connected users
+			Shift+Click: Sync setting to selected user
+	============================================================================ */
+	function _bbmmBuildSyncTooltip() {
+		try {
+			return `${LT.click()}: ${LT.sync.PushHint()}\n${LT.shiftClick()}: ${LT.sync.ShiftSyncUser()}`;
+		} catch (err) {
+			DL(2, "_bbmmBuildSyncTooltip(): error", err);
+			return LT.sync.PushHint();
 		}
 	}
 
@@ -1347,7 +1392,7 @@ import { LT, BBMM_ID } from "./localization.js";
 						lockIcon = makeIcon(softTitle, "fa-regular fa-lock", true);
 						lockIcon.classList.add("bbmm-active");
 					} else {
-						lockIcon = makeIcon(LT.sync.ToggleHint(), "fa-solid fa-lock-open", true);
+						lockIcon = makeIcon(_bbmmBuildLockTooltip(), "fa-solid fa-lock-open", true);
 					}
 
 					// if GM edits a locked setting value, queue CLEAR immediately
@@ -1390,8 +1435,7 @@ import { LT, BBMM_ID } from "./localization.js";
 					}
 					
 					// push icon...
-					const pushTitle = (LT.sync.PushHint());
-					const pushIcon = makeIcon(pushTitle, "fa-solid fa-arrows-rotate", true);
+					const pushIcon = makeIcon(_bbmmBuildSyncTooltip(), "fa-solid fa-arrows-rotate", true);
 					pushIcon.addEventListener("click", (ev) => {
 						try {
 							ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
@@ -1506,7 +1550,7 @@ import { LT, BBMM_ID } from "./localization.js";
 							lockIcon = mk(softTitle, "fa-regular fa-lock");
 							lockIcon.classList.add("bbmm-active");
 						} else {
-							lockIcon = mk(LT.lockNoneTip(), "fa-solid fa-lock-open");
+							lockIcon = mk(_bbmmBuildLockTooltip(), "fa-solid fa-lock-open");
 						}
 
 						// click + SHIFT-click + right-click gestures
@@ -1534,7 +1578,7 @@ import { LT, BBMM_ID } from "./localization.js";
 						bar.appendChild(lockIcon);
 
 						// SYNC icon
-						const syncIcon = mk(LT.sync?.PushHint?.() || "Sync setting to connected users", "fa-solid fa-arrows-rotate");
+						const syncIcon = mk(_bbmmBuildSyncTooltip(), "fa-solid fa-arrows-rotate");
 						syncIcon.addEventListener("click", (ev) => {
 							try {
 								ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
@@ -2054,7 +2098,7 @@ import { LT, BBMM_ID } from "./localization.js";
 		Returns {} if not yet set.
 	============================================================================= */
 	function _bbmmCtrlGetStore() {
-		try { return game.settings.get(BBMM_ID, CTRL_STORE_KEY) ?? {}; } catch { return {}; }
+		try { return game.settings.get(BBMM_ID, "userControlSync") ?? {}; } catch { return {}; }
 	}
 
 	/*  Set Control Sync store ======================================================
@@ -2062,7 +2106,7 @@ import { LT, BBMM_ID } from "./localization.js";
 		Persists immediately via game.settings.
 	============================================================================= */
 	async function _bbmmCtrlSetStore(next) {
-		try { await game.settings.set(BBMM_ID, CTRL_STORE_KEY, next ?? {}); }
+		try { await game.settings.set(BBMM_ID, "userControlSync", next ?? {}); }
 		catch (err) { DL(2, "setting-sync.js | ctrlSetStore() failed", err); }
 	}
 
@@ -2071,7 +2115,7 @@ import { LT, BBMM_ID } from "./localization.js";
 		Tracks revision numbers per control for change detection.
 	============================================================================= */
 	function _bbmmCtrlGetRevMap() {
-		try { return game.settings.get(BBMM_ID, CTRL_REV_STORE) ?? {}; } catch { return {}; }
+		try { return game.settings.get(BBMM_ID, "softLockRevMap_controls") ?? {}; } catch { return {}; }
 	}
 
 	/*  Set Control Revision Map ====================================================
@@ -2079,7 +2123,7 @@ import { LT, BBMM_ID } from "./localization.js";
 		Saves to world settings.
 	============================================================================= */
 	async function _bbmmCtrlSetRevMap(map) {
-		try { await game.settings.set(BBMM_ID, CTRL_REV_STORE, map ?? {}); }
+		try { await game.settings.set(BBMM_ID, "softLockRevMap_controls", map ?? {}); }
 		catch (err) { DL(2, "setting-sync.js | ctrlSetRevMap() failed", err); }
 	}
 
@@ -2089,7 +2133,7 @@ import { LT, BBMM_ID } from "./localization.js";
 	function _bbmmCtrlEnabled() {
 		try {
 			const master = bbmmIsSyncEnabled();
-			const ctrl = game.settings.get(BBMM_ID, CTRL_TOGGLE) !== false;
+			const ctrl = game.settings.get(BBMM_ID, "enableControlSync") !== false;
 			return master && ctrl;
 		} catch { return false; }
 	}

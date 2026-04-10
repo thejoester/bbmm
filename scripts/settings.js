@@ -1929,7 +1929,7 @@ Hooks.once("init", () => {
 			});
 
 			// Controls Sync Storage
-			game.settings.register?.(BBMM_ID, CTRL_STORE_KEY, {
+			game.settings.register?.(BBMM_ID, "userControlSync", {
 				name: LT._settings.userControlSync_name(),
 				hint: LT._settings.userControlSync_hint(),
 				scope: "world", 
@@ -1938,7 +1938,7 @@ Hooks.once("init", () => {
 			});
 
 			// Controls Sync RevMap
-			game.settings.register?.(BBMM_ID, CTRL_REV_STORE, {
+			game.settings.register?.(BBMM_ID, "softLockRevMap_controls", {
 				name: LT._settings.softLockRevMap_controls_name(),
 				hint: LT._settings.softLockRevMap_controls_hint(),
 				scope: "world", 
@@ -2287,7 +2287,7 @@ Hooks.once("init", () => {
 			});
 
 			// Enable/disable BBMM Controls Sync
-			game.settings.register?.(BBMM_ID, CTRL_TOGGLE, {
+			game.settings.register?.(BBMM_ID, "enableControlSync", {
 				name: LT.controlsToggleName(),
 				hint: LT.controlsToggleHint(),
 				scope: "world", config: true, type: Boolean, default: true

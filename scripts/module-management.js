@@ -787,6 +787,19 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 	async _save() {
 		const data = _getTagData();
 
+		// If the filter was never used, _updateList was never called and this.selected is still null.
+		// Initialize it from saved assignments the same way _updateList does on first call.
+		if (this.selected === null) {
+			const allMods = [...game.modules.values()].filter(m => m.active !== undefined);
+			this.selected = new Set(
+				allMods.filter(m =>
+					(data.assignments[m.id] ?? []).some(a =>
+						a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
+					)
+				).map(m => m.id)
+			);
+		}
+
 		// Sync final visible checkbox state into this.selected before saving
 		for (const el of (this.element?.querySelectorAll('input[name="mod"]') ?? [])) {
 			if (el.checked) this.selected.add(el.value);
