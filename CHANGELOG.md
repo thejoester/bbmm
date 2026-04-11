@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   ### Changed
   - **Settings Sync:**
     - Improved tooltip for lock and sync buttons to specify all gestures based on settings configuration. 
+  - **Localization:**
+    - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 
 ## [0.8.2] - 2026-04-09
 
