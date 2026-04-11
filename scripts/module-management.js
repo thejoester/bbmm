@@ -2307,7 +2307,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					const groupId = tag?.id ?? "__untagged__";
 					const collapsed = this._collapsedGroups.has(groupId);
 					return `<div class="bbmm-tag-group${collapsed ? " collapsed" : ""}" data-group-id="${hlp_esc(groupId)}">` +
-						`<div class="bbmm-tag-group-header"><i class="fa-solid fa-chevron-right bbmm-collapse-icon"></i>${label}</div>` +
+						`<div class="bbmm-tag-group-header"><i class="fa-solid fa-chevron-right bbmm-collapse-icon"></i>${label} <span class="bbmm-group-count">(${mods.length})</span></div>` +
 						mods.map(renderRow).join("") +
 						`</div>`;
 				}).join("");
@@ -2319,7 +2319,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					const escapedLabel = hlp_esc(label);
 					const collapsed = this._collapsedGroups.has(label);
 					return `<div class="bbmm-tag-group${collapsed ? " collapsed" : ""}" data-group-id="${escapedLabel}">` +
-						`<div class="bbmm-tag-group-header"><i class="fa-solid fa-chevron-right bbmm-collapse-icon"></i>${escapedLabel}</div>` +
+						`<div class="bbmm-tag-group-header"><i class="fa-solid fa-chevron-right bbmm-collapse-icon"></i>${escapedLabel} <span class="bbmm-group-count">(${mods.length})</span></div>` +
 						mods.map(renderRow).join("") +
 						`</div>`;
 				}).join("");

@@ -15,7 +15,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h2><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h2></div><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Rc4FRPurKuPwxhou]{Enhanced Module Management}</h3><ul><li><p>Add Notes per module</p></li><li><p>Click to expand and show notes</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / rename / delete preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / rename / delete preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.JBIsgjN4Vl79tU2Q]{Hidden Setting Sync Manager}</h3><ul><li><p>Allows GM to manually add a sync for a hidden client setting.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Include / Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>*As of 0.7.0 the Inclusion and Exclusion managers have merged into one tool.</li><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Inclusions add hidden settings or modules to always include in presets/imports/exports.</p></li><li><p>Exclusions add specific settings to ignore on presets/imports/exports.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.w87gAp63EPHThdk4]{Import / Export}</h3><ul><li><p>*As of v0.6.5 the Import and Export functions for presets have moved to their own section under the settings menu.</p></li></ul><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
+        "content": "<div class=\"markdown-heading\" dir=\"auto\"><p>A module management tool for FoundryVTT.</p></div><p>Please report any issues, or questions on the <a href=\"https://github.com/thejoester/bbmm/\">module GitHub.</a></p><p></p><div class=\"markdown-heading\" dir=\"auto\"><h2><span style=\"text-decoration:underline\"><span style=\"text-decoration:underline\">Features</span></span></h2></div><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Rc4FRPurKuPwxhou]{Enhanced Module Management}</h3><ul><li><p>Add Notes per module</p></li><li><p>Click to expand and show notes</p></li></ul><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ZDtenIB5V5qiLXnr]{New Module Detection}</h3><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.ALKM5KUILeJAZi62]{Module Presets}</h3></div><ul dir=\"auto\"><li>Save module state (enabled/disabled) as a preset.</li><li>Load / update / rename / delete preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.mB68DCCQ83f9d3EQ]{Settings Presets}</h3></div><ul dir=\"auto\"><li>Save settings state as a preset.</li><li>Load / update / rename / delete preset.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.MLQHRwurTFNqkFBn]{Settings Sync}</h3></div><ul dir=\"auto\"><li><p>Allows GM to sync / lock settings for users.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.JBIsgjN4Vl79tU2Q]{Hidden Setting Sync Manager}</h3><ul><li><p>Allows GM to manually add a sync for a hidden client setting.</p></li></ul><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.1mPrapuBoNRZTWXo]{Include / Exclude modules &amp; settings}</h3></div><ul dir=\"auto\"><li>*As of 0.7.0 the Inclusion and Exclusion managers have merged into one tool.</li><li><p>See: @UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.XsS4wjBTXbMDeHpr]{Hidden settings}.</p></li><li><p>Inclusions add hidden settings or modules to always include in presets/imports/exports.</p></li><li><p>Exclusions add specific settings to ignore on presets/imports/exports.</p></li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3 tabindex=\"-1\" class=\"heading-element\" dir=\"auto\">@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.9zaIHbxOwTBL5iwR]{Changelog report}</h3></div><ul dir=\"auto\"><li>Opens report on login for GM with latest change logs for modules that contain a changelog file.</li></ul><div class=\"markdown-heading\" dir=\"auto\"><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.w87gAp63EPHThdk4]{Import / Export}</h3><ul><li><p>*As of v0.6.5 the Import and Export functions for presets have moved to their own section under the settings menu.</p></li></ul><h3>@UUID[Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn.JournalEntryPage.Tw7LX79cvGnJ3F67]{Macros}</h3></div>"
       },
       "video": {
         "controls": true,
@@ -36,7 +36,7 @@
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1757732832081,
-        "modifiedTime": 1771834111547,
+        "modifiedTime": 1775907532233,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.LqdPKzBQbWas56RQ"
@@ -366,7 +366,7 @@
       "image": {},
       "text": {
         "format": 1,
-        "content": "<p>This feature will let you click an edit button on the module list for each module and enter notes. You can then click any module to expand it and see those notes.</p><img src=\"modules/bbmm/assets/readme/enhanced-module-management1.png\" /><p></p><h3><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Future features</span></strong></span></h3><p>I am working to add the following features to the Enhanced Module Management:</p><ul><li><p>Add Tags to modules</p></li><li><p>Ability to filter/sort by tags</p></li><li><p>Ability to rename module in list.</p></li></ul>"
+        "content": "<p>The Module Manager window has been replaced with a more feature rich version.</p><h2>Features</h2><h3>Persistent filter buttons</h3><p>When you apply a filter such as Active Modules, Inactive Modules, or Group by Tags/Subtag, the button will remain highlighted while that filter is active.</p><img src=\"modules/bbmm/assets/readme/enhanced-module-management2.png\" /><h3>Module Description</h3><p>Clicking on a module title will expand the module listing and display the description from its <em>module.json</em> file.</p><img src=\"modules/bbmm/assets/readme/enhanced-module-management3.png\" /><p></p><p>If you set a personal note for the module by clicking the edit button it will be displayed instead.</p><img src=\"modules/bbmm/assets/readme/enhanced-module-management1.png\" /><p></p><h3>Add Tags/Subtags</h3><p>You can add tags and subtags to a module: <br /><br /><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Method 1 - Single module</span></strong></span></p><ul><li><p>In the Module Management window, click the edit button</p></li><li><p>click Edit Tags</p></li><li><p>You can Add / Remove tags for that module</p></li></ul><img src=\"modules/bbmm/assets/readme/edit-tags.png\" /><p></p><p><span style=\"text-decoration:underline\"><strong><span style=\"text-decoration:underline\">Method 2 - Multiple modules</span></strong></span></p><ul><li><p>In the Module Management window, Click the <strong>Tag Manager</strong> button</p></li><li><p>Find the Tag or Subtag you want to add to one or more modules</p></li><li><p>Click the \"+\" button for that tag</p></li><li><p>Select the modules you wish to add this tag to and click <strong>Save</strong></p></li></ul><img src=\"modules/bbmm/assets/readme/bulk-add-tags.png\" /><p><br /></p><h3>Filter or group by tags or subtags.</h3><p>the buttons on the top of the Module Management window will let you filter and group modules by tags.</p><img src=\"modules/bbmm/assets/readme/group-by-tags.png\" /><p></p><h3>Tag Manager</h3><p>Create, edit, delete tags and subtags.</p><img src=\"modules/bbmm/assets/readme/tag-manager.png\" /><p></p><h3>Lock Module</h3><p>You can lock a module, preventing the activation or deactivation of the module by clicking the lock icon. When locked the icon will turn orange and change to a locked state. </p><p></p><h3>Settings Shortcut</h3><p>If a module has an entry in Settings, it will show a Gear icon. Clicking this will open that modules setting page directly. </p><p></p><h3>Open link</h3><p>If a module has a link in its <em>module.json</em> file, it will show a link icon. Clicking this will open the page in a new window/tab. </p><p></p><p></p><p></p><h3></h3>"
       },
       "video": {
         "controls": true,
@@ -387,7 +387,7 @@
         "systemId": "pf2e",
         "systemVersion": "7.4.3",
         "createdTime": 1758413865302,
-        "modifiedTime": 1771833554921,
+        "modifiedTime": 1775907206093,
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.Rc4FRPurKuPwxhou"
@@ -430,45 +430,6 @@
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.EWkK8UJBIc3junpJ"
-    },
-    {
-      "sort": 650000,
-      "name": "How To: Migrate presets",
-      "type": "text",
-      "_id": "fBhc3e12eZRtNnSd",
-      "system": {},
-      "title": {
-        "show": true,
-        "level": 1
-      },
-      "image": {},
-      "text": {
-        "format": 1,
-        "content": "<p>As of BBMM v0.6.0, <strong data-start=\"180\" data-end=\"250\">module presets and settings presets are no longer stored per-world </strong>(local). All presets are now saved in <strong data-start=\"281\" data-end=\"303\">persistent storage</strong> (global), which is shared across worlds.</p><p data-start=\"337\" data-end=\"544\">Because of this change, <strong data-start=\"361\" data-end=\"430\">existing presets from older worlds are not migrated automatically</strong>. This is intentional, to avoid accidental overwrites and to give you full control over what gets carried forward.</p><p>If you have presets created before v0.6.0 and want to keep using them, follow the steps below.</p><h3 data-start=\"133\" data-end=\"151\">Important Note</h3><p data-start=\"153\" data-end=\"322\">BBMM will only retain legacy per-world presets for a limited time. These older presets will remain available for the next few releases to allow ample time for migration.</p><p data-start=\"324\" data-end=\"555\">After that period, the legacy preset data will be removed as part of a cleanup of world-level settings. If you wish to keep any existing presets, be sure to import them into <strong>persistent storage</strong> before this cleanup occurs.</p><h2 data-start=\"647\" data-end=\"683\">Step 1: Open the Migration Macros</h2><p data-start=\"685\" data-end=\"788\">BBMM provides macros specifically for exporting old presets and importing them into persistent storage.</p><p></p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.RKF8LHvxgzFG9tq8]{Manual Module Preset Migration} - Will let you choose which <strong>Module Presets</strong> to import from the current world into the persistent module storage that will be available in all worlds.</p><p>@UUID[Compendium.bbmm.bbmm-macros.Macro.bWAbfYyIUqhk24FB]{Manual Setting Preset Migration} - Will let you choose which <strong>Settings Presets</strong> to import from the current world into the persistent module storage that will be available in all worlds.</p><h2 data-start=\"975\" data-end=\"1019\">Step 2: Import Presets into Persistent Storage</h2><ul><li><p data-start=\"1021\" data-end=\"1104\">When you run the macro, you will be shown a list of local presets available in the current world's settings.</p></li><li><p data-start=\"1021\" data-end=\"1104\">Select the presets you wish to copy to global, and click \"Import\"<br /></p><img src=\"modules/bbmm/assets/readme/macro-migrate-presets.png\" /></li></ul><p data-start=\"1108\" data-end=\"1167\"></p><hr data-start=\"1729\" data-end=\"1732\" /><h2 data-start=\"1734\" data-end=\"1752\">Important Notes</h2><ul data-start=\"1754\" data-end=\"1992\"><li data-start=\"1754\" data-end=\"1819\"><p data-start=\"1756\" data-end=\"1819\">Importing presets <strong data-start=\"1774\" data-end=\"1819\">does not overwrite anything automatically</strong>, any preset imported this way will have \"(manual)\" appended to the name, and if that already exists it will be renamed with a numerical value added to the name, for example \"good-backup\" would become \"good-backup (manual) \", and then \"good-backup (manual) 2\" if that already existed, and so on.</p></li><li data-start=\"1880\" data-end=\"1944\"><p data-start=\"1882\" data-end=\"1944\">Once imported, presets are shared across all worlds using BBMM</p></li><li data-start=\"1945\" data-end=\"1992\"><p data-start=\"1947\" data-end=\"1992\">You only need to import each preset file once</p></li><li data-start=\"1945\" data-end=\"1992\"><p>If you want to keep a backup, you can either:</p><ul><li data-start=\"1945\" data-end=\"1992\"><p>Load the preset, then export to .json, or</p></li><li data-start=\"1945\" data-end=\"1992\"><p>the .json files can be copied from the `Data/modules/bbmm/storage/presets/` directory.</p></li></ul></li></ul><hr data-start=\"1994\" data-end=\"1997\" /><h2 data-start=\"1999\" data-end=\"2024\">Why This Change Exists</h2><p data-start=\"2026\" data-end=\"2068\">Persistent storage allows BBMM presets to:</p><ul data-start=\"2069\" data-end=\"2201\"><li data-start=\"2069\" data-end=\"2107\"><p data-start=\"2071\" data-end=\"2107\">Survive world deletion or recreation</p></li><li data-start=\"2108\" data-end=\"2145\"><p data-start=\"2110\" data-end=\"2145\">Be reused across multiple campaigns / worlds</p></li></ul><p data-start=\"2203\" data-end=\"2263\">This migration step is a one-time task for existing presets.</p><hr data-start=\"2265\" data-end=\"2268\" /><p data-start=\"2270\" data-end=\"2411\">If something doesn’t look right after importing, you can safely re-run the import macro or remove presets manually using the preset managers.<br /><br />If you have any questions or need assistance please <a href=\"https://github.com/thejoester/bbmm/issues\">open an issue on Github</a>, or <a href=\"https://discord.com/users/182349607190265857\">contact me on Discord</a>.</p>"
-      },
-      "video": {
-        "controls": true,
-        "volume": 0.5
-      },
-      "src": null,
-      "category": null,
-      "ownership": {
-        "default": -1,
-        "EpqDCtSCbVNM4wPj": 3
-      },
-      "flags": {},
-      "_stats": {
-        "compendiumSource": null,
-        "duplicateSource": null,
-        "exportSource": null,
-        "coreVersion": "13.351",
-        "systemId": "pf2e",
-        "systemVersion": "7.8.0",
-        "createdTime": 1767008505790,
-        "modifiedTime": 1771834089421,
-        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
-      },
-      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.fBhc3e12eZRtNnSd"
     },
     {
       "sort": 321875,
@@ -547,6 +508,45 @@
         "lastModifiedBy": "EpqDCtSCbVNM4wPj"
       },
       "_key": "!journal.pages!u3uUIp6Jfg8411Pn.w87gAp63EPHThdk4"
+    },
+    {
+      "sort": 137500,
+      "name": "New Module Detection",
+      "type": "text",
+      "_id": "ZDtenIB5V5qiLXnr",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>When you install a new module, the first time you load your world after installing it BBMM will detect the new module(s) and prompt you to enable the module(s).</p><p></p><img src=\"modules/bbmm/assets/readme/new-module-detection.png\" />"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "EpqDCtSCbVNM4wPj": 3
+      },
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "pf2e",
+        "systemVersion": "7.12.1",
+        "createdTime": 1775907268249,
+        "modifiedTime": 1775907570928,
+        "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+      },
+      "_key": "!journal.pages!u3uUIp6Jfg8411Pn.ZDtenIB5V5qiLXnr"
     }
   ],
   "folder": null,

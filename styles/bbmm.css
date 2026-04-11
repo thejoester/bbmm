@@ -206,6 +206,14 @@
 }
 
 /* ── Tag group headers in module list ───────────────────────────────────── */
+.bbmm-group-count {
+	font-weight: normal;
+	opacity: 0.6;
+	font-size: 0.9em;
+	letter-spacing: 0;
+	text-transform: none;
+}
+
 .bbmm-tag-group-header {
 	padding: 0.4em 0.8em;
 	font-weight: bold;
