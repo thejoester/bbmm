@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5] - 2026-04-12
+
+  ## Fixed
+  - **General:**
+    - Fixed 404 error on load when storage documents for persistent storage do not exist. Now checks for files and if they do not exist, blank files are created.
+
+  ### Changed
+  - **V14 Support:**
+    - Testing has found no issues in v14 so I am officially releasing for v14. 
+  - **Localization:**
+    - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+    - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+    - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+    
 ## [0.8.4] - 2026-04-11
 
   ### Changed
