@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.8.5] - 2026-04-12
 
-  ## Fixed
+  ### Fixed
   - **General:**
     - Fixed 404 error on load when storage documents for persistent storage do not exist. Now checks for files and if they do not exist, blank files are created.
 
@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
     - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
     - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
-    
+
 ## [0.8.4] - 2026-04-11
 
   ### Changed
