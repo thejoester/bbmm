@@ -392,8 +392,6 @@
       		"filterByTags": "Filtrar por Tags",
       		"groupByTags": "Agrupar por Tags",
       		"groupBySubtags": "Agrupar por Subtags",
-     		"collapseAll": "Recolher Tudo",
-      		"expandAll": "Expandir Tudo",
       		"untagged": "Sem Tag",
       		"tagMgrAssignToModules": "Atribuir aos módulos",
       		"tagMgrRenameTag": "Renomear Tag",
