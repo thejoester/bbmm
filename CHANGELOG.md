@@ -5,16 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.8.6] - 2026-04-29
+  ### Added
+  - **Module Presets:** 
+    - Added a "Preview" button to the Module Preset Manager that shows which modules a preset will enable/disable before applying it.
     
-    ### Added
-    - **Module Presets:** 
-      - Added a "Preview" button to the Module Preset Manager that shows which modules a preset will enable/disable before applying it.
-    
-    ### Changed
-    - **Settings Preset Preview:**
-      - Long setting values in the preview dialog are now collapsed by default, with a toggle to expand them.
-    - **Localization:**
-      - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+  ### Changed
+  - **Settings Preset Preview:**
+    - Long setting values in the preview dialog are now collapsed by default, with a toggle to expand them.
+  - **Localization:**
+    - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
 
 ## [0.8.5] - 2026-04-12
 
