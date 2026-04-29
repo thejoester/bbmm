@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - **Localization:**
     - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
 
+  ### Fixed
+  - **Persistent Data:**
+    - Fixed 404 errors on load if the persistent data .json files do not exist yet. 
+
 ## [0.8.5] - 2026-04-12
 
   ### Fixed

@@ -40,14 +40,30 @@ function _excStorageUrl() {
 export async function hlp_readUserExclusions({ force = false } = {}) {
 	if (!force && _excCache) return _excCache;
 
+	const _setEmpty = () => {
+		_excCache = { settings: [], modules: [] };
+		globalThis.bbmm._userExclusions = _excCache;
+		invalidateSkipMap();
+		return _excCache;
+	};
+
+	// Check the file exists before fetching to avoid a 404 on first run
+	let fileUrl = null;
 	try {
-		const res = await fetch(_excStorageUrl(), { cache: "no-store" });
+		const browse = await FilePicker.browse("data", "bbmm-data", { extensions: ["json"] });
+		fileUrl = (browse?.files ?? []).find(f => String(f).endsWith(`/${EXC_STORAGE_FILE}`)) ?? null;
+		if (!fileUrl) return _setEmpty();
+	} catch (e) {
+		const msg = String(e?.message ?? e);
+		if (msg.includes("does not exist") || msg.includes("not accessible")) return _setEmpty();
+		// unexpected browse error — fall through to fetch attempt
+	}
+
+	try {
+		const res = await fetch(fileUrl ?? _excStorageUrl(), { cache: "no-store" });
 		if (!res.ok) {
 			DL(2, `exclusions.js | hlp_readUserExclusions(): fetch not ok (${res.status})`);
-			_excCache = { settings: [], modules: [] };
-			globalThis.bbmm._userExclusions = _excCache;
-			invalidateSkipMap();
-			return _excCache;
+			return _setEmpty();
 		}
 
 		const data = await res.json();
@@ -62,10 +78,7 @@ export async function hlp_readUserExclusions({ force = false } = {}) {
 		return out;
 	} catch (err) {
 		DL(3, "exclusions.js | hlp_readUserExclusions(): failed", err);
-		_excCache = { settings: [], modules: [] };
-		globalThis.bbmm._userExclusions = _excCache;
-		invalidateSkipMap();
-		return _excCache;
+		return _setEmpty();
 	}
 }
 

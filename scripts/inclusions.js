@@ -68,15 +68,29 @@ function _inclusionsStorageUrl() {
 async function hlp_readUserInclusions({ force = false } = {}) {
 	if (!force && _incCacheLoaded && _incCache) return _incCache;
 
-	const url = _inclusionsStorageUrl();
+	const _setEmpty = () => {
+		_incCache = _sanitizeInclusions(null);
+		_incCacheLoaded = true;
+		return _incCache;
+	};
+
+	// Check the file exists before fetching to avoid a 404 on first run
+	let fileUrl = null;
+	try {
+		const browse = await FilePicker.browse("data", "bbmm-data", { extensions: ["json"] });
+		fileUrl = (browse?.files ?? []).find(f => String(f).endsWith(`/${FILE_USER_INCLUSIONS}`)) ?? null;
+		if (!fileUrl) return _setEmpty();
+	} catch (e) {
+		const msg = String(e?.message ?? e);
+		if (msg.includes("does not exist") || msg.includes("not accessible")) return _setEmpty();
+		// unexpected browse error — fall through to fetch attempt
+	}
 
 	try {
-		const res = await fetch(url, { cache: "no-store" });
+		const res = await fetch(fileUrl ?? _inclusionsStorageUrl(), { cache: "no-store" });
 		if (!res.ok) {
-			DL(2, `inclusions.js | hlp_readUserInclusions(): fetch not ok (${res.status})`, { url });
-			_incCache = _sanitizeInclusions(null);
-			_incCacheLoaded = true;
-			return _incCache;
+			DL(2, `inclusions.js | hlp_readUserInclusions(): fetch not ok (${res.status})`, { url: fileUrl });
+			return _setEmpty();
 		}
 
 		const data = await res.json();
@@ -91,9 +105,7 @@ async function hlp_readUserInclusions({ force = false } = {}) {
 		return _incCache;
 	} catch (err) {
 		DL(2, "inclusions.js | hlp_readUserInclusions(): failed, using empty", err);
-		_incCache = _sanitizeInclusions(null);
-		_incCacheLoaded = true;
-		return _incCache;
+		return _setEmpty();
 	}
 }
 

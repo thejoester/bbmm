@@ -72,7 +72,6 @@ function hlp_sanitizeUserInclusions(raw) {
 export async function hlp_readSettingsPresetsFromStorage() {
     const dir = `bbmm-data`;
 
-    // Prefer browse
     try {
         const browse = await FilePicker.browse("data", dir, {
             extensions: ["json"],
@@ -84,32 +83,16 @@ export async function hlp_readSettingsPresetsFromStorage() {
             const data = await hlp_fetchJSON(match);
             return hlp_sanitizeSettingsPresets(data);
         }
+        return null;
     } catch (err) {
         const msg = String(err?.message ?? err ?? "");
-        if (msg.includes("does not exist") || msg.includes("not accessible")) {
-            DL(
-                "settings-presets.js | hlp_readSettingsPresetsFromStorage(): presets folder not found yet, will try fallback"
-            );
-        } else {
+        if (!msg.includes("does not exist") && !msg.includes("not accessible")) {
             DL(
                 2,
                 "settings-presets.js | hlp_readSettingsPresetsFromStorage(): browse failed",
                 err
             );
         }
-    }
-
-    // Fallback fetch
-    try {
-        const url = `${dir}/${SETTINGS_PRESETS_STORAGE_FILE}`;
-        const data = await hlp_fetchJSON(url);
-        return hlp_sanitizeSettingsPresets(data);
-    } catch (err) {
-        DL(
-            2,
-            "settings-presets.js | hlp_readSettingsPresetsFromStorage(): fallback fetch failed",
-            err
-        );
     }
 
     return null;
@@ -2608,6 +2591,7 @@ export async function openSettingsPresetManager() {
 
 // Expose API + migrate presets on load (GM only)
 Hooks.once("ready", async () => {
+    await (globalThis.bbmm?._dataFilesReady ?? Promise.resolve());
     const mod = game.modules.get(BBMM_ID);
     if (!mod) return;
     mod.api ??= {};

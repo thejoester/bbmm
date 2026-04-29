@@ -1966,22 +1966,55 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
-	
+
 	DL("settings.js | ready fired");
 
-	// Ensure bbmm-data folder exists (Data/bbmm-data)
-	if (game.user.isGM) {
+	// Seed data files before other ready hooks read them.
+	// Stored as a promise so other scripts can await it (settings.js loads first).
+	globalThis.bbmm ??= {};
+	globalThis.bbmm._dataFilesReady = (async () => {
+		if (!game.user.isGM) return;
+
+		// Ensure directory
 		try {
 			await FilePicker.createDirectory("data", "bbmm-data");
-			DL("settings.js | Directory 'bbmm-data' exists!");
+			DL("settings.js | Directory 'bbmm-data' ensured");
 		} catch (err) {
 			const msg = String(err?.message ?? err);
-			if (!msg.toLowerCase().includes("exist")) { // ignore "already exists" errors
+			if (!msg.toLowerCase().includes("exist"))
 				DL(2, "settings.js | createDirectory failed for bbmm-data", err);
+		}
+
+		// Seed any missing data files with empty defaults
+		const seeds = {
+			"module-notes.json":     {},
+			"module-presets.json":   {},
+			"module-tags.json":      {},
+			"settings-presets.json": {},
+			"user-exclusions.json":  { settings: [], modules: [] },
+			"user-inclusions.json":  { settings: [], modules: [] },
+		};
+
+		let existing = new Set();
+		try {
+			const browse = await FilePicker.browse("data", "bbmm-data", { extensions: ["json"] });
+			existing = new Set((browse?.files ?? []).map(f => f.split("/").pop()));
+		} catch (_) { /* folder may not exist yet — all files will be seeded */ }
+
+		for (const [filename, defaultData] of Object.entries(seeds)) {
+			if (existing.has(filename)) continue;
+			try {
+				const file = new File([JSON.stringify(defaultData, null, 2)], filename, { type: "application/json" });
+				await FilePicker.upload("data", "bbmm-data", file, { notify: false });
+				DL(`settings.js | seeded ${filename}`);
+			} catch (err) {
+				DL(2, `settings.js | failed to seed ${filename}`, err);
 			}
 		}
-	}
-	
+	})();
+
+	await globalThis.bbmm._dataFilesReady;
+
 	// Prime exclusions cache for getSkipMap() users
 	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }
 

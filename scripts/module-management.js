@@ -29,17 +29,12 @@ async function _bbmmFetchJSON(filename) {
 			const res = await fetch(match, { cache: "no-store" });
 			if (res.ok) return await res.json();
 		}
+		return null;
 	} catch (e) {
 		const msg = String(e?.message ?? e);
 		if (!msg.includes("does not exist") && !msg.includes("not accessible"))
 			DL(2, `module-management.js | _bbmmFetchJSON(${filename}): browse failed`, e);
 	}
-	// fallback direct fetch
-	try {
-		const url = foundry.utils.getRoute(`bbmm-data/${filename}`);
-		const res = await fetch(url, { cache: "no-store" });
-		if (res.ok) return await res.json();
-	} catch (_) { /* file not yet created */ }
 	return null;
 }
 
@@ -2837,7 +2832,8 @@ Hooks.on("renderSettings", (_app, rootEl) => {
 	btn.setAttribute("data-tooltip", LT.moduleManagement.settingBtnToolTip());
 });
 
-Hooks.on("ready", () => {
+Hooks.on("ready", async () => {
+	await (globalThis.bbmm?._dataFilesReady ?? Promise.resolve());
 	// Load persistent data caches (fire-and-forget; reads are fast and sync callers fall back gracefully)
 	loadTagData().catch(e => DL(3, "module-management.js | ready: loadTagData failed", e));
 	loadNotesData().catch(e => DL(3, "module-management.js | ready: loadNotesData failed", e));

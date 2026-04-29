@@ -187,7 +187,6 @@ async function hlp_fetchJSON(url) {
 
 // Ensure storage root has expected shape
 async function hlp_readPresetsFromStorage() {
-	// Try browse first (optional convenience)
 	try {
 		const dir = `bbmm-data`;
 		const browse = await FilePicker.browse("data", dir, { extensions: ["json"] });
@@ -197,25 +196,13 @@ async function hlp_readPresetsFromStorage() {
 			const data = await hlp_fetchJSON(match);
 			return hlp_sanitizePresetMap(data);
 		}
+		return {};
 	} catch (err) {
 		const msg = String(err?.message ?? err);
-
-		// Folder missing is normal on first run if it wasn't shipped
-		if (msg.includes("does not exist") || msg.includes("not accessible")) {
-			DL("module-presets.js | hlp_readPresetsFromStorage(): presets folder not found yet, will try fallback");
-		} else {
+		if (!msg.includes("does not exist") && !msg.includes("not accessible"))
 			DL(2, "module-presets.js | hlp_readPresetsFromStorage(): browse failed unexpectedly", err);
-		}
 	}
-
-	// Direct fetch fallback
-	try {
-		const url = foundry.utils.getRoute(`bbmm-data/${MODULE_PRESETS_STORAGE_FILE}`);
-		const data = await hlp_fetchJSON(url);
-		return hlp_sanitizePresetMap(data);
-	} catch (_err2) {
-		return {};
-	}
+	return {};
 }
 
 // Sanitize storage root shape
@@ -816,6 +803,7 @@ export async function openPresetManager() {
 }
 
 Hooks.once("ready", async () => {
+	await (globalThis.bbmm?._dataFilesReady ?? Promise.resolve());
 	// load presets into cache
 	await hlp_loadPresets();
 
