@@ -168,6 +168,11 @@
     "selectNamespace": "Sélectionnez l'espace de noms...",
     "hiddenOnly": "Uniquement les objets cachés",
     "noChangesDetected": "Aucun changement détecté. Le préréglage est identique à l'état actuel.",
+    "previewMoreLines": "{count} lignes supplémentaires — cliquez pour développer",
+    "previewCollapse": "Cliquez pour réduire",
+    "titleModulePresetPreview": "Aperçu du préréglage du module",
+    "moduleMissing": "(manquant)",
+    "modulesMissing": "{count} manquant(s)",
     "buttons": {
       "yes": "Oui",
       "no": "Non",
