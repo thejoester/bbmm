@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-05-15
+
+### Changed
+- **Settings Presets:**
+  - For Players, when saving a settings preset it will default to save hidden settings as it will only save player "user" and "client" settings. 
+- **Import/Export:**
+  - Added ability for players to import/export player setting .json files. Player imports will not import any world scoped data. 
+**Localization**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
 ## [0.8.7] - 2026-04-29
 
 ### Fixed
