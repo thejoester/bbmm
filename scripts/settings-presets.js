@@ -280,7 +280,7 @@ function hlp_toJsonSafe(value, seen = new WeakSet(), path = "", depth = 0) {
         return out;
     }
 
-    // Primitive wrapper objects (String/Number/Boolean) — treat as their primitive value.
+    // Primitive wrapper objects (String/Number/Boolean), treat as their primitive value.
     // Use constructor === not instanceof so Foundry subclasses (Color extends Number,
     // etc.) are NOT intercepted here and instead fall through to the duplicate() path
     // which calls their toJSON() correctly (e.g. Color.toJSON() → "#rrggbb").
@@ -659,7 +659,7 @@ async function svc_collectAllModuleSettings({ includeDisabled = false, includeHi
                 }
             }
 
-            // EXPORT_SKIP + user-exclusions.json — inclusions do NOT override these
+            // EXPORT_SKIP + user-exclusions.json, inclusions do NOT override these
             if (
                 isExcludedWith(skipMap, namespace) ||
                 isExcludedWith(skipMap, namespace, key)
@@ -752,7 +752,7 @@ async function svc_applySettingsExport(exportData) {
             // Exclude entire namespace first
             if (isExcludedWith(skip, namespace)) {
                 DL(
-                    `settings-presets.js | svc_applySettingsExport(): excluded module "${namespace}" — skipping all keys in scope=${scope}`
+                    `settings-presets.js | svc_applySettingsExport(): excluded module "${namespace}", skipping all keys in scope=${scope}`
                 );
                 continue;
             }
@@ -804,7 +804,7 @@ async function svc_applySettingsExport(exportData) {
                     // Hydrate from JSON-safe
                     let hydrated = hlp_fromJsonSafe(value);
 
-                    /* Back-compat: old exports stored {} for Set/Map — treat as empty */
+                    /* Back-compat: old exports stored {} for Set/Map, treat as empty */
                     if (cfg?.type === Set && hlp_isPlainEmptyObject(value))
                         hydrated = new Set();
                     if (cfg?.type === Map && hlp_isPlainEmptyObject(value))
@@ -1056,7 +1056,7 @@ async function svc_planSettingsChanges(env) {
                         continue;
                     }
 
-                    // compare — normalize through hlp_toJsonSafe so non-plain types
+                    // compare, normalize through hlp_toJsonSafe so non-plain types
                     // (e.g. Foundry Color objects) serialize the same way as stored values
                     let current;
                     try {
@@ -1335,7 +1335,7 @@ function ui_openPresetPreview(rows, presetName = "") {
                 if (t === "string" || t === "number" || t === "boolean")
                     return v;
 
-                // Primitive wrapper objects produce char-indexed keys — unwrap them.
+                // Primitive wrapper objects produce char-indexed keys, unwrap them.
                 // Use constructor === so Foundry subclasses (Color extends Number) fall
                 // through to the plain-object path and get their own serialization.
                 if (v.constructor === String) return v.toString();
@@ -1700,7 +1700,7 @@ class BBMMImportWizard extends AppV2 {
             "click",
             () => {
                 DL(
-                    "settings-presets.js | BBMMImportWizard: cancel clicked — closing"
+                    "settings-presets.js | BBMMImportWizard: cancel clicked, closing"
                 );
                 this.close();
             }
@@ -2124,24 +2124,28 @@ export async function openSettingsPresetManager() {
             const chkHidden = root.querySelector('input[name="includeHidden"]');
             const includeHiddenRaw = !!(chkHidden && chkHidden.checked);
 
-            // If the user asked to include hidden, confirm first
+            // GM gets a confirmation warning before including hidden settings; players skip it
             let includeHiddenFinal = false;
             if (includeHiddenRaw) {
-                const ok = await foundry.applications.api.DialogV2.confirm({
-                    window: { title: LT.includeHiddenWarnTitle() },
-                    content: `<div style="display:flex;flex-direction:column;gap:.5rem;">
+                if (game.user.isGM) {
+                    const ok = await foundry.applications.api.DialogV2.confirm({
+                        window: { title: LT.includeHiddenWarnTitle() },
+                        content: `<div style="display:flex;flex-direction:column;gap:.5rem;">
 						<p>${LT.includeHiddenWarnMsg()}</p>
 						${LT.includeHiddenWarnLink?.() || ""}
 					</div>`,
-                    defaultYes: false,
-                    ok: { label: LT.buttons.yes() },
-                    cancel: { label: LT.buttons.no() },
-                });
-                includeHiddenFinal = !!ok;
-                if (!ok)
-                    DL(
-                        "settings-presets.js | include hidden CANCELLED — proceeding with non-hidden + inclusions only"
-                    );
+                        defaultYes: false,
+                        ok: { label: LT.buttons.yes() },
+                        cancel: { label: LT.buttons.no() },
+                    });
+                    includeHiddenFinal = !!ok;
+                    if (!ok)
+                        DL(
+                            "settings-presets.js | include hidden CANCELLED, proceeding with non-hidden + inclusions only"
+                        );
+                } else {
+                    includeHiddenFinal = true;
+                }
             }
 
             // Guard: name required for save-current
@@ -2158,7 +2162,7 @@ export async function openSettingsPresetManager() {
                         includeHidden: includeHiddenFinal,
                     });
                     DL(
-                        "settings-presets.js | openSettingsPresetManager(): save-current — collected payload",
+                        "settings-presets.js | openSettingsPresetManager(): save-current, collected payload",
                         {
                             counts: {
                                 world: Object.keys(payload.world ?? {}).length,
@@ -2172,12 +2176,12 @@ export async function openSettingsPresetManager() {
                     // Normalize schema types
                     hlp_schemaCorrectNonPlainTypes(payload);
                     DL(
-                        "settings-presets.js | openSettingsPresetManager(): save-current — schema corrected"
+                        "settings-presets.js | openSettingsPresetManager(): save-current, schema corrected"
                     );
 
                     // Save preset (overwrites if same name already exists)
                     DL(
-                        "settings-presets.js | openSettingsPresetManager(): save-current — calling svc_saveSettingsPreset",
+                        "settings-presets.js | openSettingsPresetManager(): save-current, calling svc_saveSettingsPreset",
                         { name: newName }
                     );
                     const res = await svc_saveSettingsPreset(
@@ -2185,7 +2189,7 @@ export async function openSettingsPresetManager() {
                         payload
                     );
                     DL(
-                        "settings-presets.js | openSettingsPresetManager(): save-current — save result",
+                        "settings-presets.js | openSettingsPresetManager(): save-current, save result",
                         res
                     );
                     if (res?.status !== "saved") return;
@@ -2213,7 +2217,7 @@ export async function openSettingsPresetManager() {
                         includeHidden: includeHiddenFinal,
                     });
                     DL(
-                        "settings-presets.js | openSettingsPresetManager(): update — collected payload",
+                        "settings-presets.js | openSettingsPresetManager(): update, collected payload",
                         {
                             counts: {
                                 world: Object.keys(payload.world ?? {}).length,
@@ -2227,12 +2231,12 @@ export async function openSettingsPresetManager() {
                     // Normalize schema types
                     hlp_schemaCorrectNonPlainTypes(payload);
                     DL(
-                        "settings-presets.js | openSettingsPresetManager(): update — schema corrected"
+                        "settings-presets.js | openSettingsPresetManager(): update, schema corrected"
                     );
 
                     // Save over the selected name
                     DL(
-                        "settings-presets.js | openSettingsPresetManager(): update — calling svc_saveSettingsPreset",
+                        "settings-presets.js | openSettingsPresetManager(): update, calling svc_saveSettingsPreset",
                         { name: selected }
                     );
                     const res = await svc_saveSettingsPreset(
@@ -2240,7 +2244,7 @@ export async function openSettingsPresetManager() {
                         payload
                     );
                     DL(
-                        "settings-presets.js | openSettingsPresetManager(): update — save result",
+                        "settings-presets.js | openSettingsPresetManager(): update, save result",
                         res
                     );
                     if (res?.status !== "saved") return;
