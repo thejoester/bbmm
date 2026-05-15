@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Fixed critical bug that deleted persistent data on load caused by changes that attempted to prevent 404 errors. 
   - On very first load after activating the module, you will still see a 404 error once for each file, but once loaded it should not appear again. 
 
+### Changed
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+
 ## [0.8.6] - 2026-04-29 [YANKED]
 
 ### Added
