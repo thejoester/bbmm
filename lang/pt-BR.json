@@ -169,6 +169,11 @@
 		"selectNamespace": "Selecionar namespace...",
 		"hiddenOnly": "Apenas itens Ocultos",
 		"noChangesDetected": "Nenhuma alteração detectada. A predefinição é idêntica ao estado atual.",
+		"previewMoreLines": "{count} linhas adicionais — clique para expandir",
+    	"previewCollapse": "Clique para recolher",
+    	"titleModulePresetPreview": "Visualização de Predefinições do Módulo",
+    	"moduleMissing": "(ausente)",
+    	"modulesMissing": "{count} faltando",
 		"buttons": {
 			"yes": "Sim",
 			"no": "Não",
