@@ -998,12 +998,6 @@ async function _bbmmOpenNotesDialog(moduleId) {
             buttons: [
                 { action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark" },
                 {
-					action: "tags",
-					label: LT.moduleManagement.editTags(),
-					icon: "fa-solid fa-tags",
-					callback: () => { openModuleTagsApp(moduleId); return false; }
-				},
-                {
 					action: "save",
 					label: LT.buttons.save(),
 					icon: "fa-solid fa-floppy-disk",
@@ -1980,7 +1974,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	}
 
 	/* Build a core-style tag strip from module metadata (no version pill). */
-	_buildTagsFor(mod) {
+	_buildTagsFor(mod, tagData = null) {
 		
 		try {
 			const parts = [];
@@ -1999,6 +1993,21 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					);
 				}
 			} catch (e) { DL(2, "BBMMModuleManagerApp::_buildTagsFor(): lock tag failed", e); }
+
+			/* Tag edit button */
+			try {
+				if (game.user.isGM) {
+					const assignments = tagData?.assignments?.[mod.id] ?? [];
+					const hasTags = assignments.length > 0;
+					parts.push(
+						`<button type="button" class="tag flexrow" data-bbmm-action="edit-tags" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(LT.moduleManagement.editTags())}">` +
+							(hasTags
+								? `<i class="fa-solid fa-tags fa-fw" style="color: orange;"></i>`
+								: `<i class="fa-solid fa-tags fa-fw"></i>`) +
+						`</button>`
+					);
+				}
+			} catch (e) { DL(2, "BBMMModuleManagerApp::_buildTagsFor(): tags button failed", e); }
 
 			// Settings gear (same size as native via "tag flexrow")
 			try{
@@ -2276,7 +2285,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					<div class="actions">
 						<div class="tags">
 						${noteBadge}
-						${this._buildTagsFor(modObj)}
+						${this._buildTagsFor(modObj, tagData)}
 						${verTxt ? `<span class="ver-text" title="${hlp_esc(verTitle)}" style="${verColor ? `color:${verColor}` : ""}">v${hlp_esc(verTxt)}</span>` : ``}
 						</div>
 						${game.user.isGM ? `<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
@@ -2504,6 +2513,18 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					_bbmmOpenModuleSettingsTab(id);
 					DL(`BBMMModuleManagerApp | open settings for ${id}`);
 				} catch (e) { DL(2, "BBMMModuleManagerApp | open settings failed", e); }
+			}, true);
+
+			// edit tags (tag icon)
+			this._root.addEventListener("click", (ev) => {
+				const btn = ev.target.closest?.('[data-bbmm-action="edit-tags"]');
+				if (!btn) return;
+				ev.stopPropagation();
+				const id = btn.getAttribute("data-mod-id");
+				if (!id) return;
+				try {
+					openModuleTagsApp(id);
+				} catch (e) { DL(2, "BBMMModuleManagerApp | edit tags failed", e); }
 			}, true);
 
 			// edit notes (pencil)

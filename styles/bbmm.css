@@ -1024,8 +1024,9 @@
 	padding: 0 !important;
 }
 
-/* keep borders ONLY on settings gear + edit buttons */
+/* keep borders ONLY on settings gear + tag edit + edit buttons */
 #bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"],
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"],
 #bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit {
 	border: 1px solid var(--color-border, #555) !important;
 	background: rgba(255, 255, 255, .05) !important;
@@ -1033,10 +1034,12 @@
 	padding: .15rem .4rem;
 }
 #bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:hover,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"]:hover,
 #bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:hover {
 	background: rgba(255, 255, 255, .10) !important;
 }
 #bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:focus-visible,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"]:focus-visible,
 #bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:focus-visible {
 	outline: 1px solid var(--color-border, #777);
 	outline-offset: 1px;

@@ -6,9 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.8.9-test1] - 2026-05-19
 
+### Added
+- **Module Manager:**
+  - Added a tag icon button to each module row. The icon turns orange when the module has tags assigned. Clicking it opens the tag editor for that module directly from the list.
+
 ### Changed
 - **Module Manager:**
   - Players opening the Module Manager now see a read-only view. Checkboxes, the Activate All/Deactivate All buttons, Find the Culprit, Manage Tags, per-module lock toggles, and the Edit Notes button are hidden for non-GM users.
+  - Removed the "Edit Tags" button from the Edit Notes dialog, as tags can now be edited directly from the module row.
+
 
 ## [0.8.8] - 2026-05-15
 
