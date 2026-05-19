@@ -1987,13 +1987,17 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 			/* Lock toggle tag */
 			try {
-				const isLocked = this.locks?.has?.(mod.id) === true;
-				parts.push(
-					`<button type="button" class="tag flexrow" data-bbmm-action="toggle-lock" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(isLocked ? LT.moduleManagement.lockUnlock() : LT.moduleManagement.lockLock())}">` +
-						/* When locked: closed lock + inline orange so it’s instantly visible */
-						`<i class="fa-solid ${isLocked ? "fa-lock" : "fa-lock-open"} fa-fw"${isLocked ? ' style="color: orange;"' : ""}></i>` +
-					`</button>`
-				);
+				if (game.user.isGM) {
+					const isLocked = this.locks?.has?.(mod.id) === true;
+					parts.push(
+						`<button type="button" class="tag flexrow" data-bbmm-action="toggle-lock" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(isLocked ? LT.moduleManagement.lockUnlock() : LT.moduleManagement.lockLock())}">` +
+							/* When locked: closed lock + inline orange so it’s instantly visible */
+							(isLocked
+								? `<i class="fa-solid fa-lock fa-fw" style="color: orange;"></i>`
+								: `<i class="fa-solid fa-lock-open fa-fw"></i>`) +
+						`</button>`
+					);
+				}
 			} catch (e) { DL(2, "BBMMModuleManagerApp::_buildTagsFor(): lock tag failed", e); }
 
 			// Settings gear (same size as native via "tag flexrow")
@@ -2155,15 +2159,16 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					<button type="button" id="bbmm-mm-expand-all" title="${hlp_esc(LT.moduleManagement.expandAll())}" style="${this.groupByTags || this.groupBySubtags ? "" : "display:none"}">
 						<i class="fa-solid fa-angles-down"></i>
 					</button>
-					<button type="button" id="bbmm-mm-manage-tags">
+					${game.user.isGM ? `<button type="button" id="bbmm-mm-manage-tags">
 						<i class="fas fa-tag"></i> ${hlp_esc(LT.moduleManagement.tagMgrLabel())}
-					</button>
+					</button>` : ""}
 				</div>
 			</div>
 		`;
 	}
 
 	_renderFooterHTML() {
+		if (!game.user.isGM) return `<div class="bbmm-mm-footer"></div>`;
 		const hasCulprit = !!game.modules.get("find-the-culprit")?.active;
 		return `
 			<div class="bbmm-mm-footer">
@@ -2171,7 +2176,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				<button type="button" id="bbmm-mm-deactivate-all">${LT.moduleManagement.deactivateAll()}</button>
 				<button type="button" id="bbmm-mm-activate-all">${LT.moduleManagement.activateAll()}</button>
 				${hasCulprit ? `<button type="button" id="bbmm-mm-culprit"><i class="fa-solid fa-search"></i> ${LT.moduleManagement.findTheCulprit()}</button>`: ``}
-				
+
 			</div>
 		`;
 	}
@@ -2258,10 +2263,10 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 				const userTagChips = this._buildUserTagChips(m.id, tagData);
 				return `
-					<div class="row ${planned ? "on" : "off"} ${changed ? "chg" : ""} ${this.locks.has(m.id) ? "bbmm-locked" : ""}" data-id="${hlp_esc(m.id)}">
-					<label class="toggle" onclick="event.stopPropagation()">
+					<div class="row ${planned ? "on" : "off"} ${changed ? "chg" : ""} ${this.locks.has(m.id) ? "bbmm-locked" : ""} ${game.user.isGM ? "" : "bbmm-no-toggle"}" data-id="${hlp_esc(m.id)}">
+					${game.user.isGM ? `<label class="toggle" onclick="event.stopPropagation()">
 						<input type="checkbox" ${planned ? "checked" : ""} ${this.locks.has(m.id) ? "disabled" : ""}>
-					</label>
+					</label>` : ""}
 
 					<div class="main">
 						<div class="title" title="${hlp_esc(m.title)}">${hlp_esc(m.title)}</div>
@@ -2274,9 +2279,9 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 						${this._buildTagsFor(modObj)}
 						${verTxt ? `<span class="ver-text" title="${hlp_esc(verTitle)}" style="${verColor ? `color:${verColor}` : ""}">v${hlp_esc(verTxt)}</span>` : ``}
 						</div>
-						<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
+						${game.user.isGM ? `<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
 						<i class="fa-solid fa-pen-to-square fa-fw"></i>
-						</button>
+						</button>` : ""}
 					</div>
 
 					<div class="notes">

@@ -943,6 +943,9 @@
 	cursor: pointer;
 }
 
+#bbmm-module-manager .bbmm-mm-body .row.bbmm-no-toggle { grid-template-columns: 1fr auto; }
+#bbmm-module-manager .bbmm-mm-body .row.bbmm-no-toggle .notes { grid-column: 1 / 3; }
+
 #bbmm-module-manager .bbmm-mm-body .row .toggle { cursor: default; }
 #bbmm-module-manager .bbmm-mm-body .row .toggle input { transform: scale(1.2); }
 
