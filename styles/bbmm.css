@@ -172,6 +172,39 @@
 	font-size: 0.95em;
 }
 
+.bbmm-bulk-scopes {
+	display: flex;
+	gap: 0;
+}
+
+.bbmm-bulk-scopes button {
+	flex: 1;
+	font-size: 0.8em;
+	padding: 0.25em 0.4em;
+	border: 1px solid var(--color-border-light-tertiary);
+	border-right-width: 0;
+	background: transparent;
+	cursor: pointer;
+	opacity: 0.6;
+}
+
+.bbmm-bulk-scopes button:last-child {
+	border-right-width: 1px;
+	border-radius: 0 4px 4px 0;
+}
+
+.bbmm-bulk-scopes button:first-child {
+	border-radius: 4px 0 0 4px;
+}
+
+.bbmm-bulk-scopes button.on {
+	opacity: 1;
+	background: rgba(255, 255, 255, 0.1);
+	border-color: var(--color-border-highlight, #aaa);
+}
+
+.bbmm-bulk-group.collapsed .bbmm-bulk-row { display: none; }
+
 .bbmm-bulk-list {
 	flex: 1;
 	overflow-y: auto;

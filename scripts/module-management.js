@@ -656,10 +656,12 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 			window: { resizable: true },
 			position: { width: 500, height: 560 }
 		});
-		this.tagId    = tagId;
-		this.subtagId = subtagId ?? null;
-		this.filter   = "";
-		this.selected = null; // null = not yet initialized; populated on first _updateList
+		this.tagId          = tagId;
+		this.subtagId       = subtagId ?? null;
+		this.filter         = "";
+		this.selected         = null; // null = not yet initialized; populated on first render
+		this.viewMode         = "none"; // "none" | "group" | "untagged"
+		this._collapsedGroups = new Set();
 	}
 
 	get _title() {
@@ -670,39 +672,88 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 		return `Assign: ${label}`;
 	}
 
+	_renderBulkRows(mods) {
+		return mods.map(m => `
+			<label class="bbmm-bulk-row">
+				<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${this.selected?.has(m.id) ? "checked" : ""}>
+				<span class="bbmm-bulk-mod-title">${hlp_esc(m.title ?? m.id)}</span>
+			</label>
+		`).join("");
+	}
+
+	_renderBulkList(data, visible) {
+		if (!visible.length) return `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`;
+
+		if (this.viewMode === "group") {
+			const groups = [];
+			const seenIds = new Set();
+			for (const tag of data.tags) {
+				const tagMods = visible.filter(m =>
+					(data.assignments[m.id] ?? []).some(a => a.tagId === tag.id)
+				);
+				if (tagMods.length) {
+					groups.push({ tag, mods: tagMods });
+					tagMods.forEach(m => seenIds.add(m.id));
+				}
+			}
+			const untagged = visible.filter(m => !seenIds.has(m.id));
+			if (untagged.length) groups.push({ tag: null, mods: untagged });
+
+			if (!groups.length) return `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`;
+			return groups.map(({ tag, mods }) => {
+				const groupId = tag ? hlp_esc(tag.id) : "__untagged__";
+				const label   = tag ? hlp_esc(tag.label) : hlp_esc(LT.moduleManagement.untagged());
+				const collapsed = this._collapsedGroups.has(tag ? tag.id : "__untagged__");
+				return `<div class="bbmm-bulk-group bbmm-tag-group${collapsed ? " collapsed" : ""}" data-group-id="${groupId}">
+					<div class="bbmm-bulk-group-header bbmm-tag-group-header">
+						<i class="fa-solid fa-chevron-right bbmm-collapse-icon"></i>
+						${label} <span class="bbmm-group-count">(${mods.length})</span>
+					</div>
+					${this._renderBulkRows(mods)}
+				</div>`;
+			}).join("");
+		}
+
+		return this._renderBulkRows(visible);
+	}
+
 	async _renderHTML() {
 		const data = _getTagData();
 		const tag  = data.tags.find(t => t.id === this.tagId);
 		const sub  = this.subtagId ? data.subtags.find(s => s.id === this.subtagId) : null;
 		const label = sub ? `${tag?.label ?? this.tagId} / ${sub.label}` : (tag?.label ?? this.tagId);
 
-		// All installed modules sorted alphabetically
 		const allMods = [...game.modules.values()]
-			.filter(m => m.active !== undefined) // installed
+			.filter(m => m.active !== undefined)
 			.sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id));
 
-		const q = this.filter.toLowerCase().trim();
-		const visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
-
-		const rows = visible.map(m => {
-			const assignments = data.assignments[m.id] ?? [];
-			const checked = assignments.some(a =>
-				a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
+		// Initialize selected from saved assignments on first render
+		if (this.selected === null) {
+			this.selected = new Set(
+				allMods.filter(m =>
+					(data.assignments[m.id] ?? []).some(a =>
+						a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
+					)
+				).map(m => m.id)
 			);
-			return `
-				<label class="bbmm-bulk-row">
-					<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${checked ? "checked" : ""}>
-					<span class="bbmm-bulk-mod-title">${hlp_esc(m.title ?? m.id)}</span>
-				</label>
-			`;
-		}).join("");
+		}
 
+		const q = this.filter.toLowerCase().trim();
+		let visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
+		if (this.viewMode === "untagged") visible = visible.filter(m => !(data.assignments[m.id]?.length));
+
+		const vm = this.viewMode;
 		const root = document.createElement("div");
 		root.className = "bbmm-bulk-assign-content";
 		root.innerHTML = `
 			<div class="bbmm-bulk-header">${hlp_esc(LT.moduleManagement.tagMgrAssigning())} <strong>${hlp_esc(label)}</strong></div>
+			<div class="bbmm-bulk-scopes">
+				<button type="button" data-bulk-view="none"     class="${vm === "none"     ? "on" : ""}">${hlp_esc(LT.moduleManagement.tagMgrViewNone())}</button>
+				<button type="button" data-bulk-view="group"    class="${vm === "group"    ? "on" : ""}">${hlp_esc(LT.moduleManagement.groupByTags())}</button>
+				<button type="button" data-bulk-view="untagged" class="${vm === "untagged" ? "on" : ""}">${hlp_esc(LT.moduleManagement.tagMgrViewUntagged())}</button>
+			</div>
 			<input type="text" id="bbmm-bulk-filter" placeholder="${hlp_esc(LT.moduleManagement.tagMgrFilterPlaceholder())}" value="${hlp_esc(this.filter)}">
-			<div class="bbmm-bulk-list">${rows || `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`}</div>
+			<div class="bbmm-bulk-list">${this._renderBulkList(data, visible)}</div>
 		`;
 		return root;
 	}
@@ -717,6 +768,41 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 			this.filter = e.target.value ?? "";
 			this._updateList(content);
 		});
+
+		// View mode segmented buttons
+		content.addEventListener("click", (ev) => {
+			const btn = ev.target.closest("[data-bulk-view]");
+			if (!btn) return;
+			this.viewMode = btn.dataset.bulkView;
+			this._collapsedGroups.clear();
+			this._updateList(content);
+			for (const b of content.querySelectorAll("[data-bulk-view]"))
+				b.classList.toggle("on", b.dataset.bulkView === this.viewMode);
+		});
+
+		// Group collapse toggle
+		content.addEventListener("click", (ev) => {
+			const header = ev.target.closest(".bbmm-bulk-group-header");
+			if (!header) return;
+			const group = header.closest(".bbmm-bulk-group");
+			const groupId = group?.getAttribute("data-group-id");
+			if (!groupId) return;
+			if (this._collapsedGroups.has(groupId)) this._collapsedGroups.delete(groupId);
+			else this._collapsedGroups.add(groupId);
+			group.classList.toggle("collapsed", this._collapsedGroups.has(groupId));
+		});
+
+		// Sync duplicate checkboxes when grouped view shows a module in multiple groups
+		content.querySelector(".bbmm-bulk-list")?.addEventListener("change", (ev) => {
+			const cb = ev.target.closest('input[name="mod"]');
+			if (!cb) return;
+			const id = cb.value;
+			if (cb.checked) this.selected.add(id);
+			else this.selected.delete(id);
+			for (const el of content.querySelectorAll(`input[name="mod"][value="${CSS.escape(id)}"]`)) {
+				el.checked = cb.checked;
+			}
+		});
 	}
 
 	_updateList(content) {
@@ -725,10 +811,8 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 		const allMods = [...game.modules.values()]
 			.filter(m => m.active !== undefined)
 			.sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id));
-		const visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
 
-		// On first call, initialize selected from saved assignments.
-		// On subsequent calls, sync any visible checkbox changes into selected before re-rendering.
+		// Sync current checkbox state into selected before re-rendering
 		if (this.selected === null) {
 			this.selected = new Set(
 				allMods.filter(m =>
@@ -744,18 +828,11 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 			}
 		}
 
-		const rows = visible.map(m => {
-			const isChecked = this.selected.has(m.id);
-			return `
-				<label class="bbmm-bulk-row">
-					<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${isChecked ? "checked" : ""}>
-					<span class="bbmm-bulk-mod-title">${hlp_esc(m.title ?? m.id)}</span>
-				</label>
-			`;
-		}).join("");
+		let visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
+		if (this.viewMode === "untagged") visible = visible.filter(m => !(data.assignments[m.id]?.length));
 
 		const list = content.querySelector(".bbmm-bulk-list");
-		if (list) list.innerHTML = rows || `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`;
+		if (list) list.innerHTML = this._renderBulkList(data, visible);
 	}
 
 	async _renderFrame(options) {
