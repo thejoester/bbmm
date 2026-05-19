@@ -7,12 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [0.8.9-test2] - 2026-05-19
 
 ### Added
-### Added
 - **Module Manager:**
   - Added a tag icon button to each module row. The icon turns orange when the module has tags assigned. Clicking it opens the tag editor for that module directly from the list.
 - **Bulk Tag Assign:**
-  - Added a view mode selector (None / Group by Tags / Untagged Only) to the bulk assign window, replacing the previous two separate toggle buttons. When "Group by Tags" is selected, groups are collapsible by clicking the group header.
-
+  - Added a view mode selector (None / Group by Tags / Untagged Only) to the bulk assign window. When "Group by Tags" is selected, groups are collapsible by clicking the group header.
+  
 ### Changed
 - **Module Manager:**
   - Players opening the Module Manager now see a read-only view. Checkboxes, the Activate All/Deactivate All buttons, Find the Culprit, Manage Tags, per-module lock toggles, and the Edit Notes button are hidden for non-GM users.
