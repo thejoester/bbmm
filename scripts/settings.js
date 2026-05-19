@@ -624,14 +624,6 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 					</div>
 
 					<div style="display:flex;align-items:center;gap:.75rem;">
-						<div style="min-width:160px;font-weight:700;">${LT.settingsPresetsBtn()}:</div>
-						<div style="display:flex;gap:.5rem;">
-							<button type="button" data-action="bbmm-set-import" style="width:auto;">${LT.buttons.import()}</button>
-							<button type="button" data-action="bbmm-set-export" style="width:auto;">${LT.buttons.export()}</button>
-						</div>
-					</div>
-
-					<div style="display:flex;align-items:center;gap:.75rem;">
 						<div style="min-width:160px;font-weight:700;">${LT.inclusions.manager()} / ${LT.exclusions()}:</div>
 						<div style="display:flex;gap:.5rem;">
 							<button type="button" data-action="bbmm-inc-import" style="width:auto;">${LT.buttons.import()}</button>
@@ -639,6 +631,14 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 						</div>
 					</div>
 					` : ``}
+
+					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">${LT.settingsPresetsBtn()}:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-set-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-set-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
 
 					<div style="display:flex;align-items:center;gap:.75rem;">
 						<div style="min-width:160px;font-weight:700;">Keybindings:</div>
@@ -766,19 +766,25 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 				}
 				// Module Preset Import
 				if (action === "bbmm-mod-import") return await bbmm_importModulePresetsAll();
-				// Settings Preset Import
+				// Settings Preset Export
 				if (action === "bbmm-set-export") {
 					const FN = "settings.js | BBMMImportExportDialog._onRender(): settings preset export chooser:";
 					try {
-						const url = `bbmm-data/settings-presets.json`;
-						const res = await fetch(url, { cache: "no-store" });
-						if (!res.ok) {
-							DL(3, `${FN} fetch not ok`, { url, status: res.status });
-							ui.notifications.error(LT.errors.failedReadSettingsPreset());
-							return;
+						// GM reads from file storage; player reads from user-scoped setting
+						let presets;
+						if (game.user.isGM) {
+							const url = `bbmm-data/settings-presets.json`;
+							const res = await fetch(url, { cache: "no-store" });
+							if (!res.ok) {
+								DL(3, `${FN} fetch not ok`, { url, status: res.status });
+								ui.notifications.error(LT.errors.failedReadSettingsPreset());
+								return;
+							}
+							presets = await res.json();
+						} else {
+							presets = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS_U) ?? {};
 						}
 
-						const presets = await res.json();
 						const names = Object.keys(presets ?? {}).sort((a, b) => a.localeCompare(b));
 
 						const options =
@@ -814,9 +820,18 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 
 						if (!pick || pick.action !== "export") return;
 
-						// All presets → same behavior as now
+						// All presets
 						if (pick.preset === "__all") {
-							await bbmm_exportSettingsPresetsAll();
+							if (game.user.isGM) {
+								await bbmm_exportSettingsPresetsAll();
+							} else {
+								const d = new Date();
+								const pad = (n) => String(n).padStart(2, "0");
+								const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-bbmm-settings-presets.json`;
+								await hlp_saveJSONFile(presets ?? {}, fname);
+								ui.notifications.info(LT._importExport.exportedSettingsPreset());
+								DL(1, `${FN} exported all player presets`, { fname });
+							}
 							return;
 						}
 
@@ -889,7 +904,81 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 				}
 				// Settings Presets import
 				if (action === "bbmm-set-import") {
-					await bbmm_importSettingsPresetsAll();
+					if (game.user.isGM) {
+						await bbmm_importSettingsPresetsAll();
+					} else {
+						// Player path: merge into user-scoped setting
+						const FN = "settings.js | BBMMImportExportDialog._onRender(): bbmm-set-import (player):";
+						const file = await hlp_pickLocalJSONFile();
+						if (!file) return;
+
+						let data;
+						try {
+							data = JSON.parse(await file.text());
+
+							// Wrap a single exported preset payload into the map format
+							if (data && typeof data === "object" && !Array.isArray(data)
+								&& data.type === "bbmm-settings"
+								&& data.world && typeof data.world === "object"
+								&& data.client && typeof data.client === "object"
+								&& data.user && typeof data.user === "object"
+							) {
+								const presetName = (file?.name ?? "bbmm-settings-preset").replace(/\.json$/i, "");
+								data = { [presetName]: data };
+								DL(1, `${FN} wrapped single preset payload`, { presetName });
+							}
+						} catch (err) {
+							DL(3, `${FN} invalid json`, err);
+							ui.notifications.error(LT.errors.invalidJSONFile());
+							return;
+						}
+
+						if (!data || typeof data !== "object" || Array.isArray(data)) {
+							ui.notifications.error(LT.errors.invalidJSONFile());
+							return;
+						}
+
+						const current = foundry.utils.deepClone(game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS_U) ?? {});
+
+						const now = new Date();
+						const padN = (n) => String(n).padStart(2, "0");
+						const dateStamp = `${now.getFullYear()}-${padN(now.getMonth() + 1)}-${padN(now.getDate())}`;
+						const timeStamp = `${padN(now.getHours())}:${padN(now.getMinutes())}`;
+						const suffixBase = ` (imported on ${dateStamp} ${timeStamp})`;
+
+						let added = 0, renamed = 0;
+
+						for (const [name, presetRaw] of Object.entries(data)) {
+							if (!name || typeof name !== "string") continue;
+							if (!presetRaw || typeof presetRaw !== "object" || Array.isArray(presetRaw)) continue;
+
+							let finalName = name;
+							if (Object.prototype.hasOwnProperty.call(current, finalName)) {
+								finalName = `${name}${suffixBase}`;
+								renamed++;
+								let i = 2;
+								while (Object.prototype.hasOwnProperty.call(current, finalName)) {
+									finalName = `${name}${suffixBase} (${i})`;
+									i++;
+								}
+							}
+
+							// Strip world bucket — players can't apply world settings and it saves space
+							const stripped = { ...presetRaw, world: {} };
+							current[finalName] = stripped;
+							added++;
+						}
+
+						try {
+							await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS_U, current);
+							DL(1, `${FN} imported presets into user setting`, { added, renamed });
+							ui.notifications.info(`Imported ${added} settings preset(s).${renamed ? ` Renamed ${renamed}.` : ""}`);
+						} catch (err) {
+							DL(3, `${FN} failed to write user setting`, err);
+							ui.notifications.error(LT.errors.errorOccured());
+							return;
+						}
+					}
 
 					// Force refresh the Settings Presets cache
 					try {
