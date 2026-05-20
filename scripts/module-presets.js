@@ -445,7 +445,7 @@ function ui_openModulePresetPreview(preset) {
 		new foundry.applications.api.DialogV2({
 			id: "bbmm-module-preset-preview",
 			window: { title: LT.titleModulePresetPreview() },
-			position: { width: Math.min(600, window.innerWidth - 100), height: Math.round(window.innerHeight * 0.5) },
+			position: { width: Math.min(600, window.innerWidth - 100) },
 			content,
 			buttons: [{ action: "close", label: LT.buttons.close(), default: true }],
 			submit: () => "close",
