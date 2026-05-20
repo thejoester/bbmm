@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Module Manager:**
   - Players opening the Module Manager now see a read-only view. Checkboxes, the Activate All/Deactivate All buttons, Find the Culprit, Manage Tags, per-module lock toggles, and the Edit Notes button are hidden for non-GM users.
   - Removed the "Edit Tags" button from the Edit Notes dialog, as tags can now be edited directly from the module row.
+- **Localization**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
   
   ### Fixed
 - **Module Presets:**
@@ -28,10 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - For Players, when saving a settings preset it will default to save hidden settings as it will only save player "user" and "client" settings. 
 - **Import/Export:**
   - Added ability for players to import/export player setting .json files. Player imports will not import any world scoped data. 
-**Localization**
-  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
-  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
-  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
 
 ## [0.8.7] - 2026-04-29
 
