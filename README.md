@@ -68,6 +68,9 @@ I would like to extend a thanks to the following people for helping contribute t
 - Polish (pl): [Lioheart](https://gitlocalize.com/users/Lioheart)
 - Brazilian Portuguese (pt-BR): [FarenRavirar](https://github.com/FarenRavirar) / [Kharmans](https://github.com/Kharmans)!
 
+### Testing
+- Many thanks to [RedB-hub](https://github.com/RedB-hub) for testing my module thoroughly!
+
 ## Contribute
 
 If you would like to contribute to the localization, you can do so in one of these ways: 
