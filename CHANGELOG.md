@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.9-test3] - 2026-05-19
+## [0.8.9] - 2026-05-19
 
 ### Added
 - **Module Manager:**
@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
   - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
-  
+
   ### Fixed
 - **Module Presets:**
   - Fixed the Close button being pushed off the bottom of the preset preview window.
