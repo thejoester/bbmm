@@ -172,6 +172,24 @@
 	font-size: 0.95em;
 }
 
+.bbmm-bulk-scopes {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.bbmm-bulk-scopes button {
+	flex: 1;
+	font-size: 0.8em;
+}
+
+.bbmm-bulk-scopes button.on {
+	background: var(--button-hover-background-color);
+	color: var(--button-hover-text-color);
+	border-color: var(--button-hover-border-color);
+}
+
+.bbmm-bulk-group.collapsed .bbmm-bulk-row { display: none; }
+
 .bbmm-bulk-list {
 	flex: 1;
 	overflow-y: auto;
@@ -943,6 +961,9 @@
 	cursor: pointer;
 }
 
+#bbmm-module-manager .bbmm-mm-body .row.bbmm-no-toggle { grid-template-columns: 1fr auto; }
+#bbmm-module-manager .bbmm-mm-body .row.bbmm-no-toggle .notes { grid-column: 1 / 3; }
+
 #bbmm-module-manager .bbmm-mm-body .row .toggle { cursor: default; }
 #bbmm-module-manager .bbmm-mm-body .row .toggle input { transform: scale(1.2); }
 
@@ -1021,8 +1042,9 @@
 	padding: 0 !important;
 }
 
-/* keep borders ONLY on settings gear + edit buttons */
+/* keep borders ONLY on settings gear + tag edit + edit buttons */
 #bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"],
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"],
 #bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit {
 	border: 1px solid var(--color-border, #555) !important;
 	background: rgba(255, 255, 255, .05) !important;
@@ -1030,10 +1052,12 @@
 	padding: .15rem .4rem;
 }
 #bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:hover,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"]:hover,
 #bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:hover {
 	background: rgba(255, 255, 255, .10) !important;
 }
 #bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:focus-visible,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"]:focus-visible,
 #bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:focus-visible {
 	outline: 1px solid var(--color-border, #777);
 	outline-offset: 1px;

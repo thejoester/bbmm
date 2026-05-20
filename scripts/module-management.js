@@ -656,10 +656,12 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 			window: { resizable: true },
 			position: { width: 500, height: 560 }
 		});
-		this.tagId    = tagId;
-		this.subtagId = subtagId ?? null;
-		this.filter   = "";
-		this.selected = null; // null = not yet initialized; populated on first _updateList
+		this.tagId          = tagId;
+		this.subtagId       = subtagId ?? null;
+		this.filter         = "";
+		this.selected         = null; // null = not yet initialized; populated on first render
+		this.viewMode         = "none"; // "none" | "group" | "untagged"
+		this._collapsedGroups = new Set();
 	}
 
 	get _title() {
@@ -670,39 +672,88 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 		return `Assign: ${label}`;
 	}
 
+	_renderBulkRows(mods) {
+		return mods.map(m => `
+			<label class="bbmm-bulk-row">
+				<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${this.selected?.has(m.id) ? "checked" : ""}>
+				<span class="bbmm-bulk-mod-title">${hlp_esc(m.title ?? m.id)}</span>
+			</label>
+		`).join("");
+	}
+
+	_renderBulkList(data, visible) {
+		if (!visible.length) return `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`;
+
+		if (this.viewMode === "group") {
+			const groups = [];
+			const seenIds = new Set();
+			for (const tag of data.tags) {
+				const tagMods = visible.filter(m =>
+					(data.assignments[m.id] ?? []).some(a => a.tagId === tag.id)
+				);
+				if (tagMods.length) {
+					groups.push({ tag, mods: tagMods });
+					tagMods.forEach(m => seenIds.add(m.id));
+				}
+			}
+			const untagged = visible.filter(m => !seenIds.has(m.id));
+			if (untagged.length) groups.push({ tag: null, mods: untagged });
+
+			if (!groups.length) return `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`;
+			return groups.map(({ tag, mods }) => {
+				const groupId = tag ? hlp_esc(tag.id) : "__untagged__";
+				const label   = tag ? hlp_esc(tag.label) : hlp_esc(LT.moduleManagement.untagged());
+				const collapsed = this._collapsedGroups.has(tag ? tag.id : "__untagged__");
+				return `<div class="bbmm-bulk-group bbmm-tag-group${collapsed ? " collapsed" : ""}" data-group-id="${groupId}">
+					<div class="bbmm-bulk-group-header bbmm-tag-group-header">
+						<i class="fa-solid fa-chevron-right bbmm-collapse-icon"></i>
+						${label} <span class="bbmm-group-count">(${mods.length})</span>
+					</div>
+					${this._renderBulkRows(mods)}
+				</div>`;
+			}).join("");
+		}
+
+		return this._renderBulkRows(visible);
+	}
+
 	async _renderHTML() {
 		const data = _getTagData();
 		const tag  = data.tags.find(t => t.id === this.tagId);
 		const sub  = this.subtagId ? data.subtags.find(s => s.id === this.subtagId) : null;
 		const label = sub ? `${tag?.label ?? this.tagId} / ${sub.label}` : (tag?.label ?? this.tagId);
 
-		// All installed modules sorted alphabetically
 		const allMods = [...game.modules.values()]
-			.filter(m => m.active !== undefined) // installed
+			.filter(m => m.active !== undefined)
 			.sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id));
 
-		const q = this.filter.toLowerCase().trim();
-		const visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
-
-		const rows = visible.map(m => {
-			const assignments = data.assignments[m.id] ?? [];
-			const checked = assignments.some(a =>
-				a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
+		// Initialize selected from saved assignments on first render
+		if (this.selected === null) {
+			this.selected = new Set(
+				allMods.filter(m =>
+					(data.assignments[m.id] ?? []).some(a =>
+						a.tagId === this.tagId && (a.subtagId ?? null) === this.subtagId
+					)
+				).map(m => m.id)
 			);
-			return `
-				<label class="bbmm-bulk-row">
-					<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${checked ? "checked" : ""}>
-					<span class="bbmm-bulk-mod-title">${hlp_esc(m.title ?? m.id)}</span>
-				</label>
-			`;
-		}).join("");
+		}
 
+		const q = this.filter.toLowerCase().trim();
+		let visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
+		if (this.viewMode === "untagged") visible = visible.filter(m => !(data.assignments[m.id]?.length));
+
+		const vm = this.viewMode;
 		const root = document.createElement("div");
 		root.className = "bbmm-bulk-assign-content";
 		root.innerHTML = `
 			<div class="bbmm-bulk-header">${hlp_esc(LT.moduleManagement.tagMgrAssigning())} <strong>${hlp_esc(label)}</strong></div>
+			<div class="bbmm-bulk-scopes">
+				<button type="button" data-bulk-view="none"     class="${vm === "none"     ? "on" : ""}">${hlp_esc(LT.moduleManagement.tagMgrViewNone())}</button>
+				<button type="button" data-bulk-view="group"    class="${vm === "group"    ? "on" : ""}">${hlp_esc(LT.moduleManagement.groupByTags())}</button>
+				<button type="button" data-bulk-view="untagged" class="${vm === "untagged" ? "on" : ""}">${hlp_esc(LT.moduleManagement.tagMgrViewUntagged())}</button>
+			</div>
 			<input type="text" id="bbmm-bulk-filter" placeholder="${hlp_esc(LT.moduleManagement.tagMgrFilterPlaceholder())}" value="${hlp_esc(this.filter)}">
-			<div class="bbmm-bulk-list">${rows || `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`}</div>
+			<div class="bbmm-bulk-list">${this._renderBulkList(data, visible)}</div>
 		`;
 		return root;
 	}
@@ -717,6 +768,41 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 			this.filter = e.target.value ?? "";
 			this._updateList(content);
 		});
+
+		// View mode segmented buttons
+		content.addEventListener("click", (ev) => {
+			const btn = ev.target.closest("[data-bulk-view]");
+			if (!btn) return;
+			this.viewMode = btn.dataset.bulkView;
+			this._collapsedGroups.clear();
+			this._updateList(content);
+			for (const b of content.querySelectorAll("[data-bulk-view]"))
+				b.classList.toggle("on", b.dataset.bulkView === this.viewMode);
+		});
+
+		// Group collapse toggle
+		content.addEventListener("click", (ev) => {
+			const header = ev.target.closest(".bbmm-bulk-group-header");
+			if (!header) return;
+			const group = header.closest(".bbmm-bulk-group");
+			const groupId = group?.getAttribute("data-group-id");
+			if (!groupId) return;
+			if (this._collapsedGroups.has(groupId)) this._collapsedGroups.delete(groupId);
+			else this._collapsedGroups.add(groupId);
+			group.classList.toggle("collapsed", this._collapsedGroups.has(groupId));
+		});
+
+		// Sync duplicate checkboxes when grouped view shows a module in multiple groups
+		content.querySelector(".bbmm-bulk-list")?.addEventListener("change", (ev) => {
+			const cb = ev.target.closest('input[name="mod"]');
+			if (!cb) return;
+			const id = cb.value;
+			if (cb.checked) this.selected.add(id);
+			else this.selected.delete(id);
+			for (const el of content.querySelectorAll(`input[name="mod"][value="${CSS.escape(id)}"]`)) {
+				el.checked = cb.checked;
+			}
+		});
 	}
 
 	_updateList(content) {
@@ -725,10 +811,8 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 		const allMods = [...game.modules.values()]
 			.filter(m => m.active !== undefined)
 			.sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id));
-		const visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
 
-		// On first call, initialize selected from saved assignments.
-		// On subsequent calls, sync any visible checkbox changes into selected before re-rendering.
+		// Sync current checkbox state into selected before re-rendering
 		if (this.selected === null) {
 			this.selected = new Set(
 				allMods.filter(m =>
@@ -744,18 +828,11 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 			}
 		}
 
-		const rows = visible.map(m => {
-			const isChecked = this.selected.has(m.id);
-			return `
-				<label class="bbmm-bulk-row">
-					<input type="checkbox" name="mod" value="${hlp_esc(m.id)}" ${isChecked ? "checked" : ""}>
-					<span class="bbmm-bulk-mod-title">${hlp_esc(m.title ?? m.id)}</span>
-				</label>
-			`;
-		}).join("");
+		let visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
+		if (this.viewMode === "untagged") visible = visible.filter(m => !(data.assignments[m.id]?.length));
 
 		const list = content.querySelector(".bbmm-bulk-list");
-		if (list) list.innerHTML = rows || `<p>${hlp_esc(LT.moduleManagement.tagMgrNoModulesFound())}</p>`;
+		if (list) list.innerHTML = this._renderBulkList(data, visible);
 	}
 
 	async _renderFrame(options) {
@@ -997,12 +1074,6 @@ async function _bbmmOpenNotesDialog(moduleId) {
             },
             buttons: [
                 { action: "cancel", label: LT.buttons.cancel(), icon: "fa-solid fa-xmark" },
-                {
-					action: "tags",
-					label: LT.moduleManagement.editTags(),
-					icon: "fa-solid fa-tags",
-					callback: () => { openModuleTagsApp(moduleId); return false; }
-				},
                 {
 					action: "save",
 					label: LT.buttons.save(),
@@ -1980,21 +2051,40 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	}
 
 	/* Build a core-style tag strip from module metadata (no version pill). */
-	_buildTagsFor(mod) {
+	_buildTagsFor(mod, tagData = null) {
 		
 		try {
 			const parts = [];
 
 			/* Lock toggle tag */
 			try {
-				const isLocked = this.locks?.has?.(mod.id) === true;
-				parts.push(
-					`<button type="button" class="tag flexrow" data-bbmm-action="toggle-lock" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(isLocked ? LT.moduleManagement.lockUnlock() : LT.moduleManagement.lockLock())}">` +
-						/* When locked: closed lock + inline orange so it’s instantly visible */
-						`<i class="fa-solid ${isLocked ? "fa-lock" : "fa-lock-open"} fa-fw"${isLocked ? ' style="color: orange;"' : ""}></i>` +
-					`</button>`
-				);
+				if (game.user.isGM) {
+					const isLocked = this.locks?.has?.(mod.id) === true;
+					parts.push(
+						`<button type="button" class="tag flexrow" data-bbmm-action="toggle-lock" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(isLocked ? LT.moduleManagement.lockUnlock() : LT.moduleManagement.lockLock())}">` +
+							/* When locked: closed lock + inline orange so it’s instantly visible */
+							(isLocked
+								? `<i class="fa-solid fa-lock fa-fw" style="color: orange;"></i>`
+								: `<i class="fa-solid fa-lock-open fa-fw"></i>`) +
+						`</button>`
+					);
+				}
 			} catch (e) { DL(2, "BBMMModuleManagerApp::_buildTagsFor(): lock tag failed", e); }
+
+			/* Tag edit button */
+			try {
+				if (game.user.isGM) {
+					const assignments = tagData?.assignments?.[mod.id] ?? [];
+					const hasTags = assignments.length > 0;
+					parts.push(
+						`<button type="button" class="tag flexrow" data-bbmm-action="edit-tags" data-mod-id="${hlp_esc(mod.id)}" aria-label="${hlp_esc(LT.moduleManagement.editTags())}">` +
+							(hasTags
+								? `<i class="fa-solid fa-tags fa-fw" style="color: orange;"></i>`
+								: `<i class="fa-solid fa-tags fa-fw"></i>`) +
+						`</button>`
+					);
+				}
+			} catch (e) { DL(2, "BBMMModuleManagerApp::_buildTagsFor(): tags button failed", e); }
 
 			// Settings gear (same size as native via "tag flexrow")
 			try{
@@ -2155,15 +2245,16 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					<button type="button" id="bbmm-mm-expand-all" title="${hlp_esc(LT.moduleManagement.expandAll())}" style="${this.groupByTags || this.groupBySubtags ? "" : "display:none"}">
 						<i class="fa-solid fa-angles-down"></i>
 					</button>
-					<button type="button" id="bbmm-mm-manage-tags">
+					${game.user.isGM ? `<button type="button" id="bbmm-mm-manage-tags">
 						<i class="fas fa-tag"></i> ${hlp_esc(LT.moduleManagement.tagMgrLabel())}
-					</button>
+					</button>` : ""}
 				</div>
 			</div>
 		`;
 	}
 
 	_renderFooterHTML() {
+		if (!game.user.isGM) return `<div class="bbmm-mm-footer"></div>`;
 		const hasCulprit = !!game.modules.get("find-the-culprit")?.active;
 		return `
 			<div class="bbmm-mm-footer">
@@ -2171,7 +2262,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				<button type="button" id="bbmm-mm-deactivate-all">${LT.moduleManagement.deactivateAll()}</button>
 				<button type="button" id="bbmm-mm-activate-all">${LT.moduleManagement.activateAll()}</button>
 				${hasCulprit ? `<button type="button" id="bbmm-mm-culprit"><i class="fa-solid fa-search"></i> ${LT.moduleManagement.findTheCulprit()}</button>`: ``}
-				
+
 			</div>
 		`;
 	}
@@ -2258,10 +2349,10 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 				const userTagChips = this._buildUserTagChips(m.id, tagData);
 				return `
-					<div class="row ${planned ? "on" : "off"} ${changed ? "chg" : ""} ${this.locks.has(m.id) ? "bbmm-locked" : ""}" data-id="${hlp_esc(m.id)}">
-					<label class="toggle" onclick="event.stopPropagation()">
+					<div class="row ${planned ? "on" : "off"} ${changed ? "chg" : ""} ${this.locks.has(m.id) ? "bbmm-locked" : ""} ${game.user.isGM ? "" : "bbmm-no-toggle"}" data-id="${hlp_esc(m.id)}">
+					${game.user.isGM ? `<label class="toggle" onclick="event.stopPropagation()">
 						<input type="checkbox" ${planned ? "checked" : ""} ${this.locks.has(m.id) ? "disabled" : ""}>
-					</label>
+					</label>` : ""}
 
 					<div class="main">
 						<div class="title" title="${hlp_esc(m.title)}">${hlp_esc(m.title)}</div>
@@ -2271,12 +2362,12 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					<div class="actions">
 						<div class="tags">
 						${noteBadge}
-						${this._buildTagsFor(modObj)}
+						${this._buildTagsFor(modObj, tagData)}
 						${verTxt ? `<span class="ver-text" title="${hlp_esc(verTitle)}" style="${verColor ? `color:${verColor}` : ""}">v${hlp_esc(verTxt)}</span>` : ``}
 						</div>
-						<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
+						${game.user.isGM ? `<button type="button" class="btn-edit" data-id="${hlp_esc(m.id)}" title="${hlp_esc(LT.modListEditNotes())}">
 						<i class="fa-solid fa-pen-to-square fa-fw"></i>
-						</button>
+						</button>` : ""}
 					</div>
 
 					<div class="notes">
@@ -2499,6 +2590,18 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 					_bbmmOpenModuleSettingsTab(id);
 					DL(`BBMMModuleManagerApp | open settings for ${id}`);
 				} catch (e) { DL(2, "BBMMModuleManagerApp | open settings failed", e); }
+			}, true);
+
+			// edit tags (tag icon)
+			this._root.addEventListener("click", (ev) => {
+				const btn = ev.target.closest?.('[data-bbmm-action="edit-tags"]');
+				if (!btn) return;
+				ev.stopPropagation();
+				const id = btn.getAttribute("data-mod-id");
+				if (!id) return;
+				try {
+					openModuleTagsApp(id);
+				} catch (e) { DL(2, "BBMMModuleManagerApp | edit tags failed", e); }
 			}, true);
 
 			// edit notes (pencil)
