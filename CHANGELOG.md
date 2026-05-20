@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.9-test2] - 2026-05-19
+## [0.8.9-test3] - 2026-05-19
 
 ### Added
 - **Module Manager:**
@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Module Manager:**
   - Players opening the Module Manager now see a read-only view. Checkboxes, the Activate All/Deactivate All buttons, Find the Culprit, Manage Tags, per-module lock toggles, and the Edit Notes button are hidden for non-GM users.
   - Removed the "Edit Tags" button from the Edit Notes dialog, as tags can now be edited directly from the module row.
+  
+  ### Fixed
+- **Module Presets:**
+  - Fixed the Close button being pushed off the bottom of the preset preview window.
 
 ## [0.8.8] - 2026-05-15
 
