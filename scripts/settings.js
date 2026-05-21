@@ -251,6 +251,7 @@ export function injectBBMMHeaderButton(root) {
 			{ action: "exclusions", label: LT.exclusionsMgr(), onClick: () => openExclusionsManager() },
 			/*{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },*/
 			{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel(), onClick: () => openhiddenSettingSyncManager() },
+			{ action: "lockPresets", label: LT.lockPresets.menuLabel(), onClick: () => openLockPresetManager() },
 			{ action: "tags", label: LT.moduleManagement.tagMgrLabel(), onClick: () => openTagManager() },
 			{ action: "changelogFiles", label: LT.changelog.filesMgrLabel(), onClick: () => openChangelogFilesManager() },
 			// Import / Export
@@ -525,6 +526,17 @@ export function openhiddenSettingSyncManager() {
 	}
 }
 
+function openLockPresetManager() {
+	DL("settings.js | openLockPresetManager(): fired");
+	try {
+		const fn = globalThis.bbmm?.openLockPresetManager;
+		if (typeof fn === "function") return fn();
+		DL(3, "settings.js | openLockPresetManager(): launcher not found");
+	} catch (err) {
+		DL(3, "settings.js | openLockPresetManager(): failed", err);
+	}
+}
+
 // Open a small chooser dialog, then launch the selected manager
 export function openTagManager() {
 	DL("settings.js | openTagManager(): fired");
@@ -552,8 +564,9 @@ export async function openBBMMLauncher() {
 					{ action: "settings", label: LT.settingsPresetMgr() },
 					// { action: "controls-presets", label: LT.controlsPresetMgr() },
 					{ action: "exclusions", label: LT.exclusionsMgr() },
-					{ action: "hiddenSettings",   label: LT.hiddenSettingSync.menuLabel() },
-					{ action: "importExport", label: LT.buttons.importExport() },
+					{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel() },
+					{ action: "lockPresets",    label: LT.lockPresets.menuLabel() },
+					{ action: "importExport",   label: LT.buttons.importExport() },
 					{ action: "cancel",   label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
@@ -603,6 +616,8 @@ export async function openBBMMLauncher() {
 			}
 	} else if (choice === "hiddenSettings") {
 		openhiddenSettingSyncManager();
+	} else if (choice === "lockPresets") {
+		openLockPresetManager();
 	}
 	// "cancel" -> do nothing
 }
@@ -1851,6 +1866,39 @@ Hooks.once("init", () => {
 				}
 			});
 
+			// MENU: Lock Preset Manager
+			game.settings.registerMenu(BBMM_ID, "lockPresetManager", {
+				name: LT.lockPresets.menuLabel(),
+				label: LT.lockPresets.menuLabel(),
+				icon: "fas fa-lock",
+				restricted: true,
+				type: class extends FormApplication {
+					constructor(...args){ super(...args); }
+					static get defaultOptions() {
+						return foundry.utils.mergeObject(super.defaultOptions, {
+							id: "bbmm-lock-preset-manager-opener",
+							title: LT.lockPresets.title(),
+							template: null,
+							width: 600
+						});
+					}
+					async render(...args) {
+						try {
+							const fn = globalThis.bbmm?.openLockPresetManager;
+							if (typeof fn !== "function") {
+								DL(3, "settings.js | lockPresetManager menu: global opener not found");
+								return this;
+							}
+							fn();
+						} catch (err) {
+							DL(3, "settings.js | lockPresetManager menu: failed", err);
+						}
+						return this;
+					}
+					async _updateObject() {}
+				}
+			});
+
 			// MENU: Changelog Filename Manager
 			game.settings.registerMenu(BBMM_ID, "changelogFilesManager", {
 				name: LT.changelog.filesMgrName(),
@@ -2102,6 +2150,7 @@ Hooks.once("ready", async () => {
 			"settings-presets.json": {},
 			"user-exclusions.json":  { settings: [], modules: [] },
 			"user-inclusions.json":  { settings: [], modules: [] },
+			"lock-presets.json":     {},
 		};
 
 		for (const [filename, defaultData] of Object.entries(seeds)) {
