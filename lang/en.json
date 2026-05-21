@@ -523,7 +523,10 @@
 			"staleQuestion":        "Include these locks in the preset anyway, or discard them?",
 			"staleKeep":            "Include Anyway",
 			"staleDontSave":        "Don't Save",
-			"stalePurge":           "Purge from Locks"
+			"stalePurge":           "Purge from Locks",
+			"clearBeforeApply":     "Clear all existing locks before applying",
+			"confirmUpdate":        "Update lock preset <b>{name}</b> with current active locks?",
+			"titleConfirmUpdate":   "Update Lock Preset"
 		},
 		"_importExport": {
 			"allPresets": "All Presets",

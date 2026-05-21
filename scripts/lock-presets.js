@@ -66,7 +66,7 @@ async function svc_setLockPresets(obj) {
 	- Reads userSettingSync for entries with no userIds (all-user scope)
 	- Stores namespace, key, lockType — no values
 ======================================================================= */
-async function svc_saveCurrentLocksAsPreset(name) {
+async function svc_saveCurrentLocksAsPreset(name, skipOverwriteConfirm = false) {
 	const rawName = String(name ?? "").trim();
 	if (!rawName) {
 		ui.notifications.warn(`${LT.lockPresets.nameRequired()}.`);
@@ -135,7 +135,7 @@ async function svc_saveCurrentLocksAsPreset(name) {
 	if (!_lockPresetCache) await svc_loadLockPresets();
 	const all = svc_getLockPresets();
 
-	if (all[rawName]) {
+	if (all[rawName] && !skipOverwriteConfirm) {
 		const confirmed = await foundry.applications.api.DialogV2.confirm({
 			window:     { title: LT.lockPresets.titleConfirmOverwrite() },
 			content:    `<p>${LT.lockPresets.confirmOverwrite({ name: hlp_esc(rawName) })}</p>`,
@@ -161,7 +161,7 @@ async function svc_saveCurrentLocksAsPreset(name) {
 	- Hard locks: write to map, emit bbmm-sync-push + bbmm-sync-refresh
 	- Additive: only touches settings in the preset; existing locks remain
 ======================================================================= */
-async function svc_applyLockPreset(name) {
+async function svc_applyLockPreset(name, wipeFirst = false) {
 	const all    = svc_getLockPresets();
 	const preset = all[name];
 	if (!preset || !Array.isArray(preset.locks) || !preset.locks.length) {
@@ -182,8 +182,8 @@ async function svc_applyLockPreset(name) {
 		return;
 	}
 
-	let map      = game.settings.get(BBMM_ID, "userSettingSync")  || {};
-	let revMap   = game.settings.get(BBMM_ID, "softLockRevMap")   || {};
+	let map    = wipeFirst ? {} : (game.settings.get(BBMM_ID, "userSettingSync") || {});
+	let revMap = game.settings.get(BBMM_ID, "softLockRevMap") || {};
 	let revChanged = false;
 	const softPushes = [];
 	const hardPushes = [];
@@ -252,6 +252,10 @@ async function svc_applyLockPreset(name) {
 
 	const applied = valid.length - skipped;
 	ui.notifications.info(`${LT.lockPresets.loaded({ name, count: applied, skipped })}.`);
+}
+
+async function svc_updateLockPreset(name) {
+	return svc_saveCurrentLocksAsPreset(name, true);
 }
 
 async function svc_deleteLockPreset(name) {
@@ -331,7 +335,7 @@ function ui_openLockPresetPreview(presetName) {
 			return;
 		}
 
-		const COL         = "110px 1fr 100px";
+		const COL         = "143px 1fr 100px";
 		const HEADER_STYLE = `display:grid;grid-template-columns:${COL};border-bottom:1px solid var(--color-border,#444);padding:.35rem .5rem;font-weight:600;font-size:12px;`;
 		const ROW_STYLE    = `display:grid;grid-template-columns:${COL};align-items:start;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;`;
 		const CELL_STYLE   = "padding:.25rem .4rem;min-width:0;overflow-wrap:break-word;";
@@ -415,21 +419,21 @@ export async function openLockPresetManager() {
 
 		const rows = list.length
 			? list.map(({ name, preset }) => `
-				<tr>
-					<td style="flex:1;padding:.25rem .5rem;">${hlp_esc(name)}</td>
+				<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+					<td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hlp_esc(name)}</td>
 					<td style="width:4rem;text-align:center;padding:.25rem .5rem;">${Array.isArray(preset.locks) ? preset.locks.length : 0}</td>
-					<td style="width:11rem;padding:.25rem .5rem;">${_fmtDate(preset.updated ?? preset.created)}</td>
 					<td style="padding:.25rem .5rem;">
 						<div style="display:flex;gap:.25rem;justify-content:flex-end;">
 							<button type="button" data-action="preview" data-preset-name="${hlp_esc(name)}">${LT.buttons.preview()}</button>
 							<button type="button" data-action="load"    data-preset-name="${hlp_esc(name)}">${LT.buttons.load()}</button>
+							<button type="button" data-action="update"  data-preset-name="${hlp_esc(name)}">${LT.buttons.update()}</button>
 							<button type="button" data-action="rename"  data-preset-name="${hlp_esc(name)}">${LT.errors.rename()}</button>
 							<button type="button" data-action="delete"  data-preset-name="${hlp_esc(name)}">${LT.buttons.delete()}</button>
 						</div>
 					</td>
 				</tr>
 			`).join("")
-			: `<tr><td colspan="4" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets()}</td></tr>`;
+			: `<tr><td colspan="3" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets()}</td></tr>`;
 
 		const content = `
 			<section style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
@@ -439,18 +443,15 @@ export async function openLockPresetManager() {
 						style="flex:1;">
 					<button type="button" data-action="save-current">${LT.lockPresets.saveBtnLabel()}</button>
 				</div>
-				<table style="width:100%;border-collapse:collapse;">
-					<thead>
-						<tr style="border-bottom:1px solid var(--color-border-dark-5);">
-							<th style="text-align:left;padding:.25rem .5rem;">${LT.lockPresets.colName()}</th>
-							<th style="width:4rem;text-align:center;padding:.25rem .5rem;">${LT.lockPresets.colCount()}</th>
-							<th style="width:11rem;padding:.25rem .5rem;">${LT.lockPresets.colCreated()}</th>
-							<th></th>
-						</tr>
-					</thead>
-				</table>
 				<div style="overflow-y:auto;max-height:35vh;">
 					<table style="width:100%;border-collapse:collapse;">
+						<thead style="position:sticky;top:0;background:var(--color-bg,#1a1a1a);z-index:1;">
+							<tr style="border-bottom:1px solid var(--color-border-dark-5);">
+								<th style="text-align:left;padding:.25rem .5rem;">${LT.lockPresets.colName()}</th>
+								<th style="width:4rem;text-align:center;padding:.25rem .5rem;">${LT.lockPresets.colCount()}</th>
+								<th></th>
+							</tr>
+						</thead>
 						<tbody>${rows}</tbody>
 					</table>
 				</div>
@@ -490,7 +491,7 @@ export async function openLockPresetManager() {
 				const btn = ev.target;
 				if (!(btn instanceof HTMLButtonElement)) return;
 				const action = btn.dataset.action;
-				if (!["save-current", "preview", "load", "rename", "delete"].includes(action)) return;
+				if (!["save-current", "preview", "load", "update", "rename", "delete"].includes(action)) return;
 				ev.preventDefault();
 				ev.stopImmediatePropagation();
 
@@ -513,15 +514,54 @@ export async function openLockPresetManager() {
 				}
 
 				if (action === "load") {
+					const { confirmed, clearFirst } = await new Promise((resolve) => {
+						new foundry.applications.api.DialogV2({
+							window:      { title: LT.lockPresets.titleConfirmLoad(), modal: true },
+							content:     `
+								<p>${LT.lockPresets.confirmLoad({ name: hlp_esc(presetName) })}</p>
+								<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-top:.5rem;">
+									<input type="checkbox" name="clearFirst">
+									${LT.lockPresets.clearBeforeApply()}
+								</label>
+							`,
+							buttons: [
+								{
+									action:   "ok",
+									label:    LT.buttons.apply(),
+									default:  false,
+									callback: (_ev, btn) => resolve({ confirmed: true, clearFirst: !!btn.form?.elements?.clearFirst?.checked }),
+								},
+								{
+									action:   "cancel",
+									label:    LT.buttons.cancel(),
+									default:  true,
+									callback: () => resolve({ confirmed: false, clearFirst: false }),
+								},
+							],
+							submit:      () => {},
+							rejectClose: false,
+							close:       () => resolve({ confirmed: false, clearFirst: false }),
+						}).render(true);
+					});
+					if (!confirmed) return;
+					await svc_applyLockPreset(presetName, clearFirst);
+					return;
+				}
+
+				if (action === "update") {
 					const confirmed = await foundry.applications.api.DialogV2.confirm({
-						window:     { title: LT.lockPresets.titleConfirmLoad() },
-						content:    `<p>${LT.lockPresets.confirmLoad({ name: hlp_esc(presetName) })}</p>`,
+						window:     { title: LT.lockPresets.titleConfirmUpdate() },
+						content:    `<p>${LT.lockPresets.confirmUpdate({ name: hlp_esc(presetName) })}</p>`,
 						defaultYes: false,
-						ok:         { label: LT.buttons.apply() },
+						ok:         { label: LT.buttons.update() },
 						cancel:     { label: LT.buttons.cancel() },
 					});
 					if (!confirmed) return;
-					await svc_applyLockPreset(presetName);
+					const res = await svc_updateLockPreset(presetName);
+					if (res?.status === "saved") {
+						try { await dlg.close({ force: true }); } catch {}
+						openLockPresetManager();
+					}
 					return;
 				}
 

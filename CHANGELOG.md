@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-test1] - 2026-05-21
+
+### Added
+- **Lock Presets:**
+  - New Lock Preset Manager lets GMs save a named snapshot of all current all-user setting locks and soft locks.
+  - Saved presets store the namespace, key, and lock type (hard or soft) for each locked setting — not the values — so they are applied against whatever the current values are at apply time.
+  - Applying a preset is additive by default: only the settings listed in the preset are touched; existing locks on other settings remain unchanged.
+  - Load confirm dialog includes a "Clear all existing locks before applying" checkbox (unchecked by default) for a full replace instead of additive apply.
+  - Update button on each row re-saves current active locks over that preset without prompting for a name.
+  - Preview button shows the full list of settings in a preset (module, setting name, hint, lock type) before applying.
+  - Rename and Delete buttons for managing saved presets.
+  - When saving, if any locked settings belong to modules that are no longer installed, a dialog prompts the GM to include, skip, or purge those stale entries. Purging also removes them from the active lock map immediately.
+  - Lock Preset Manager is accessible from the BBMM header button menu, the BBMM launcher dialog, and the module settings menu (GM only).
+  - Preset data is stored in `bbmm-data/lock-presets.json` alongside other BBMM persistent data files.
+
+### Changed
+- **Setting Sync:**
+  - Soft lock login-apply is now deferred until after `canvasReady` so all modules have finished registering their settings before BBMM attempts to apply. Falls back to a 2-second delay when the canvas is disabled or no scene is active.
+  - Soft lock ledger now records the last evaluated revision even when the setting value did not need to change, preventing redundant re-evaluation on every subsequent push.
+
 ## [0.8.9] - 2026-05-19
 
 ### Added
