@@ -1651,10 +1651,13 @@ import { LT, BBMM_ID } from "./localization.js";
 				return;
 			}
 
-			/* SETTINGS — apply pending SOFT locks at login (players only; jump ledger to world rev) */
+			/* SETTINGS — apply pending SOFT locks at login (players only; jump ledger to world rev)
+			   Deferred until after all modules have fully registered their settings:
+			   - Primary:  Hooks.once("canvasReady") — fires after canvas init, well after all ready hooks
+			   - Fallback: setTimeout 2000ms — used when canvas is disabled or no scene is active */
 			if (!game.user?.isGM) {
-				try {
-					const map	 = game.settings.get(BBMM_ID, "userSettingSync") || {};
+				const _softLoginApply = async () => { try {
+					const map    = game.settings.get(BBMM_ID, "userSettingSync") || {};
 					const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
 					let applied = 0;
 
@@ -1666,6 +1669,11 @@ import { LT, BBMM_ID } from "./localization.js";
 							if (dot <= 0) continue;
 							const ns  = id.slice(0, dot);
 							const key = id.slice(dot + 1);
+
+							if (!game.settings.settings.get(id)) {
+								DL(`setting-sync.js |  SOFT login-apply skipped (unregistered): ${id}`);
+								continue;
+							}
 
 							const worldRev = Number.isInteger(ent.rev) ? ent.rev : 0;
 							const prevRev  = Number.isInteger(ledger[id]?.r) ? ledger[id].r : 0;
@@ -1688,6 +1696,16 @@ import { LT, BBMM_ID } from "./localization.js";
 					}
 				} catch (e) {
 					DL(2, "setting-sync.js |  SOFT login-apply block failed", e);
+				} };
+
+				const noCanvas      = !!game.settings.get("core", "noCanvas");
+				const noActiveScene = !game.scenes?.active;
+				if (noCanvas || noActiveScene) {
+					DL(`setting-sync.js |  SOFT login-apply: no canvas/scene, using 2s fallback`);
+					setTimeout(_softLoginApply, 2000);
+				} else {
+					DL(`setting-sync.js |  SOFT login-apply: waiting for canvasReady`);
+					Hooks.once("canvasReady", _softLoginApply);
 				}
 			}
 
@@ -1914,25 +1932,25 @@ import { LT, BBMM_ID } from "./localization.js";
 						}
 
 						const current = game.settings.get(namespace, key);
+
+						// Update ledger to reflect last evaluated rev regardless of whether value changed
+						if (soft === true) {
+							try {
+								const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
+								const prev = ledger[id];
+								const prevRev = (prev && typeof prev === "object" && Number.isInteger(prev.r)) ? prev.r : -1;
+								const recordRev = Number.isInteger(softRev) ? softRev : prevRev;
+								ledger[id] = { v: JSON.stringify(value ?? null), r: recordRev };
+								await game.settings.set(BBMM_ID, "softLockLedger", ledger);
+								DL(`setting-sync.js |  soft-ledger: marked evaluated rev=${recordRev} for ${id}`);
+							} catch (e) {
+								DL(2, "setting-sync.js |  soft-ledger: mark on evaluate failed", e);
+							}
+						}
+
 						if (!objectsEqual(current, value)) {
 							DL(`setting-sync.js |  bbmm-setting-lock: push apply ${id} ->`, value);
 							await game.settings.set(namespace, key, value);
-
-							// Mark handled for soft — record exact world rev
-							if (soft === true) {
-								try {
-									const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
-									const prev = ledger[id];
-									const prevRev = (prev && typeof prev === "object" && Number.isInteger(prev.r)) ? prev.r : -1;
-
-									const recordRev = Number.isInteger(softRev) ? softRev : prevRev;
-									ledger[id] = { v: JSON.stringify(value ?? null), r: recordRev };
-									await game.settings.set(BBMM_ID, "softLockLedger", ledger);
-									DL(`setting-sync.js |  soft-ledger: marked applied rev=${recordRev} for ${id}`);
-								} catch (e) {
-									DL(2, "setting-sync.js |  soft-ledger: mark after push failed", e);
-								}
-							}
 
 							if (requiresReload || cfg.requiresReload) {
 								if (hlp_shouldAutoForceReload()) {
