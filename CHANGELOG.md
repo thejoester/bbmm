@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Soft lock ledger now records the last evaluated revision even when the setting value did not need to change, preventing redundant re-evaluation on every subsequent push.
 - **Journal:**
   - Updated compendium Journal manual. 
+- **Localization**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 
 ## [0.8.9] - 2026-05-19
 
