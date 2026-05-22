@@ -23,6 +23,7 @@
         "scripts/exclusions.js",
         "scripts/inclusions.js",
         "scripts/setting-sync.js",
+        "scripts/lock-presets.js",
         "scripts/module-management.js",
         "scripts/changelogs.js",
         "scripts/hidden-setting-sync.js",
@@ -85,7 +86,7 @@
     "flags": {
         "canUpload": true
     },
-    "description": "Utility to manage modules and settings.",
+    "description": "Advanced Module management tool. Settings Presets, Module Presets, User settings sync/lock, Change log reports, and more!",
     "url": "https://github.com/thejoester/bbmm/",
     "manifest": "https://github.com/thejoester/bbmm/releases/download/0.6.5-test1/module.json",
     "download": "https://github.com/thejoester/bbmm/releases/download/0.6.5-test1/bbmm.zip",
