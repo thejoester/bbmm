@@ -413,6 +413,8 @@
 		"tagMgrAssigning": "Assegnazione:",
 		"tagMgrFilterPlaceholder": "Filtra moduli...",
 		"tagMgrNoModulesFound": "Nessun modulo trovato.",
+		"tagMgrViewNone": "Nessuno",
+		"tagMgrViewUntagged": "Solo senza Tag",
 		"tagMgrSubtagNone": "(nessuno)",
 		"tagMgrClearFilter": "Cancella",
 		"filterModules": "Filtra Moduli",
