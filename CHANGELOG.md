@@ -23,22 +23,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 
-## [1.0.0] - 2026-05-21
-
-### Added
-- **Lock Presets:**
-  - New Lock Preset Manager lets GMs save a named snapshot of the current user setting locks and soft locks.
-  - Saved Presets contain only the setting and lock type, NOT THE VALUE.
-  - Applying a preset is additive by default: only the settings listed in the preset are touched; existing locks on other settings remain unchanged.
-  - Preset data is stored in `bbmm-data/lock-presets.json` alongside other BBMM persistent data files, so presets will be available in all worlds.
-
-### Changed
-- **Setting Sync:**
-  - Soft lock login-apply is now deferred until after `canvasReady` so all modules have finished registering their settings before BBMM attempts to apply. Falls back to a 2-second delay when the canvas is disabled or no scene is active.
-  - Soft lock ledger now records the last evaluated revision even when the setting value did not need to change, preventing redundant re-evaluation on every subsequent push.
-- **Journal:**
-  - Updated compendium Journal manual. 
-
 ## [0.8.9] - 2026-05-19
 
 ### Added
