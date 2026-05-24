@@ -4,24 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2026-05-21
+## [1.1.0-test1] - 2026-05-24
 
 ### Added
-- **Lock Presets:**
-  - New Lock Preset Manager lets GMs save a named snapshot of the current user setting locks and soft locks.
-  - Saved Presets contain only the setting and lock type, NOT THE VALUE.
-  - Applying a preset is additive by default: only the settings listed in the preset are touched; existing locks on other settings remain unchanged.
-  - Preset data is stored in `bbmm-data/lock-presets.json` alongside other BBMM persistent data files, so presets will be available in all worlds.
+- **Lock Configurator:**
+  - New Lock Configurator macro lets GMs view and manage all global setting locks without having to open the full Foundry settings.
+  - Each locked setting shows the lock type (Lock or Soft Lock), which module it belongs to, the setting name, and the currently locked value.
+  - GMs can unlock any setting or switch it between Lock and Soft Lock directly from the list.
+  - An "Add Lock(s)" button opens a picker where the GM can browse all user and client settings by module, see current values, and apply a Lock or Soft Lock to individual settings without changing their own value. Multiple locks can be staged and saved together.
+  - The Lock Configurator is accessible from the BBMM header button menu (GM only).
+  - NOTE: This does not affect user based locks, only global global locks. 
 
 ### Changed
+- **Module Preset Manager & Settings Preset Manager:**
+  - Reworked layout to match the Lock Preset Manager: save-new-preset name field and button are now at the top, and the preset list is shown as a scrollable table (instead of a dropdown + separate action buttons).
+  - Each preset row has its own Load, Preview, Update, Rename, and Delete buttons inline.
+  - The list area is fixed in height to show ~5-6 presets, scrolling when there are more.
+  - The window now preserves its position and size when it reopens after a save, update, rename, or delete.
 - **Setting Sync:**
-  - Soft lock login-apply is now deferred until after `canvasReady` so all modules have finished registering their settings before BBMM attempts to apply. Falls back to a 2-second delay when the canvas is disabled or no scene is active.
-  - Soft lock ledger now records the last evaluated revision even when the setting value did not need to change, preventing redundant re-evaluation on every subsequent push.
-- **Journal:**
-  - Updated compendium Journal manual. 
-- **Localization**
-  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
-  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+  - Added a new "Hide Locked Settings from Players" option (enabled by default). When disabled, settings that are locked for players are still visible in their settings list but cannot be changed, rather than being hidden entirely.
+- **Setting Sync:**
+  - Now when a GM changes a setting that is locked for players, the lock now stays active for players and updates to reflect the GM's new value, so players remain locked to whatever the GM most recently set.
 
 ## [0.8.9] - 2026-05-19
 
