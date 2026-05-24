@@ -8,6 +8,7 @@ import { svc_loadSettingsPresets } from "./settings-presets.js";
 import { hlp_loadPresets } from "./module-presets.js";
 
 const BBMM_SYNC_CH = "module.bbmm";
+let _lockConfiguratorWarnShown = false;
 
 
 /* ==========================================================================
@@ -2014,9 +2015,22 @@ export function openKeybindInspector() {
 	}
 }
 
-export function openLockConfigurator() {
+export async function openLockConfigurator() {
 	try {
 		if (!game.user?.isGM) { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
+
+		if (!_lockConfiguratorWarnShown) {
+			const confirmed = await foundry.applications.api.DialogV2.confirm({
+				window:     { title: LT.lockConfigurator.warnTitle(), modal: true },
+				content:    `<p>${LT.lockConfigurator.warnBody()}</p>`,
+				defaultYes: false,
+				yes:        { label: LT.lockConfigurator.warnProceed() },
+				no:         { label: LT.buttons.cancel() },
+			});
+			if (!confirmed) return;
+			_lockConfiguratorWarnShown = true;
+		}
+
 		DL("macros.js | openLockConfigurator(): launching");
 		new BBMMLockConfigurator().render(true);
 	} catch (err) {

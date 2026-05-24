@@ -1989,7 +1989,34 @@ Hooks.once("init", () => {
 				requiresReload: true,
 			});
 
-			// Prompt to enable newly added modules 
+			// Default grouping mode for module manager
+			game.settings.register(BBMM_ID, "defaultGrouping", {
+				name: LT.defaultGroupingName(),
+				hint: LT.defaultGroupingHint(),
+				scope: "world",
+				config: true,
+				type: String,
+				choices: {
+					"none":   LT.defaultGroupingNone(),
+					"tag":    LT.defaultGroupingByTag(),
+					"subtag": LT.defaultGroupingBySubtag(),
+				},
+				default: "none",
+				restricted: true,
+			});
+
+			// Auto collapse all groups when module manager opens
+			game.settings.register(BBMM_ID, "autoCollapseList", {
+				name: LT.autoCollapseListName(),
+				hint: LT.autoCollapseListHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: false,
+				restricted: true,
+			});
+
+			// Prompt to enable newly added modules
 			game.settings.register(BBMM_ID, "promptEnableNewModules", {
 				name: LT.moduleManagement.promptEnableNewModulesName(),
 				hint: LT.moduleManagement.promptEnableNewModulesHint(),

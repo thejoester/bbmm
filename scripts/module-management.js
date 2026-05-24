@@ -1153,8 +1153,9 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		this.query = "";
 		this.scope = "all";
 		this.tagFilter = new Set();  // tagIds to filter by (empty = show all)
-		this.groupByTags = false;
-		this.groupBySubtags = false;
+		const _defaultGrouping = game.settings.get(BBMM_ID, "defaultGrouping") ?? "none";
+		this.groupByTags    = _defaultGrouping === "tag";
+		this.groupBySubtags = _defaultGrouping === "subtag";
 		this._collapsedGroups = new Set();
 		/* runtime lock state */
 		this.locks = new Set();
@@ -1166,6 +1167,15 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 
 		// snapshot modules once on open
 		this._refreshDataset();
+
+		// Pre-collapse all groups if auto-collapse is enabled
+		if (game.settings.get(BBMM_ID, "autoCollapseList") && (this.groupByTags || this.groupBySubtags)) {
+			if (this.groupByTags) {
+				for (const { tag } of this._getGrouped()) this._collapsedGroups.add(tag?.id ?? "__untagged__");
+			} else {
+				for (const { label } of this._getGroupedBySubtag()) this._collapsedGroups.add(label);
+			}
+		}
 
 		this._temp = null;       // working copy (object: id -> boolean)
 		this._coreSnap = null;   // snapshot of core at open time (object: id -> boolean)
