@@ -1,0 +1,32 @@
+{
+  "name": "BBMM: Clear all tags",
+  "type": "script",
+  "flags": {
+    "macro-wheel": {
+      "activeCondition": ""
+    }
+  },
+  "command": "const confirmed = await foundry.applications.api.DialogV2.confirm({\n      window: { title: \"Clear All Tags\" },\n      content: \"<p>This will delete all tags, subtags, and module assignments. Are you sure?</p>\"\n  });\n  if (!confirmed) return;\n\n  const empty = { tags: [], subtags: [], assignments: {} };\n  const payload = JSON.stringify(empty, null, 2);\n  const file = new File([payload], \"module-tags.json\", { type: \"application/json\" });\n  await FilePicker.upload(\"data\", \"bbmm-data\", file, { notify: false });\n\n  ui.notifications.info(\"BBMM: All tags cleared. Reload to refresh the tag manager.\");",
+  "img": "icons/sundries/flags/banner-green.webp",
+  "author": "EpqDCtSCbVNM4wPj",
+  "scope": "global",
+  "folder": null,
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.351",
+    "systemId": "pf2e",
+    "systemVersion": "7.12.1",
+    "createdTime": 1779617318838,
+    "modifiedTime": 1779617318838,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_id": "2hDprUWA8E5mr4J5",
+  "sort": 0,
+  "_key": "!macros!2hDprUWA8E5mr4J5"
+}

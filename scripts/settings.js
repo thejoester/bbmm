@@ -560,14 +560,16 @@ export async function openBBMMLauncher() {
 				classes: ["bbmm-launcher-dialog"],
 				content: ``,
 				buttons: [
-					{ action: "modules",  label: LT.modulePresetMgr(), default: true },
-					{ action: "settings", label: LT.settingsPresetMgr() },
-					// { action: "controls-presets", label: LT.controlsPresetMgr() },
-					{ action: "exclusions", label: LT.exclusionsMgr() },
+					{ action: "modules",        label: LT.modulePresetMgr(), default: true },
+					{ action: "settings",       label: LT.settingsPresetMgr() },
+					{ action: "exclusions",     label: LT.exclusionsMgr() },
 					{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel() },
 					{ action: "lockPresets",    label: LT.lockPresets.menuLabel() },
+					{ action: "tags",           label: LT.moduleManagement.tagMgrLabel() },
+					{ action: "changelogFiles", label: LT.changelog.filesMgrLabel() },
 					{ action: "importExport",   label: LT.buttons.importExport() },
-					{ action: "cancel",   label: LT.buttons.cancel() }
+					{ action: "help",           label: (LT.buttons.help?.() ?? "Help") },
+					{ action: "cancel",         label: LT.buttons.cancel() }
 				],
 				submit: (res) => resolve(res ?? "cancel"),
 				rejectClose: false,
@@ -598,26 +600,27 @@ export async function openBBMMLauncher() {
 		openSettingsPresetManager();
 	} else if (choice === "exclusions") {
 		openExclusionsManager();
-	} else if (choice === "inclusions") {
-		openInclusionsManagerApp();
-	} else if (choice === "controls-presets") {
-		openControlsPresetManager();
-	} else if (choice === "importExport") {
-		try {
-				const menu = game.settings.menus.get(`${BBMM_ID}.importExport`);
-				if (!menu || !menu.type) {
-					DL(3, "settings.js | BBMM header dropdown: importExport menu not found", `${BBMM_ID}.importExport`);
-					return;
-				}
-
-				new menu.type().render(true);
-			} catch (err) {
-				DL(3, "settings.js | BBMM header dropdown: failed to open importExport menu", err);
-			}
 	} else if (choice === "hiddenSettings") {
 		openhiddenSettingSyncManager();
 	} else if (choice === "lockPresets") {
 		openLockPresetManager();
+	} else if (choice === "tags") {
+		openTagManager();
+	} else if (choice === "changelogFiles") {
+		openChangelogFilesManager();
+	} else if (choice === "importExport") {
+		try {
+			const menu = game.settings.menus.get(`${BBMM_ID}.importExport`);
+			if (!menu || !menu.type) {
+				DL(3, "settings.js | openBBMMLauncher: importExport menu not found", `${BBMM_ID}.importExport`);
+				return;
+			}
+			new menu.type().render(true);
+		} catch (err) {
+			DL(3, "settings.js | openBBMMLauncher: failed to open importExport menu", err);
+		}
+	} else if (choice === "help") {
+		hlp_openManualByUuid(BBMM_README_UUID);
 	}
 	// "cancel" -> do nothing
 }
@@ -1569,8 +1572,8 @@ Hooks.once("init", () => {
 
 			// User scoped Settings presets
 			game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS_U, {
-				name: LT._settings.settingsPresetsUser_name(),
-				hint: LT._settings.settingsPresetsUser_hint(),
+				//name: LT._settings.settingsPresetsUser_name(),
+				//hint: LT._settings.settingsPresetsUser_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
@@ -1579,15 +1582,15 @@ Hooks.once("init", () => {
 
 			// User scoped Module Presets
 			game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS_U, {
-				name:  LT._settings.modulePresetsUser_name(),
-				hint: LT._settings.modulePresetsUser_hint(),
+				//name:  LT._settings.modulePresetsUser_name(),
+				//hint: LT._settings.modulePresetsUser_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
 				default: {}
 			});
 
-			// HIDDEN World map of { [moduleId]: "x.y.z" } that we've marked as seen
+			// World map of { [moduleId]: "x.y.z" } that we've marked as seen
 			game.settings.register(BBMM_ID, "seenChangelogs", {
 				name: LT._settings.seenChangelogs_name(),
 				hint: LT._settings.seenChangelogs_hint(),
@@ -1609,8 +1612,8 @@ Hooks.once("init", () => {
 
 			// User-scoped ledger: remembers which soft-lock value was last auto-applied per setting id
 			game.settings.register(BBMM_ID, "softLockLedger", {
-				name: LT._settings.softLockLedger_name(),
-				hint: LT._settings.softLockLedger_hint(),
+				//name: LT._settings.softLockLedger_name(),
+				//hint: LT._settings.softLockLedger_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
@@ -2080,7 +2083,18 @@ Hooks.once("init", () => {
 				onChange: v => DL(`settings.js | gestureAction_shiftRight -> ${v}`)
 			});
 			
-			// Auto-force player reload 
+			// Hide locked settings from players (vs. show disabled)
+			game.settings.register(BBMM_ID, "hideLockedSettings", {
+				name: LT._settings.hideLockedSettingsName(),
+				hint: LT._settings.hideLockedSettingsHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: true,
+				restricted: true
+			});
+
+			// Auto-force player reload
 			game.settings.register(BBMM_ID, "autoForceReload", {
 				name: LT._settings.autoForceReloadName(),
 				hint: LT._settings.autoForceReloadHint(),

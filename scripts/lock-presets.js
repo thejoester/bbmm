@@ -7,6 +7,7 @@ const LOCK_PRESETS_APP_ID = "bbmm-lock-preset-manager";
 const BBMM_SYNC_CH        = "module.bbmm";
 
 let _lockPresetCache = null;
+let _lockPresetManagerLastPos = null;
 
 /* =======================================================================
 	{FILE I/O}
@@ -335,7 +336,7 @@ function ui_openLockPresetPreview(presetName) {
 			return;
 		}
 
-		const COL         = "143px 1fr 100px";
+		const COL         = "160px 1fr 100px";
 		const HEADER_STYLE = `display:grid;grid-template-columns:${COL};border-bottom:1px solid var(--color-border,#444);padding:.35rem .5rem;font-weight:600;font-size:12px;`;
 		const ROW_STYLE    = `display:grid;grid-template-columns:${COL};align-items:start;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;`;
 		const CELL_STYLE   = "padding:.25rem .4rem;min-width:0;overflow-wrap:break-word;";
@@ -461,8 +462,10 @@ export async function openLockPresetManager() {
 
 		const dlg = new foundry.applications.api.DialogV2({
 			id:       LOCK_PRESETS_APP_ID,
-			window:   { title: LT.lockPresets.title(), resizable: true },
-			position: { width: 660, height: "auto" },
+			window:   { title: LT.lockPresets.title() },
+			position: _lockPresetManagerLastPos
+				? { top: _lockPresetManagerLastPos.top, left: _lockPresetManagerLastPos.left, width: _lockPresetManagerLastPos.width, height: "auto" }
+				: { width: 660, height: "auto" },
 			content,
 			buttons:  [{ action: "close", label: LT.buttons.close(), default: true }],
 		});
@@ -487,6 +490,15 @@ export async function openLockPresetManager() {
 
 			form.querySelectorAll("button[data-action]").forEach(b => b.setAttribute("type", "button"));
 
+			function reopenPreserving() {
+				try {
+					const pos = app.position;
+					if (pos) _lockPresetManagerLastPos = { top: pos.top, left: pos.left, width: pos.width };
+				} catch {}
+				app.close();
+				openLockPresetManager();
+			}
+
 			form.addEventListener("click", async (ev) => {
 				const btn = ev.target;
 				if (!(btn instanceof HTMLButtonElement)) return;
@@ -501,10 +513,7 @@ export async function openLockPresetManager() {
 					const nameInput = root.querySelector('input[name="newPresetName"]');
 					const inputVal  = nameInput ? String(nameInput.value ?? "").trim() : "";
 					const res       = await svc_saveCurrentLocksAsPreset(inputVal);
-					if (res?.status === "saved") {
-						try { await dlg.close({ force: true }); } catch {}
-						openLockPresetManager();
-					}
+					if (res?.status === "saved") reopenPreserving();
 					return;
 				}
 
@@ -558,10 +567,7 @@ export async function openLockPresetManager() {
 					});
 					if (!confirmed) return;
 					const res = await svc_updateLockPreset(presetName);
-					if (res?.status === "saved") {
-						try { await dlg.close({ force: true }); } catch {}
-						openLockPresetManager();
-					}
+					if (res?.status === "saved") reopenPreserving();
 					return;
 				}
 
@@ -569,8 +575,7 @@ export async function openLockPresetManager() {
 					const newName = await ui_promptRenameLockPreset(presetName);
 					if (!newName) return;
 					await svc_renameLockPreset(presetName, newName);
-					try { await dlg.close({ force: true }); } catch {}
-					openLockPresetManager();
+					reopenPreserving();
 					return;
 				}
 
@@ -584,8 +589,7 @@ export async function openLockPresetManager() {
 					});
 					if (!confirmed) return;
 					await svc_deleteLockPreset(presetName);
-					try { await dlg.close({ force: true }); } catch {}
-					openLockPresetManager();
+					reopenPreserving();
 					return;
 				}
 			});
