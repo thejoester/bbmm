@@ -464,13 +464,13 @@
 			"filterClear": "Limpar filtro",
 			"promptEnableNewModulesName": "Notificar para ativar módulos recém-instalados",
 			"promptEnableNewModulesHint": "Se ativado, o BBMM identificará novos módulos instalados e solicitará ao GM a confirmação para habilitá-los.",
-			"newModulesTitle": "Novos módulos detectados",
-			"newModulesIntro": "O BBMM detectou {count} módulo(s) recém-instalado (s). Selecione quais ativar agora.",
+			"newModulesTitle": "Novos Módulos Detectados",
+			"newModulesIntro": "O BBMM detectou {count} módulo(s) recém-instalado(s). Selecione quais ativar agora.",
 			"newModulesEnableAndReload": "Ativar e Recarregar",
-			"newModulesSelectAll": "Selecionar Tudo",
+			"newModulesSelectAll": "Selecionar Todos",
 			"newModulesSelectNone": "Selecionar Nenhum",
-			"newModulesDontAskAgain": "Não me pergunte novamente",
-			"newModulesAskLater": "Perguntar mais tarde",
+			"newModulesDontAskAgain": "Não Perguntar Novamente",
+			"newModulesAskLater": "Perguntar Depois",
 			"newModulesNoneSelected": "Nenhum módulo selecionado."
 		},
 		"hiddenSettingSync": {
