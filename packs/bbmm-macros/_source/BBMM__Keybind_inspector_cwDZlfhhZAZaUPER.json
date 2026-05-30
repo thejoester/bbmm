@@ -19,14 +19,14 @@
     "compendiumSource": null,
     "duplicateSource": null,
     "exportSource": null,
-    "coreVersion": "13.350",
+    "coreVersion": "13.351",
     "systemId": "pf2e",
     "systemVersion": "7.6.0",
     "createdTime": 1760243401603,
-    "modifiedTime": 1760249566692,
+    "modifiedTime": 1779614846086,
     "lastModifiedBy": "EpqDCtSCbVNM4wPj"
   },
   "_id": "cwDZlfhhZAZaUPER",
-  "sort": 0,
+  "sort": 300000,
   "_key": "!macros!cwDZlfhhZAZaUPER"
 }

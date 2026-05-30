@@ -1066,6 +1066,7 @@ import { LT, BBMM_ID } from "./localization.js";
 			if (!ids.length) return;
 
 			let changed = false;
+			let revMap = null; // loaded lazily if a soft lock value changes
 
 			for (const id of ids) {
 				const dot = id.indexOf(".");
@@ -1076,7 +1077,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 				// Only user/client settings are enforced
 				const cfg = game.settings.settings.get(id);
-				if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client" && cfg.scope !== "user")) continue;
+				if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
 
 				// If an unlock is queued for this id, remove it and skip resnap
 				if (_bbmmIsUnlockQueued?.(id)) {
@@ -1099,11 +1100,19 @@ import { LT, BBMM_ID } from "./localization.js";
 				const existing = map[id];
 				const prev = existing?.value;
 
-				// Core rule: if GM changed a setting that had a lock (soft or hard), CLEAR the lock
+				// GM changed the value: update the lock snapshot so players stay locked to the new value
 				if (existing && !objectsEqual(cur, prev)) {
-					delete map[id];
+					if (existing.soft === true) {
+						// Soft lock: bump rev so the new value gets pushed to players on next login/push
+						revMap ??= game.settings.get(BBMM_ID, "softLockRevMap") || {};
+						const newRev = (Number.isInteger(revMap[id]) ? revMap[id] : 0) + 1;
+						map[id] = { ...existing, value: cur, rev: newRev };
+						revMap[id] = newRev;
+					} else {
+						map[id] = { ...existing, value: cur };
+					}
 					changed = true;
-					DL(`setting-sync.js | closeSettingsConfig: GM changed ${id} -> cleared lock`);
+					DL(`setting-sync.js | closeSettingsConfig: GM changed ${id} -> updated lock value`);
 					continue;
 				}
 
@@ -1120,6 +1129,7 @@ import { LT, BBMM_ID } from "./localization.js";
 
 			if (changed) {
 				await game.settings.set(BBMM_ID, "userSettingSync", map);
+				if (revMap) await game.settings.set(BBMM_ID, "softLockRevMap", revMap);
 				bbmmBroadcastTrigger(); // notify players after write
 				DL("setting-sync.js | bbmm-setting-lock: userSettingSync updated on closeSettingsConfig");
 			}
@@ -1216,12 +1226,23 @@ import { LT, BBMM_ID } from "./localization.js";
 				// NOTE: requires a user-scoped setting "softLockLedger" ({ "<ns>.<key>": "<JSON rec value>" })
 				const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
 				const myId = game.user?.id;
+				const hideLocked = (() => { try { return game.settings.get(BBMM_ID, "hideLockedSettings") !== false; } catch { return true; } })();
 
 				let seen = 0, hidden = 0;
 
 				// Helper: hide an element robustly
 				const hideNode = (el) => {
 					try { el.classList.add("bbmm-locked-hide"); el.style.display = "none"; } catch {}
+				};
+
+				// Helper: show an element as disabled (used when hideLockedSettings is off)
+				const disableNode = (el) => {
+					try {
+						el.querySelectorAll?.("input, select, textarea, button").forEach(inp => {
+							inp.disabled = true;
+						});
+						el.classList.add("bbmm-locked-disabled");
+					} catch {}
 				};
 
 				// Walk each labeled row
@@ -1312,20 +1333,26 @@ import { LT, BBMM_ID } from "./localization.js";
 
 					if (!shouldHide) continue;
 
-					hideNode(group);
-					group.setAttribute("data-bbmm-hidden", "true");
+					if (hideLocked) {
+						hideNode(group);
+						group.setAttribute("data-bbmm-hidden", "true");
+					} else {
+						disableNode(group);
+					}
 					hidden++;
 				}
 
-				// Hide section headers that have no visible rows left
-				const sections = form.querySelectorAll?.(".settings-list, fieldset") || [];
-				for (const section of sections) {
-					const hasVisible = section.querySelector(':scope .form-group:not(.bbmm-locked-hide), :scope .form-group-stacked:not(.bbmm-locked-hide), :scope .form-fields:not(.bbmm-locked-hide)');
-					if (!hasVisible) {
-						hideNode(section);
-						const heading = section.previousElementSibling;
-						if (heading && (heading.matches("h2,h3,h4") || heading.classList.contains("form-header"))) {
-							hideNode(heading);
+				// Hide section headers that have no visible rows left (only when actually hiding)
+				if (hideLocked) {
+					const sections = form.querySelectorAll?.(".settings-list, fieldset") || [];
+					for (const section of sections) {
+						const hasVisible = section.querySelector(':scope .form-group:not(.bbmm-locked-hide), :scope .form-group-stacked:not(.bbmm-locked-hide), :scope .form-fields:not(.bbmm-locked-hide)');
+						if (!hasVisible) {
+							hideNode(section);
+							const heading = section.previousElementSibling;
+							if (heading && (heading.matches("h2,h3,h4") || heading.classList.contains("form-header"))) {
+								hideNode(heading);
+							}
 						}
 					}
 				}
@@ -1395,44 +1422,7 @@ import { LT, BBMM_ID } from "./localization.js";
 						lockIcon = makeIcon(_bbmmBuildLockTooltip(), "fa-solid fa-lock-open", true);
 					}
 
-					// if GM edits a locked setting value, queue CLEAR immediately
-					// (prevents resnap/push/reload from re-applying)
-					try {
-						if (state !== "none") {
-							const sel = `input[name="settings.${cfg.namespace}.${cfg.key}"], select[name="settings.${cfg.namespace}.${cfg.key}"], textarea[name="settings.${cfg.namespace}.${cfg.key}"]`;
-							const inputs = form.querySelectorAll?.(sel) || [];
-							if (inputs.length) {
-								const dot = id.indexOf(".");
-								const ns = id.slice(0, dot);
-								const key = id.slice(dot + 1);
-								const clearOnce = async () => {
-									try {
-										if (_bbmmIsUnlockQueued(id)) return;
-
-										// Remove immediately from world map so resnap won’t re-add it
-										let map = game.settings.get(BBMM_ID, "userSettingSync") || {};
-										if (map[id]) {
-											delete map[id];
-											await game.settings.set(BBMM_ID, "userSettingSync", map);
-											bbmmBroadcastTrigger();
-											DL(`setting-sync.js | GM changed ${id} while locked -> immediate CLEAR`);
-										}
-
-										// Also queue clears for consistency (so pendingOps stays in sync)
-										_bbmmApplyClearLocks({ id, ns, key, iconEl: lockIcon });
-									} catch (e) {
-										DL(2, "setting-sync.js | GM-change clearOnce failed", e);
-									}
-								};
-								for (const inp of inputs) {
-									inp.addEventListener("change", clearOnce, { once: true });
-									inp.addEventListener("input", clearOnce, { once: true });
-								}
-							}
-						}
-					} catch (e) {
-						DL(2, "setting-sync.js | attach GM-change clear handler failed", e);
-					}
+					// GM changing a locked setting’s value is handled on closeSettingsConfig (updates lock value, keeps lock alive)
 					
 					// push icon...
 					const pushIcon = makeIcon(_bbmmBuildSyncTooltip(), "fa-solid fa-arrows-rotate", true);
@@ -1755,15 +1745,26 @@ import { LT, BBMM_ID } from "./localization.js";
 
 							// Handle SOFT entries separately
 							if (existing.soft === true) {
-								// If GM changed their own setting, clear the soft lock entirely
+								// If GM changed their own setting, update the lock snapshot + bump rev
 								if (!objectsEqual(live, prev)) {
-									delete map[id];
+									const revMap = game.settings.get(BBMM_ID, "softLockRevMap") || {};
+									const newRev = (Number.isInteger(revMap[id]) ? revMap[id] : 0) + 1;
+									map[id] = {
+										namespace: ns,
+										key,
+										value: live,
+										requiresReload: existing.requiresReload ?? !!cfg?.requiresReload,
+										soft: true,
+										rev: newRev
+									};
+									revMap[id] = newRev;
+									await game.settings.set(BBMM_ID, "softLockRevMap", revMap);
 									changed = true;
-									DL(`setting-sync.js |  bbmm-resnap: cleared SOFT ${id} (GM changed value)`);
-									continue; // go to next id
+									DL(`setting-sync.js |  bbmm-resnap: updated SOFT ${id} rev=${newRev} (GM changed value)`);
+									continue;
 								}
 
-								// Otherwise, keep soft as-is, refresh the stored value/flags
+								// No change; keep soft as-is, refresh stored value/flags
 								const rev = Number.isInteger(existing.rev) ? existing.rev : 1;
 								map[id] = {
 									namespace: ns,
@@ -1773,8 +1774,7 @@ import { LT, BBMM_ID } from "./localization.js";
 									soft: true,
 									rev
 								};
-								// Note: no "changed" flip if nothing materially changed
-								continue; // next id
+								continue;
 							}
 
 							// HARD entry (lock all / partial)

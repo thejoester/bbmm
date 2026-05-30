@@ -2,6 +2,7 @@ import { DL, BBMM_README_UUID } from './settings.js';
 import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, hlp_injectHeaderHelpButton } from './helpers.js';
 import { LT, BBMM_ID } from "./localization.js";
 const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  enabled module ids
+let _presetManagerLastPos = null; // Remembers window position across reopens
 
 /*	===============================================
 	HELPERS 
@@ -506,37 +507,53 @@ export async function openPresetManager() {
 			count: list.length
 		});
 
-		const options = list
-			.map(p => `<option value="${hlp_esc(p.id)}">${hlp_esc(p.displayName)}</option>`)
-			.join("");
+		// Build table rows — one per preset, with per-row action buttons
+		const rows = list.length
+			? list.map(p => `
+				<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+					<td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hlp_esc(p.displayName)}</td>
+					<td style="padding:.25rem .5rem;">
+						<div style="display:flex;gap:.25rem;justify-content:flex-end;flex-wrap:wrap;">
+							<button type="button" data-action="load"    data-preset-id="${hlp_esc(p.id)}">${LT.buttons.load()}</button>
+							<button type="button" data-action="preview" data-preset-id="${hlp_esc(p.id)}">${LT.buttons.preview()}</button>
+							<button type="button" data-action="update"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.update()}</button>
+							<button type="button" data-action="rename"  data-preset-id="${hlp_esc(p.id)}">${LT.errors.rename()}</button>
+							<button type="button" data-action="delete"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.delete()}</button>
+						</div>
+					</td>
+				</tr>
+			`).join("")
+			: `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
-		// Dialog content
+		// Dialog content — save section at top, scrollable list below
 		const content = `
-			<div style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
-
-				<div style="display:flex;gap:.5rem;align-items:center;">
-					<label style="min-width:10rem;">${LT.savedPresets()}</label>
-					<select name="presetName" style="flex:1;">${options}</select>
-					<button type="button" data-action="load">${LT.buttons.load()}</button>
-					<button type="button" data-action="preview">${LT.buttons.preview()}</button>
-					<button type="button" data-action="update">${LT.buttons.update()}</button>
-					<button type="button" data-action="rename">${LT.errors.rename()}</button>
-					<button type="button" data-action="delete">${LT.buttons.delete()}</button>
-				</div>
-
-				<hr>
-				<p>${LT.presetSaveCurrentModules()}:</p>
+			<section style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
+				<p style="margin:0;">${LT.presetSaveCurrentModules()}:</p>
 				<div style="display:flex;gap:.5rem;align-items:center;">
 					<input name="newName" type="text" placeholder="${LT.newPresetName()}…" style="flex:1;">
 					<button type="button" data-action="save-current">${LT.buttons.saveCurrent()}</button>
 				</div>
-			</div>
+				<div style="overflow-y:auto;max-height:210px;">
+					<table style="width:100%;border-collapse:collapse;">
+						<thead style="position:sticky;top:0;background:var(--color-bg,#1a1a1a);z-index:1;">
+							<tr style="border-bottom:1px solid var(--color-border-dark-5);">
+								<th style="text-align:left;padding:.25rem .5rem;">${LT.savedPresets()}</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>${rows}</tbody>
+					</table>
+				</div>
+			</section>
 		`;
 
 		const dlg = new foundry.applications.api.DialogV2({
 			window: { title: LT.modulePresets() },
 			content,
-			buttons: [{ action: "close", label: LT.buttons.close(), default: true }]
+			buttons: [{ action: "close", label: LT.buttons.close(), default: true }],
+			position: _presetManagerLastPos
+				? { top: _presetManagerLastPos.top, left: _presetManagerLastPos.left, width: _presetManagerLastPos.width, height: "auto" }
+				: { width: 640, height: "auto" }
 		});
 
 		const onRender = (app) => {
@@ -561,6 +578,16 @@ export async function openPresetManager() {
 
 			form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
 
+			// Reopen the manager preserving the current window position
+			function reopenPreserving() {
+				try {
+					const pos = app.position;
+					if (pos) _presetManagerLastPos = { top: pos.top, left: pos.left, width: pos.width };
+				} catch {}
+				app.close();
+				openPresetManager();
+			}
+
 			form.addEventListener("click", async (ev) => {
 				const btn = ev.target;
 				if (!(btn instanceof HTMLButtonElement)) return;
@@ -574,9 +601,8 @@ export async function openPresetManager() {
 				ev.stopImmediatePropagation();
 
 				try {
-					const sel = form.elements.namedItem("presetName");
-					const selectedId = sel ? String(sel.value || "") : "";
-					const picked = selectedId ? index[selectedId] : null;
+					const presetId = btn.dataset.presetId ?? "";
+					const picked = presetId ? index[presetId] : null;
 
 					// Preview preset
 					if (action === "preview") {
@@ -598,8 +624,7 @@ export async function openPresetManager() {
 						if (res?.status !== "saved") return;
 
 						ui.notifications.info(`${LT.savedSummary({ name: res.name, count: enabled.length })}.`);
-						app.close();
-						openPresetManager();
+						reopenPreserving();
 						return;
 					}
 
@@ -646,8 +671,7 @@ export async function openPresetManager() {
 						if (res?.status !== "saved") return;
 
 						ui.notifications.info(`${LT.updatedSummary({ name: picked.name, count: enabled.length })}.`);
-						app.close();
-						openPresetManager();
+						reopenPreserving();
 						return;
 					}
 
@@ -756,8 +780,7 @@ export async function openPresetManager() {
 						await hlp_setPresets(presets);
 
 						ui.notifications.info(`${LT.renamePreset()}: "${oldKey}" -> "${finalName}".`);
-						app.close();
-						openPresetManager();
+						reopenPreserving();
 						return;
 					}
 
@@ -778,8 +801,7 @@ export async function openPresetManager() {
 						await hlp_setPresets(p);
 
 						ui.notifications.info(`${LT.deletedPreset()} "${picked.name}".`);
-						app.close();
-						openPresetManager();
+						reopenPreserving();
 						return;
 					}
 

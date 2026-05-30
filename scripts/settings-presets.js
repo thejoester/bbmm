@@ -3,6 +3,7 @@ import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp
 import { LT, BBMM_ID } from "./localization.js";
 const SETTING_SETTINGS_PRESETS = "settingsPresetsUser"; // user-scoped store defined in settings.js
 const PRESET_MANAGER_ID = "bbmm-settings-preset-manager"; // stable window id
+let _settingsPresetManagerLastPos = null; // Remembers window position across reopens
 const SETTINGS_PRESETS_STORAGE_FILE = "settings-presets.json";
 let _settingsPresetCache = null;
 
@@ -2000,14 +2001,6 @@ export async function openSettingsPresetManager() {
     const presetIndex = {};
     for (const p of list) presetIndex[p.id] = p;
 
-    const options = list
-        .map((p) => {
-            return `<option value="${hlp_esc(p.id)}">${hlp_esc(
-                p.name
-            )}</option>`;
-        })
-        .join("");
-
     DL(
         "settings-presets.js | openSettingsPresetManager(): merged presets list built",
         {
@@ -2015,41 +2008,58 @@ export async function openSettingsPresetManager() {
         }
     );
 
-    // Content markup (make central area scrollable to avoid off-screen growth)
-    const content = `
-		<section class="bbmm-preset-manager-root" style="min-width:560px;display:flex;flex-direction:column;gap:.75rem;max-height:70vh;overflow:auto;">
-			<div style="display:flex;gap:.5rem;align-items:center;">
-				<label style="min-width:12rem;">${LT.savedSettingsPresets()}</label>
-				<select name="presetName" style="flex:1;">${options}</select>
-				<button type="button" data-action="load">${LT.buttons.load()}</button>
-				<button type="button" data-action="preview">${LT.buttons.preview()}</button>
-				<button type="button" data-action="update">${LT.buttons.update()}</button>
-				<button type="button" data-action="rename">${LT.errors.rename()}</button>
-				<button type="button" data-action="delete">${LT.buttons.delete()}</button>
-			</div>
-			<div>
-				${LT.noteSaveBeforeLoad()}.
-				<hr>
-			</div>
-			
-			<p>${LT.presetSaveCurrentSettings()}:</p>
-			<div style="display:flex;gap:.5rem;align-items:center;">
-				<input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
-				<button type="button" data-action="save-current">${LT.buttons.saveCurrentSettings()}</button>
-			</div>
-			<div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
-				<label><input type="checkbox" name="includeDisabled" checked> ${LT.incDisabledModules()}</label>
-				<label><input type="checkbox" name="includeHidden"> ${LT.includeHidden()}</label>
-			</div>
+    // Build table rows — one per preset, with per-row action buttons
+    const rows = list.length
+        ? list.map((p) => `
+            <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+                <td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hlp_esc(p.name)}</td>
+                <td style="padding:.25rem .5rem;">
+                    <div style="display:flex;gap:.25rem;justify-content:flex-end;flex-wrap:wrap;">
+                        <button type="button" data-action="load"    data-preset-id="${hlp_esc(p.id)}">${LT.buttons.load()}</button>
+                        <button type="button" data-action="preview" data-preset-id="${hlp_esc(p.id)}">${LT.buttons.preview()}</button>
+                        <button type="button" data-action="update"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.update()}</button>
+                        <button type="button" data-action="rename"  data-preset-id="${hlp_esc(p.id)}">${LT.errors.rename()}</button>
+                        <button type="button" data-action="delete"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.delete()}</button>
+                    </div>
+                </td>
+            </tr>
+        `).join("")
+        : `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
-		</section>
-	`;
+    // Content markup — save section at top, scrollable list below
+    const content = `
+        <section class="bbmm-preset-manager-root" style="min-width:560px;display:flex;flex-direction:column;gap:.75rem;">
+            <p style="margin:0;">${LT.presetSaveCurrentSettings()}:</p>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+                <input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
+                <button type="button" data-action="save-current">${LT.buttons.saveCurrentSettings()}</button>
+            </div>
+            <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
+                <label><input type="checkbox" name="includeDisabled" checked> ${LT.incDisabledModules()}</label>
+                <label><input type="checkbox" name="includeHidden"> ${LT.includeHidden()}</label>
+            </div>
+            <div style="font-size:.85em;color:var(--color-text-light-7);">${LT.noteSaveBeforeLoad()}.</div>
+            <div style="overflow-y:auto;max-height:210px;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead style="position:sticky;top:0;background:var(--color-bg,#1a1a1a);z-index:1;">
+                        <tr style="border-bottom:1px solid var(--color-border-dark-5);">
+                            <th style="text-align:left;padding:.25rem .5rem;">${LT.savedSettingsPresets()}</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </section>
+    `;
 
     // Construct the DialogV2
     const dlg = new foundry.applications.api.DialogV2({
         id: PRESET_MANAGER_ID,
-        window: { title: LT.titleSettingsPresetMgr(), resizable: true },
-        position: { width: 700, height: "auto" },
+        window: { title: LT.titleSettingsPresetMgr() },
+        position: _settingsPresetManagerLastPos
+            ? { top: _settingsPresetManagerLastPos.top, left: _settingsPresetManagerLastPos.left, width: _settingsPresetManagerLastPos.width, height: "auto" }
+            : { width: 700, height: "auto" },
         content,
         buttons: [
             { action: "close", label: LT.buttons.close(), default: true },
@@ -2061,9 +2071,9 @@ export async function openSettingsPresetManager() {
         if (app !== dlg) return;
         Hooks.off("renderDialogV2", onRender);
 
-        // Re-size and re-center the window so it fits the viewport
+        // Recalculate height without resetting position
         try {
-            dlg.setPosition({ height: "auto", left: null, top: null });
+            dlg.setPosition({ height: "auto" });
         } catch {}
 
         const root = app.element;
@@ -2085,6 +2095,16 @@ export async function openSettingsPresetManager() {
         form.querySelectorAll("button[data-action]").forEach((b) =>
             b.setAttribute("type", "button")
         );
+
+        // Reopen the manager preserving the current window position
+        function reopenPreserving() {
+            try {
+                const pos = app.position;
+                if (pos) _settingsPresetManagerLastPos = { top: pos.top, left: pos.left, width: pos.width };
+            } catch {}
+            app.close();
+            openSettingsPresetManager();
+        }
 
         // Single delegated click handler for all actions
         form.addEventListener("click", async (ev) => {
@@ -2108,11 +2128,10 @@ export async function openSettingsPresetManager() {
             ev.stopImmediatePropagation();
 
             // Read controls directly from the dialog root
-            const sel = root.querySelector('select[name="presetName"]');
             const txt = root.querySelector('input[name="newName"]');
             const chk = root.querySelector('input[name="includeDisabled"]');
 
-            const selected = sel ? String(sel.value ?? "") : "";
+            const selected = btn.dataset.presetId ?? "";
             const newName = txt ? String(txt.value ?? "").trim() : "";
             const includeDisabled = !!(chk && chk.checked);
 
@@ -2199,8 +2218,7 @@ export async function openSettingsPresetManager() {
                     );
 
                     // Refresh list
-                    app.close();
-                    openSettingsPresetManager();
+                    reopenPreserving();
                     return;
                 }
 
@@ -2254,8 +2272,7 @@ export async function openSettingsPresetManager() {
                     );
 
                     // Refresh list
-                    app.close();
-                    openSettingsPresetManager();
+                    reopenPreserving();
                     return;
                 }
 
@@ -2521,8 +2538,7 @@ export async function openSettingsPresetManager() {
                     );
 
                     // Refresh list
-                    app.close();
-                    openSettingsPresetManager();
+                    reopenPreserving();
                     return;
                 }
 
@@ -2549,8 +2565,7 @@ export async function openSettingsPresetManager() {
                     );
 
                     // Refresh list
-                    app.close();
-                    openSettingsPresetManager();
+                    reopenPreserving();
                     return;
                 }
             } catch (err) {

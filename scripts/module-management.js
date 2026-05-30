@@ -193,7 +193,7 @@ async function _bbmmRenderSavedNotesHTML(moduleId) {
 			}
 		}
 
-		// No user note — fall back to module description if available.
+		// No user note, fall back to module description if available.
 		const desc = _bbmmGetModuleDescription(moduleId).trim();
 		if (!desc) return "";
 
@@ -1134,18 +1134,21 @@ async function _bbmmOpenNotesDialog(moduleId) {
 }
 
 /* ============================================================================
-	BBMM: Stand-alone Module Manager (ApplicationV2) — launchable from a macro
+	BBMM: Stand-alone Module Manager (ApplicationV2), launchable from a macro
 	V13-only. No core patching. Purely client-side planning of enable/disable.
 ============================================================================ */
 class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	constructor() {
+		const _defaultGrouping = game.settings.get(BBMM_ID, "defaultGrouping") ?? "none";
+		const _openHeight = _defaultGrouping !== "none" ? 780 : 640;
 		super({
 			id: "bbmm-module-manager",
 			window: { title: LT.moduleManagement.modListWindowTitle() },
 			width: 1000,
-			height: 640,
+			height: _openHeight,
 			resizable: true
 		});
+		this._openHeight = _openHeight;
 
 		// working set, by module id -> boolean
 		this.plan = new Map();
@@ -1153,8 +1156,8 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		this.query = "";
 		this.scope = "all";
 		this.tagFilter = new Set();  // tagIds to filter by (empty = show all)
-		this.groupByTags = false;
-		this.groupBySubtags = false;
+		this.groupByTags    = _defaultGrouping === "tag";
+		this.groupBySubtags = _defaultGrouping === "subtag";
 		this._collapsedGroups = new Set();
 		/* runtime lock state */
 		this.locks = new Set();
@@ -2466,7 +2469,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			window.BBMM_MM = this;
 		} catch (e) { DL(2, "BBMM | failed to expose app instance", e); }
 
-		// Explicit centering
+		// Explicit centering, only adjust position, never lock dimensions
 		const _centerNow = () => {
 			try {
 				const el = this.element;
@@ -2474,7 +2477,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				const H = el.offsetHeight || 640;
 				const left = Math.max((window.innerWidth  - W) / 2, 0);
 				const top  = Math.max((window.innerHeight - H) / 2, 0);
-				this.setPosition({ left, top, width: W, height: H });
+				this.setPosition({ left, top });
 			} catch (e) { DL(2, "BBMMModuleManagerApp::_centerNow(): failed", e); }
 		};
 		_centerNow();
@@ -2492,6 +2495,20 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		// ensure dataset is live then draw
 		this._refreshDataset();
 		this._rerender();
+
+		// Lock height then collapse - defer to next frame so Foundry finishes its own
+		// sizing pass first, then we pin the height and collapse groups via direct DOM
+		// manipulation rather than _rerender() to avoid triggering another Foundry resize.
+		requestAnimationFrame(() => {
+			try { this.setPosition({ height: this._openHeight }); } catch {}
+			if (game.settings.get(BBMM_ID, "autoCollapseList") && (this.groupByTags || this.groupBySubtags)) {
+				this._root?.querySelectorAll(".bbmm-tag-group").forEach(g => {
+					const id = g.getAttribute("data-group-id");
+					if (id) this._collapsedGroups.add(id);
+					g.classList.add("collapsed");
+				});
+			}
+		});
 
 		// wire events once
 		if (!this._bound) {
@@ -2765,7 +2782,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 						return;
 					}
 				} catch (e) {
-					// If the quick diff itself fails, just proceed to saving — the saver will diff again.
+					// If the quick diff itself fails, just proceed to saving, the saver will diff again.
 					DL(2, "BBMMModuleManagerApp | pre-save diff failed; proceeding to save", e);
 				}
 
