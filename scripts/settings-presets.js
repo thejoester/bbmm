@@ -2010,9 +2010,15 @@ export async function openSettingsPresetManager() {
 
     // Build table rows — one per preset, with per-row action buttons
     const rows = list.length
-        ? list.map((p) => `
+        ? list.map((p) => {
+            const fullName = hlp_esc(p.name);
+            const displayName = p.name.length > 40
+                ? hlp_esc(p.name.slice(0, 37)) + "..."
+                : fullName;
+            const titleAttr = p.name.length > 40 ? ` title="${fullName}"` : "";
+            return `
             <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
-                <td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hlp_esc(p.name)}</td>
+                <td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"${titleAttr}>${displayName}</td>
                 <td style="padding:.25rem .5rem;">
                     <div style="display:flex;gap:.25rem;justify-content:flex-end;flex-wrap:wrap;">
                         <button type="button" data-action="load"    data-preset-id="${hlp_esc(p.id)}">${LT.buttons.load()}</button>
@@ -2023,12 +2029,13 @@ export async function openSettingsPresetManager() {
                     </div>
                 </td>
             </tr>
-        `).join("")
+        `;
+        }).join("")
         : `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
     // Content markup — save section at top, scrollable list below
     const content = `
-        <section class="bbmm-preset-manager-root" style="min-width:560px;display:flex;flex-direction:column;gap:.75rem;">
+        <section class="bbmm-preset-manager-root" style="min-width:645px;display:flex;flex-direction:column;gap:.75rem;">
             <p style="margin:0;">${LT.presetSaveCurrentSettings()}:</p>
             <div style="display:flex;gap:.5rem;align-items:center;">
                 <input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
@@ -2059,7 +2066,7 @@ export async function openSettingsPresetManager() {
         window: { title: LT.titleSettingsPresetMgr() },
         position: _settingsPresetManagerLastPos
             ? { top: _settingsPresetManagerLastPos.top, left: _settingsPresetManagerLastPos.left, width: _settingsPresetManagerLastPos.width, height: "auto" }
-            : { width: 700, height: "auto" },
+            : { width: 805, height: "auto" },
         content,
         buttons: [
             { action: "close", label: LT.buttons.close(), default: true },

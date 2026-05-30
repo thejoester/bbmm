@@ -509,9 +509,15 @@ export async function openPresetManager() {
 
 		// Build table rows — one per preset, with per-row action buttons
 		const rows = list.length
-			? list.map(p => `
+			? list.map(p => {
+				const fullName = hlp_esc(p.name);
+				const displayName = p.name.length > 40
+					? hlp_esc(p.name.slice(0, 37)) + "..."
+					: fullName;
+				const titleAttr = p.name.length > 40 ? ` title="${fullName}"` : "";
+				return `
 				<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
-					<td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hlp_esc(p.displayName)}</td>
+					<td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"${titleAttr}>${displayName}</td>
 					<td style="padding:.25rem .5rem;">
 						<div style="display:flex;gap:.25rem;justify-content:flex-end;flex-wrap:wrap;">
 							<button type="button" data-action="load"    data-preset-id="${hlp_esc(p.id)}">${LT.buttons.load()}</button>
@@ -522,12 +528,13 @@ export async function openPresetManager() {
 						</div>
 					</td>
 				</tr>
-			`).join("")
+			`;
+			}).join("")
 			: `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
 		// Dialog content — save section at top, scrollable list below
 		const content = `
-			<section style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
+			<section style="min-width:600px;display:flex;flex-direction:column;gap:.75rem;">
 				<p style="margin:0;">${LT.presetSaveCurrentModules()}:</p>
 				<div style="display:flex;gap:.5rem;align-items:center;">
 					<input name="newName" type="text" placeholder="${LT.newPresetName()}…" style="flex:1;">
@@ -553,7 +560,7 @@ export async function openPresetManager() {
 			buttons: [{ action: "close", label: LT.buttons.close(), default: true }],
 			position: _presetManagerLastPos
 				? { top: _presetManagerLastPos.top, left: _presetManagerLastPos.left, width: _presetManagerLastPos.width, height: "auto" }
-				: { width: 640, height: "auto" }
+				: { width: 805, height: "auto" }
 		});
 
 		const onRender = (app) => {
