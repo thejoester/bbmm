@@ -28,6 +28,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Added a new "Hide Locked Settings from Players" option (enabled by default). When disabled, settings that are locked for players are still visible in their settings list but cannot be changed, rather than being hidden entirely.
 - **Setting Sync:**
   - Now when a GM changes a setting that is locked for players, the lock now stays active for players and updates to reflect the GM's new value, so players remain locked to whatever the GM most recently set.
+  - Soft lock login-apply is now deferred until after `canvasReady` so all modules have finished registering their settings before BBMM attempts to apply. Falls back to a 2-second delay when the canvas is disabled or no scene is active.
+  - Soft lock ledger now records the last evaluated revision even when the setting value did not need to change, preventing redundant re-evaluation on every subsequent push.
+- **Journal:**
+  - Updated compendium Journal manual. 
+- **Localization**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 - **Localization:**
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
