@@ -36,7 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
   - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
-
+ 
 ## [0.8.9] - 2026-05-19
 
 ### Added
