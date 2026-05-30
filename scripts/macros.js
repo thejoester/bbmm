@@ -1736,7 +1736,8 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 			#bbmm-lock-picker .window-content{display:flex;flex-direction:column;padding:.4rem !important}
 			#bbmm-lock-picker .bbmm-lp-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.4rem}
 			#bbmm-lock-picker .bbmm-lp-toolbar{display:flex;gap:.5rem;align-items:center}
-			#bbmm-lock-picker .bbmm-lp-toolbar input{flex:1}
+			#bbmm-lock-picker .bbmm-lp-toolbar select{flex:0 1 200px;min-width:100px;max-width:200px}
+			#bbmm-lock-picker .bbmm-lp-toolbar input{flex:1;min-width:0}
 			#bbmm-lock-picker .bbmm-lp-sbadge{display:inline-block;padding:.1em .5em;border-radius:3px;font-size:.85em;background:rgba(80,160,80,.3);border:1px solid rgba(80,160,80,.4)}
 			#bbmm-lock-picker .bbmm-lp-head{display:grid;grid-template-columns:${cols};border:1px solid var(--color-border,#444);border-radius:.4rem .4rem 0 0;background:var(--color-bg-header,#1e1e1e)}
 			#bbmm-lock-picker .bbmm-lp-head .h{padding:.25rem .4rem;border-bottom:1px solid #444;font-weight:600}

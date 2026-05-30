@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [1.1.0] - 2026-05-30
 
+### Fixed
+- **Module Preset Manager & Settings Preset Manager:**
+  - Preset names longer than 40 characters are now truncated to 37 characters with an ellipsis (`...`). Hovering over a truncated name shows the full name in a tooltip. This matches the behavior already used in the Settings Preset Manager.
+- **Help icon and "READ ME" links fixed to point to journal.
+
+## [1.1.0] - 2026-05-30
+
 ### Added
 - **Module Manager:**
   - New **Default Grouping** setting: choose whether the Module Manager opens with no grouping, grouped by Tag, or grouped by Subtag.
