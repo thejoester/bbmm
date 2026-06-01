@@ -322,7 +322,7 @@
 			"hideLockedSettingsName": "Ocultar Configurações Bloqueadas dos Jogadores",
       		"hideLockedSettingsHint": "Quando ativado, as configurações bloqueadas para os jogadores ficam completamente ocultas. Quando desativado, as configurações bloqueadas continuam visíveis, mas não podem ser alteradas.",
 			"autoForceReloadName": "Forçar Recarregamento do Foundry do Jogador",
-			"autoForceReloadHint": "Forçar Recarregamento Instantâneo para os jogadores quando novas configurações forem bloqueadas/sincronizadas.",
+			"autoForceReloadHint": "Força o recarregamento imediato para os jogadores quando novas configurações forem bloqueadas/sincronizadas.",
 			"importExportHint": "Importar/exportar predefinições e listas.",
 			"receiveImportantMessages": "Receber mensagens de notificação importantes:",	
 			"receiveImportantMessagesHint": "Quando ativado, você poderá receber mensagens de notificação importantes em caso de um problema urgente com o BBMM ou com um módulo que você tenha instalado. Essas mensagens serão enviadas apenas quando necessário e incluirão informações importantes sobre o problema e como resolvê-lo. Você pode optar por desativá-las se preferir, mas é recomendado mantê-las ativadas para se manter informado sobre problemas críticos que podem afetar o seu jogo.",
