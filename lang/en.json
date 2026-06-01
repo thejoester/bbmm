@@ -322,7 +322,7 @@
 			"hideLockedSettingsName": "Hide Locked Settings from Players",
 			"hideLockedSettingsHint": "When enabled, settings locked for players are hidden entirely. When disabled, locked settings are still shown but cannot be changed.",
 			"autoForceReloadName": "Force Player Reload",
-			"autoForceReloadHint": "Force instant reload to players when settings new settings are locked/synced",
+			"autoForceReloadHint": "Force instant reload to players when new settings are locked/synced",
 			"importExportHint": "Import/export presets and lists.",
 			"receiveImportantMessages": "Receive important push messages:",	
 			"receiveImportantMessagesHint": "When enabled, you may receive important messages in the case of an urgent issue with BBMM or a module you have installed. These messages will only be sent when necessary and will include important information about the issue and how to resolve it. You can choose to disable these if you prefer, but it is recommended to keep them enabled to stay informed about critical issues that may affect your game.",
