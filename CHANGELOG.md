@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [1.1.2] - 2026-05-30
 
+### Changed
+- **Localization:**
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
 ### Fixed
 - **Settings:**
   - Fixed grammar error in Force Player Reload setting hint. .
