@@ -12,7 +12,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Lock Configurator:**
   - Corrected changelog entry for `1.1.0` about how to access lock configurator, which is in the BBMM Macros compendium. 
 
-
 ## [1.1.1] - 2026-05-30
 
 ### Fixed
