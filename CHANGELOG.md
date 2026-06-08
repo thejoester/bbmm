@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] - 2026-06-08
+
+### Changed
+- **Module Manager:**
+  - Added **Select All** / **Select None** buttons to the filter dialog for quickly toggling all checkboxes.
+  - The filter dialog now includes an **Untagged** option, allowing the filter to include or exclude modules with no tags assigned.
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+
 ## [1.1.3] - 2026-06-03
 
 ### Changed

@@ -1307,14 +1307,20 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		const q = (this.query ?? "").toLowerCase().trim();
 		const scope = this.scope;
 		const tagFilter = this.tagFilter;
-		const tagData = tagFilter.size > 0 ? _getTagData() : null;
+		// When grouping is active, tag filtering is applied at the group level - skip it here
+		const applyTagFilter = tagFilter.size > 0 && !this.groupByTags && !this.groupBySubtags;
+		const hasTagFilter = applyTagFilter && ![...tagFilter].every(id => id === "__untagged__");
+		const wantUntagged = applyTagFilter && tagFilter.has("__untagged__");
+		const tagData = (hasTagFilter || wantUntagged) ? _getTagData() : null;
 		return (this._mods ?? []).filter(m => {
 			const planned = !!this._getTempActive(m.id);
 			if (scope === "active" && !planned)   return false;
 			if (scope === "inactive" && planned)  return false;
-			if (tagFilter.size > 0) {
+			if (applyTagFilter) {
 				const assignments = tagData.assignments[m.id] ?? [];
-				if (!assignments.some(a => tagFilter.has(a.tagId))) return false;
+				const hasNoTags = assignments.length === 0;
+				const matchesTag = hasTagFilter && assignments.some(a => tagFilter.has(a.tagId));
+				if (!matchesTag && !(wantUntagged && hasNoTags)) return false;
 			}
 			if (!q) return true;
 			const blob = (m.title + " " + m.id + " " + (m.version || "") + " " + (m.authors || "")).toLowerCase();
@@ -1325,9 +1331,11 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	_getGrouped() {
 		const filtered = this._getFiltered();
 		const tagData = _getTagData();
+		const tagFilter = this.tagFilter;
 		const groups = [];
 		const placed = new Set();
 		for (const tag of tagData.tags) {
+			if (tagFilter.size > 0 && !tagFilter.has(tag.id)) continue;
 			const mods = filtered.filter(m =>
 				(tagData.assignments[m.id] ?? []).some(a => a.tagId === tag.id)
 			);
@@ -1337,19 +1345,22 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			}
 		}
 		const untagged = filtered.filter(m => !placed.has(m.id));
-		if (untagged.length) groups.push({ tag: null, mods: untagged });
+		if (untagged.length && (tagFilter.size === 0 || tagFilter.has("__untagged__")))
+			groups.push({ tag: null, mods: untagged });
 		return groups;
 	}
 
 	_getGroupedBySubtag() {
 		const filtered = this._getFiltered();
 		const tagData = _getTagData();
-		const groups = new Map(); // label -> Set of mods
+		const tagFilter = this.tagFilter;
+		const groups = new Map(); // label -> mods array
 		const placed = new Set();
 
 		for (const m of filtered) {
 			const assignments = tagData.assignments[m.id] ?? [];
 			for (const a of assignments) {
+				if (tagFilter.size > 0 && !tagFilter.has(a.tagId)) continue;
 				const tag = tagData.tags.find(t => t.id === a.tagId);
 				const sub = a.subtagId ? tagData.subtags.find(s => s.id === a.subtagId) : null;
 				const label = sub
@@ -1366,28 +1377,39 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			.map(([label, mods]) => ({ label, mods }));
 
 		const untagged = filtered.filter(m => !placed.has(m.id));
-		if (untagged.length) result.push({ label: LT.moduleManagement.untagged(), mods: untagged });
+		if (untagged.length && (tagFilter.size === 0 || tagFilter.has("__untagged__")))
+			result.push({ label: LT.moduleManagement.untagged(), mods: untagged });
 		return result;
 	}
 
 	async _openTagFilterDialog() {
 		const tagData = _getTagData();
-		if (!tagData.tags.length) {
-			ui.notifications?.info(LT.moduleManagement.tagMgrFilterNone());
-			return;
-		}
-		const rows = tagData.tags.map(t => `
+		const tagRows = tagData.tags.map(t => `
 			<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
 				<input type="checkbox" name="tag" value="${hlp_esc(t.id)}" ${this.tagFilter.has(t.id) ? "checked" : ""}>
 				${hlp_esc(t.label)}
 			</label>
 		`).join("");
 
+		const untaggedRow = `
+			<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;margin-top:${tagRows ? "8px" : "0"};font-style:italic;">
+				<input type="checkbox" name="tag" value="__untagged__" ${this.tagFilter.has("__untagged__") ? "checked" : ""}>
+				${hlp_esc(LT.moduleManagement.untagged())}
+			</label>
+		`;
+
+		const selectAllRow = `
+			<div style="display:flex;gap:6px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--color-border-light-tertiary);">
+				<button type="button" id="bbmm-filter-select-all" style="flex:1;font-size:0.85em;">${hlp_esc(LT.moduleManagement.filterSelectAll())}</button>
+				<button type="button" id="bbmm-filter-select-none" style="flex:1;font-size:0.85em;">${hlp_esc(LT.moduleManagement.filterSelectNone())}</button>
+			</div>
+		`;
+
 		let dlgEl = null;
 		await new Promise(resolve => {
 			const dlg = new foundry.applications.api.DialogV2({
 				window: { title: LT.moduleManagement.tagMgrFilterTitle() },
-				content: `<div style="display:flex;flex-direction:column;padding:0.5em;">${rows}</div>`,
+				content: `<div style="display:flex;flex-direction:column;padding:0.5em;">${selectAllRow}${tagRows}${untaggedRow}</div>`,
 				buttons: [
 					{
 						action: "apply",
@@ -1405,7 +1427,16 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				rejectClose: false,
 				close: resolve
 			});
-			dlg.render(true).then(() => { dlgEl = dlg; });
+			dlg.render(true).then(() => {
+				dlgEl = dlg;
+				const el = dlg.element;
+				el?.querySelector("#bbmm-filter-select-all")?.addEventListener("click", () => {
+					el.querySelectorAll('input[name="tag"]').forEach(cb => cb.checked = true);
+				});
+				el?.querySelector("#bbmm-filter-select-none")?.addEventListener("click", () => {
+					el.querySelectorAll('input[name="tag"]').forEach(cb => cb.checked = false);
+				});
+			});
 		});
 
 		this._rerender({ keepFocus: true });
