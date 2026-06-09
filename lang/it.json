@@ -408,6 +408,8 @@
 		"tagMgrDeleteSubtagConfirm": "Eliminare il subtag '{label}'? In questo modo verrà rimosso da tutte le assegnazioni dei moduli.",
 		"tagMgrFilterTitle": "Filtra per Tag",
 		"tagMgrFilterNone": "Nessun tag definito. Aggiungi prima i tag nel Gestore tag.",
+		"filterSelectAll": "Seleziona tutto",
+		"filterSelectNone": "Deseleziona tutto",
 		"filterByTags": "Filtra per Tag",
 		"groupByTags": "Raggruppa per Tag",
 		"groupBySubtags": "Raggruppa per Subtag",
