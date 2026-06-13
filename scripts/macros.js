@@ -683,12 +683,14 @@ function toPresetItems(preset) {
 			for (const [ns, nsData] of Object.entries(scopeData)) {
 				if (isPlain(nsData)) {
 					for (const [key, value] of Object.entries(nsData)) {
+						const reg = game.settings.settings.get(`${ns}.${key}`);
+						const isConfig = reg ? (reg.config !== false) : true;
 						out.push({
 							namespace: String(ns),
 							key: String(key),
 							value,
 							scope: scopeName,
-							config: true
+							config: isConfig
 						});
 					}
 				} else {

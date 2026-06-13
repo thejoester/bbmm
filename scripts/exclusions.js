@@ -720,7 +720,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		return `
 			<div class="row" data-ns="${foundry.utils.escapeHTML(ns)}" data-key="${foundry.utils.escapeHTML(key)}">
 				<div class="c-mod" title="${foundry.utils.escapeHTML(ns)}">${foundry.utils.escapeHTML(String(r.modTitle ?? ns))}</div>
-				<div class="c-key" title="${foundry.utils.escapeHTML(pairTitle)}">
+				<div class="c-key" title="${foundry.utils.escapeHTML(r.hint ? String(r.hint) : pairTitle)}">
 					<div class="bbmm-setting-title">${foundry.utils.escapeHTML(String(r.setTitle ?? key))}</div>
 					${r.hint ? `<div class="bbmm-setting-hint">${foundry.utils.escapeHTML(String(r.hint))}</div>` : ""}
 				</div>
@@ -1967,7 +1967,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 					<div class="bbmm-x-advanced">
 						<span>${LT.inclusions.advFeature()}</span>
-						<a class="bbmm-x-manual" data-uuid="Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn">${LT.inclusions.readManual()}</a>
+						<a class="bbmm-x-manual" data-uuid="${BBMM_README_UUID}">${LT.inclusions.readManual()}</a>
 					</div>
 					<div class="bbmm-x-count">${LT.total()}: ${entryCount}</div>
 				</div>
