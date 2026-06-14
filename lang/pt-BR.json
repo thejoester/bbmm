@@ -114,7 +114,7 @@
 		"infoClearedLocks": "Bloqueios removidos desta configuração.",
 		"includeHidden": "Salvar Configurações Ocultas",
 		"includeHiddenWarnTitle": "Incluir Configurações Ocultas?",
-		"includeHiddenWarnMsg": "Salvar e carregar configurações ocultas pode causar resultados inesperados. Recomenda-se usar o Gerenciador de Inclusões para adicionar configurações ocultas específicas. Tem certeza de que deseja salvar/exportar configurações ocultas?",
+		"includeHiddenWarnMsg": "Atenção: salvar todas as configurações ocultas consumirá mais espaço ao salvar. Além disso, qualquer configuração oculta que não esteja incluída no Gerenciador de Inclusão/Exclusão não será aplicada ao carregar uma predefinição. Consulte o manual para mais informações!",
 		"includeHiddenWarnLink": "",
 		"click": "Clique",
 		"rightClick": "Clique Direito",
