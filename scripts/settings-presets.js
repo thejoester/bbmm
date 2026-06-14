@@ -743,6 +743,19 @@ async function svc_applySettingsExport(exportData) {
     // Exclusions: build once
     const skip = getSkipMap();
 
+    // Inclusions: hidden settings are only applied if explicitly included
+    let includedPairs = new Set();
+    let includedModules = new Set();
+    try {
+        const inc = hlp_sanitizeUserInclusions(await hlp_fetchJSON(`bbmm-data/user-inclusions.json`));
+        includedPairs = new Set(
+            (inc?.settings ?? []).map((s) => `${s?.namespace ?? ""}.${s?.key ?? ""}`)
+        );
+        includedModules = new Set((inc?.modules ?? []).map((ns) => String(ns ?? "")));
+    } catch (e) {
+        DL(2, "settings-presets.js | svc_applySettingsExport(): failed to load inclusions", e);
+    }
+
     const applied = [];
     const skipped = [];
     const missingModules = new Set();
@@ -788,6 +801,20 @@ async function svc_applySettingsExport(exportData) {
                 if (def.scope !== scope) {
                     skipped.push(`${namespace}.${key}`);
                     continue;
+                }
+
+                // Hidden setting gate: skip config:false settings not in inclusions
+                if (def?.config === false) {
+                    const inInclusions =
+                        includedPairs.has(`${namespace}.${key}`) ||
+                        includedModules.has(namespace);
+                    if (!inInclusions) {
+                        DL(
+                            `settings-presets.js | svc_applySettingsExport(): skipped hidden setting "${namespace}.${key}" (not in inclusions)`
+                        );
+                        skipped.push(`${namespace}.${key}`);
+                        continue;
+                    }
                 }
 
                 // Permission: world requires GM
@@ -1035,6 +1062,19 @@ async function svc_planSettingsChanges(env) {
         // Build unified skip map (EXPORT_SKIP + userExclusions)
         const skipMap = getSkipMap();
 
+        // Inclusions: hidden settings are only planned if explicitly included
+        let planIncludedPairs = new Set();
+        let planIncludedModules = new Set();
+        try {
+            const inc = hlp_sanitizeUserInclusions(await hlp_fetchJSON(`bbmm-data/user-inclusions.json`));
+            planIncludedPairs = new Set(
+                (inc?.settings ?? []).map((s) => `${s?.namespace ?? ""}.${s?.key ?? ""}`)
+            );
+            planIncludedModules = new Set((inc?.modules ?? []).map((ns) => String(ns ?? "")));
+        } catch (e) {
+            DL(2, "settings-presets.js | svc_planSettingsChanges(): failed to load inclusions", e);
+        }
+
         for (const scope of ["world", "client", "user"]) {
             const S = env?.[scope];
             if (!S || typeof S !== "object") continue;
@@ -1055,6 +1095,19 @@ async function svc_planSettingsChanges(env) {
                             `settings-presets.js | svc_planSettingsChanges(): excluded setting "${ns}.${key}" (scope=${scope})`
                         );
                         continue;
+                    }
+
+                    // Hidden setting gate: mirror apply-time behavior
+                    if (cfg?.config === false) {
+                        const inInclusions =
+                            planIncludedPairs.has(`${ns}.${key}`) ||
+                            planIncludedModules.has(ns);
+                        if (!inInclusions) {
+                            DL(
+                                `settings-presets.js | svc_planSettingsChanges(): skipped hidden setting "${ns}.${key}" (not in inclusions)`
+                            );
+                            continue;
+                        }
                     }
 
                     // compare, normalize through hlp_toJsonSafe so non-plain types

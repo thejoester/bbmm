@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [1.1.6 ] - 2026-06-13
 
+### Changed
+- **Settings Presets:**
+  - Updated logic for loading settings presets to prevent any hidden setting from being loaded if that setting is not included in the `Inclusion/Exclusion Manager`. 
+  - Removed "(not recommended)" text from the "save hidden settings" checkbox, and updated "notice" when saving a preset when it is enabled. 
+
 ### Fixed
 - **Inclusions / Exclusions Manager:**
   - Fixed broken link to the manual on the inclusions / exclusions manager window. 
