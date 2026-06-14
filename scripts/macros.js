@@ -1512,7 +1512,7 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 		super({
 			id: "bbmm-lock-picker",
 			window: { title: LT.lockPicker.title() },
-			width: 860,
+			width: 1825,
 			height: 600,
 			resizable: true
 		});
@@ -1628,16 +1628,22 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 			return `<input type="text" class="bbmm-lp-val" value="${hlp_esc(String(value ?? ""))}">`;
 		}
 
-		// Fallback for objects/arrays/unknown
-		let json = "";
-		try { json = JSON.stringify(value); } catch { json = String(value ?? ""); }
-		return `<textarea class="bbmm-lp-val" rows="2">${hlp_esc(json)}</textarea>`;
+		// Fallback for objects/arrays/unknown: preview + pop-out JSON editor
+		let jsonStr = "";
+		try { jsonStr = JSON.stringify(value); } catch { jsonStr = String(value ?? ""); }
+		let prettyPreview = "";
+		try { prettyPreview = JSON.stringify(value, null, 2); } catch { prettyPreview = jsonStr; }
+		return `<div class="bbmm-json-editor-wrap" style="display:flex;flex-direction:column;gap:.2rem;min-width:0;">` +
+			`<code class="bbmm-json-preview" style="display:block;white-space:pre-wrap;word-break:break-all;font-size:.8em;opacity:.85;min-height:7em;overflow:hidden;">${hlp_esc(prettyPreview)}</code>` +
+			`<button type="button" class="bbmm-json-edit-btn" style="align-self:flex-start;white-space:nowrap;">${LT.lockPicker.jsonEditorBtn?.() ?? "Edit JSON…"}</button>` +
+			`<input type="hidden" class="bbmm-lp-val" value="${hlp_esc(jsonStr)}">` +
+			`</div>`;
 	}
 
 	_readInputValue(inputEl, cfg) {
 		if (!inputEl) return undefined;
 		if (inputEl.type === "checkbox") return inputEl.checked;
-		if (inputEl.tagName === "TEXTAREA") {
+		if (inputEl.tagName === "TEXTAREA" || inputEl.type === "hidden") {
 			try { return JSON.parse(inputEl.value); }
 			catch { ui.notifications.warn(LT.lockPicker.invalidJSON()); return undefined; }
 		}
@@ -1682,7 +1688,7 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 		const badge   = this._root.querySelector("#bbmm-lp-staged");
 		const summary = this._root.querySelector("#bbmm-lp-staged-summary");
 		const saveBtn = this._root.querySelector("#bbmm-lp-save");
-		const bodyEl  = this._root.querySelector("#bbmm-lp-body");
+		const rowsEl  = this._root.querySelector("#bbmm-lp-rows");
 
 		if (badge) {
 			badge.textContent   = count > 0 ? LT.lockPicker.stagedCount({ count }) : "";
@@ -1691,18 +1697,50 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 		if (summary) summary.textContent = LT.lockPicker.stagedSummary({ count });
 		if (saveBtn) saveBtn.disabled    = count === 0;
 
-		if (bodyEl && !bodyEl.querySelector(".bbmm-lp-row")) {
-			bodyEl.innerHTML = `<div class="bbmm-lp-empty">${LT.lockPicker.noSettings()}</div>`;
+		if (rowsEl && !rowsEl.querySelector(".bbmm-lp-row")) {
+			rowsEl.innerHTML = `<div class="bbmm-lp-empty">${LT.lockPicker.noSettings()}</div>`;
+		}
+	}
+
+	async _openJsonEditor(hiddenInput, keyLabel) {
+		let pretty = "";
+		try { pretty = JSON.stringify(JSON.parse(hiddenInput.value), null, 2); }
+		catch { pretty = hiddenInput.value; }
+
+		const newVal = await new Promise((resolve) => {
+			new foundry.applications.api.DialogV2({
+				window: { title: LT.lockPicker.jsonEditorTitle({ key: keyLabel }), modal: false },
+				position: { width: 500 },
+				content: `<textarea name="jsonVal" style="width:100%;min-height:280px;font-family:monospace;font-size:.85em;resize:vertical;box-sizing:border-box;">${hlp_esc(pretty)}</textarea>`,
+				buttons: [
+					{ action: "apply", label: LT.lockPicker.jsonEditorApply?.() ?? "Apply", default: true, callback: (_ev, btn) => resolve(btn.form.elements.jsonVal?.value ?? "") },
+					{ action: "cancel", label: LT.lockPicker.cancel?.() ?? "Cancel", callback: () => resolve(null) },
+				],
+				submit: () => {},
+				rejectClose: false,
+			}).render(true);
+		});
+
+		if (newVal === null) return;
+
+		try { JSON.parse(newVal); }
+		catch { ui.notifications.warn(LT.lockPicker.invalidJSON()); return; }
+
+		hiddenInput.value = newVal;
+		const previewEl = hiddenInput.closest(".bbmm-json-editor-wrap")?.querySelector(".bbmm-json-preview");
+		if (previewEl) {
+			try { previewEl.textContent = JSON.stringify(JSON.parse(newVal), null, 2); }
+			catch { previewEl.textContent = newVal; }
 		}
 	}
 
 	_renderNamespaceRows(ns) {
-		const bodyEl = this._root?.querySelector("#bbmm-lp-body");
-		if (!bodyEl) return;
+		const rowsEl = this._root?.querySelector("#bbmm-lp-rows");
+		if (!rowsEl) return;
 		const q    = (this.filter || "").trim().toLowerCase();
 		let rows   = this._loadNamespaceRows(ns);
 		if (q) rows = rows.filter(r => r.key.toLowerCase().includes(q) || r.settingName.toLowerCase().includes(q));
-		bodyEl.innerHTML = rows.length
+		rowsEl.innerHTML = rows.length
 			? rows.map(r => this._rowHTML(r)).join("")
 			: `<div class="bbmm-lp-empty">${LT.lockPicker.noSettings()}</div>`;
 	}
@@ -1733,43 +1771,22 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 			: `<div class="bbmm-lp-empty">${LT.lockPicker.noSettings()}</div>`;
 
 		const staged = this._staged.size;
-		const cols   = "1fr 180px 150px";
-		const css    = `
-			#bbmm-lock-picker .window-content{display:flex;flex-direction:column;padding:.4rem !important}
-			#bbmm-lock-picker .bbmm-lp-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.4rem}
-			#bbmm-lock-picker .bbmm-lp-toolbar{display:flex;gap:.5rem;align-items:center}
-			#bbmm-lock-picker .bbmm-lp-toolbar select{flex:0 1 200px;min-width:100px;max-width:200px}
-			#bbmm-lock-picker .bbmm-lp-toolbar input{flex:1;min-width:0}
-			#bbmm-lock-picker .bbmm-lp-sbadge{display:inline-block;padding:.1em .5em;border-radius:3px;font-size:.85em;background:rgba(80,160,80,.3);border:1px solid rgba(80,160,80,.4)}
-			#bbmm-lock-picker .bbmm-lp-head{display:grid;grid-template-columns:${cols};border:1px solid var(--color-border,#444);border-radius:.4rem .4rem 0 0;background:var(--color-bg-header,#1e1e1e)}
-			#bbmm-lock-picker .bbmm-lp-head .h{padding:.25rem .4rem;border-bottom:1px solid #444;font-weight:600}
-			#bbmm-lock-picker .bbmm-lp-body{display:block;flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .4rem .4rem}
-			#bbmm-lock-picker .bbmm-lp-row{display:grid;grid-template-columns:${cols};border-bottom:1px solid #333;align-items:start}
-			#bbmm-lock-picker .bbmm-lp-cell{padding:.25rem .4rem;min-width:0}
-			#bbmm-lock-picker .bbmm-lp-name{font-weight:500}
-			#bbmm-lock-picker .bbmm-lp-hint{font-size:.8em;opacity:.6;margin-top:.1rem}
-			#bbmm-lock-picker .bbmm-lp-hbadge{display:inline-block;padding:.05em .35em;border-radius:3px;font-size:.75em;background:rgba(255,200,0,.2);border:1px solid rgba(255,200,0,.35);margin-left:.25rem;vertical-align:middle}
-			#bbmm-lock-picker .c-value .bbmm-lp-val{width:100%}
-			#bbmm-lock-picker .c-actions{display:flex;gap:.25rem;align-items:center;flex-wrap:wrap;padding-top:.2rem}
-			#bbmm-lock-picker .bbmm-lp-empty{padding:2rem;text-align:center;opacity:.6;font-style:italic}
-			#bbmm-lock-picker .bbmm-lp-footer{display:flex;justify-content:space-between;align-items:center;padding:.35rem .4rem 0;border-top:1px solid #333;flex-shrink:0}
-			#bbmm-lock-picker .bbmm-lp-fbtns{display:flex;gap:.5rem}
-		`;
 
 		return (
-			`<style>${css}</style>` +
 			`<div class="bbmm-lp-root">` +
 				`<div class="bbmm-lp-toolbar">` +
 					`<select id="bbmm-lp-ns">${nsOpts}</select>` +
 					`<input id="bbmm-lp-filter" type="text" placeholder="${hlp_esc(LT.lockPicker.filterPlaceholder())}" value="${hlp_esc(this.filter ?? "")}" />` +
 					`<span id="bbmm-lp-staged" class="bbmm-lp-sbadge" style="${staged > 0 ? "" : "display:none;"}">${staged > 0 ? LT.lockPicker.stagedCount({ count: staged }) : ""}</span>` +
 				`</div>` +
-				`<div class="bbmm-lp-head">` +
-					`<div class="h">${LT.lockPicker.colSetting()}</div>` +
-					`<div class="h">${LT.lockPicker.colValue()}</div>` +
-					`<div class="h"></div>` +
+				`<div class="bbmm-lp-body" id="bbmm-lp-body">` +
+					`<div class="bbmm-lp-head">` +
+						`<div class="h">${LT.lockPicker.colSetting()}</div>` +
+						`<div class="h">${LT.lockPicker.colValue()}</div>` +
+						`<div class="h"></div>` +
+					`</div>` +
+					`<div id="bbmm-lp-rows">${bodyHTML}</div>` +
 				`</div>` +
-				`<div class="bbmm-lp-body" id="bbmm-lp-body">${bodyHTML}</div>` +
 				`<div class="bbmm-lp-footer">` +
 					`<span id="bbmm-lp-staged-summary">${LT.lockPicker.stagedSummary({ count: staged })}</span>` +
 					`<div class="bbmm-lp-fbtns">` +
@@ -1781,14 +1798,48 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 		);
 	}
 
+	static _LP_COLS = "525px 400px 150px";
+
+	static _ensureStyles() {
+		const id = "bbmm-lock-picker-styles";
+		if (document.getElementById(id)) return;
+		const cols = BBMMLockPicker._LP_COLS;
+		const css = `
+			#bbmm-lock-picker .window-content{display:flex;flex-direction:column;padding:.4rem !important}
+			#bbmm-lock-picker .bbmm-lp-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.4rem;overflow-x:hidden}
+			#bbmm-lock-picker .bbmm-lp-toolbar{display:flex;gap:.5rem;align-items:center}
+			#bbmm-lock-picker .bbmm-lp-toolbar select{flex:0 1 200px;min-width:100px;max-width:200px}
+			#bbmm-lock-picker .bbmm-lp-toolbar input{flex:1;min-width:0}
+			#bbmm-lock-picker .bbmm-lp-sbadge{display:inline-block;padding:.1em .5em;border-radius:3px;font-size:.85em;background:rgba(80,160,80,.3);border:1px solid rgba(80,160,80,.4)}
+			#bbmm-lock-picker .bbmm-lp-body{display:block;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;border:1px solid var(--color-border,#444);border-radius:.4rem}
+			#bbmm-lock-picker .bbmm-lp-head{display:grid;grid-template-columns:${cols};position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1e1e1e);border-bottom:1px solid #444}
+			#bbmm-lock-picker .bbmm-lp-head .h{padding:.25rem .4rem;font-weight:600;min-width:0;overflow:hidden}
+			#bbmm-lock-picker .bbmm-lp-row{display:grid;grid-template-columns:${cols};border-bottom:1px solid #333;align-items:start;overflow:hidden}
+			#bbmm-lock-picker .bbmm-lp-cell{padding:.25rem .4rem;min-width:0;overflow:hidden}
+			#bbmm-lock-picker .bbmm-lp-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+			#bbmm-lock-picker .bbmm-lp-hint{font-size:.8em;opacity:.6;margin-top:.1rem;overflow-wrap:break-word;word-break:break-word;white-space:normal}
+			#bbmm-lock-picker .bbmm-lp-hbadge{display:inline-block;padding:.05em .35em;border-radius:3px;font-size:.75em;background:rgba(255,200,0,.2);border:1px solid rgba(255,200,0,.35);margin-left:.25rem;vertical-align:middle}
+			#bbmm-lock-picker .c-value .bbmm-lp-val{width:100%}
+			#bbmm-lock-picker .c-actions{display:flex;gap:.25rem;align-items:center;flex-wrap:wrap;padding-top:.2rem}
+			#bbmm-lock-picker .bbmm-lp-empty{padding:2rem;text-align:center;opacity:.6;font-style:italic}
+			#bbmm-lock-picker .bbmm-lp-footer{display:flex;justify-content:space-between;align-items:center;padding:.35rem .4rem 0;border-top:1px solid #333;flex-shrink:0}
+			#bbmm-lock-picker .bbmm-lp-fbtns{display:flex;gap:.5rem}
+		`;
+		const el = document.createElement("style");
+		el.id = id;
+		el.textContent = css;
+		document.head.appendChild(el);
+	}
+
 	async _replaceHTML(result, _options) {
+		BBMMLockPicker._ensureStyles();
+
 		const content = this.element.querySelector(".window-content") || this.element;
 		Object.assign(content.style, { display:"flex", flexDirection:"column", height:"100%", minHeight:"0" });
 
 		try {
 			const winEl = this.element;
 			winEl.style.minWidth  = "600px";
-			winEl.style.maxWidth  = "1100px";
 			winEl.style.minHeight = "400px";
 			winEl.style.maxHeight = "750px";
 			winEl.style.overflow  = "hidden";
@@ -1821,6 +1872,14 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 		}, { passive: true });
 
 		root.addEventListener("click", (ev) => {
+			const editBtn = ev.target.closest?.(".bbmm-json-edit-btn");
+			if (editBtn) {
+				const wrap = editBtn.closest?.(".bbmm-json-editor-wrap");
+				const hiddenInput = wrap?.querySelector(".bbmm-lp-val");
+				const row = editBtn.closest?.(".bbmm-lp-row");
+				if (hiddenInput) this._openJsonEditor(hiddenInput, row?.dataset?.key ?? "");
+				return;
+			}
 			const lock = ev.target.closest?.(".bbmm-lp-lock");
 			if (lock) { const row = lock.closest?.(".bbmm-lp-row"); if (row) { this._stageRow(lock.dataset.id, "locked", row); return; } }
 			const soft = ev.target.closest?.(".bbmm-lp-soft");

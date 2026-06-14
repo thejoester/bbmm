@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-14
+
+### Changed
+- **Lock Manager:**
+  - The `Lock Manager` tool will allow GM to set locks and soft locks on user and client settings (both visible and hidden), as well as define the value for the players without changing thier own values. 
+  - The `Lock Manager` tool will replace the `Hidden Settings Sync` tool in the settings and menus.
+  - This tool is an advanced tool to be used with caution, values that are stored as JSON strings should be edited with care! The editor will validate the JSON format but not the actual values. 
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+
 ## [1.1.6] - 2026-06-13
 
 ### Changed

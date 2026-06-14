@@ -2203,28 +2203,28 @@ export async function openSettingsPresetManager() {
             const chkHidden = root.querySelector('input[name="includeHidden"]');
             const includeHiddenRaw = !!(chkHidden && chkHidden.checked);
 
-            // GM gets a confirmation warning before including hidden settings; players skip it
+            // [GM only] If 'Save hidden settings' enabled, display "warning" that hidden settings
+            // will not be imported unless included in the inclusions/exclusions manager. 
             let includeHiddenFinal = false;
             if (includeHiddenRaw) {
                 if (game.user.isGM) {
-                    const ok = await foundry.applications.api.DialogV2.confirm({
-                        window: { title: LT.includeHiddenWarnTitle() },
-                        content: `<div style="display:flex;flex-direction:column;gap:.5rem;">
-						<p>${LT.includeHiddenWarnMsg()}</p>
-						${LT.includeHiddenWarnLink?.() || ""}
-					</div>`,
-                        defaultYes: false,
-                        ok: { label: LT.buttons.yes() },
-                        cancel: { label: LT.buttons.no() },
+                    await new Promise((resolve) => {
+                        new foundry.applications.api.DialogV2({
+                            window: { title: LT.includeHiddenWarnTitle(), modal: true },
+                            position: { width: 450 },
+                            content: `<div style="display:flex;flex-direction:column;gap:.5rem;">
+							<p>${LT.includeHiddenWarnMsg()}</p>
+							${LT.includeHiddenWarnLink?.() || ""}
+						</div>`,
+                            buttons: [
+                                { action: "ok", label: LT.buttons.ok?.() ?? "OK", default: true, callback: () => resolve() },
+                            ],
+                            submit: () => {},
+                            rejectClose: false,
+                        }).render(true);
                     });
-                    includeHiddenFinal = !!ok;
-                    if (!ok)
-                        DL(
-                            "settings-presets.js | include hidden CANCELLED, proceeding with non-hidden + inclusions only"
-                        );
-                } else {
-                    includeHiddenFinal = true;
                 }
+                includeHiddenFinal = true;
             }
 
             // Guard: name required for save-current
