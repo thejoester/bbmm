@@ -1,0 +1,32 @@
+{
+  "name": "BBMM: Setting Preset Inspector",
+  "type": "script",
+  "flags": {
+    "macro-wheel": {
+      "activeCondition": ""
+    }
+  },
+  "command": "/* BBMM Settings Preset Inspector ===========================================\n\t- Tool to inspect any settings presets\n========================================================================= */\n(async () => {\n\tconst api = game.modules.get(\"bbmm\")?.api;\n\tif (!api) return ui.notifications.error(\"BBMM API not available.\");\n\tapi.openPresetInspector();\n})();",
+  "img": "icons/tools/scribal/magnifying-glass.webp",
+  "author": "EpqDCtSCbVNM4wPj",
+  "scope": "global",
+  "folder": null,
+  "ownership": {
+    "default": 0,
+    "EpqDCtSCbVNM4wPj": 3
+  },
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": null,
+    "coreVersion": "13.351",
+    "systemId": "pf2e",
+    "systemVersion": "7.4.1",
+    "createdTime": 1756038416051,
+    "modifiedTime": 1779614846086,
+    "lastModifiedBy": "EpqDCtSCbVNM4wPj"
+  },
+  "_id": "sc6d0g6syYz3nEbB",
+  "sort": 600000,
+  "_key": "!macros!sc6d0g6syYz3nEbB"
+}

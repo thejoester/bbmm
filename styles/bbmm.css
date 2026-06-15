@@ -1,0 +1,1225 @@
+/* Settings section headers */
+.bbmm-settings-header {
+	border-bottom: 1px solid var(--color-border-light-tertiary);
+	padding-bottom: 0.25em;
+}
+
+/* ── Tag Manager ─────────────────────────────────────────────────────────── */
+.bbmm-tag-manager-content {
+	padding: 0.5em;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+	height: 100%;
+	overflow: hidden;
+}
+
+.bbmm-tag-manager-content .bbmm-tag-list {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
+}
+
+.bbmm-tag-block {
+	border: 1px solid var(--color-border-light-tertiary);
+	border-radius: 4px;
+	padding: 0.4em 0.6em;
+	margin-bottom: 0.3em;
+}
+
+.bbmm-tag-row,
+.bbmm-subtag-row {
+	display: flex;
+	align-items: center;
+	gap: 0.4em;
+}
+
+.bbmm-tag-label {
+	flex: 1;
+	font-weight: bold;
+}
+
+.bbmm-subtag-label {
+	flex: 1;
+	padding-left: 1em;
+	font-size: 0.9em;
+}
+
+.bbmm-subtag-add-row {
+	display: flex;
+	gap: 0.4em;
+	margin-top: 0.3em;
+	padding-left: 1em;
+}
+
+.bbmm-subtag-add-row input,
+.bbmm-tag-add-row input {
+	flex: 1;
+}
+
+.bbmm-tag-add-row {
+	display: flex;
+	gap: 0.4em;
+	margin-top: 0.4em;
+}
+
+.bbmm-tag-empty {
+	color: var(--color-text-dark-secondary);
+	font-style: italic;
+}
+
+/* ── Module Tags App ─────────────────────────────────────────────────────── */
+.bbmm-module-tags-content {
+	padding: 0.5em;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+}
+
+.bbmm-module-tags-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5em;
+	padding: 1em 0.5em;
+	text-align: center;
+}
+
+.bbmm-chip-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3em;
+	min-height: 2em;
+}
+
+.bbmm-tag-none {
+	color: var(--color-text-dark-secondary);
+	font-style: italic;
+}
+
+.bbmm-tag-add-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3em;
+}
+
+.bbmm-tag-selects {
+	display: flex;
+	gap: 0.4em;
+	align-items: center;
+}
+
+/* ── Tag chips (shared) ──────────────────────────────────────────────────── */
+.bbmm-tag-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25em;
+	background: var(--color-bg-option);
+	border: 1px solid var(--color-border-light-tertiary);
+	border-radius: 3px;
+	padding: 0.1em 0.4em;
+	font-size: 0.8em;
+	white-space: nowrap;
+}
+
+.bbmm-chip-remove {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	line-height: 1;
+}
+
+/* ── Module row tag chips ────────────────────────────────────────────────── */
+.bbmm-row-tag-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.2em;
+	margin-top: 0.15em;
+}
+
+/* ── Toolbar rows ────────────────────────────────────────────────────────────── */
+.bbmm-mm-toolbar-row1,
+.bbmm-mm-toolbar-row2 {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	flex-wrap: wrap;
+}
+
+.bbmm-mm-toolbar-row2 {
+	border-top: 1px solid var(--color-border-light-tertiary);
+	padding-top: 0.3em;
+}
+
+.bbmm-mm-toolbar-row2 button.on {
+	background: var(--button-hover-background-color);
+	color: var(--button-hover-text-color);
+	border-color: var(--button-hover-border-color);
+}
+
+/* ── Bulk Tag Assign window ──────────────────────────────────────────────────── */
+.bbmm-bulk-assign-content {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4em;
+	height: 100%;
+	overflow: hidden;
+	padding: 0.5em;
+}
+
+.bbmm-bulk-header {
+	font-size: 0.95em;
+}
+
+.bbmm-bulk-scopes {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.bbmm-bulk-scopes button {
+	flex: 1;
+	font-size: 0.8em;
+}
+
+.bbmm-bulk-scopes button.on {
+	background: var(--button-hover-background-color);
+	color: var(--button-hover-text-color);
+	border-color: var(--button-hover-border-color);
+}
+
+.bbmm-bulk-group.collapsed .bbmm-bulk-row { display: none; }
+
+.bbmm-bulk-list {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
+	border: 1px solid var(--color-border-light-tertiary);
+	border-radius: 4px;
+	padding: 0.25em;
+}
+
+.bbmm-bulk-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding: 0.2em 0.3em;
+	cursor: pointer;
+}
+
+.bbmm-bulk-row:hover {
+	background: var(--color-bg-option);
+}
+
+.bbmm-bulk-mod-title {
+	flex: 1;
+}
+
+.bbmm-bulk-footer,
+.bbmm-module-tags-footer {
+	display: flex;
+	justify-content: space-between;
+	padding: 0.5em;
+	border-top: 1px solid var(--color-border-light-tertiary);
+}
+
+/* ── Tag group headers in module list ───────────────────────────────────── */
+.bbmm-group-count {
+	font-weight: normal;
+	opacity: 0.6;
+	font-size: 0.9em;
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+.bbmm-tag-group-header {
+	padding: 0.4em 0.8em;
+	font-weight: bold;
+	font-size: 1.1em;
+	background: var(--color-bg-header, rgba(0,0,0,0.1));
+	border: 1px solid var(--color-border-light-tertiary);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 0.4em;
+	margin-bottom: 2px;
+	user-select: none;
+}
+
+.bbmm-collapse-icon {
+	transition: transform 0.15s ease;
+	font-size: 0.75em;
+}
+
+.bbmm-tag-group:not(.collapsed) .bbmm-collapse-icon {
+	transform: rotate(90deg);
+}
+
+#bbmm-module-manager .bbmm-tag-group.collapsed .row {
+	display: none;
+}
+
+#bbmm-mm-collapse-all,
+#bbmm-mm-expand-all {
+	padding: 0.3em 0.5em;
+	min-width: unset;
+}
+
+/* BBMM Exclusions dialog */
+.bbmm-exclusions-dialog .window-content {
+	/* make sure our content can lay out as intended */
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+/* Force the toolbar into a single row regardless of theme */
+.bbmm-exclusions-dialog .bbmm-x-toolbar {
+	display: grid !important;
+	grid-template-columns: max-content max-content 1fr max-content !important;
+	align-items: center !important;
+	column-gap: 8px !important;
+	row-gap: 0 !important;
+}
+
+/* Keep buttons compact and inline */
+.bbmm-exclusions-dialog .bbmm-x-toolbar .bbmm-btn {
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	width: auto !important;
+	max-width: none !important;
+	min-width: 0 !important;
+	white-space: nowrap !important;
+	flex: 0 0 auto !important;
+	margin: 0 !important;
+}
+
+/* if some theme forces buttons to block in all contexts */
+.bbmm-exclusions-dialog .bbmm-x-toolbar .bbmm-btn,
+.bbmm-exclusions-dialog .bbmm-x-toolbar .bbmm-x-cell > .bbmm-btn {
+	display: inline-flex !important;
+}
+
+/* BBMM Inclusions window baseline styling */
+.bbmm-inclusions-app .window-content {
+	/* layout sane defaults */
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+/* Tighten padding */
+.bbmm-inclusions-app .window-content .bbmm-im-root,
+.bbmm-inclusions-app .window-content .bbmm-ai-root {
+	padding: 8px;
+}
+
+/* cap width if a theme tries to stretch it */
+#bbmm-inclusions-manager,
+#bbmm-inclusions-add-setting {
+	max-width: 760px;
+}
+
+/* BBMM Launcher dialog: stack footer buttons full-width */ 
+.bbmm-launcher-dialog footer.form-footer,
+.bbmm-launcher-dialog footer .dialog-buttons {
+	display: grid !important;
+	grid-template-columns: 1fr !important;
+	row-gap: 0.5rem !important;
+	align-items: stretch !important;
+	justify-items: stretch !important;
+}
+
+/* Make each footer button a full-width block */ 
+.bbmm-launcher-dialog footer.form-footer button,
+.bbmm-launcher-dialog footer .dialog-buttons > button {
+	display: block !important;
+	width: 100% !important;
+	max-width: none !important;
+	margin: 0 !important;
+	white-space: nowrap !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+	Lock/Sync Icons
+   ───────────────────────────────────────────────────────────── */
+.bbmm-lock-icons {
+	display: inline-flex;
+	gap: 0.4rem;
+	margin-left: 0.4rem;
+	vertical-align: middle;
+}
+.bbmm-lock-icons i + i { margin-left: 0.35rem; }
+.bbmm-lock-icons .bbmm-badge { opacity: 0.85; }
+.bbmm-lock-icons .bbmm-click {cursor: pointer; opacity: 0.85; }
+.bbmm-lock-icons .bbmm-click:hover { opacity: 1; transform: translateY(-1px); }
+
+/* Active: orange tint */
+.bbmm-active { color: orange !important; }
+
+/* Partial: blue tint */
+.bbmm-lock-icons .bbmm-partial { color: #1f449c; }
+
+/* ─────────────────────────────────────────────────────────────
+	Player Disabled Styles
+   ───────────────────────────────────────────────────────────── */
+.bbmm-locked-input { opacity: .65; pointer-events: none; }
+.bbmm-locked-badge { display: inline-flex; align-items: center; gap: .25rem; margin-left: .4rem; color: var(--color-text-dark-secondary, #999); }
+.bbmm-locked-hide { display: none !important; }
+
+/* ─────────────────────────────────────────────────────────────
+	Changelog — theme reset + scoped styles
+   ───────────────────────────────────────────────────────────── */
+
+/* Use Foundry/theme defaults inside the right pane */
+.bbmm-changelog-journal .bbmm-theme-reset {
+	all: revert;
+	font: inherit;
+	color: inherit;
+	background: transparent;
+}
+
+.bbmm-changelog-journal .bbmm-theme-reset .log,
+.bbmm-changelog-journal .bbmm-theme-reset .card,
+.bbmm-changelog-journal .bbmm-theme-reset .panel {
+	background: transparent;
+	color: inherit;
+	border-color: currentColor;	
+}
+
+/* Fix the changelog window width exactly */
+.app#bbmm-changelog-journal,
+.window-app#bbmm-changelog-journal {
+	max-width: 1200px !important;
+	min-width: 480px !important;
+	width: auto !important;
+	box-sizing: border-box;  
+	max-height: 75vh !important;
+}
+
+/* SHELL: ensure it can shrink and never force overflow */
+.bbmm-changelog-journal .bbmm-shell {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+	min-width: 0;               
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+/* Allow the right-side pane to wrap and never force horizontal overflow */
+.bbmm-changelog-journal .right {
+	flex: 1 1 auto;
+	min-width: 0 !important;   
+	max-width: 100%;
+	overflow-x: hidden;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+/* LAYOUT: give the left nav a fixed basis; let the right side be flexible */
+.bbmm-changelog-journal .left {
+	flex: 0 0 260px;                /* fixed sidebar width */
+	max-width: 260px;
+	min-width: 200px;               /* optional floor */
+}
+
+/* HEADINGS / TEXT rhythm */
+.bbmm-heading {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.4rem;
+	margin: 0;
+}
+
+.bbmm-heading .bbmm-version {
+	font-size: 0.9rem;
+	opacity: 0.8;
+}
+
+.bbmm-changelog-body h1,
+.bbmm-changelog-body h2,
+.bbmm-changelog-body h3 {
+	margin: 0.5em 0 0.25em;
+}
+
+.bbmm-changelog-body p,
+.bbmm-changelog-body ul,
+.bbmm-changelog-body ol {
+	margin: 0.4em 0;
+}
+
+/* Inline code */
+.bbmm-changelog-body code {
+	background: rgba(127, 127, 127, 0.18);
+	color: inherit; 
+	border: 1px solid rgba(127, 127, 127, 0.45);
+	border-radius: 4px;
+	padding: 0 4px;
+	white-space: normal !important;
+}
+
+/* Code blocks (<pre>) */
+.bbmm-changelog-body pre {
+	background: #0c0c0c; 
+	color: #e6e6e6;
+	border: 1px solid #444;
+	border-radius: 6px;
+	padding: 0.5em;
+	white-space: pre !important;
+	overflow: auto;
+}
+
+/* BBMM Changelog links — force Foundry-style orange */
+.bbmm-changelog-journal .bbmm-changelog-body a {
+	color: var(--color-text-hyperlink, #ff6400) !important;
+	text-decoration: underline;
+}
+
+/* Sidebar nav items */
+.bbmm-changelog-journal .bbmm-nav-item {
+	display: block;
+	width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-align: left;
+
+	background: transparent;
+	color: inherit;
+	border: 1px solid var(--color-border-light, #888);
+	border-radius: 8px;
+
+	/* comfortable tap target */
+	padding: 0.4rem 0.5rem;
+	line-height: 1.3;
+	min-height: 2.8rem;
+}
+
+.bbmm-changelog-journal .bbmm-nav-item div {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Active item */
+.bbmm-changelog-journal {
+	border-color: var(--color-border, #666);
+	box-shadow: inset 0 0 0 9999px color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.bbmm-nav-item[data-active="1"] {
+	outline: 2px solid orange;
+	outline-offset: -2px;
+	border-radius: 8px;
+}
+
+/* Hover / focus */
+.bbmm-changelog-journal .bbmm-nav-item:hover,
+.bbmm-changelog-journal .bbmm-nav-item:focus {
+	border-color: var(--color-border, #ffffff);
+	box-shadow: inset 0 0 0 2px orange;
+	background-color: rgba(119, 78, 0, 0.432);
+	color: white;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+/* Tiny badge after title */
+.bbmm-seen-badge {
+	margin-left: .35rem;
+	font-weight: 800;
+}
+
+/* De-emphasis utility used in body text */
+.bbmm-changelog-journal .bbmm-theme-reset .muted {
+	opacity: .75;
+}
+
+/* ─────────────────────────────────────────────────────────────
+	Text wrapping & overflow control in changelog body
+   ───────────────────────────────────────────────────────────── */
+
+/* Make the window content a flex column so inner panes can shrink/scroll */
+.bbmm-changelog-journal .window-content {
+	display: flex;
+	flex-direction: column;
+	min-height: 0; /* allow children to be smaller than their content */
+}
+
+/* The changelog body becomes the scrolling region */
+.bbmm-changelog-journal .bbmm-changelog-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+}
+
+/* Flex children must be allowed to shrink to enable wrapping */
+.bbmm-changelog-journal .window-content,
+.bbmm-changelog-journal .right,
+.bbmm-changelog-journal .bbmm-changelog-body {
+	min-width: 0 !important;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+/* Wrap everything in the body (except code blocks) */
+.bbmm-changelog-journal .bbmm-changelog-body,
+.bbmm-changelog-journal .bbmm-changelog-body *:not(pre):not(code) {
+	white-space: normal !important;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+	hyphens: auto;
+	min-width: 0 !important; 
+	max-width: 100%;
+}
+
+/* Long URLs can still be extreme—break them aggressively */
+.bbmm-changelog-journal .bbmm-changelog-body a {
+	overflow-wrap: anywhere;
+	word-break: break-all;
+}
+
+/* Inline code should WRAP; only code blocks should keep preformatted width */
+.bbmm-changelog-journal .bbmm-changelog-body code {
+	white-space: normal !important;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+/* keep wide tables usable without pushing the pane */
+.bbmm-changelog-journal .bbmm-changelog-body table {
+	display: block;
+	table-layout: fixed;
+	width: 100%;
+	overflow-x: auto;
+}
+
+/* Media should never push layout wider than the pane */
+.bbmm-changelog-journal .bbmm-changelog-body img,
+.bbmm-changelog-journal .bbmm-changelog-body table {
+	max-width: 100%;
+	height: auto;
+}
+
+/* Kill common nowrap culprits from third-party styles */
+.bbmm-changelog-journal .bbmm-changelog-body .label,
+.bbmm-changelog-journal .bbmm-changelog-body .tag,
+.bbmm-changelog-journal .bbmm-changelog-body .badge {
+	white-space: normal !important;
+}
+
+/* Final guardrail: descendants cannot impose a larger min-width */
+.bbmm-changelog-journal .bbmm-changelog-body * {
+	min-width: 0 !important;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+/* ==========================================================================
+	BBMM: compact Manage Modules list
+=========================================================================== */
+
+/* kill default menu padding while our UI is active */
+.bbmm-modmgmt menu.package-list,
+.bbmm-modmgmt menu.package-list.scrollable {
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+
+/* Move the native <menu> off-screen (NOT display:none) so core search still runs */
+.bbmm-modmgmt menu.package-list.bbmm-source-offscreen,
+.bbmm-modmgmt .package-list.bbmm-source-offscreen {
+	position: absolute !important;
+	left: -100000px !important;
+	top: 0 !important;
+	width: 1px !important;
+	height: 1px !important;
+	overflow: hidden !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+}
+
+/* Our grid is now a sibling of <menu> — stretch full width and stay visible */
+.bbmm-modmgmt .bbmm-modlist {
+	display: block;          /* outside the menu, so normal block */
+	margin-top: 6px;
+}
+.bbmm-modmgmt .bbmm-modlist.bbmm-force-visible { /* JS may add this when filtering */
+	display: block !important;
+}
+
+/* row: fixed grid so text never shifts */
+.bbmm-modmgmt .bbmm-modrow {
+	display: grid;
+	grid-template-columns: 32px 1fr auto; /* fixed checkbox + flex name + auto tags */
+	align-items: center;
+	gap: 8px;
+
+	width: 100%;
+	max-width: none;
+	padding: 4px 6px;
+	min-height: 30px;
+
+	border: none;
+	border-radius: 6px;
+	background: var(--bg-light, rgba(255,255,255,0.02));
+	transition: background 120ms, outline-color 120ms;
+	cursor: pointer;
+}
+.bbmm-modmgmt .bbmm-modrow:hover {
+	background: var(--bg-hover, rgba(255,255,255,0.06));
+	outline: 1px solid var(--color-border-highlight, #4d84ff);
+	outline-offset: 0;
+}
+
+/* ensure grid children don’t blow out column widths */
+.bbmm-modmgmt .bbmm-modrow > * { min-width: 0; }
+
+/* left: checkbox (lock width) */
+.bbmm-modmgmt .bbmm-col-left {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	min-width: 32px;
+}
+.bbmm-modmgmt .bbmm-toggle { margin: 0; }
+
+/* middle: name only */
+.bbmm-modmgmt .bbmm-col-middle { min-width: 0; }
+.bbmm-modmgmt .bbmm-name {
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* right: tag icons + edit button */
+.bbmm-modmgmt .bbmm-col-right {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: 4px;
+}
+.bbmm-modmgmt .bbmm-col-right .tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+}
+.bbmm-modmgmt .bbmm-col-right .tag.badge {
+	padding: 0 6px;
+	border-radius: 4px;
+}
+.bbmm-modmgmt .bbmm-col-right .bbmm-edit {
+	height: 20px;
+	min-width: 20px;
+	padding: 0 6px;
+	border: 1px solid var(--color-border-light-2, #2a2a2a);
+	border-radius: 4px;
+	background: rgba(255,255,255,0.04);
+}
+.bbmm-modmgmt .bbmm-col-right .bbmm-edit:hover {
+	background: rgba(255,255,255,0.1);
+	border-color: var(--color-border-highlight, #4d84ff);
+}
+
+/* expandable notes panel — span full row so it doesn’t shift columns */
+.bbmm-modmgmt .bbmm-notes-panel {
+	grid-column: 1 / -1;
+	max-height: 0;
+	overflow: hidden;
+	padding: 0 8px;
+	border-top: 1px solid var(--color-border-light-2, #2a2a2a);
+	transition: max-height 180ms ease, padding 180ms ease;
+}
+.bbmm-modmgmt .bbmm-modrow.bbmm-open .bbmm-notes-panel {
+	max-height: 600px;
+	padding: 8px;
+}
+.bbmm-modmgmt .bbmm-notes-html {
+	max-height: 560px;
+	overflow: auto;
+	line-height: 1.3;
+}
+.bbmm-modmgmt .bbmm-notes-empty {
+	opacity: 0.7;
+	font-style: italic;
+}
+
+/* compact reset for the native menu list when our UI is active */
+.bbmm-modmgmt .bbmm-compact {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+/* Make the window body a flex column so the list can flex + scroll */
+.bbmm-modmgmt .window-content {
+	display: flex;
+	flex-direction: column;
+	min-height: 0; /* allow children to shrink below content height */
+}
+
+/* Let our BBMM grid be the scrolling region */
+.bbmm-modmgmt .bbmm-modlist {
+	flex: 1 1 auto;   /* take remaining height */
+	min-height: 0;    /* critical for flex overflow */
+	overflow: auto;   /* <-- scrolling now happens here */
+}
+
+/*  Window sizing clamp  */
+.bbmm-modmgmt.window-app {
+	max-height: 72vh;
+}
+/* Make the body a column, but clamp its height */
+.bbmm-modmgmt .window-content {
+	display: flex;
+	flex-direction: column;
+	max-height: calc(72vh - 48px);    
+	overflow: hidden;                 
+}
+
+/* The BBMM grid is the only thing that scrolls */
+.bbmm-modmgmt .bbmm-modlist {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+}
+
+/* ==========================================================================
+	BBMM: Settings gear icon in Manage Modules
+=========================================================================== */
+.bbmm-col-right .bbmm-settings {
+	padding: 0 6px;
+	gap: 4px;
+}
+/* Remove button outline for settings gear so it looks like a plain icon */
+.bbmm-col-right .bbmm-settings {
+	all: unset;                /* reset button defaults */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.bbmm-col-right .bbmm-settings i {
+	font-size: 13px;
+	color: var(--color-text-light-primary);
+	opacity: 0.9;
+}
+
+.bbmm-col-right .bbmm-settings:hover i {
+	opacity: 1;
+	color: var(--color-text-hyperlink);
+}
+
+/* ==========================================================================
+	BBMM: Module Notes dialog
+=========================================================================== */
+
+/* keep the notes dialog from being width-clamped by themes */
+.window-app:has(#bbmm-notes-*) { 
+	max-width: none !important; 
+}
+
+/* form container */
+.bbmm-notes-form { 
+	display: block;
+	margin: 0;
+	padding: 0;
+	max-height: 100%;
+	overflow-y: auto;
+	padding-bottom: 8px; /* room above buttons */
+}
+
+/* section wrapper with separators (use <hr class="bbmm-hr"> in markup) */
+.bbmm-notes-form .bbmm-notes-section { display: block; }
+.bbmm-notes-form .bbmm-hr {
+	border: 0;
+	border-top: 1px solid var(--color-border-light-2, #2a2a2a);
+	margin: 6px 0 4px; /* tighten space above buttons */
+}
+
+/* header row */
+.bbmm-notes-form .bbmm-notes-head {
+	display: flex;
+	justify-content: flex-start;   /* left align by default */
+	align-items: center;
+	margin: 4px 0;
+}
+.bbmm-notes-form .bbmm-notes-head > label {
+	font-size: 12px;
+	opacity: 0.8;
+	padding: 2px 4px;
+	white-space: nowrap;
+}
+/* heading style when using <h3> instead of <label> */
+.bbmm-notes-form .bbmm-notes-title {
+	font-size: 1.1rem;
+	font-weight: 600;
+	margin: 0;
+	padding: 0 4px;
+	color: var(--color-text-light-1, #ddd);
+}
+
+/* make the editor span full width and look tidy */
+.bbmm-notes-form prose-mirror {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+}
+.bbmm-notes-form .editor {
+	border: 1px solid var(--color-border-light-2, #2a2a2a);
+	border-radius: 6px;
+}
+.bbmm-notes-form .editor .editor-content { min-height: 260px; }
+
+/* BBMM: tighten space above footer buttons in Notes dialog */
+.window-app:has(#bbmm-notes-*) .bbmm-notes-form {
+	padding-bottom: 0;      /* kill extra padding above buttons */
+	margin-bottom: 0;
+}
+.window-app:has(#bbmm-notes-*) .bbmm-notes-form .bbmm-hr:last-of-type {
+	margin-bottom: 4px;     /* shrink the last rule’s bottom gap */
+}
+
+/* Foundry footer row usually has a generous margin-top; tighten it here */
+.window-app:has(#bbmm-notes-*) .dialog-buttons {
+	margin-top: 6px;        /* was ~12–16px in many themes */
+}
+
+/* ensure the window content has a bit of padding below the form */
+.window-app:has(#bbmm-notes-*) .window-content {
+	padding-bottom: 6px;
+}
+
+/* ==========================================================================
+	BBMM: Module Manager Appv2 window
+=========================================================================== */
+#bbmm-module-manager .window-content {
+	display: flex;
+	flex-direction: column;
+	padding: .5rem !important;
+	min-height: 0;
+}
+
+/* app root & toolbar */
+#bbmm-module-manager .bbmm-mm-root {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+#bbmm-module-manager .bbmm-mm-toolbar {
+	display: flex;
+	flex-direction: column;
+	gap: .3rem;
+}
+
+#bbmm-module-manager .bbmm-mm-toolbar input { flex: 1; }
+
+#bbmm-module-manager .bbmm-mm-scopes { display: flex; gap: .25rem; }
+#bbmm-module-manager .bbmm-mm-scopes button.on {
+	background: var(--button-hover-background-color);
+	color: var(--button-hover-text-color);
+	border-color: var(--button-hover-border-color);
+}
+
+#bbmm-module-manager .bbmm-mm-diff {
+	margin-left: auto;
+	display: flex;
+	gap: .75rem;
+}
+#bbmm-module-manager .bbmm-mm-diff .ena { color: var(--color-positive, #5cb85c); }
+#bbmm-module-manager .bbmm-mm-diff .dis { color: var(--color-negative, #d9534f); }
+
+/* list body */
+#bbmm-module-manager .bbmm-mm-body {
+	display: block;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	border: 1px solid var(--color-border, #444);
+	border-radius: .5rem;
+	margin-top: .5rem;
+}
+
+#bbmm-module-manager .bbmm-mm-body .row {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: .5rem;
+	padding: .4rem .6rem;
+	border-bottom: 1px solid #333;
+	cursor: pointer;
+}
+
+#bbmm-module-manager .bbmm-mm-body .row.bbmm-no-toggle { grid-template-columns: 1fr auto; }
+#bbmm-module-manager .bbmm-mm-body .row.bbmm-no-toggle .notes { grid-column: 1 / 3; }
+
+#bbmm-module-manager .bbmm-mm-body .row .toggle { cursor: default; }
+#bbmm-module-manager .bbmm-mm-body .row .toggle input { transform: scale(1.2); }
+
+#bbmm-module-manager .bbmm-mm-body .row .main .title { font-weight: 600; }
+
+#bbmm-module-manager .bbmm-mm-body .row .main .meta {
+	opacity: .8;
+	display: flex;
+	gap: .5rem;
+	font-size: .9em;
+}
+#bbmm-module-manager .bbmm-mm-body .row .main .meta .tag {
+	border: 1px solid var(--color-border, #555);
+	border-radius: .35rem;
+	padding: .05rem .35rem;
+}
+#bbmm-module-manager .bbmm-mm-body .row .main .meta .tag.dep { border-color: #777; }
+#bbmm-module-manager .bbmm-mm-body .row .main .meta .tag.con { border-color: #a55; }
+
+#bbmm-module-manager .bbmm-mm-body .row.on { background: rgba(120, 200, 120, .06); }
+
+/* actions on the right */
+#bbmm-module-manager .bbmm-mm-body .row .actions {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+
+/* TAG STRIP — neutral, no borders (except gear/edit), icons ~15% smaller */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags {
+	display: flex;
+	align-items: center;
+	gap: .25rem;
+}
+
+/* base tag appearance */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 18px;
+	min-width: 18px;
+	padding: 0 .25rem;
+	border: none !important;
+	background: transparent !important;
+	border-radius: .35rem;
+	font-size: .8rem; /* ~15% smaller overall */
+	line-height: 1;
+	box-shadow: none !important;
+}
+
+/* icons inside tags */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag i {
+	font-size: .80rem; /* shrink icon a bit */
+	line-height: 1;
+}
+
+/* plain version text */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .ver-text {
+	margin-left: .4rem;
+	font-size: .95rem;
+	font-weight: 600;
+	color: var(--color-text-light, #ddd);
+	opacity: .95;
+	background: transparent !important;
+	border: 0 !important;
+	padding: 0 !important;
+}
+
+/* kill any theme’s “version pill” look just in case */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .version,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag.version {
+	background: transparent !important;
+	border: 0 !important;
+	color: inherit !important;
+	padding: 0 !important;
+}
+
+/* keep borders ONLY on settings gear + tag edit + edit buttons */
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"],
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"],
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit {
+	border: 1px solid var(--color-border, #555) !important;
+	background: rgba(255, 255, 255, .05) !important;
+	border-radius: .35rem;
+	padding: .15rem .4rem;
+}
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:hover,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"]:hover,
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:hover {
+	background: rgba(255, 255, 255, .10) !important;
+}
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="open-settings"]:focus-visible,
+#bbmm-module-manager .bbmm-mm-body .row .actions .tags .tag[data-bbmm-action="edit-tags"]:focus-visible,
+#bbmm-module-manager .bbmm-mm-body .row .actions .btn-edit:focus-visible {
+	outline: 1px solid var(--color-border, #777);
+	outline-offset: 1px;
+}
+
+/* expandable notes panel */
+#bbmm-module-manager .bbmm-mm-body .row .notes {
+	grid-column: 1 / 4;
+	display: none;
+	margin: .25rem 0 0 2.0rem;
+	border-top: 1px dotted #444;
+	padding-top: .35rem;
+}
+#bbmm-module-manager .bbmm-mm-body .row.expanded .notes { display: block; }
+#bbmm-module-manager .bbmm-mm-body .row .notes .html { max-height: 40vh; overflow: auto; }
+
+/* empty + footer */
+#bbmm-module-manager .bbmm-mm-empty { padding: 1rem; opacity: .8; }
+
+#bbmm-module-manager .bbmm-mm-footer {
+	display: flex;
+	gap: .5rem;
+	justify-content: flex-start;
+	margin-top: .5rem;
+}
+
+/* Notes header (chips above description) */
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	margin-bottom: .35rem;
+	opacity: .95;
+}
+
+/* chips inside notes header */
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag {
+	border: 1px solid var(--color-border, #555);
+	border-radius: .35rem;
+	padding: .05rem .35rem;
+	font-size: .9em;
+}
+
+/* ==========================================================================
+	Dependencies badges
+=========================================================================== */
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.dep { border-color: #777; }
+.bbmm .tag.dep {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #777;           
+	border-color: #777;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.con { border-color: #a55; }
+.bbmm .tag.con {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #a55;           
+	border-color: #a55;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
+#bbmm-module-manager .bbmm-mm-body .row .notes .notes-head .tag.rec { border-color: #38bdf8; }
+.bbmm .tag.rec {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	border: 1px solid currentColor;
+	border-radius: .35rem;
+	padding: .1rem .4rem;
+	font-size: 0.85rem;
+	color: #38bdf8;           
+	border-color: #38bdf8;
+	opacity: .9;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.bbmm .tag.rec:hover {
+	opacity: 1;
+	transform: translateY(-1px);
+}
+
+/* Locked rows */
+.bbmm .bbmm-locked { opacity: .8; }
+.bbmm .bbmm-lock-active { color: orange; }
+
+/* Compatibility badge colors */
+.bbmm .tag.compat.ok { color: #16a34a; border-color: currentColor; }     /* green */
+.bbmm .tag.compat.warn { color: #d97706; border-color: currentColor; }   /* amber */
+.bbmm .tag.compat.bad { color: #dc2626; border-color: currentColor; }    /* red */
+
+/* ==========================================================================
+	Search Filter
+=========================================================================== */
+
+/* Wrapper to absolutely-position the clear button inside the filter field */
+.bbmm-mm-toolbar .bbmm-filter-wrap {
+	position: relative;
+	display: inline-block;
+}
+
+/* Make room on the right for the X so text doesn't sit under it */
+.bbmm-mm-toolbar .bbmm-filter-wrap > #bbmm-mm-q {
+	padding-right: 1.5rem;
+}
+
+/* The clear button ("X") */
+.bbmm-mm-toolbar .bbmm-filter-clear {
+	position: absolute;
+	top: 0;
+	right: 0;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	padding: 0 0.4rem;
+	background: transparent;
+	border: 0;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+
+	opacity: 0;
+	transition: opacity 100ms linear;
+}
+
+/* Only show the X when hovering over the filter area */
+.bbmm-mm-toolbar .bbmm-filter-wrap:hover .bbmm-filter-clear {
+	opacity: 0.8;
+}
+
+/* Slight highlight on direct hover of the X */
+.bbmm-mm-toolbar .bbmm-filter-clear:hover {
+	opacity: 1;
+}
+
+/* Make sure the icon itself doesn't eat the click */
+.bbmm-mm-toolbar .bbmm-filter-clear i.fa-solid {
+	pointer-events: none;
+}

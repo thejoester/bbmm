@@ -1,0 +1,96 @@
+{
+    "id": "bbmm",
+    "title": "Big Bad Module Manager",
+    "version": "0.0.0",
+    "authors": [
+        {
+            "name": "TheJoester",
+            "discord": "thejoester",
+            "url": "https://github.com/thejoester",
+            "flags": {}
+        }
+    ],
+    "compatibility": {
+        "minimum": "13",
+        "verified": "14"
+    },
+    "esmodules": [
+        "scripts/localization.js",
+        "scripts/settings.js",
+        "scripts/helpers.js",
+        "scripts/module-presets.js",
+        "scripts/settings-presets.js",
+        "scripts/exclusions.js",
+        "scripts/inclusions.js",
+        "scripts/setting-sync.js",
+        "scripts/lock-presets.js",
+        "scripts/module-management.js",
+        "scripts/changelogs.js",
+        "scripts/hidden-setting-sync.js",
+        "scripts/macros.js"
+    ],
+    "socket": true,
+    "persistentStorage": true,
+    "packs": [
+        {
+            "name": "bbmm-macros",
+            "label": "BBMM Macros",
+            "path": "packs/bbmm-macros",
+            "type": "Macro",
+            "ownership": {
+                "PLAYER": "NONE",
+                "ASSISTANT": "OWNER"
+            }
+        },
+        {
+            "name": "bbmm-journal",
+            "label": "BBMM Journal",
+            "path": "packs/bbmm-journal",
+            "type": "JournalEntry",
+            "ownership": {
+                "PLAYER": "NONE",
+                "ASSISTANT": "OWNER"
+            }
+        }
+    ],
+    "styles": [
+        "styles/bbmm.css"
+    ],
+    "languages": [
+        {
+            "lang": "en",
+            "name": "English",
+            "path": "lang/en.json"
+        },
+        {
+            "lang": "fr",
+            "name": "French",
+            "path": "lang/fr.json"
+        },
+        {
+            "lang": "it",
+            "name": "Italiano",
+            "path": "lang/it.json"
+        },
+        {
+            "lang": "pl",
+            "name": "Polish",
+            "path": "lang/pl.json"
+        },
+        {
+            "lang": "pt-BR",
+            "name": "Português (Brasil)",
+            "path": "lang/pt-BR.json"
+        }
+    ],
+    "flags": {
+        "canUpload": true
+    },
+    "description": "Advanced Module management tool. Settings Presets, Module Presets, User settings sync/lock, Change log reports, and more!",
+    "url": "https://github.com/thejoester/bbmm/",
+    "manifest": "https://github.com/thejoester/bbmm/releases/download/0.6.5-test1/module.json",
+    "download": "https://github.com/thejoester/bbmm/releases/download/0.6.5-test1/bbmm.zip",
+    "readme": "https://github.com/thejoester/bbmm/blob/main/CHANGELOG.md",
+    "bugs": "https://github.com/thejoester/bbmm/issues",
+    "changelog": "https://github.com/thejoester/bbmm/blob/main/README.md"
+}

@@ -1,0 +1,717 @@
+# Big Bad Module Manager Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.2.0-test2] - 2026-06-14
+
+### Changed
+- **Lock Manager:**
+  - The `Lock Manager` tool will allow GM to set locks and soft locks on user and client settings (both visible and hidden), as well as define the value for the players without changing thier own values. 
+  - The `Lock Manager` tool will replace the `Hidden Settings Sync` tool in the settings and menus.
+  - This tool is an advanced tool to be used with caution, values that are stored as JSON strings should be edited with care! The editor will validate the JSON format but not the actual values. 
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+### Removed
+- **Hidden Settings Sync:**
+  - Removed the `Hidden Settings Sync` as it is replaced by the `Lock Manager` (see above).
+
+## [1.1.6] - 2026-06-13
+
+### Changed
+- **Settings Presets:**
+  - Updated logic for loading settings presets to prevent any hidden setting from being loaded if that setting is not included in the `Inclusion/Exclusion Manager`. 
+  - Removed "(not recommended)" text from the "save hidden settings" checkbox, and updated "notice" when saving a preset when it is enabled. 
+
+### Fixed
+- **Inclusions / Exclusions Manager:**
+  - Fixed broken link to the manual on the inclusions / exclusions manager window. 
+
+## [1.1.5] - 2026-06-10
+
+### Changed
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+  
+## [1.1.4] - 2026-06-08
+
+### Changed
+- **Module Manager:**
+  - Added **Select All** / **Select None** buttons to the filter dialog for quickly toggling all checkboxes.
+  - The filter dialog now includes an **Untagged** option, allowing the filter to include or exclude modules with no tags assigned.
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+
+## [1.1.3] - 2026-06-03
+
+### Changed
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+## [1.1.2] - 2026-05-30
+
+### Changed
+- **Localization:**
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+### Fixed
+- **Settings:**
+  - Fixed grammar error in Force Player Reload setting hint. .
+- **Lock Configurator:**
+  - Corrected changelog entry for `1.1.0` about how to access lock configurator, which is in the BBMM Macros compendium. 
+
+## [1.1.1] - 2026-05-30
+
+### Fixed
+- **Module Preset Manager & Settings Preset Manager:**
+  - Preset names longer than 40 characters are now truncated to 37 characters with an ellipsis (`...`). Hovering over a truncated name shows the full name in a tooltip. This matches the behavior already used in the Settings Preset Manager.
+- **Help icon and "READ ME" links fixed to point to journal.
+
+## [1.1.0] - 2026-05-30
+
+### Added
+- **Module Manager:**
+  - New **Default Grouping** setting: choose whether the Module Manager opens with no grouping, grouped by Tag, or grouped by Subtag.
+  - New **Auto Collapse List** setting: when grouping is active, all groups are collapsed automatically when the Module Manager opens.
+- **Lock Configurator:**
+  - New Lock Configurator macro lets GMs view and manage all global setting locks without having to open the full Foundry settings.
+  - Each locked setting shows the lock type (Lock or Soft Lock), which module it belongs to, the setting name, and the currently locked value.
+  - GMs can unlock any setting or switch it between Lock and Soft Lock directly from the list.
+  - An "Add Lock(s)" button opens a picker where the GM can browse all user and client settings by module, see current values, and apply a Lock or Soft Lock to individual settings without changing their own value. Multiple locks can be staged and saved together.
+  - The Lock Configurator is accessible from the BBMM macro compendium.
+  - NOTE: This does not affect user based locks, only global global locks. 
+
+### Changed
+- **Module Preset Manager & Settings Preset Manager:**
+  - Reworked layout to match the Lock Preset Manager: save-new-preset name field and button are now at the top, and the preset list is shown as a scrollable table (instead of a dropdown + separate action buttons).
+  - Each preset row has its own Load, Preview, Update, Rename, and Delete buttons inline.
+  - The list area is fixed in height to show ~5-6 presets, scrolling when there are more.
+  - The window now preserves its position and size when it reopens after a save, update, rename, or delete.
+- **Setting Sync:**
+  - Added a new "Hide Locked Settings from Players" option (enabled by default). When disabled, settings that are locked for players are still visible in their settings list but cannot be changed, rather than being hidden entirely.
+- **Setting Sync:**
+  - Now when a GM changes a setting that is locked for players, the lock now stays active for players and updates to reflect the GM's new value, so players remain locked to whatever the GM most recently set.
+  - Soft lock login-apply is now deferred until after `canvasReady` so all modules have finished registering their settings before BBMM attempts to apply. Falls back to a 2-second delay when the canvas is disabled or no scene is active.
+  - Soft lock ledger now records the last evaluated revision even when the setting value did not need to change, preventing redundant re-evaluation on every subsequent push.
+- **Journal:**
+  - Updated compendium Journal manual. 
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+ 
+## [0.8.9] - 2026-05-19
+
+### Added
+- **Module Manager:**
+  - Added a tag icon button to each module row. The icon turns orange when the module has tags assigned. Clicking it opens the tag editor for that module directly from the list.
+- **Bulk Tag Assign:**
+  - Added a view mode selector (None / Group by Tags / Untagged Only) to the bulk assign window. When "Group by Tags" is selected, groups are collapsible by clicking the group header.
+  
+### Changed
+- **Module Manager:**
+  - Players opening the Module Manager now see a read-only view. Checkboxes, the Activate All/Deactivate All buttons, Find the Culprit, Manage Tags, per-module lock toggles, and the Edit Notes button are hidden for non-GM users.
+  - Removed the "Edit Tags" button from the Edit Notes dialog, as tags can now be edited directly from the module row.
+- **Localization**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
+  ### Fixed
+- **Module Presets:**
+  - Fixed the Close button being pushed off the bottom of the preset preview window.
+
+## [0.8.8] - 2026-05-15
+
+### Changed
+- **Settings Presets:**
+  - For Players, when saving a settings preset it will default to save hidden settings as it will only save player "user" and "client" settings. 
+- **Import/Export:**
+  - Added ability for players to import/export player setting .json files. Player imports will not import any world scoped data. 
+
+
+## [0.8.7] - 2026-04-29
+
+### Fixed
+- **Persistent Data:**
+  - Fixed critical bug that deleted persistent data on load caused by changes that attempted to prevent 404 errors. 
+  - On very first load after activating the module, you will still see a 404 error once for each file, but once loaded it should not appear again. 
+
+### Changed
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+
+## [0.8.6] - 2026-04-29 [YANKED]
+
+### Added
+- **Module Presets:** 
+  - Added a "Preview" button to the Module Preset Manager that shows which modules a preset will enable/disable before applying it.
+  
+### Changed
+- **Settings Preset Preview:**
+  - Long setting values in the preview dialog are now collapsed by default, with a toggle to expand them.
+- **Localization:**
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
+### Fixed
+- **Persistent Data:**
+  - Fixed 404 errors on load if the persistent data .json files do not exist yet. 
+
+## [0.8.5] - 2026-04-12
+
+### Fixed
+- **General:**
+  - Fixed 404 error on load when storage documents for persistent storage do not exist. Now checks for files and if they do not exist, blank files are created.
+
+### Changed
+- **V14 Support:**
+  - Testing has found no issues in v14 so I am officially releasing for v14. 
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+
+## [0.8.4] - 2026-04-11
+
+### Changed
+- **Module Management:**
+  - Added module count when grouping by tags/subtags
+- **Documentation:**
+  - Updated BBMM Journal to include newer features. 
+
+## [0.8.3] - 2026-04-10
+
+### Fixed
+- **Module Management:**
+  - Fixed bug when unselecting a module in the Tag Manager bulk tag window it would become unresponsive. 
+
+### Changed
+- **Settings Sync:**
+  - Improved tooltip for lock and sync buttons to specify all gestures based on settings configuration. 
+- **Localization:**
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+## [0.8.2] - 2026-04-09
+
+### Added
+- **Module Management:**
+  - Tag/subtag group headers now display with a distinct border and larger text for better readability.
+  - Click a group header to collapse or expand that group (chevron icon indicates state).
+  - Added **Collapse All** / **Expand All** toolbar buttons (visible when grouping is active) to collapse or expand all groups at once.
+
+## [0.8.1] - 2026-04-07
+
+### Fixed
+- **Module Management:**
+  - Module search now includes author names in addition to module name and ID.
+  - When using Tag Manager to bulk tag modules: selecting modules, then changing the filter no longer clears previously selected modules.
+
+## [0.8.0] - 2026-04-07
+
+### Added
+- **Module Management**: 
+  - New tag/subtag system for organizing modules
+    - Create and manage tags and subtags via the Tag Manager (Settings menu or GM toolbar dropdown)
+    - Assign tags to individual modules from the module notes edit window
+    - Bulk-assign a tag/subtag combination to multiple modules at once using the "+" button in Tag Manager
+    - Filter the module list by tag in Module Management
+    - Group modules by tag or by subtag in Module Management
+    - Tag and subtag assignments persist across worlds via file storage (`bbmm-data/module-tags.json`)
+    - Tags and subtags are sorted alphabetically
+- **Settings**: 
+- Added section headers (Changelogs, Module Management, Sync, Advanced) to settings page for nicer UX
+- Added "Manage Tags" and "Changelog Filenames" entries to the GM toolbar dropdown
+
+### Changed
+- Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+- Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+## [0.7.6] - 2026-03-30
+
+### Changed
+- **Settigns:**
+  - Corrected spelling error in setting.
+
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
+## [0.7.5] - 2026-03-21
+
+### Added
+- **Changelog Report:**
+  - Added "Changelog Filename Manager" in settings. Allows adding or removing filenames that BBMM searches for when detecting a module's changelog file (e.g. for modules with non-standard changelog filenames).
+
+### Changed
+- **Changelog Report:**
+  - Changelog file detection is now case-insensitive (`changelog.md`, `CHANGELOG.MD`, `ChangeLog.Md`, etc. all match).
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+  - Updated Brazilian Portuguese (pt-BR) localization. Credit: [Kharmans](https://github.com/Kharmans)!
+
+## [0.7.4] - 2026-03-01
+
+### Added
+- Added Brazilian Portuguese (pt-BR) localization. Credit: [FarenRavirar](https://github.com/FarenRavirar)!
+
+### Changed 
+- Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
+## [0.7.3] - 2026-02-26
+
+### Changed
+- **Inclusions / Exclusions:**
+  - Updated export format to include module version and full title. This will not affect existing export files. 
+
+## [0.7.2] - 2026-02-25
+
+### Fixed
+- **Localization:**
+  - Added updated en.json that was missed in last release. 
+  
+## [0.7.1] - 2026-02-25
+
+### Changed
+- **Module:**
+  - Added setting to disable important message retrieval.
+
+### Fixed 
+- **Hidden Settings Sync:**
+  - Fixed bug preventing adding sync or lock to hidden user settings. 
+
+## [0.7.0] - 2026-02-24
+
+### Added
+- **Module:**
+  - Added feature that will allow me to send a message to users, in cases of bugs or issues that they may need advanced notice on.
+  - Updated Manual (Journal).
+- **Module management:**
+  - Added notification when new module(s) has been installed, prompting to enable. This feature can be disabled in settings.
+- **Inclusions / Exclusions:**
+  - Merged inclusion and Exclusion Manager. 
+  - Moved Export feature to the Import / Export window (In BBMM Settings screen):
+    - Export exports both inclusions and exclusion lists. 
+    - Added functionality to export and import inclusions and exclusion list per module.
+    - Added "All" option to export one file will all inclusions / exclusions.
+  - Added "Only Hidden Items" filter in "Add Setting Inclusion / Exclusion" window.
+  - Added "BBMM" Menu to Inclusions / Exclusions Manager.
+  - Made hidden settings show hidden icon in orange. 
+  - Added note that this tool is an advanced feature with clickable link to Manual (journal). 
+
+### Changed
+- **Localization:**
+  - Cleaned up unused localization keys in en.json.
+
+### Fixed
+- **Hidden Settings Sync:**
+  - Fixed bug causing only client scope settings to show when adding hidden setting to sync. 
+
+## [0.6.8] - 2026-01-20
+
+### Changed
+- **Localization:**
+  - Updated Italian localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+is%3Aopen+author%3AGregoryWarn)!
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
+## [0.6.7] - 2026-01-20
+
+### Added
+- **Import/Export:**
+  - Added functionality to import/export keybindings.
+    - Import/Export user keybindings. 
+    - Available to both GM and Players. 
+
+## [0.6.6] - 2026-01-20
+
+### Fixed
+- **Keybind sync:**
+  - Fixed issue with sync of keybind not pushing sync. 
+- **Settings Presets:**
+  - Fixed warning in console for players when loading the game.
+
+## [0.6.5] - 2026-01-16
+
+### Fixed
+- **Persistent Storage:** Due to an issue found in versions 0.6.0 - 0.6.4 causing persistent storage to be reset upon each update, major changes had to be made to the persistent storage. 
+  - This update will, unfortunately reset the module and settings presets. Data from prior to the v0.6.0 release will still be avaliable to import in using the macros in the compendium. 
+  - Data will now be stored in a 'bbmm-data' folder in the `/Data` directory. 
+
+### Changed
+- **Import/Export:**
+  - Import/Export functionality moved from module/settings presets windows into consolidated settings menu.
+  - Export module/setting preset will prompt to select specific preset or export all presets in one .json file
+  - Importing a module/setting preset will allow to import a single preset or a group of presets (from the export all), and if a preset with the same name exists it will rename it to append "(imported on 2026-01-12 02:37)" to the preset name.
+  - Ability to import and export inclusions and exclusions. These will just import/export all and when importing will overwrite current lists.
+- **Module/Settings Presets:**
+  - Added rename functionality to module and setting presets. Will prompt for new name, if the new name already exists will prompt to overwrite or rename again. 
+- **Inclusions / Exclusions:**
+  - Changed "Scope" column to display icons representing setting scope and visibility. 
+    - World icon = Global, Computer icon = Client, = User icon = User. 
+	- Eye icon = visible, Slashed Eye icon = hidden. 
+  - If value size is larger than 4kb the Setting column text will be colored dark orange indicating a setting with large size value. 
+- **Drop Down Menu:**
+  - Fixed styling on "BBMM" Dropdown button on settings and module management windows to work better with light ui. 
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+
+## [0.6.4] - 2026-01-11
+
+### Changed
+- **BBMM Buttons:**
+  - Changed "BBMM" buttons on settings and module management windows to display a drop-down menu instead of opening a separate window. 
+### Fixed
+- **Inclusions/Exclusions:**
+  - Fixed bug in inclusions/exclusions migration to persistent storage where when opening a new world, or world that has not migrated could overwrite inclusions/exclusions.
+
+## [0.6.3] - 2026-01-05
+### Fixed
+- **Journal:**
+  - Uploaded image for journal for preset migration instructions. 
+
+## [0.6.2] - 2026-01-05
+### Changed
+- **Changelog:** 
+  - Updated version tag in changelog to reflect the version that it was updated from. Example: "1.0.0 -> 1.2.3". Thanks [ChasarooniZ](https://github.com/ChasarooniZ/)!
+- **Journal:**
+  - Fixed broken image link in journal for preset migration instructions. 
+- **Localization:**
+  - Updated Italian localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+is%3Aopen+author%3AGregoryWarn)!
+
+## [0.6.1] - 2026-01-02
+
+### Added
+- **Setting Sync:**
+  - Added setting to force player reload when setting sync happens with setting that requires reload instead of prompting them. Default is disabled.
+  - Added Hidden Setting Sync manager to allow manual adding of hidden client settings that may be on menus.
+### Fixed
+- **Inclusions/Exclusions:**
+ - Fixed issue with saved inclusions / exclusions not migrating to the global persistent storage. 
+
+## [0.6.0] - 2025-12-31
+
+### Changed
+- **Presets:**
+  - GM Setting presets and Module presets are now saved in persistent storage, and will be shared across worlds.
+    - See instructions in Compendium Journal on how to import your old presets! 
+### Changed
+- **Inclusions/Exclusions:**
+  - Inclusion/Exclusion lists are now stored in persistent storage, and accessible from all worlds. 
+  - Should migrate when loading a world for the first time. 
+  - Filtered out '[menu]’ settings to clean up lists. 
+  - When adding a setting inclusion/exclusion, will filter by module in drop down. 
+  - Reminder: Please read the [Wiki](https://github.com/thejoester/bbmm/wiki) or compendium journal regarding inclusions/exclusions and hidden settings!
+- **Settings-Sync:**
+  - Added optional setting to force reload for players when setting requiring reload is locked/synced. 
+- **Changelog:**
+  - Moved "Mark Current Seen" and "Mark All Seen" buttons so they remain static even if window resizes. 
+
+## [0.5.17] - 2025-12-06
+
+### Changed
+- **Localization:**
+  - [#71](https://github.com/thejoester/bbmm/issues/71): Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+### Fixed
+- **Changelog Report:**
+  - Fixed bug causing inline text to be unreadable in light mode.
+
+## [0.5.16] - 2025-12-04
+
+### Changed
+- **Changelog Report:**
+  - [#66](https://github.com/thejoester/bbmm/issues/66): When marking changelog entry as seen, will move to next unread entry.
+### Fixed
+- **Module Management:**
+  - [#69](https://github.com/thejoester/bbmm/issues/69) (nice): Fixed CSS style for "All Modules" button so it shows properly in light and dark modes.
+
+## [0.5.15] - 2025-11-19
+
+### Changed
+- **Localization:**
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+
+## [0.5.14] - 2025-11-03
+
+### Fixed
+- **Module Management:**
+  - Fixed bug where `Manage Modules` button did not open the enhanced module management window when other core language was set. 
+
+## [0.5.13] - 2025-11-02
+
+### Fixed
+- **Localization:** 
+  - Added Polish language to module.json. 
+
+## [0.5.12] - 2025-10-31 
+
+### Added
+- **Localization:** 
+  - Added Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
+
+## [0.5.11] - 2025-10-31
+
+### Changed
+- **Module Management:**
+  - Added "Clear" in filter field. 
+  - When disabling a module, if there are dependencies or orphaned dependencies it will allow to decide which modules if any to disable. 
+- **Localization:** 
+- Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+
+## [0.5.10] - 2025-10-29
+
+### Fixed
+- **Module Management:** Fixed setting so that enhanced module management does not open if disabled in settings.  
+
+## [0.5.9] - 2025-10-29
+
+### Changed
+- **Module Management:** Complete overhaul of the Module Management window. 
+  - Improved performance! Rebuilt as a separate ApplicationV2 window. 
+  - Header shows enabled/disabled module counts.
+  - Added Activate All modules option.
+  - Added Lock icon that will lock module state from being changed. 
+  - Shows count of Dependencies and Conflicts from module.json for each module when expanded.
+  - Smart Dependency & Safety Logic:
+    - Enabling modules:
+      - Prompts if the module requires dependencies not yet enabled.
+      - Immediately marks those deps active in the temp config & UI.
+      - Prompts to select recommended modules allowing to select/unselect individual modules. 
+    - Disabling modules:
+      - Detects and lists dependent modules that rely on the one being disabled, prompts to disable them too.
+      - Detects orphaned requires (modules now unused by anything else), offers to disable those as well for a clean load order.
+  - Find The Culprit! Support.
+
+## [0.5.8] - 2025-10-13
+
+### Changed
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+
+## [0.5.7] - 2025-10-11
+
+### Changed
+- **Module Management:**
+  - [Issue #48](https://github.com/thejoester/bbmm/issues/48): If there are no notes for a module, it will show the module description from the module.json if it exists when expanded. 
+- **Macros:**
+  - Consolidated macros into module code so they could be localized. 
+  - Added macro to reset changelog seen state and reopen changelog report. 
+### Fixed 
+- **Changelog Report:**
+  - [Issue #47](https://github.com/thejoester/bbmm/issues/47): Fixed issue with some changelog text pushing off window, and forcing buttons off window. 
+- **Macros:**
+  - (Multiple) copy button in macros now functional to copy value to clipboard. 
+
+## [0.5.6] - 2025-10-09
+
+### Changed
+- **Controls Sync:**
+  - When applying soft-sync icon changes to orange
+  - added right-click gesture to clear soft-sync
+- **Inclusion/Exclusion Managers:**
+  - When adding inclusions/exclusions, window will not close allowing to add multiple settings/modules. 
+  - Changed buttons on exclusion manager window to match inclusion manager. 
+
+## [0.5.5] - 2025-10-07
+
+### Changed
+- **Inclusion Manager:**
+  - updated warning text when including module: fixed link so it works and localized the text.
+- **Macros (Compendium):** 
+  - Updated the `BBMM: Game Settings Inspector` macro to allow to browse user flags for current user and all users. 
+  - Note: This module currently does not support user flags at this time, it may be something that will be supported later but this macro may help locate where something is saved.
+
+## [0.5.4] - 2025-10-06
+
+### Changed
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+
+## [0.5.3] - 2025-10-02
+
+### Added
+- **Module Management:**
+  - Added gear icon in module list for modules with settings option, clicking will open settings to module settings tab. 
+
+## [0.5.2] - 2025-09-30
+
+### Fixed
+- **Module Management:**
+  - Fixed bug where enabling/disabling module with dependencies did not show the module or dependency changed. 
+
+## [0.5.1] - 2025-09-28
+
+### Changed
+- **Localization:**
+  - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
+  - Updated French (fr) localization. Thank you [Rectulo](https://gitlocalize.com/users/rectulo)!
+### Fixed
+- **Module Management:**
+  - fixed bug where "deactivate all modules" button was not functioning. 
+- **Module:**
+  - suppressed false positive console errors about missing localization keys before localization was finished loading. 
+
+## [0.5.0] - 2025-09-22
+
+### Added 
+- **Module Management:**
+  - Added enhanced module management
+    - Enable/Disable in settings (default: enabled).
+    - Added edit button, add notes to module. 
+    - If notes exist, when clicking on module in list will expand to show notes. 
+- **Controls Sync:**
+  - (these were added in 0.4.0 but was not included in notes)
+  - Lets a GM sync key binding settings to players. 
+  - Click: Sync to connected players.
+  - Shift+Click: Will put a "Soft-Lock" on the sync.
+### Fixed
+- **Inclusion Manager:** 
+  - Fixed bug not showing some settings. 
+- **Settings Sync:**
+  - Fixed bug when setting soft lock, users not logged in would not sync. 
+  - Fixed bug where lock/sync icons not showing for some user/client scoped settings.   
+  - Fixed bug when locking settings when no users setup it did not save
+  - Can now export/import sync and lock states
+- **Changelog Report:**
+  - fixed depriciation warning for `FilePicker` and `TextEditor`.
+### Changed
+- **Documentation:**
+  - Updated Journal Documentation
+
+## [0.4.1] - 2025-09-17
+
+### Fixed
+- included assets/ folder for images in journal. 
+
+## [0.4.0] - 2025-09-17
+
+### Added
+- **Compendiums:**
+  - Added Compendium folder "Big Bad Module Manager".
+  - Added Journal for module with documentation.
+  - Added Macro compendium:
+    - Macro to show changelog report manually. 
+    - Macro to Inspect settings. 
+    - Macro to Inspect Setting Presets.
+- **Inclusion Manager:**
+  - Added inclusion manager to include hidden settings in presets/inports/exports.
+### Changed
+- **Settings Sync:**
+  - Added click gesture detection on the lock icon:
+    - Click = Lock Selected (will promtp to select users).
+    - Right-Click = Lock All.
+    - Shift+Click = Soft Lock.
+    - Shift+Right-Click = Clear Locks. 
+  - Soft Lock option, will sync user setting once, but allow them to change it unless GM changes setting while soft lock enabled. 
+  - Icon changes immediately, but changes still only save when clicking "Save Changes" 
+  - Settings will allow to change click gesture behavior. 
+- **Settings Preset Manager:**
+  - No longer save hidden settings as it could cause issues with many hidden settings. 
+    - See Inclusion Manager to add specific hidden settings you wish to save. 
+    - Use with Caution! See [Wiki](https://github.com/thejoester/bbmm/wiki) or Journal documentation!
+### Fixed
+- **Settings Sync:**
+  - When GM changes setting with lock (hard or soft), it will clear lock. 
+
+## [0.3.3] - 2025-09-09
+
+### Added
+- **Localization:** Added Italian (it) localization. Credit: [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+author%3AGregoryWarn)
+### Fixed
+- **Changelog Report:** Fixed markdown formatting. 
+### Changed
+- **Settings:** Changed default debug level to none.
+
+## [0.3.2] - 2025-09-07
+
+### Fixed
+- **Settings Sync**
+  - Fixed typo affecting hover text and missing entry in en.json
+ 
+## [0.3.1] - 2025-09-03
+
+### Changed
+- **Settings Sync**
+  - Added settings lock toggle, this will lock setting value for players and hide setting from them. 
+  - Sync icon is no longer toggle, pushing it will push current GM setting to connected players but will not lock the setting. 
+  - Added setting option to enable/disable settings sync feature. 
+- **Changelog report**
+  - Updated styling and interaction settings of changelog window.
+
+## [0.3.0] - 2025-09-03
+
+### Added
+- **Settings Sync**
+  - Added Sync icon next to user/client settings. 
+  - When clicked it toggles on and turns orange. 
+  - Will push setting to connected clients, but also when clients log in they sync to enabled GM settings.
+### Fixed
+- **Changelog report** 
+  - Fixed issues for lower resolution displays:
+    - Moved 'Mark Seen' buttons to top
+    - Window will resize to smaller size if resolution is smaller
+
+## [0.2.2] - 2025-09-02
+
+### Changed
+- **Changelog report** 
+  - Locked changelog window to fixed width
+  - Improved url detection, links now show properly
+### Fixed
+- **Changelog report** 
+  - Fixed style of changelog on light interface settings.
+
+## [0.2.1] - 2025-09-01
+
+### Fixed
+- **Settings Preset Manager:** fixed bug preventing import of settings .json file
+
+## [0.2.0] - 2025-08-31
+
+### Added
+- **Changelog report** Upon GM login will show report of changelogs. 
+  - Will only show if module includes changelog file in the root or 'docs/' directory
+  - Can mark/unmark as read
+  - enabled by default, can disable in settings
+  - default only shows enabled modules, can change in settings to show all modules
+- **Settings Preset Manager:** Added "Preview" button to preview changes loading a preset will make, will highlight changes in red. 
+  - This may hang for a minute if lots of changes or large data included. 
+- **v12:** added minimal v12 support. In v12 just added tools to export settings and module states to .json to prep for migration to v13.
+  - NOTE! Cannot guarantee all settings will import in v13 if setting names have changed. 
+### Fixed
+- **Module Preset Manager:** Fixed dual 'export to .json' buttons.
+
+## [0.1.3] - 2025-08-30
+
+### Added
+- **Localization:** Added French translation. Credit: @retculo
+
+## [0.1.2] - 2025-08-29
+
+### Fixed
+- **Localization:** fixed issue with en.json not being included in install. 
+
+## [0.1.1] - 2025-08-28
+
+### Added
+- Added Localization support. 
+
+## [0.1.0] - 2025-08-25
+
+### Added
+- **Exclusions:** Added exclusions manager allowing to add exclusions for settings presets/import/export. Supports adding by entire module or direct setting. 
+- **Player Support:** Settings Preset Manager accessible for users through Settings or View Active Modules screens. 
+- **Macro:** Added Settings Preset inspector macro that will show saved setting values in selected preset. 
+- **Presets (modules and settings):** Added update button that will overwrite the selected preset with current settings / module list. 
+### Changed
+- Moved button on Manage Modules window to toolbar
+- Added button on Settings window toolbar
+### Fixed
+- **Settings Preset Manager:** export/import suppord for user scope settings. This is only for current user.
+- **Settings Preset Manager:** fixed bug that overwrote module state when loading setting presets. 
