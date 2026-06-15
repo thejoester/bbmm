@@ -541,6 +541,8 @@
 		},
 		"lockConfigurator": {
 			"title":              "BBMM: Lock Manager",
+			"menuName":           "Settings Lock Manager",
+			"menuLabel":          "Settings Lock Manager",
 			"filterPlaceholder":  "Filter locks...",
 			"colLockType":        "Lock Type",
 			"colNamespace":       "Namespace",
@@ -557,7 +559,7 @@
 			"gmOnly":             "Lock Manager is only available to the GM.",
 			"failedOpen":         "Failed to open Lock Manager (see console).",
 			"warnTitle":          "Advanced Tool — Proceed with Caution",
-			"warnBody":           "The Lock Manager is an advanced tool. Settings that store raw data (objects, arrays, JSON blobs) can break a module or the game if locked to an incorrect value. Only proceed if you are confident you know what you are doing.",
+			"warnBody":           "The Lock Manager is an advanced tool. Settings that store raw data (objects, arrays, JSON blobs) can break a module or the game if locked to an incorrect value. Only change these if you are confident you know what you are doing.",
 			"warnProceed":        "I understand, open it"
 		},
 		"lockPicker": {
