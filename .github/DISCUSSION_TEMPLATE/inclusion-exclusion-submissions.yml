@@ -1,0 +1,43 @@
+title: "[Inclusion/Exclusion] "
+labels:
+  - "inclusion-exclusion"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Submit a BBMM Inclusion / Exclusion File
+
+        Attach your `.json` file to this discussion before posting:
+        - Drag and drop the file into the editor (or use the attachment button)
+        - The JSON must include: `schemaVersion`, `target`, `targetVersion`, `foundryVersion`, `entries`
+
+        You do NOT need to type module/system namespace, versions, etc.
+        The validator will read those from the file and post them back automatically.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description (Optional)"
+      description: "Briefly describe what this file covers."
+      placeholder: "Includes hidden settings keys used by PF2e Workbench."
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ### Required: Attach Your JSON File
+
+        Make sure your `.json` file is attached to this discussion post.
+
+  - type: textarea
+    id: links
+    attributes:
+      label: "Related Links (Optional)"
+      description: "Optional links to module/system page or documentation."
+      placeholder: |
+        - Module page: ...
+        - Documentation: ...
+    validations:
+      required: false

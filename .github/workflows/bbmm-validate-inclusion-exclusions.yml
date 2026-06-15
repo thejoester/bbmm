@@ -1,0 +1,328 @@
+name: BBMM Validate Inclusion/Exclusion JSON (Discussions)
+
+on:
+  discussion:
+    types: [created, edited]
+  discussion_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  discussions: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate attached JSON and comment result
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const token = process.env.GITHUB_TOKEN;
+
+            const TARGET_CATEGORY_SLUG = "inclusion-exclusion-submissions";
+
+            function extractCandidateUrls(text) {
+              if (!text) return [];
+              const urls = [];
+
+              // Markdown links/images: [text](url) or ![text](url)
+              const mdLinkRe = /\]\((https?:\/\/[^\s)]+)\)/g;
+              let m;
+              while ((m = mdLinkRe.exec(text)) !== null) urls.push(m[1]);
+
+              // Raw URLs
+              const rawRe = /(https?:\/\/[^\s)]+)/g;
+              while ((m = rawRe.exec(text)) !== null) urls.push(m[1]);
+
+              const unique = Array.from(new Set(urls));
+
+              // Likely attachments:
+              // - ends with .json (optionally with querystring)
+              // - GitHub user-attachments links (used for drag-drop uploads)
+              return unique.filter((u) =>
+                /\.json(\?|$)/i.test(u) || /\/user-attachments\//i.test(u)
+              );
+            }
+
+            async function tryDownloadText(url) {
+              // For GitHub drag-drop attachments, sending Authorization can cause 404.
+              // Try no-auth first, then fall back to auth.
+              const isUserAttachment = /\/\/github\.com\/user-attachments\//i.test(url);
+
+              const attempt = async (useAuth) => {
+                const headers = {
+                  "User-Agent": "bbmm-validator",
+                  "Accept": "application/octet-stream"
+                };
+
+                if (useAuth && token) headers.Authorization = "Bearer " + token;
+
+                const res = await fetch(url, { redirect: "follow", headers });
+                if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
+                return await res.text();
+              };
+
+              if (isUserAttachment) {
+                try {
+                  return await attempt(false);
+                } catch (e1) {
+                  return await attempt(true);
+                }
+              }
+
+              // Non-attachment URLs: auth first (if available), then no-auth fallback
+              try {
+                return await attempt(true);
+              } catch (e2) {
+                return await attempt(false);
+              }
+            }
+
+            function validateBundle(data) {
+              const errors = [];
+
+              if (!data || typeof data !== "object") {
+                errors.push("File is not a JSON object.");
+                return errors;
+              }
+
+              // Required top-level fields (newest combined format)
+              if (typeof data.schemaVersion !== "number") errors.push("Missing/invalid `schemaVersion` (must be a number).");
+              if (typeof data.foundryVersion !== "string") errors.push("Missing/invalid `foundryVersion` (must be a string; can be empty).");
+              if (typeof data.filter !== "string" || !data.filter.trim()) errors.push("Missing/invalid `filter` (must be a non-empty string).");
+
+              if (!data.inclusions || typeof data.inclusions !== "object") errors.push("Missing/invalid `inclusions` (must be an object).");
+              if (!data.exclusions || typeof data.exclusions !== "object") errors.push("Missing/invalid `exclusions` (must be an object).");
+
+              if (data.inclusions && typeof data.inclusions === "object") {
+                if (!Array.isArray(data.inclusions.modules)) errors.push("Missing/invalid `inclusions.modules` (must be an array).");
+                if (!Array.isArray(data.inclusions.settings)) errors.push("Missing/invalid `inclusions.settings` (must be an array).");
+              }
+
+              if (data.exclusions && typeof data.exclusions === "object") {
+                if (!Array.isArray(data.exclusions.modules)) errors.push("Missing/invalid `exclusions.modules` (must be an array).");
+                if (!Array.isArray(data.exclusions.settings)) errors.push("Missing/invalid `exclusions.settings` (must be an array).");
+              }
+
+              // Validate settings entries (both inclusions + exclusions)
+              for (const bucketName of ["inclusions", "exclusions"]) {
+                const bucket = data[bucketName];
+                if (!bucket || typeof bucket !== "object") continue;
+
+                const settings = bucket.settings;
+                if (!Array.isArray(settings)) continue;
+
+                settings.forEach((s, idx) => {
+                  if (!s || typeof s !== "object") {
+                    errors.push(`${bucketName}.settings[${idx}] must be an object.`);
+                    return;
+                  }
+                  if (typeof s.namespace !== "string" || !s.namespace.trim()) errors.push(`${bucketName}.settings[${idx}].namespace must be a non-empty string.`);
+                  if (typeof s.key !== "string" || !s.key.trim()) errors.push(`${bucketName}.settings[${idx}].key must be a non-empty string.`);
+                });
+              }
+
+              return errors;
+            }
+
+            function computeNamespaceFilter(data) {
+              const ns = new Set();
+
+              if (!data || typeof data !== "object") return [];
+
+              // Always include the top-level filter (primary namespace)
+              if (typeof data.filter === "string" && data.filter.trim()) ns.add(data.filter.trim());
+
+              for (const bucketName of ["inclusions", "exclusions"]) {
+                const bucket = data[bucketName];
+                if (!bucket || typeof bucket !== "object") continue;
+
+                // modules: array of module ids (strings)
+                if (Array.isArray(bucket.modules)) {
+                  for (const m of bucket.modules) {
+                    if (typeof m === "string" && m.trim()) ns.add(m.trim());
+                  }
+                }
+
+                // settings: array of { namespace, key }
+                if (Array.isArray(bucket.settings)) {
+                  for (const s of bucket.settings) {
+                    if (s && typeof s === "object" && typeof s.namespace === "string" && s.namespace.trim()) {
+                      ns.add(s.namespace.trim());
+                    }
+                  }
+                }
+              }
+
+              return Array.from(ns).sort((a, b) => a.localeCompare(b));
+            }
+
+            // GraphQL helpers (Discussions are best handled via GraphQL here)
+            async function getDiscussion(number) {
+              const q = [
+                "query($owner:String!, $repo:String!, $number:Int!) {",
+                "  repository(owner:$owner, name:$repo) {",
+                "    discussion(number:$number) {",
+                "      id",
+                "      body",
+                "      category {",
+                "        slug",
+                "        name",
+                "      }",
+                "    }",
+                "  }",
+                "}"
+              ].join("\n");
+
+              const res = await github.graphql(q, { owner, repo, number });
+              return (res && res.repository && res.repository.discussion) ? res.repository.discussion : null;
+            }
+
+            async function postComment(discussionNumber, body) {
+              const disc = await getDiscussion(discussionNumber);
+              const discussionId = disc && disc.id ? disc.id : null;
+              if (!discussionId) throw new Error("Could not resolve discussion id for #" + discussionNumber);
+
+              const m = [
+                "mutation($discussionId:ID!, $body:String!) {",
+                "  addDiscussionComment(input:{discussionId:$discussionId, body:$body}) {",
+                "    comment { id url }",
+                "  }",
+                "}"
+              ].join("\n");
+
+              await github.graphql(m, { discussionId, body });
+            }
+
+            // Determine which discussion and what content to scan
+            let discussionNumber = null;
+            let bodiesToScan = [];
+
+            if (context.eventName === "discussion") {
+              discussionNumber = context.payload.discussion.number;
+              bodiesToScan = [context.payload.discussion.body || ""];
+            } else if (context.eventName === "discussion_comment") {
+              discussionNumber = context.payload.discussion.number;
+
+              const commentBody = context.payload.comment.body || "";
+              bodiesToScan = [commentBody];
+
+              // Fallback to discussion body
+              const disc = await getDiscussion(discussionNumber);
+              bodiesToScan.push((disc && disc.body) ? disc.body : "");
+            } else {
+              return;
+            }
+
+            // Category gate: only run in the desired Discussions category
+            const discForCategory = await getDiscussion(discussionNumber);
+            const catSlug = String(discForCategory?.category?.slug ?? "");
+            if (!catSlug || catSlug !== TARGET_CATEGORY_SLUG) return;
+
+            // Find candidate attachment URLs
+            const candidates = [];
+            for (const b of bodiesToScan) {
+              for (const u of extractCandidateUrls(b)) candidates.push(u);
+            }
+            const urls = Array.from(new Set(candidates));
+
+            // If no attachment links, skip silently (no comment)
+            if (!urls.length) return;
+
+            // Try each candidate URL until one parses as JSON
+            let chosenUrl = null;
+            let parsed = null;
+            let lastDownloadErr = null;
+            let lastParseErr = null;
+
+            for (const u of urls) {
+              try {
+                const txt = await tryDownloadText(u);
+                try {
+                  const obj = JSON.parse(txt);
+                  chosenUrl = u;
+                  parsed = obj;
+                  break;
+                } catch (eParse) {
+                  lastParseErr = eParse;
+                  continue;
+                }
+              } catch (eDl) {
+                lastDownloadErr = eDl;
+                continue;
+              }
+            }
+
+            if (!chosenUrl || !parsed) {
+              const msg = [
+                "<!-- bbmm-validator -->",
+                "❌ I found attachment links, but none could be downloaded and parsed as JSON.",
+                "",
+                "**Links found:**",
+                ...urls.map((u) => "- " + u),
+                "",
+                lastDownloadErr ? ("**Last download error:** " + String(lastDownloadErr.message || lastDownloadErr)) : "",
+                lastParseErr ? ("**Last parse error:** " + String(lastParseErr.message || lastParseErr)) : "",
+                "",
+                "Make sure the attached file is a `.json` export from BBMM and try again."
+              ].filter(Boolean).join("\n");
+
+              await postComment(discussionNumber, msg);
+              return;
+            }
+
+            const errors = validateBundle(parsed);
+
+            if (errors.length) {
+              const msg = [
+                "<!-- bbmm-validator -->",
+                "❌ BBMM inclusion/exclusion file validation failed.",
+                "",
+                "**File:** " + chosenUrl,
+                "",
+                "**Problems found:**",
+                ...errors.map((e) => "- " + e),
+                "",
+                "Fix the JSON and re-attach (or attach a corrected file). Editing the post will trigger validation again."
+              ].join("\n");
+
+              await postComment(discussionNumber, msg);
+              return;
+            }
+
+            const nsFilter = computeNamespaceFilter(parsed);
+
+            const incModulesCount = (parsed.inclusions && Array.isArray(parsed.inclusions.modules)) ? parsed.inclusions.modules.length : 0;
+            const incSettingsCount = (parsed.inclusions && Array.isArray(parsed.inclusions.settings)) ? parsed.inclusions.settings.length : 0;
+            const excModulesCount = (parsed.exclusions && Array.isArray(parsed.exclusions.modules)) ? parsed.exclusions.modules.length : 0;
+            const excSettingsCount = (parsed.exclusions && Array.isArray(parsed.exclusions.settings)) ? parsed.exclusions.settings.length : 0;
+
+            const hasModTitle = (typeof parsed.moduleTitle === "string" && parsed.moduleTitle.trim());
+            const hasModVersion = (typeof parsed.moduleVersion === "string" && parsed.moduleVersion.trim());
+            const modMetaLines = [];
+
+            if (hasModTitle) modMetaLines.push("- Module Title: `" + String(parsed.moduleTitle) + "`");
+            if (hasModVersion) modMetaLines.push("- Module Version: `" + String(parsed.moduleVersion) + "`");
+
+            const okMsg = [
+              "<!-- bbmm-validator -->",
+              "✅ BBMM inclusion/exclusion file looks valid.",
+              "",
+              "**File:** " + chosenUrl,
+              "",
+              "**Detected:**",
+              ...(modMetaLines.length ? modMetaLines : []),
+              "- Filter (namespace/module): `" + String(parsed.filter) + "`",
+              "- FoundryVTT Version: `" + String(parsed.foundryVersion) + "`",
+              "- Inclusions: " + (incModulesCount + incSettingsCount),
+              "- Exclusions: " + (excModulesCount + excSettingsCount),
+
+              "",
+              "**Namespace filter (derived):**",
+              nsFilter.length ? nsFilter.map((n) => "- `" + n + "`").join("\n") : "_(none)_"
+            ].join("\n");
+
+            await postComment(discussionNumber, okMsg);
