@@ -1,1 +1,17 @@
+# Node
 node_modules/
+package-lock.json
+
+# Keep only JSON source; ignore LevelDB internals
+/packs/*/*
+!/packs/*/_source/
+!/packs/*/_source/**
+
+# LevelDB junk
+/packs/*/lost/
+
+# BBMM persistent preset storage (world-generated)
+storage/presets/*.json
+
+#markdownlint
+.markdownlint.json
