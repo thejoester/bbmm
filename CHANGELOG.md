@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 
+### Removed
+- **Hidden Settings Sync:**
+  - Removed the `Hidden Settings Sync` as it is replaced by the `Lock Manager` (see above).
+
 ## [1.1.6] - 2026-06-13
 
 ### Changed
