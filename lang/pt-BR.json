@@ -578,7 +578,7 @@
 			"invalidJSON":        "JSON inválido — não foi possível interpretar o valor."
 		},
 		"_importExport": {
-			"allPresets": "Todos os Presets.",
+			"allPresets": "Todos os Presets",
 			"whichPreset": "Qual preset você deseja exportar?",
 			"exportedSettingsPreset": "Preset de configurações exportado.",
 			"importedList": "Lista Importada.",
