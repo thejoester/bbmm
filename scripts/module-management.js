@@ -1344,7 +1344,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				for (const m of mods) placed.add(m.id);
 			}
 		}
-		const untagged = filtered.filter(m => !placed.has(m.id));
+		const untagged = filtered.filter(m => !placed.has(m.id) && !(tagData.assignments[m.id]?.length));
 		if (untagged.length && (tagFilter.size === 0 || tagFilter.has("__untagged__")))
 			groups.push({ tag: null, mods: untagged });
 		return groups;
@@ -1376,7 +1376,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			.sort(([a], [b]) => a.localeCompare(b))
 			.map(([label, mods]) => ({ label, mods }));
 
-		const untagged = filtered.filter(m => !placed.has(m.id));
+		const untagged = filtered.filter(m => !placed.has(m.id) && !(tagData.assignments[m.id]?.length));
 		if (untagged.length && (tagFilter.size === 0 || tagFilter.has("__untagged__")))
 			result.push({ label: LT.moduleManagement.untagged(), mods: untagged });
 		return result;

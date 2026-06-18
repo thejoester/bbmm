@@ -1516,10 +1516,11 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 			height: 600,
 			resizable: true
 		});
-		this._parent     = parentConfigurator;
-		this._staged     = new Map();
-		this._selectedNs = "";
-		this.filter      = "";
+		this._parent          = parentConfigurator;
+		this._staged          = new Map();
+		this._selectedNs      = "";
+		this.filter           = "";
+		this._showUnlabeled   = false;
 	}
 
 	_nsLabel(ns) {
@@ -1562,10 +1563,11 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 			if (cfg.scope !== "user" && cfg.scope !== "client") continue;
 			if (syncMap[fullKey]) continue;
 			if (this._staged.has(fullKey)) continue;
-			const key         = fullKey.slice(idx + 1);
-			const settingName = cfg.name ? game.i18n.localize(cfg.name) : "";
-			// Skip settings whose name didn't resolve (localization key returned unchanged, e.g. "mod.settings.foo.name")
-			if (!settingName || (settingName === cfg.name && cfg.name.includes("."))) continue;
+			const key            = fullKey.slice(idx + 1);
+			const rawName        = cfg.name ? game.i18n.localize(cfg.name) : "";
+			const isUnlabeled    = !rawName || (rawName === cfg.name && cfg.name.includes("."));
+			if (isUnlabeled && !this._showUnlabeled) continue;
+			const settingName    = isUnlabeled ? key : rawName;
 			let value;
 			try { value = game.settings.get(ns, key); } catch { value = null; }
 			rows.push({
@@ -1576,7 +1578,8 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 				value,
 				settingName,
 				hint:        cfg.hint ? (game.i18n.localize(cfg.hint) || "") : "",
-				isHidden:    cfg.config === false
+				isHidden:    cfg.config === false,
+				isUnlabeled
 			});
 		}
 		rows.sort((a, b) => {
@@ -1634,7 +1637,7 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 		let prettyPreview = "";
 		try { prettyPreview = JSON.stringify(value, null, 2); } catch { prettyPreview = jsonStr; }
 		return `<div class="bbmm-json-editor-wrap" style="display:flex;flex-direction:column;gap:.2rem;min-width:0;">` +
-			`<code class="bbmm-json-preview" style="display:block;white-space:pre-wrap;word-break:break-all;font-size:.8em;opacity:.85;min-height:7em;overflow:hidden;">${hlp_esc(prettyPreview)}</code>` +
+			`<code class="bbmm-json-preview" style="display:block;white-space:pre-wrap;word-break:break-all;font-size:.8em;opacity:.85;max-height:13em;overflow-y:auto;">${hlp_esc(prettyPreview)}</code>` +
 			`<button type="button" class="bbmm-json-edit-btn" style="align-self:flex-start;white-space:nowrap;">${LT.lockPicker.jsonEditorBtn?.() ?? "Edit JSON…"}</button>` +
 			`<input type="hidden" class="bbmm-lp-val" value="${hlp_esc(jsonStr)}">` +
 			`</div>`;
@@ -1655,9 +1658,13 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 	}
 
 	_rowHTML(r) {
-		const badge = r.isHidden
+		const hiddenBadge    = r.isHidden
 			? `<span class="bbmm-lp-hbadge">${LT.lockPicker.hiddenBadge()}</span>`
 			: "";
+		const unlabeledBadge = r.isUnlabeled
+			? `<span class="bbmm-lp-ulbadge">${LT.lockPicker.unlabeledBadge()}</span>`
+			: "";
+		const badge = hiddenBadge + unlabeledBadge;
 		return `
 			<div class="bbmm-lp-row" data-id="${hlp_esc(r.id)}" data-ns="${hlp_esc(r.namespace)}" data-key="${hlp_esc(r.key)}">
 				<div class="bbmm-lp-cell c-setting">
@@ -1777,6 +1784,10 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 				`<div class="bbmm-lp-toolbar">` +
 					`<select id="bbmm-lp-ns">${nsOpts}</select>` +
 					`<input id="bbmm-lp-filter" type="text" placeholder="${hlp_esc(LT.lockPicker.filterPlaceholder())}" value="${hlp_esc(this.filter ?? "")}" />` +
+					`<label class="bbmm-lp-unlabeled-label" title="${hlp_esc(LT.lockPicker.includeUnlabeledTooltip())}">` +
+						`<input type="checkbox" id="bbmm-lp-unlabeled"${this._showUnlabeled ? " checked" : ""}>` +
+						hlp_esc(LT.lockPicker.includeUnlabeled()) +
+					`</label>` +
 					`<span id="bbmm-lp-staged" class="bbmm-lp-sbadge" style="${staged > 0 ? "" : "display:none;"}">${staged > 0 ? LT.lockPicker.stagedCount({ count: staged }) : ""}</span>` +
 				`</div>` +
 				`<div class="bbmm-lp-body" id="bbmm-lp-body">` +
@@ -1819,6 +1830,8 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 			#bbmm-lock-picker .bbmm-lp-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 			#bbmm-lock-picker .bbmm-lp-hint{font-size:.8em;opacity:.6;margin-top:.1rem;overflow-wrap:break-word;word-break:break-word;white-space:normal}
 			#bbmm-lock-picker .bbmm-lp-hbadge{display:inline-block;padding:.05em .35em;border-radius:3px;font-size:.75em;background:rgba(255,200,0,.2);border:1px solid rgba(255,200,0,.35);margin-left:.25rem;vertical-align:middle}
+			#bbmm-lock-picker .bbmm-lp-ulbadge{display:inline-block;padding:.05em .35em;border-radius:3px;font-size:.75em;background:rgba(200,100,255,.2);border:1px solid rgba(200,100,255,.35);margin-left:.25rem;vertical-align:middle}
+			#bbmm-lock-picker .bbmm-lp-unlabeled-label{display:flex;align-items:center;gap:.3rem;white-space:nowrap;cursor:pointer;font-size:.9em;flex-shrink:0}
 			#bbmm-lock-picker .c-value .bbmm-lp-val{width:100%}
 			#bbmm-lock-picker .c-actions{display:flex;gap:.25rem;align-items:center;flex-wrap:wrap;padding-top:.2rem}
 			#bbmm-lock-picker .bbmm-lp-empty{padding:2rem;text-align:center;opacity:.6;font-style:italic}
@@ -1855,12 +1868,20 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 
 		root.addEventListener("change", (ev) => {
 			const ns = ev.target.closest?.("#bbmm-lp-ns");
-			if (!ns) return;
-			this._selectedNs = ns.value || "";
-			this.filter = "";
-			const f = root.querySelector("#bbmm-lp-filter");
-			if (f) f.value = "";
-			this._renderNamespaceRows(this._selectedNs);
+			if (ns) {
+				this._selectedNs = ns.value || "";
+				this.filter = "";
+				const f = root.querySelector("#bbmm-lp-filter");
+				if (f) f.value = "";
+				this._renderNamespaceRows(this._selectedNs);
+				return;
+			}
+			const unlabeled = ev.target.closest?.("#bbmm-lp-unlabeled");
+			if (unlabeled) {
+				this._showUnlabeled = unlabeled.checked;
+				this._renderNamespaceRows(this._selectedNs);
+				return;
+			}
 		});
 
 		let debTimer = null;
