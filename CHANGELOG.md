@@ -4,19 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.0-test3] - 2026-06-14
+## [1.2.0-test4] - 2026-06-18
 
 ### Changed
 - **Lock Manager:**
   - The `Lock Manager` tool will allow GM to set locks and soft locks on user and client settings (both visible and hidden), as well as define the value for the players without changing thier own values. 
   - The `Lock Manager` tool will replace the `Hidden Settings Sync` tool in the settings and menus.
   - This tool is an advanced tool to be used with caution, values that are stored as JSON strings should be edited with care! The editor will validate the JSON format but not the actual values. 
-- **Localization:**
+- **Localization (to be released in official release):**
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+  - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
 
 ### Fixed
-- **Module:**
+- **Module Manager:**
+  - Fixed an issue with `Filter by Tags` function where modules assigned to a tag that was not included in the active filter would incorrectly appear in the `Untagged` group. Modules now only appear in `Untagged` if they have no tag assignments at all.
+- **UI:**
   - Fixed several UI issues where the window would resize width depending on content such as the Changelog report and enhanced module management windows.
 
 ### Removed
