@@ -202,6 +202,7 @@ function _bbmmSizeFrameOnce(frame, app) {
 
 		// Apply to inner frame
 		frame.style.width = `${w}px`;
+		frame.style.minWidth = `${w}px`;
 		frame.style.height = `${h}px`;
 		frame.style.maxWidth = `${MAX_W}px`;
 		frame.style.maxHeight = `calc(75vh - ${marginH}px)`;

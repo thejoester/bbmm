@@ -540,7 +540,9 @@
 			"titleConfirmUpdate":   "Update Lock Preset"
 		},
 		"lockConfigurator": {
-			"title":              "BBMM: Lock Configurator",
+			"title":              "BBMM: Lock Manager",
+			"menuName":           "Settings Lock Manager",
+			"menuLabel":          "Settings Lock Manager",
 			"filterPlaceholder":  "Filter locks...",
 			"colLockType":        "Lock Type",
 			"colNamespace":       "Namespace",
@@ -554,10 +556,10 @@
 			"unlocked":           "Unlocked \"{key}\".",
 			"unlockBtn":          "Unlock",
 			"addLocks":           "Add Lock(s)",
-			"gmOnly":             "Lock Configurator is only available to the GM.",
-			"failedOpen":         "Failed to open Lock Configurator (see console).",
+			"gmOnly":             "Lock Manager is only available to the GM.",
+			"failedOpen":         "Failed to open Lock Manager (see console).",
 			"warnTitle":          "Advanced Tool — Proceed with Caution",
-			"warnBody":           "The Lock Configurator is an advanced tool. Settings that store raw data (objects, arrays, JSON blobs) can break a module or the game if locked to an incorrect value. Only proceed if you are confident you know what you are doing.",
+			"warnBody":           "The Lock Manager is an advanced tool. Settings that store raw data (objects, arrays, JSON blobs) can break a module or the game if locked to an incorrect value. Only change these if you are confident you know what you are doing.",
 			"warnProceed":        "I understand, open it"
 		},
 		"lockPicker": {
@@ -575,7 +577,10 @@
 			"saveLocks":          "Save Locks",
 			"lockBtn":            "Lock",
 			"softLockBtn":        "Soft Lock",
-			"invalidJSON":        "Invalid JSON — could not parse value."
+			"invalidJSON":        "Invalid JSON — could not parse value.",
+			"jsonEditorBtn":      "Edit JSON…",
+			"jsonEditorTitle":    "Edit JSON — {key}",
+			"jsonEditorApply":    "Apply"
 		},
 		"_importExport": {
 			"allPresets": "All Presets",

@@ -1140,7 +1140,7 @@ async function _bbmmOpenNotesDialog(moduleId) {
 class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		const _defaultGrouping = game.settings.get(BBMM_ID, "defaultGrouping") ?? "none";
-		const _openHeight = _defaultGrouping !== "none" ? 780 : 640;
+		const _openHeight = _defaultGrouping !== "none" ? 900 : 760;
 		super({
 			id: "bbmm-module-manager",
 			window: { title: LT.moduleManagement.modListWindowTitle() },
@@ -1162,10 +1162,10 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		/* runtime lock state */
 		this.locks = new Set();
 
-		this._minW = 760;
-		this._maxW = 1400;
-		this._minH = 480;
-		this._maxH = 900;
+		this._minW = 800;
+		this._maxW = 800;
+		this._minH = 720;
+		this._maxH = 1000;
 
 		// snapshot modules once on open
 		this._refreshDataset();
@@ -1344,7 +1344,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				for (const m of mods) placed.add(m.id);
 			}
 		}
-		const untagged = filtered.filter(m => !placed.has(m.id));
+		const untagged = filtered.filter(m => !placed.has(m.id) && !(tagData.assignments[m.id]?.length));
 		if (untagged.length && (tagFilter.size === 0 || tagFilter.has("__untagged__")))
 			groups.push({ tag: null, mods: untagged });
 		return groups;
@@ -1376,7 +1376,7 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 			.sort(([a], [b]) => a.localeCompare(b))
 			.map(([label, mods]) => ({ label, mods }));
 
-		const untagged = filtered.filter(m => !placed.has(m.id));
+		const untagged = filtered.filter(m => !placed.has(m.id) && !(tagData.assignments[m.id]?.length));
 		if (untagged.length && (tagFilter.size === 0 || tagFilter.has("__untagged__")))
 			result.push({ label: LT.moduleManagement.untagged(), mods: untagged });
 		return result;

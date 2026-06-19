@@ -249,7 +249,7 @@ export function injectBBMMHeaderButton(root) {
 			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
 			{ action: "exclusions", label: LT.exclusionsMgr(), onClick: () => openExclusionsManager() },
 			/*{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },*/
-			{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel(), onClick: () => openhiddenSettingSyncManager() },
+			{ action: "lockManager", label: LT.lockConfigurator.menuLabel(), onClick: () => globalThis.bbmm?.openLockConfigurator?.() },
 			{ action: "lockPresets", label: LT.lockPresets.menuLabel(), onClick: () => openLockPresetManager() },
 			{ action: "tags", label: LT.moduleManagement.tagMgrLabel(), onClick: () => openTagManager() },
 			{ action: "changelogFiles", label: LT.changelog.filesMgrLabel(), onClick: () => openChangelogFilesManager() },
@@ -562,7 +562,7 @@ export async function openBBMMLauncher() {
 					{ action: "modules",        label: LT.modulePresetMgr(), default: true },
 					{ action: "settings",       label: LT.settingsPresetMgr() },
 					{ action: "exclusions",     label: LT.exclusionsMgr() },
-					{ action: "hiddenSettings", label: LT.hiddenSettingSync.menuLabel() },
+					{ action: "lockManager", label: LT.lockConfigurator.menuLabel() },
 					{ action: "lockPresets",    label: LT.lockPresets.menuLabel() },
 					{ action: "tags",           label: LT.moduleManagement.tagMgrLabel() },
 					{ action: "changelogFiles", label: LT.changelog.filesMgrLabel() },
@@ -599,8 +599,8 @@ export async function openBBMMLauncher() {
 		openSettingsPresetManager();
 	} else if (choice === "exclusions") {
 		openExclusionsManager();
-	} else if (choice === "hiddenSettings") {
-		openhiddenSettingSyncManager();
+	} else if (choice === "lockManager") {
+		globalThis.bbmm?.openLockConfigurator?.();
 	} else if (choice === "lockPresets") {
 		openLockPresetManager();
 	} else if (choice === "tags") {
@@ -1741,12 +1741,11 @@ Hooks.once("init", () => {
 						});
 					}
 					async render(...args) {
-						const uuid = "Compendium.bbmm.bbmm-journal.JournalEntry.u3uUIp6Jfg8411Pn";
 						try {
-							DL("settings.js | About BBMM button clicked", { uuid });
-							const doc = await fromUuid(uuid);
+							DL("settings.js | About BBMM button clicked", { BBMM_README_UUID });
+							const doc = await fromUuid(BBMM_README_UUID);
 							if (!doc) {
-								DL(2, "settings.js | About BBMM open failed: document not found", { uuid });
+								DL(2, "settings.js | About BBMM open failed: document not found", { BBMM_README_UUID });
 								return ui.notifications?.error(LT.aboutOpenMissing());
 							}
 							await doc.sheet.render(true);
@@ -1832,35 +1831,35 @@ Hooks.once("init", () => {
 				}
 			});
 
-			// MENU: Hidden Client Setting Sync Manager
-			game.settings.registerMenu(BBMM_ID, "hiddenSettingSyncManager", {
-				name: LT.hiddenSettingSync.menuName(),
-				label: LT.hiddenSettingSync.menuLabel(),
-				icon: "fas fa-user-gear",
+			// MENU: Settings Lock Manager
+			game.settings.registerMenu(BBMM_ID, "lockManager", {
+				name: LT.lockConfigurator.menuName(),
+				label: LT.lockConfigurator.menuLabel(),
+				icon: "fas fa-lock",
 				restricted: true,
 				type: class extends FormApplication {
 					constructor(...args){ super(...args); }
 					static get defaultOptions() {
 						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-hidden-client-sync-opener",
-							title: LT.hiddenSettingSync?.title?.() ?? "Hidden Client Setting Sync",
+							id: "bbmm-lock-manager-opener",
+							title: LT.lockConfigurator?.title?.() ?? "Lock Manager",
 							template: null,
 							width: 600
 						});
 					}
 					async render(...args) {
 						try {
-							const fn = globalThis.bbmm?.openhiddenSettingSyncManagerApp;
+							const fn = globalThis.bbmm?.openLockConfigurator;
 
 							if (typeof fn !== "function") {
-								DL(3, "settings.js | openhiddenSettingSyncManager(): global opener not found", globalThis.bbmm);
-								ui.notifications?.error(LT.hiddenSettingSync?.openError?.() ?? "Hidden Client Sync Manager not available.");
+								DL(3, "settings.js | lockManager registerMenu: global opener not found", globalThis.bbmm);
+								ui.notifications?.error(LT.lockConfigurator?.failedOpen?.() ?? "Lock Manager not available.");
 								return this;
 							}
 
 							fn();
 						} catch (err) {
-							DL(2, "settings.js | Hidden Client Sync Manager open failed", err);
+							DL(2, "settings.js | Lock Manager open failed", err);
 						}
 						return this;
 					}
