@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - The `Lock Manager` tool will allow GM to set locks and soft locks on user and client settings (both visible and hidden), as well as define the value for the players without changing thier own values. 
   - The `Lock Manager` tool will replace the `Hidden Settings Sync` tool in the settings and menus.
   - This tool is an advanced tool to be used with caution, values that are stored as JSON strings should be edited with care! The editor will validate the JSON format but not the actual values. 
-- **Localization (to be released in official release):**
+- **Localization:**
   - Updated Italian (it) localization. Thank you [GregoryWarn](https://github.com/GregoryWarn)!
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
   - Updated Polish (pl) localization. Thank you [Lioheart](https://gitlocalize.com/users/Lioheart)!
