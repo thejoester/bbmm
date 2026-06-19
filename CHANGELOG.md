@@ -21,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Fixed an issue with `Filter by Tags` function where modules assigned to a tag that was not included in the active filter would incorrectly appear in the `Untagged` group. Modules now only appear in `Untagged` if they have no tag assignments at all.
 - **UI:**
   - Fixed several UI issues where the window would resize width depending on content such as the Changelog report and enhanced module management windows.
+- **Setting Sync / Lock Manager:**
+    - Fixed a deprecation warning triggered when opening or closing the Settings window. The equality helper now prefers `foundry.utils.equals` (v14+), falls back to `foundry.utils.objectsEqual` (v13), and uses a JSON comparison as a last resort.
 
 ### Removed
 - **Hidden Settings Sync:**

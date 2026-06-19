@@ -17,7 +17,7 @@ import { LT, BBMM_ID } from "./localization.js";
 	const BBMM_SYNC_CH = `module.${BBMM_ID}`;	// Socket channel for this module
 	const _bbmmPendingOps = [];	 // Pending operations queue (applied on Save Changes)
 	/*  equality helper ============================================================ */
-	const objectsEqual = foundry?.utils?.objectsEqual ?? ((a, b) => { 
+	const objectsEqual = foundry?.utils?.equals ?? foundry?.utils?.objectsEqual ?? ((a, b) => {
 		try { return JSON.stringify(a) === JSON.stringify(b); } catch { return a === b; }
 	});
 	let _bbmmTriggerTimer = null; // For bbmmBroadcastTrigger()
