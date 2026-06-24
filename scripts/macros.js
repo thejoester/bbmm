@@ -1309,16 +1309,22 @@ class BBMMLockConfigurator extends foundry.applications.api.ApplicationV2 {
 		const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
 		const rows = [];
 		for (const [id, entry] of Object.entries(syncMap)) {
-			if (Array.isArray(entry.userIds) && entry.userIds.length > 0) continue;
 			const cfg = game.settings.settings.get(id);
 			const ns  = entry.namespace || id.slice(0, id.indexOf("."));
 			const key = entry.key      || id.slice(id.indexOf(".") + 1);
+			const entryUserIds = Array.isArray(entry.userIds) ? entry.userIds : [];
+			const nonGMs = (game.users?.contents || []).filter(u => !u.isGM);
+			const usersLabel = entryUserIds.length === 0
+				? (LT.lockConfigurator.allPlayers?.() || "All Players")
+				: (LT.lockConfigurator.partialPlayers?.({ count: entryUserIds.length, total: nonGMs.length }) || `${entryUserIds.length} of ${nonGMs.length} players`);
 			rows.push({
 				id,
 				namespace:   ns,
 				key,
 				lockType:    entry.soft ? "soft" : "locked",
 				value:       entry.value,
+				userIds:     entryUserIds,
+				usersLabel,
 				nsLabel:     this._nsLabel(ns),
 				settingName: cfg?.name ? (game.i18n.localize(cfg.name) || key) : key,
 				hint:        cfg?.hint ? (game.i18n.localize(cfg.hint) || "") : "",
@@ -1349,6 +1355,7 @@ class BBMMLockConfigurator extends foundry.applications.api.ApplicationV2 {
 					${r.hint ? `<div class="bbmm-lc-hint">${hlp_esc(r.hint)}</div>` : ""}
 				</div>
 				<div class="bbmm-lc-cell c-value" title="${hlp_esc(toPreview(r.value))}"><code>${hlp_esc(toPreview(r.value))}</code></div>
+				<div class="bbmm-lc-cell c-players" title="${hlp_esc(r.usersLabel)}">${hlp_esc(r.usersLabel)}</div>
 				<div class="bbmm-lc-cell c-actions">
 					<button type="button" class="bbmm-lc-unlock" data-id="${hlp_esc(r.id)}">${LT.lockConfigurator.unlockBtn()}</button>
 				</div>
@@ -1384,7 +1391,7 @@ class BBMMLockConfigurator extends foundry.applications.api.ApplicationV2 {
 		const entry   = syncMap[id];
 		if (!entry) return;
 		await _lc_writeLockChanges({
-			toAdd:    [{ namespace: entry.namespace, key: entry.key, lockType: newLockType, value: entry.value }],
+			toAdd:    [{ namespace: entry.namespace, key: entry.key, lockType: newLockType, value: entry.value, userIds: entry.userIds }],
 			toRemove: []
 		});
 		this._rerenderRows();
@@ -1411,7 +1418,7 @@ class BBMMLockConfigurator extends foundry.applications.api.ApplicationV2 {
 			? filteredRows.map(r => this._rowHTML(r)).join("")
 			: `<div class="bbmm-lc-empty">${LT.lockConfigurator.noLocks()}</div>`;
 
-		const cols = "130px 130px 1fr 140px 76px";
+		const cols = "130px 130px 1fr 140px 110px 76px";
 		const css  = `
 			#bbmm-lock-configurator .window-content{display:flex;flex-direction:column;padding:.4rem !important}
 			#bbmm-lock-configurator .bbmm-lc-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.4rem}
@@ -1443,6 +1450,7 @@ class BBMMLockConfigurator extends foundry.applications.api.ApplicationV2 {
 					`<div class="h">${LT.lockConfigurator.colNamespace()}</div>` +
 					`<div class="h">${LT.lockConfigurator.colSetting()}</div>` +
 					`<div class="h">${LT.lockConfigurator.colValue()}</div>` +
+					`<div class="h">${LT.lockConfigurator.colPlayers?.() || "Players"}</div>` +
 					`<div class="h"></div>` +
 				`</div>` +
 				`<div class="bbmm-lc-body" id="bbmm-lc-body">${bodyHTML}</div>` +
@@ -1914,6 +1922,215 @@ class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
 }
 
 /* ==========================================================================
+	Lock Report - read-only view of all current locks, with push-to-players
+========================================================================== */
+class BBMMLockReport extends foundry.applications.api.ApplicationV2 {
+	constructor() {
+		super({
+			id: "bbmm-lock-report",
+			window: { title: LT.lockReport.title() },
+			width: 720,
+			height: 500,
+			resizable: true
+		});
+	}
+
+	_nsLabel(ns) {
+		if (ns === "core") return "Core Foundry";
+		if (ns === game.system?.id) return game.system?.title || ns;
+		return game.modules.get(ns)?.title || ns;
+	}
+
+	_loadRows() {
+		const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+		const rows    = [];
+		for (const [id, entry] of Object.entries(syncMap)) {
+			const cfg = game.settings.settings.get(id);
+			const ns  = entry.namespace || id.slice(0, id.indexOf("."));
+			const key = entry.key       || id.slice(id.indexOf(".") + 1);
+
+			let lockTypeLabel;
+			if (entry.soft) {
+				lockTypeLabel = LT.lockConfigurator.lockTypeSoft();
+			} else if (Array.isArray(entry.userIds) && entry.userIds.length > 0) {
+				lockTypeLabel = LT.lockReport.lockTypePartial({ count: entry.userIds.length });
+			} else {
+				lockTypeLabel = LT.lockConfigurator.lockTypeLocked();
+			}
+
+			rows.push({
+				id,
+				namespace:   ns,
+				key,
+				lockKind:    entry.soft ? "soft" : (Array.isArray(entry.userIds) && entry.userIds.length ? "partial" : "locked"),
+				lockTypeLabel,
+				value:       entry.value,
+				nsLabel:     this._nsLabel(ns),
+				settingName: cfg?.name ? (game.i18n.localize(cfg.name) || key) : key
+			});
+		}
+		rows.sort((a, b) => a.namespace.localeCompare(b.namespace) || a.key.localeCompare(b.key));
+		return rows;
+	}
+
+	_rowHTML(r) {
+		const typeClass =
+			r.lockKind === "soft"    ? "bbmm-lr-type-soft" :
+			r.lockKind === "partial" ? "bbmm-lr-type-partial" :
+			"bbmm-lr-type-locked";
+		return `
+			<div class="bbmm-lr-row">
+				<div class="bbmm-lr-cell c-type ${typeClass}">${hlp_esc(r.lockTypeLabel)}</div>
+				<div class="bbmm-lr-cell c-ns" title="${hlp_esc(r.nsLabel)}">${hlp_esc(r.nsLabel)}</div>
+				<div class="bbmm-lr-cell c-setting" title="${hlp_esc(r.key)}">${hlp_esc(r.settingName)}</div>
+				<div class="bbmm-lr-cell c-value"><code title="${hlp_esc(toPreview(r.value))}">${hlp_esc(toPreview(r.value))}</code></div>
+			</div>`;
+	}
+
+	async _pushAll() {
+		if (!game.user?.isGM)  { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
+		if (!game.socket) return;
+
+		let map    = game.settings.get(BBMM_ID, "userSettingSync") || {};
+		let revMap = game.settings.get(BBMM_ID, "softLockRevMap")  || {};
+		const nonGMIds = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+
+		const softPushes = [];
+		const hardPushes = [];
+		let mapChanged = false, revChanged = false;
+		let softCount = 0, hardCount = 0;
+
+		for (const [id, entry] of Object.entries(map)) {
+			const dot = id.indexOf(".");
+			if (dot <= 0) continue;
+			const ns  = id.slice(0, dot);
+			const key = id.slice(dot + 1);
+			const cfg = game.settings.settings.get(id);
+			if (!cfg) continue;
+
+			if (entry.soft) {
+				// Bump rev so offline players re-apply on next login and online players accept the push
+				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
+				const newRev     = currentRev + 1;
+				map[id]          = { ...entry, rev: newRev };
+				revMap[id]       = newRev;
+				mapChanged = true;
+				revChanged = true;
+				softPushes.push({ namespace: ns, key, value: entry.value, requiresReload: !!cfg.requiresReload, softRev: newRev });
+				softCount++;
+			} else {
+				// Hard lock: push to all non-GM users (or the specific userIds subset)
+				const targets = Array.isArray(entry.userIds) && entry.userIds.length ? entry.userIds : null;
+				hardPushes.push({ namespace: ns, key, value: entry.value, requiresReload: !!cfg.requiresReload, targets });
+				hardCount++;
+			}
+		}
+
+		const total = softCount + hardCount;
+		if (total === 0) { ui.notifications.warn(LT.lockReport.pushNone()); return; }
+
+		if (mapChanged) await game.settings.set(BBMM_ID, "userSettingSync", map);
+		if (revChanged) await game.settings.set(BBMM_ID, "softLockRevMap", revMap);
+
+		for (const sp of softPushes) {
+			game.socket.emit(BBMM_SYNC_CH, {
+				t: "bbmm-sync-push",
+				soft: true, softRev: sp.softRev,
+				namespace: sp.namespace, key: sp.key,
+				value: sp.value, targets: nonGMIds,
+				requiresReload: sp.requiresReload
+			});
+		}
+		for (const hp of hardPushes) {
+			game.socket.emit(BBMM_SYNC_CH, {
+				t: "bbmm-sync-push",
+				namespace: hp.namespace, key: hp.key,
+				value: hp.value, targets: hp.targets,
+				requiresReload: hp.requiresReload
+			});
+		}
+		// Refresh trigger picks up hard locks on clients that haven't received a direct push
+		setTimeout(() => game.socket.emit(BBMM_SYNC_CH, { t: "bbmm-sync-refresh" }), 200);
+
+		ui.notifications.info(LT.lockReport.pushSuccess({ total, hardcount: hardCount, softcount: softCount }));
+	}
+
+	async _renderHTML() {
+		const rows    = this._loadRows();
+		const bodyHTML = rows.length
+			? rows.map(r => this._rowHTML(r)).join("")
+			: `<div class="bbmm-lr-empty">${LT.lockConfigurator.noLocks()}</div>`;
+
+		const cols = "110px 160px 1fr 170px";
+		const css  = `
+			#bbmm-lock-report .window-content { display:flex; flex-direction:column; padding:.4rem !important; }
+			#bbmm-lock-report .bbmm-lr-root { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:.4rem; }
+			#bbmm-lock-report .bbmm-lr-head { display:grid; grid-template-columns:${cols}; border:1px solid var(--color-border,#444); border-radius:.4rem .4rem 0 0; background:var(--color-bg-header,#1e1e1e); }
+			#bbmm-lock-report .bbmm-lr-head .h { padding:.25rem .4rem; border-bottom:1px solid #444; font-weight:600; line-height:1.2; }
+			#bbmm-lock-report .bbmm-lr-body { display:block; flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--color-border,#444); border-top:0; border-radius:0 0 .4rem .4rem; }
+			#bbmm-lock-report .bbmm-lr-row { display:grid; grid-template-columns:${cols}; border-bottom:1px solid #333; align-items:center; }
+			#bbmm-lock-report .bbmm-lr-cell { padding:.25rem .4rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.2; }
+			#bbmm-lock-report .c-value code { font-size:.82em; opacity:.85; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+			#bbmm-lock-report .bbmm-lr-type-locked { font-weight:600; color:var(--color-positive,#5fbf7f); }
+			#bbmm-lock-report .bbmm-lr-type-soft { font-style:italic; opacity:.85; }
+			#bbmm-lock-report .bbmm-lr-type-partial { color:var(--color-warning,#d4a017); }
+			#bbmm-lock-report .bbmm-lr-empty { padding:2rem; text-align:center; opacity:.6; font-style:italic; }
+			#bbmm-lock-report .bbmm-lr-footer { display:flex; justify-content:space-between; align-items:center; padding:.35rem .4rem 0; border-top:1px solid #333; flex-shrink:0; }
+			#bbmm-lock-report .bbmm-lr-fbtns { display:flex; gap:.5rem; }
+		`;
+
+		return (
+			`<style>${css}</style>` +
+			`<div class="bbmm-lr-root">` +
+				`<div class="bbmm-lr-head">` +
+					`<div class="h">${LT.lockConfigurator.colLockType()}</div>` +
+					`<div class="h">${LT.lockReport.colModule()}</div>` +
+					`<div class="h">${LT.lockConfigurator.colSetting()}</div>` +
+					`<div class="h">${LT.lockConfigurator.colValue()}</div>` +
+				`</div>` +
+				`<div class="bbmm-lr-body">${bodyHTML}</div>` +
+				`<div class="bbmm-lr-footer">` +
+					`<span>${LT.lockConfigurator.activeCount({ count: rows.length })}</span>` +
+					`<div class="bbmm-lr-fbtns">` +
+						`<button type="button" id="bbmm-lr-close">${LT.buttons.close()}</button>` +
+						`<button type="button" id="bbmm-lr-push"${rows.length === 0 ? " disabled" : ""}>${LT.lockReport.pushBtn()}</button>` +
+					`</div>` +
+				`</div>` +
+			`</div>`
+		);
+	}
+
+	async _replaceHTML(result, _options) {
+		const content = this.element.querySelector(".window-content") || this.element;
+		Object.assign(content.style, { display:"flex", flexDirection:"column", height:"100%", minHeight:"0" });
+
+		try {
+			const winEl = this.element;
+			winEl.style.minWidth  = "480px";
+			winEl.style.maxWidth  = "960px";
+			winEl.style.minHeight = "280px";
+			winEl.style.maxHeight = "700px";
+			winEl.style.overflow  = "hidden";
+		} catch {}
+
+		content.innerHTML = result;
+		this._root = content;
+
+		if (this._delegated) return;
+		this._delegated = true;
+
+		const root = this._root;
+
+		root.addEventListener("click", (ev) => {
+			if (ev.target.closest?.("#bbmm-lr-close")) { this.close(); return; }
+			if (ev.target.closest?.("#bbmm-lr-push")) { this._pushAll(); return; }
+		});
+
+		try { this.setPosition({ height: "auto", left: null, top: null }); } catch {}
+	}
+}
+
+/* ==========================================================================
 	Launchers exposed on API
 ========================================================================== */
 export function openNamespaceInspector() {
@@ -2098,6 +2315,17 @@ export function openKeybindInspector() {
 	}
 }
 
+export function openLockReport() {
+	try {
+		if (!game.user?.isGM) { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
+		DL("macros.js | openLockReport(): launching");
+		new BBMMLockReport().render(true);
+	} catch (err) {
+		DL(3, "macros.js | openLockReport(): error", err);
+		ui.notifications.error(LT.lockReport.failedOpen());
+	}
+}
+
 export async function openLockConfigurator() {
 	try {
 		if (!game.user?.isGM) { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
@@ -2135,7 +2363,8 @@ export function registerApi() {
 			openNamespaceInspector,
 			openPresetInspector,
 			openKeybindInspector,
-			openLockConfigurator
+			openLockConfigurator,
+			openLockReport
 		});
 
 		DL("macros.js | registerApi(): API attached", Object.keys(mod.api));
@@ -2149,6 +2378,7 @@ Hooks.once("init", () => {
 		registerApi();
 		globalThis.bbmm ??= {};
 		globalThis.bbmm.openLockConfigurator = openLockConfigurator;
+		globalThis.bbmm.openLockReport = openLockReport;
 		DL("macros.js | macros:init(): BBMM macro API registered");
 	} catch (err) {
 		DL(3, "macros.js | macros:init(): failed to register BBMM macro API", err);

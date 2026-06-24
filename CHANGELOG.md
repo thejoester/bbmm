@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0-test1] - 2026-06-24
+
+### Added
+- **Lock Manager:**
+  - Added a **Players** column to the Lock Manager showing "All Players" for global locks or "N of M players" for partial locks.
+- **Settings Sync:**
+  - Replaced the 4-gesture lock system (click, shift+click, right-click, shift+right-click) with a simpler dialog-driven flow. 
+    - Clicking an unlocked setting's lock icon opens a **Stage Lock** dialog with a value editor, Hard/Soft lock choice, and player targeting (defaults to All Players; select a subset for a partial lock).
+    - Clicking a locked setting's lock icon opens a **Manage Lock** dialog showing the current lock type and value, with options to Edit or Unlock.
+    - Staged (not-yet-applied) locks now show in **green** on the lock icon.
+    - An **"Apply N Pending Lock(s)"** button appears in the settings form footer when locks are staged, allowing locks to be committed without clicking Save Changes.
+- **UI:**
+  - Added dividers to the BBMM header dropdown menu to group related tools visually.
+
 ## [1.2.0] - 2026-06-19
 
 ### Changed

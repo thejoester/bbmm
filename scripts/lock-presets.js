@@ -29,7 +29,7 @@ async function _writeLockPresets(obj) {
 	try {
 		const payload = JSON.stringify(obj ?? {}, null, 2);
 		const file = new File([payload], LOCK_PRESETS_FILE, { type: "application/json" });
-		const res = await FilePicker.upload("data", "bbmm-data", file, { notify: false });
+		const res = await foundry.applications.apps.FilePicker.implementation.upload("data", "bbmm-data", file, { notify: false });
 		if (!res?.path && !res?.url) {
 			DL(3, "lock-presets.js | _writeLockPresets(): upload returned no path/url", res);
 			return false;

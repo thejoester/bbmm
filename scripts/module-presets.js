@@ -209,7 +209,7 @@ async function hlp_writePresetsToStorage(presets) {
 	const file = new File([payload], MODULE_PRESETS_STORAGE_FILE, { type: "application/json" });
 
 	try {
-		const res = await FilePicker.upload("data", "bbmm-data", file, { notify: false });
+		const res = await foundry.applications.apps.FilePicker.implementation.upload("data", "bbmm-data", file, { notify: false });
 
 		if (!res || (!res.path && !res.url)) {
 			DL(3, "module-presets.js | hlp_writePresetsToStorage(): uploadPersistent returned no path/url", res);

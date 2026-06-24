@@ -36,7 +36,7 @@ async function _bbmmWriteJSON(filename, data) {
 	const payload = JSON.stringify(data ?? {}, null, 2);
 	const file = new File([payload], filename, { type: "application/json" });
 	try {
-		await FilePicker.upload("data", "bbmm-data", file, { notify: false });
+		await foundry.applications.apps.FilePicker.implementation.upload("data", "bbmm-data", file, { notify: false });
 		return true;
 	} catch (e) {
 		DL(3, `module-management.js | _bbmmWriteJSON(${filename}): upload failed`, e);

@@ -360,7 +360,13 @@
 /* Active: orange tint */
 .bbmm-active { color: orange !important; }
 
-/* Partial: blue tint */
+/* Diverged: blue tint - GM value differs from locked value */
+.bbmm-diverged { color: #4d84ff !important; }
+
+/* Pending: green tint - staged lock not yet applied */
+.bbmm-pending { color: #22c55e !important; }
+
+/* Partial: dark blue tint */
 .bbmm-lock-icons .bbmm-partial { color: #1f449c; }
 
 /* ─────────────────────────────────────────────────────────────

@@ -114,7 +114,7 @@
 		"infoClearedLocks": "Blocchi di questa impostazione rimossi.",
 		"includeHidden": "Salva impostazioni nascoste",
 		"includeHiddenWarnTitle": "Includere impostazioni nascoste?",
-		"includeHiddenWarnMsg": "Attenzione: salvare tutte le impostazioni nascoste aumenterà lo spazio occupato dai salvataggi. Inoltre, qualsiasi impostazione nascosta non inclusa nel Gestore di Inclusione/Esclusione non verrà applicata durante il caricamento di un preset. Consulta il manuale per ulteriori informazioni!",
+		"includeHiddenWarnMsg": "Salvare e caricare impostazioni nascoste può causare risultati imprevisti. Si consiglia di usare il Gestore Inclusioni per aggiungere impostazioni nascoste specifiche. Sei sicuro di voler salvare/esportare impostazioni nascoste?",
 		"includeHiddenWarnLink": "",
 		"click": "Click",
 		"rightClick": "Click Destro",
