@@ -7,7 +7,7 @@
 ============================================================================== */
 import { DL, BBMM_README_UUID, injectBBMMHeaderButton, openTagManager as _openTagManagerFromSettings } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
-import { hlp_esc, hlp_injectHeaderHelpButton } from "./helpers.js";
+import { hlp_esc, hlp_injectHeaderHelpButton, hlp_saveJSONFile, hlp_pickLocalJSONFile } from "./helpers.js";
 
 // ── Tag data helpers ──────────────────────────────────────────────────────────
 
@@ -73,6 +73,56 @@ async function _saveTagData(data) {
 	data.subtags?.sort((a, b) => a.label.localeCompare(b.label));
 	_tagsCache = foundry.utils.duplicate(data);
 	await _bbmmWriteJSON(TAGS_FILE, data);
+}
+
+async function _exportModuleTags() {
+	try {
+		const data = _getTagData();
+		const d = new Date();
+		const pad = (n) => String(n).padStart(2, "0");
+		const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+		await hlp_saveJSONFile(data, `${stamp}-bbmm-module-tags.json`);
+		ui.notifications?.info?.("Exported module tags.");
+	} catch (err) {
+		DL(3, "module-management.js | _exportModuleTags(): failed", err);
+		ui.notifications?.error?.("Failed to export module tags.");
+	}
+}
+
+async function _importModuleTags() {
+	try {
+		const file = await hlp_pickLocalJSONFile();
+		if (!file) return;
+		let imported;
+		try { imported = JSON.parse(await file.text()); }
+		catch { ui.notifications.warn("Invalid JSON file."); return; }
+		if (!Array.isArray(imported?.tags) || !Array.isArray(imported?.subtags) || typeof imported?.assignments !== "object") {
+			ui.notifications.warn("Not a valid BBMM module tags file."); return;
+		}
+		const data = _getTagData();
+		let addedTags = 0, addedSubs = 0;
+		for (const t of imported.tags) {
+			if (t?.id && !data.tags.find(x => x.id === t.id)) { data.tags.push(t); addedTags++; }
+		}
+		for (const s of imported.subtags) {
+			if (s?.id && !data.subtags.find(x => x.id === s.id)) { data.subtags.push(s); addedSubs++; }
+		}
+		for (const [modId, arr] of Object.entries(imported.assignments ?? {})) {
+			if (!Array.isArray(arr)) continue;
+			const existing = data.assignments[modId] ?? [];
+			for (const a of arr) {
+				if (!existing.some(e => e.tagId === a.tagId && (e.subtagId ?? null) === (a.subtagId ?? null)))
+					existing.push(a);
+			}
+			data.assignments[modId] = existing;
+		}
+		await _saveTagData(data);
+		_bbmmRefreshModuleManagerApp();
+		ui.notifications.info(`Imported: ${addedTags} tag(s), ${addedSubs} subtag(s).`);
+	} catch (err) {
+		DL(3, "module-management.js | _importModuleTags(): failed", err);
+		ui.notifications?.error?.("Failed to import module tags.");
+	}
 }
 
 // ── notes data ────────────────────────────────────────────────────────────────
@@ -739,7 +789,10 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 		}
 
 		const q = this.filter.toLowerCase().trim();
-		let visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
+		let visible = q ? allMods.filter(m => {
+			const authorStr = Array.from(m.authors ?? []).map(a => a.name ?? "").join(" ");
+			return (m.title + " " + m.id + " " + authorStr).toLowerCase().includes(q);
+		}) : allMods;
 		if (this.viewMode === "untagged") visible = visible.filter(m => !(data.assignments[m.id]?.length));
 
 		const vm = this.viewMode;
@@ -752,7 +805,10 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 				<button type="button" data-bulk-view="group"    class="${vm === "group"    ? "on" : ""}">${hlp_esc(LT.moduleManagement.groupByTags())}</button>
 				<button type="button" data-bulk-view="untagged" class="${vm === "untagged" ? "on" : ""}">${hlp_esc(LT.moduleManagement.tagMgrViewUntagged())}</button>
 			</div>
-			<input type="text" id="bbmm-bulk-filter" placeholder="${hlp_esc(LT.moduleManagement.tagMgrFilterPlaceholder())}" value="${hlp_esc(this.filter)}">
+			<div style="display:flex;gap:.4rem;align-items:center;">
+				<input type="text" id="bbmm-bulk-filter" placeholder="${hlp_esc(LT.moduleManagement.tagMgrFilterPlaceholder())}" value="${hlp_esc(this.filter)}" style="flex:1;">
+				<button type="button" id="bbmm-bulk-select-all" style="white-space:nowrap;">${hlp_esc(LT.moduleManagement.tagMgrSelectAll?.() || "Select All Filtered")}</button>
+			</div>
 			<div class="bbmm-bulk-list">${this._renderBulkList(data, visible)}</div>
 		`;
 		return root;
@@ -767,6 +823,19 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 		content.querySelector("#bbmm-bulk-filter")?.addEventListener("input", (e) => {
 			this.filter = e.target.value ?? "";
 			this._updateList(content);
+		});
+
+		content.querySelector("#bbmm-bulk-select-all")?.addEventListener("click", () => {
+			// sync current visible checkboxes into this.selected first
+			for (const el of content.querySelectorAll('input[name="mod"]')) {
+				if (el.checked) this.selected.add(el.value);
+				else this.selected.delete(el.value);
+			}
+			// check and add all currently visible modules
+			for (const el of content.querySelectorAll('input[name="mod"]')) {
+				el.checked = true;
+				this.selected.add(el.value);
+			}
 		});
 
 		// View mode segmented buttons
@@ -828,7 +897,10 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 			}
 		}
 
-		let visible = q ? allMods.filter(m => (m.title + " " + m.id).toLowerCase().includes(q)) : allMods;
+		let visible = q ? allMods.filter(m => {
+			const authorStr = Array.from(m.authors ?? []).map(a => a.name ?? "").join(" ");
+			return (m.title + " " + m.id + " " + authorStr).toLowerCase().includes(q);
+		}) : allMods;
 		if (this.viewMode === "untagged") visible = visible.filter(m => !(data.assignments[m.id]?.length));
 
 		const list = content.querySelector(".bbmm-bulk-list");
@@ -2293,8 +2365,8 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 		return `
 			<div class="bbmm-mm-footer">
 				<button type="button" id="bbmm-mm-save">${LT.moduleManagement.saveModuleSettings()}</button>
-				<button type="button" id="bbmm-mm-deactivate-all">${LT.moduleManagement.deactivateAll()}</button>
-				<button type="button" id="bbmm-mm-activate-all">${LT.moduleManagement.activateAll()}</button>
+				<button type="button" id="bbmm-mm-deactivate-all">${LT.moduleManagement.disableFiltered?.() || "Disable Filtered"}</button>
+				<button type="button" id="bbmm-mm-activate-all">${LT.moduleManagement.enableFiltered?.() || "Enable Filtered"}</button>
 				${hasCulprit ? `<button type="button" id="bbmm-mm-culprit"><i class="fa-solid fa-search"></i> ${LT.moduleManagement.findTheCulprit()}</button>`: ``}
 
 			</div>
@@ -2821,22 +2893,22 @@ class BBMMModuleManagerApp extends foundry.applications.api.ApplicationV2 {
 				await this._saveViaCoreSettings();
 			}, true);
 
-			// footer: Deactivate All
+			// footer: Disable Filtered
 			this._root.addEventListener("click", async (ev) => {
 				if (ev.target?.id !== "bbmm-mm-deactivate-all") return;
-				const ids = (this._mods ?? []).map(m => m.id).filter(id => !this.locks.has(id));
-				const skipped = (this._mods ?? []).map(m => m.id).filter(id => this.locks.has(id));
-				if (skipped.length) DL("BBMMModuleManagerApp | Deactivate All skipped locked modules", { skipped });
+				const ids = this._getFiltered().map(m => m.id).filter(id => !this.locks.has(id));
+				const skipped = this._getFiltered().map(m => m.id).filter(id => this.locks.has(id));
+				if (skipped.length) DL("BBMMModuleManagerApp | Disable Filtered skipped locked modules", { skipped });
 				await this._setTempActiveBulk([], ids);   // set OFF in temp
 				this._rerender({ keepFocus: true });
 			}, true);
 
-			// footer: Activate All
+			// footer: Enable Filtered
 			this._root.addEventListener("click", async (ev) => {
 				if (ev.target?.id !== "bbmm-mm-activate-all") return;
-				const ids = (this._mods ?? []).map(m => m.id).filter(id => !this.locks.has(id));
-				const skipped = (this._mods ?? []).map(m => m.id).filter(id => this.locks.has(id));
-				if (skipped.length) DL("BBMMModuleManagerApp | Activate All skipped locked modules", { skipped });
+				const ids = this._getFiltered().map(m => m.id).filter(id => !this.locks.has(id));
+				const skipped = this._getFiltered().map(m => m.id).filter(id => this.locks.has(id));
+				if (skipped.length) DL("BBMMModuleManagerApp | Enable Filtered skipped locked modules", { skipped });
 				await this._setTempActiveBulk(ids, []);   // set ON in temp
 				this._rerender({ keepFocus: true });
 			}, true);
@@ -3234,9 +3306,9 @@ Hooks.on("ready", async () => {
 	})();
 
 
-	// Expose tag app openers on globalThis.bbmm
+	// Expose tag app openers and import/export on globalThis.bbmm
 	globalThis.bbmm ??= {};
-	Object.assign(globalThis.bbmm, { openTagManager, openModuleTagsApp });
+	Object.assign(globalThis.bbmm, { openTagManager, openModuleTagsApp, exportModuleTags: _exportModuleTags, importModuleTags: _importModuleTags });
 
 	DL("module-management.js | ready fired")
 });

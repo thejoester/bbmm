@@ -15,6 +15,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Clicking a locked setting's lock icon opens a **Manage Lock** dialog showing the current lock type and value, with options to Edit or Unlock.
     - Staged (not-yet-applied) locks now show in **green** on the lock icon.
     - An **"Apply N Pending Lock(s)"** button appears in the settings form footer when locks are staged, allowing locks to be committed without clicking Save Changes.
+- **Tag Manager (Bulk Assign):**
+  - The search filter in the **Bulk assign** dialog now also searches by **author name**.
+  - Added a "Select All Filtered" button to the **Bulk Assign** dialog that checks all currently visible (filtered) modules.
+- **Module Manager:**
+  - "Activate All" and "Deactivate All" buttons are now *"Enable Filtered"* and *"Disable Filtered"*. 
+    - They operate on the currently filtered set of modules (by text search or tag filter). With no filter active the behavior is identical to before.
+- **Import/Export:**
+  - Added **Module Tags** row to the Import/Export dialog, allowing the full tag dataset (tags, subtags, and module assignments) to be exported and imported.
 - **UI:**
   - Added dividers to the BBMM header dropdown menu to group related tools visually.
 

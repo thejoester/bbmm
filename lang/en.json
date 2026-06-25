@@ -479,6 +479,9 @@
 			"disableDependentsPromptMulti": "Disable the following modules that depend on this one? Uncheck any you want to keep enabled:",
 			"disableOrphansPromptMulti": "These modules are no longer required. Disable them as well? Uncheck any you want to keep enabled:",
 			"filterClear": "Clear filter",
+			"tagMgrSelectAll": "Select All Filtered",
+			"enableFiltered": "Enable Filtered",
+			"disableFiltered": "Disable Filtered",
 			"promptEnableNewModulesName": "Prompt to enable newly installed modules",
 			"promptEnableNewModulesHint": "When enabled, BBMM will detect newly installed modules and ask the GM if they should be enabled.",
 			"newModulesTitle": "New modules detected",
@@ -572,13 +575,13 @@
 			"warnProceed":        "I understand, open it"
 		},
 		"lockReport": {
-			"title":            "BBMM: Lock Push Tool",
+			"title":            "BBMM: Setting Lock Push Tool",
 			"colModule":        "Module",
 			"lockTypePartial":  "Selected ({count})",
 			"pushBtn":          "Push to Players",
 			"pushSuccess":      "Pushed {total} lock(s) to players ({hardcount} hard, {softcount} soft).",
 			"pushNone":         "No locks to push.",
-			"failedOpen":       "Failed to open Lock Push Tool (see console)."
+			"failedOpen":       "Failed to open Setting Lock Push Tool (see console)."
 		},
 		"lockPicker": {
 			"title":              "BBMM: Add Locks",

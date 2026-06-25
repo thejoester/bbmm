@@ -655,6 +655,14 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 					</div>
 
 					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">Module Tags:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-tags-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-tags-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
+
+					<div style="display:flex;align-items:center;gap:.75rem;">
 						<div style="min-width:160px;font-weight:700;">${LT.inclusions.manager()} / ${LT.exclusions()}:</div>
 						<div style="display:flex;gap:.5rem;">
 							<button type="button" data-action="bbmm-inc-import" style="width:auto;">${LT.buttons.import()}</button>
@@ -1026,6 +1034,10 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 
 					return;
 				}
+
+				// Module Tags import/export
+				if (action === "bbmm-tags-export") return await globalThis.bbmm?.exportModuleTags?.();
+				if (action === "bbmm-tags-import") return await globalThis.bbmm?.importModuleTags?.();
 
 				// Inclusions/Exclusions: all-only file export/import (storage/lists)
 				if (action === "bbmm-inc-export") return await bbmm_exportIncExcBundle();

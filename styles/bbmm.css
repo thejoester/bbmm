@@ -370,6 +370,39 @@
 .bbmm-lock-icons .bbmm-partial { color: #1f449c; }
 
 /* ─────────────────────────────────────────────────────────────
+	Lock Dialog
+   ───────────────────────────────────────────────────────────── */
+.bbmm-ld-dialog { display: flex; flex-direction: column; gap: 1rem; padding: .25rem 0; }
+
+.bbmm-ld-header { border-bottom: 1px solid var(--color-border-light, rgba(128,128,128,.3)); padding-bottom: .5rem; margin-bottom: .15rem; }
+.bbmm-ld-name   { font-size: 1.05em; font-weight: 600; }
+.bbmm-ld-ns     { font-size: .8em; opacity: .55; margin-top: .1rem; }
+
+.bbmm-ld-section { display: flex; flex-direction: column; gap: .4rem; }
+.bbmm-ld-section-label { font-size: .72em; text-transform: uppercase; letter-spacing: .06em; opacity: .6; font-weight: 700; margin-bottom: .1rem; }
+
+.bbmm-ld-radio-row { display: flex; align-items: flex-start; gap: .65rem; cursor: pointer; padding: .35rem .5rem; border-radius: .35rem; transition: background .1s; }
+.bbmm-ld-radio-row:hover { background: rgba(128,128,128,.12); }
+.bbmm-ld-radio-row input[type="radio"] { margin-top: .25rem; flex-shrink: 0; }
+.bbmm-ld-radio-row i { margin-top: .2rem; font-size: 1em; width: 1em; text-align: center; flex-shrink: 0; }
+.bbmm-ld-radio-text { display: flex; flex-direction: column; gap: .1rem; }
+.bbmm-ld-radio-label { font-weight: 600; }
+.bbmm-ld-radio-desc  { font-size: .82em; opacity: .6; }
+
+.bbmm-ld-all-row { display: flex; align-items: center; gap: .5rem; cursor: pointer; padding: .2rem 0; }
+.bbmm-ld-user-list { display: flex; flex-direction: column; gap: .2rem; padding-left: 1.5rem; margin-top: .15rem; }
+.bbmm-ld-user-row  { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+
+.bbmm-ld-info-grid { display: grid; grid-template-columns: auto 1fr; gap: .35rem .75rem; align-items: baseline; background: rgba(0,0,0,.08); border-radius: .4rem; padding: .5rem .65rem; }
+.bbmm-ld-info-label { font-size: .72em; text-transform: uppercase; letter-spacing: .06em; opacity: .6; font-weight: 700; white-space: nowrap; }
+
+.bbmm-ld-badge      { display: inline-block; padding: .1rem .45rem; border-radius: .3rem; font-size: .82em; font-weight: 600; }
+.bbmm-ld-badge-hard { background: rgba(255,140,0,.18); color: orange; }
+.bbmm-ld-badge-soft { background: rgba(255,140,0,.18); color: orange; }
+
+.bbmm-ld-value-code { font-size: .82em; word-break: break-all; font-family: monospace; background: rgba(0,0,0,.15); padding: .15rem .35rem; border-radius: .25rem; }
+
+/* ─────────────────────────────────────────────────────────────
 	Player Disabled Styles
    ───────────────────────────────────────────────────────────── */
 .bbmm-locked-input { opacity: .65; pointer-events: none; }
