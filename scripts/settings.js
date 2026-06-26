@@ -247,11 +247,13 @@ export function injectBBMMHeaderButton(root) {
 		? [
 			{ action: "modules", label: LT.modulePresetMgr(), onClick: () => openPresetManager() },
 			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
+			{ action: "lockPresets", label: LT.lockPresets.menuLabel(), onClick: () => openLockPresetManager() },
+			{ divider: true },
 			{ action: "exclusions", label: LT.exclusionsMgr(), onClick: () => openExclusionsManager() },
 			/*{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },*/
 			{ action: "lockManager", label: LT.lockConfigurator.menuLabel(), onClick: () => globalThis.bbmm?.openLockConfigurator?.() },
-			{ action: "lockPresets", label: LT.lockPresets.menuLabel(), onClick: () => openLockPresetManager() },
 			{ action: "tags", label: LT.moduleManagement.tagMgrLabel(), onClick: () => openTagManager() },
+			{ divider: true },
 			{ action: "changelogFiles", label: LT.changelog.filesMgrLabel(), onClick: () => openChangelogFilesManager() },
 			// Import / Export
 			{
@@ -299,6 +301,11 @@ export function injectBBMMHeaderButton(root) {
 		];
 
 	for (const it of items) {
+		if (it.divider) {
+			menu.appendChild(document.createElement("hr"));
+			continue;
+		}
+
 		const mi = document.createElement("button");
 		mi.type = "button";
 		mi.className = "bbmm-header-item";
@@ -480,6 +487,13 @@ export function injectBBMMHeaderButton(root) {
 			.bbmm-header-dropdown .bbmm-header-item:hover {
 				background: rgba(255, 94, 0, 0.55);
 			}
+
+			.bbmm-header-dropdown hr {
+				border: none;
+				border-top: 1px solid var(--color-border-dark);
+				margin: 0.15rem 0;
+				opacity: 0.5;
+			}
 		`;
 		document.head.appendChild(style);
 	}
@@ -637,6 +651,14 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 						<div style="display:flex;gap:.5rem;">
 							<button type="button" data-action="bbmm-mod-import" style="width:auto;">${LT.buttons.import()}</button>
 							<button type="button" data-action="bbmm-mod-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
+
+					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">Module Tags:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-tags-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-tags-export" style="width:auto;">${LT.buttons.export()}</button>
 						</div>
 					</div>
 
@@ -1013,6 +1035,10 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 					return;
 				}
 
+				// Module Tags import/export
+				if (action === "bbmm-tags-export") return await globalThis.bbmm?.exportModuleTags?.();
+				if (action === "bbmm-tags-import") return await globalThis.bbmm?.importModuleTags?.();
+
 				// Inclusions/Exclusions: all-only file export/import (storage/lists)
 				if (action === "bbmm-inc-export") return await bbmm_exportIncExcBundle();
 				if (action === "bbmm-inc-import") return await bbmm_importIncExcBundle();
@@ -1347,13 +1373,13 @@ async function bbmm_importIncExcBundle() {
 	{
 		const payload = JSON.stringify(curInc ?? { modules: [], settings: [] }, null, 2);
 		const f = new File([payload], "user-inclusions.json", { type: "application/json" });
-		await FilePicker.upload("data", "bbmm-data", f, { notify: false });
+		await foundry.applications.apps.FilePicker.implementation.upload("data", "bbmm-data", f, { notify: false });
 	}
 
 	{
 		const payload = JSON.stringify(curExc ?? { modules: [], settings: [] }, null, 2);
 		const f = new File([payload], "user-exclusions.json", { type: "application/json" });
-		await FilePicker.upload("data", "bbmm-data", f, { notify: false });
+		await foundry.applications.apps.FilePicker.implementation.upload("data", "bbmm-data", f, { notify: false });
 	}
 
 	// Refresh in-memory caches so the manager shows the new data without a reload
@@ -1807,6 +1833,39 @@ Hooks.once("init", () => {
 				}
 			});
 			
+			// MENU: Lock Preset Manager
+			game.settings.registerMenu(BBMM_ID, "lockPresetManager", {
+				name: LT.lockPresets.menuLabel(),
+				label: LT.lockPresets.menuLabel(),
+				icon: "fas fa-lock",
+				restricted: true,
+				type: class extends FormApplication {
+					constructor(...args){ super(...args); }
+					static get defaultOptions() {
+						return foundry.utils.mergeObject(super.defaultOptions, {
+							id: "bbmm-lock-preset-manager-opener",
+							title: LT.lockPresets.title(),
+							template: null,
+							width: 600
+						});
+					}
+					async render(...args) {
+						try {
+							const fn = globalThis.bbmm?.openLockPresetManager;
+							if (typeof fn !== "function") {
+								DL(3, "settings.js | lockPresetManager menu: global opener not found");
+								return this;
+							}
+							fn();
+						} catch (err) {
+							DL(3, "settings.js | lockPresetManager menu: failed", err);
+						}
+						return this;
+					}
+					async _updateObject() {}
+				}
+			});
+			
 			// MENU: Exclusions manager
 			game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
 				name: LT.exclusionsMgr(),
@@ -1867,39 +1926,27 @@ Hooks.once("init", () => {
 				}
 			});
 
-			// MENU: Lock Preset Manager
-			game.settings.registerMenu(BBMM_ID, "lockPresetManager", {
-				name: LT.lockPresets.menuLabel(),
-				label: LT.lockPresets.menuLabel(),
-				icon: "fas fa-lock",
+			// MENU: Module Tag Manager
+			game.settings.registerMenu(BBMM_ID, "tagManager", {
+				name: LT.moduleManagement.tagMgrName(),
+				label: LT.moduleManagement.tagMgrLabel(),
+				icon: "fas fa-tags",
 				restricted: true,
 				type: class extends FormApplication {
 					constructor(...args){ super(...args); }
 					static get defaultOptions() {
 						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-lock-preset-manager-opener",
-							title: LT.lockPresets.title(),
+							id: "bbmm-tag-manager-opener",
+							title: LT.moduleManagement.tagMgrTitle(),
 							template: null,
-							width: 600
+							width: 500
 						});
 					}
-					async render(...args) {
-						try {
-							const fn = globalThis.bbmm?.openLockPresetManager;
-							if (typeof fn !== "function") {
-								DL(3, "settings.js | lockPresetManager menu: global opener not found");
-								return this;
-							}
-							fn();
-						} catch (err) {
-							DL(3, "settings.js | lockPresetManager menu: failed", err);
-						}
-						return this;
-					}
+					async render(...args) { openTagManager(); return this; }
 					async _updateObject() {}
 				}
 			});
-
+			
 			// MENU: Changelog Filename Manager
 			game.settings.registerMenu(BBMM_ID, "changelogFilesManager", {
 				name: LT.changelog.filesMgrName(),
@@ -1920,27 +1967,6 @@ Hooks.once("init", () => {
 						openChangelogFilesManager();
 						return this;
 					}
-					async _updateObject() {}
-				}
-			});
-
-			// MENU: Module Tag Manager
-			game.settings.registerMenu(BBMM_ID, "tagManager", {
-				name: LT.moduleManagement.tagMgrName(),
-				label: LT.moduleManagement.tagMgrLabel(),
-				icon: "fas fa-tags",
-				restricted: true,
-				type: class extends FormApplication {
-					constructor(...args){ super(...args); }
-					static get defaultOptions() {
-						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-tag-manager-opener",
-							title: LT.moduleManagement.tagMgrTitle(),
-							template: null,
-							width: 500
-						});
-					}
-					async render(...args) { openTagManager(); return this; }
 					async _updateObject() {}
 				}
 			});
@@ -2052,62 +2078,6 @@ Hooks.once("init", () => {
 				scope: "world", config: true, type: Boolean, default: true
 			});
 			
-			// Choices for lock-gestures 
-			const GESTURE_ACTION_CHOICES = {
-				"lockSelected": LT.name_LockSelected(),
-				"softLock": LT.name_SoftLock(),
-				"lockAll": LT.name_LockAll(),
-				"clearLocks": LT.name_ClearLocks()
-			};
-
-			// Set action for "Click" (default: lock selected)
-			game.settings.register(BBMM_ID, "gestureAction_click", {
-				name: LT.name_SetActionClick(),
-				scope: "world",
-				restricted: true,
-				config: true,
-				type: String,
-				choices: GESTURE_ACTION_CHOICES,
-				default: "lockSelected",
-				onChange: v => DL(`settings.js | gestureAction_click -> ${v}`)
-			});
-
-			// Set action for "Right-Click" (default: lock all)
-			game.settings.register(BBMM_ID, "gestureAction_right", {
-				name: LT.name_SetActionRightClick(),
-				scope: "world",
-				restricted: true,
-				config: true,
-				type: String,
-				choices: GESTURE_ACTION_CHOICES,
-				default: "lockAll",
-				onChange: v => DL(`settings.js | gestureAction_right -> ${v}`)
-			});
-
-			// Set action for "Shift+Click" (default: soft lock)
-			game.settings.register(BBMM_ID, "gestureAction_shift", {
-				name: LT.name_SetActionShiftClick(),
-				scope: "world",
-				restricted: true,
-				config: true,
-				type: String,
-				choices: GESTURE_ACTION_CHOICES,
-				default: "softLock",
-				onChange: v => DL(`settings.js | gestureAction_shift -> ${v}`)
-			});
-
-			// Set action for Shift+Right-Click (default: clearLocks)
-			game.settings.register(BBMM_ID, "gestureAction_shiftRight", {
-				name: LT.name_SetActionShiftRightClick(),
-				scope: "world",
-				restricted: true,
-				config: true,
-				type: String,
-				choices: GESTURE_ACTION_CHOICES,
-				default: "clearLocks",
-				onChange: v => DL(`settings.js | gestureAction_shiftRight -> ${v}`)
-			});
-			
 			// Hide locked settings from players (vs. show disabled)
 			game.settings.register(BBMM_ID, "hideLockedSettings", {
 				name: LT._settings.hideLockedSettingsName(),
@@ -2172,7 +2142,7 @@ Hooks.once("ready", async () => {
 
 		// Ensure directory
 		try {
-			await FilePicker.createDirectory("data", "bbmm-data");
+			await foundry.applications.apps.FilePicker.implementation.createDirectory("data", "bbmm-data");
 			DL("settings.js | Directory 'bbmm-data' ensured");
 		} catch (err) {
 			const msg = String(err?.message ?? err);
@@ -2209,7 +2179,7 @@ Hooks.once("ready", async () => {
 
 			try {
 				const file = new File([JSON.stringify(defaultData, null, 2)], filename, { type: "application/json" });
-				await FilePicker.upload("data", "bbmm-data", file, { notify: false });
+				await foundry.applications.apps.FilePicker.implementation.upload("data", "bbmm-data", file, { notify: false });
 				DL(`settings.js | seeded ${filename}`);
 			} catch (err) {
 				DL(2, `settings.js | failed to seed ${filename}`, err);

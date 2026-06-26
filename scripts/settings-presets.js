@@ -117,7 +117,7 @@ async function hlp_writeSettingsPresetsToStorage(obj) {
     });
 
     try {
-        const res = await FilePicker.upload("data", `bbmm-data`, file, {
+        const res = await foundry.applications.apps.FilePicker.implementation.upload("data", `bbmm-data`, file, {
             notify: false,
         });
 

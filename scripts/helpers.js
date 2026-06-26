@@ -442,7 +442,7 @@ export async function bbmm_importModulePresetsAll() {
 	try {
 		const payload = JSON.stringify(current ?? {}, null, 2);
 		const f = new File([payload], storageFile, { type: "application/json" });
-		const res = await FilePicker.upload("data", `bbmm-data`, f, { notify: false });
+		const res = await foundry.applications.apps.FilePicker.implementation.upload("data", `bbmm-data`, f, { notify: false });
 
 		if (!res || (!res.path && !res.url)) {
 			DL(3, `${FN} upload returned no path/url`, res);
@@ -623,7 +623,7 @@ export async function bbmm_importSettingsPresetsAll() {
 	try {
 		const payload = JSON.stringify(current ?? {}, null, 2);
 		const f = new File([payload], storageFile, { type: "application/json" });
-		const res = await FilePicker.upload("data", `bbmm-data`, f, { notify: false });
+		const res = await foundry.applications.apps.FilePicker.implementation.upload("data", `bbmm-data`, f, { notify: false });
 
 		if (!res || (!res.path && !res.url)) {
 			DL(3, `${FN} upload returned no path/url`, res);

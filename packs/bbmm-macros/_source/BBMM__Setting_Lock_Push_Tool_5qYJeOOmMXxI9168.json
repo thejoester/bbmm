@@ -1,0 +1,28 @@
+{
+  "name": "BBMM: Setting Lock Push Tool",
+  "type": "script",
+  "command": "game.modules.get(\"bbmm\")?.api?.openLockReport();",
+  "img": "icons/sundries/misc/lock-bronze-reinforced.webp",
+  "_id": "5qYJeOOmMXxI9168",
+  "author": "U2OCxXAmOSozc3K9",
+  "scope": "global",
+  "folder": null,
+  "ownership": {
+    "default": 0,
+    "U2OCxXAmOSozc3K9": 3
+  },
+  "flags": {},
+  "_stats": {
+    "coreVersion": "14.364",
+    "systemId": "pf2e",
+    "systemVersion": "8.2.0",
+    "createdTime": 1782380858643,
+    "modifiedTime": 1782380858643,
+    "lastModifiedBy": "U2OCxXAmOSozc3K9",
+    "exportSource": null,
+    "compendiumSource": null,
+    "duplicateSource": null
+  },
+  "sort": 0,
+  "_key": "!macros!5qYJeOOmMXxI9168"
+}

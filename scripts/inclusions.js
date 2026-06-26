@@ -104,7 +104,7 @@ async function hlp_writeUserInclusions(obj) {
 	const file = new File([payload], FILE_USER_INCLUSIONS, { type: "application/json" });
 
 	try {
-		const res = await FilePicker.upload("data", `bbmm-data`, file, { notify: false });
+		const res = await foundry.applications.apps.FilePicker.implementation.upload("data", `bbmm-data`, file, { notify: false });
 		if (!res || (!res.path && !res.url)) {
 			DL(3, `inclusions.js | hlp_writeUserInclusions(): upload returned no path/url`, res);
 			return false;
@@ -1479,25 +1479,73 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 		this._rows = [...modRows, ...setRows];
 
-		const rows = this._rows.map(r => `
-			<tr>
-				<td class="c-type">${r.type}</td>
-				<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">
-					${foundry.utils.escapeHTML(r.identifier)}
-				</td>
-				<td class="c-del">
-					<button type="button"
-						class="bbmm-x-del"
-						data-type="${r.type === "Module" ? "module" : "setting"}"
-						data-id="${r.type === "Module" ? (r._id ?? "") : ""}"
-						data-ns="${r._ns ?? ""}"
-						data-key="${r._key ?? ""}"
-						aria-label="${LT.inclusions.remove()}">
-						<i class="fas fa-trash"></i>
-					</button>
-				</td>
-			</tr>
-		`).join("");
+		// Build rows: module entries flat, setting entries grouped by namespace
+		let rowsHtml = "";
+
+		for (const r of modRows) {
+			rowsHtml += `
+				<tr>
+					<td class="c-type">${r.type}</td>
+					<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">${foundry.utils.escapeHTML(r.identifier)}</td>
+					<td class="c-del">
+						<button type="button" class="bbmm-x-del"
+							data-type="module"
+							data-id="${foundry.utils.escapeHTML(r._id ?? "")}"
+							data-ns="${foundry.utils.escapeHTML(r._ns ?? "")}"
+							data-key=""
+							aria-label="${LT.inclusions.remove()}">
+							<i class="fas fa-trash"></i>
+						</button>
+					</td>
+				</tr>
+			`;
+		}
+
+		const byNs = new Map();
+		for (const r of setRows) {
+			if (!byNs.has(r._ns)) byNs.set(r._ns, []);
+			byNs.get(r._ns).push(r);
+		}
+		const sortedNsGroups = Array.from(byNs.entries()).sort((a, b) => {
+			const ta = String(game.modules.get(a[0])?.title ?? a[0]);
+			const tb = String(game.modules.get(b[0])?.title ?? b[0]);
+			return ta.localeCompare(tb, game.i18n.lang || undefined, { sensitivity: "base" });
+		});
+
+		for (const [ns, nsRows] of sortedNsGroups) {
+			const modTitle = foundry.utils.escapeHTML(String(game.modules.get(ns)?.title ?? ns));
+			const groupId = foundry.utils.escapeHTML(ns);
+			rowsHtml += `
+				<tr class="bbmm-grp-hdr bbmm-grp-collapsed" data-group-hdr="${groupId}">
+					<td colspan="3">
+						<i class="fas fa-chevron-down bbmm-grp-chev"></i>
+						${modTitle}
+						<span class="bbmm-grp-count">(${nsRows.length})</span>
+					</td>
+				</tr>
+			`;
+			for (const r of nsRows) {
+				const settingLabel = foundry.utils.escapeHTML(this._getSettingLabel(r._ns, r._key));
+				rowsHtml += `
+					<tr class="bbmm-grp-row" data-group-row="${groupId}" style="display:none">
+						<td class="c-type">${r.type}</td>
+						<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">${settingLabel}</td>
+						<td class="c-del">
+							<button type="button" class="bbmm-x-del"
+								data-type="setting"
+								data-id=""
+								data-ns="${foundry.utils.escapeHTML(r._ns ?? "")}"
+								data-key="${foundry.utils.escapeHTML(r._key ?? "")}"
+								aria-label="${LT.inclusions.remove()}">
+								<i class="fas fa-trash"></i>
+							</button>
+						</td>
+					</tr>
+				`;
+			}
+		}
+
+		const rows = rowsHtml;
 
 		const html = `
 			<style>
@@ -1511,14 +1559,14 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				.bbmm-x-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:.95rem}
 
 				.bbmm-x-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
-				.bbmm-x-table thead th:first-child{width:72px}
+				.bbmm-x-table thead th:first-child{width:90px}
 				.bbmm-x-table thead th:last-child{width:44px;text-align:right}
 
 				.bbmm-x-table tbody td{padding:8px 10px;border-bottom:1px solid var(--color-border-light-2);vertical-align:middle}
 				.bbmm-x-table tbody tr:nth-child(odd){background:rgba(255,255,255,.03)}
 
 				.bbmm-x-table .c-type{
-					width:72px;
+					width:90px;
 					white-space:nowrap;
 					overflow:hidden;
 					text-overflow:ellipsis;
@@ -1541,6 +1589,15 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					display:flex;justify-content:center;align-items:center;
 					width:100%;height:36px;padding:0 14px;border-radius:8px;font-weight:600;
 				}
+
+				/* Setting namespace group headers */
+				.bbmm-grp-hdr{cursor:pointer;user-select:none}
+				.bbmm-grp-hdr td{background:rgba(255,255,255,.06);font-weight:600;padding:5px 10px;border-bottom:1px solid var(--color-border-light-2)}
+				.bbmm-grp-hdr:hover td{background:rgba(255,255,255,.1)}
+				.bbmm-grp-chev{margin-right:6px;display:inline-block;transition:transform .15s}
+				.bbmm-grp-hdr.bbmm-grp-collapsed .bbmm-grp-chev{transform:rotate(-90deg)}
+				.bbmm-grp-count{opacity:.65;font-size:.88em;margin-left:4px}
+				.bbmm-grp-row td:first-child{padding-left:24px}
 			</style>
 
 			<section class="bbmm-x-root">
@@ -1588,8 +1645,24 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			winEl.style.overflow  = "hidden";
 		} catch (e) { DL(2, "inclusions.js | BBMMInclusionsAppV2: size clamp failed", e); }
 
+		// Snapshot which groups are expanded before wiping content
+		const expandedGroups = new Set();
+		for (const hdr of (this.element?.querySelectorAll?.(".bbmm-grp-hdr:not(.bbmm-grp-collapsed)") ?? [])) {
+			if (hdr.dataset.groupHdr) expandedGroups.add(hdr.dataset.groupHdr);
+		}
+
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
+
+		// Restore previously expanded groups
+		for (const groupId of expandedGroups) {
+			const hdr = content.querySelector(`.bbmm-grp-hdr[data-group-hdr="${CSS.escape(groupId)}"]`);
+			if (!hdr) continue;
+			hdr.classList.remove("bbmm-grp-collapsed");
+			for (const row of content.querySelectorAll(`.bbmm-grp-row[data-group-row="${CSS.escape(groupId)}"]`)) {
+				row.style.display = "";
+			}
+		}
 
 		// Inject help button into title bar
 		try {
@@ -1608,6 +1681,19 @@ class BBMMInclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		}
 
 		this._bbmmClickHandler = async (ev) => {
+			// Setting namespace group header toggle
+			const groupHdr = ev.target?.closest?.(".bbmm-grp-hdr");
+			if (groupHdr) {
+				ev.preventDefault();
+				ev.stopPropagation();
+				const groupId = groupHdr.dataset.groupHdr;
+				const isCollapsed = groupHdr.classList.toggle("bbmm-grp-collapsed");
+				for (const row of content.querySelectorAll(`.bbmm-grp-row[data-group-row="${CSS.escape(groupId)}"]`)) {
+					row.style.display = isCollapsed ? "none" : "";
+				}
+				return;
+			}
+
 			const btn = ev.target.closest?.("button[data-action], .bbmm-x-del");
 			if (!(btn instanceof HTMLButtonElement)) return;
 
