@@ -4,15 +4,9 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0-test2] - 2026-06-26
+## [1.3.0] - 2026-06-26
 
 ### Changed
-- **Inclusion/Exclusion Manager:**
-  - The **Inclusions** and **Exclusions** section headers now stand out more: larger text, uppercase with letter spacing, stronger background, and a top border separator
-
-## [1.3.0-test1] - 2026-06-24
-
-### Added
 - **Lock Manager:**
   - Added a **Players** column to the Lock Manager showing "All Players" for global locks or "N of M players" for partial locks.
 - **Settings Sync:**
@@ -27,10 +21,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Module Manager:**
   - "Activate All" and "Deactivate All" buttons are now *"Enable Filtered"* and *"Disable Filtered"*. 
     - They operate on the currently filtered set of modules (by text search or tag filter). With no filter active the behavior is identical to before.
+- **Inclusion/Exclusion Manager:**
+  - The **Inclusions** and **Exclusions** section headers now stand out more: larger text, uppercase with letter spacing, stronger background, and a top border separator
 - **Import/Export:**
   - Added **Module Tags** row to the Import/Export dialog, allowing the full tag dataset (tags, subtags, and module assignments) to be exported and imported.
 - **UI:**
   - Added dividers to the BBMM header dropdown menu to group related tools visually.
+- **Localization:**
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 
 ## [1.2.0] - 2026-06-19
 
