@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - **Inclusion/Exclusion Manager:**
-  - The **Inclusions** and **Exclusions** section headers now stand out more: larger text, uppercase with letter spacing, stronger background, and a top border separator.in @bbmm
+  - The **Inclusions** and **Exclusions** section headers now stand out more: larger text, uppercase with letter spacing, stronger background, and a top border separator
 
 ## [1.3.0-test1] - 2026-06-24
 
