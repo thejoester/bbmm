@@ -2003,10 +2003,14 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				}
 
 				.bbmm-x-group td{
+					font-size:1rem;
 					font-weight:700;
-					opacity:.9;
-					background:rgba(255,255,255,.06);
+					text-transform:uppercase;
+					letter-spacing:.07em;
+					background:rgba(255,255,255,.12);
+					border-top:2px solid var(--color-border-light-2);
 					border-bottom:1px solid var(--color-border-light-2);
+					padding:6px 10px;
 				}
 
 				.bbmm-x-advanced{
@@ -2025,6 +2029,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 				/* Setting namespace group headers */
 				.bbmm-grp-hdr{cursor:pointer;user-select:none}
+				.bbmm-x-table tbody tr.bbmm-grp-hdr{background:transparent!important}
 				.bbmm-grp-hdr td{background:rgba(255,255,255,.06);font-weight:600;padding:5px 10px;border-bottom:1px solid var(--color-border-light-2)}
 				.bbmm-grp-hdr:hover td{background:rgba(255,255,255,.1)}
 				.bbmm-grp-chev{margin-right:6px;display:inline-block;transition:transform .15s}
