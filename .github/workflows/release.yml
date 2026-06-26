@@ -78,6 +78,28 @@ jobs:
           command: query
           version: ${{ steps.get_version.outputs.version-without-v }}
 
+      - name: Build release body
+        id: build_body
+        env:
+          CHANGELOG_NOTES: ${{ steps.changelog.outputs.release-notes }}
+          MANIFEST_URL: ${{ steps.set_manifest.outputs.manifest_url }}
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          {
+            echo 'body<<BODYEOF'
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              echo '> [!CAUTION]'
+              echo '> This is a test release, please test in a test world or make a backup before testing!'
+              echo '>'
+              echo '> For instructions see the [Alternative Installation Methods on this page.](https://foundryvtt.com/article/modules/)'
+              echo ''
+              echo "To install this test release use the manifest url \`$MANIFEST_URL\`."
+              echo ''
+            fi
+            echo "$CHANGELOG_NOTES"
+            echo 'BODYEOF'
+          } >> $GITHUB_OUTPUT
+
       - name: Update Release With Files
         id: create_version_release
         uses: ncipollo/release-action@v1
@@ -87,7 +109,7 @@ jobs:
           draft: ${{ github.event.release.draft }}
           prerelease: ${{ github.event.release.prerelease }}
           name: ${{ steps.get_version.outputs.version-without-v }}
-          body: ${{ steps.changelog.outputs.release-notes }}
+          body: ${{ steps.build_body.outputs.body }}
           artifacts: "module.json, dist/bbmm.zip"
 
       - name: Publish Module to FoundryVTT Website
