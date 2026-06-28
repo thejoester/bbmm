@@ -21,7 +21,7 @@ jobs:
 
       - name: Extract Version From Tag
         id: get_version
-        uses: battila7/get-version-action@v2
+        run: echo "version-without-v=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
       # Use tagged manifest for prerelease; latest for stable
       - name: Set manifest URL for channel (stable vs prerelease)
