@@ -1775,7 +1775,8 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		// Group header: Included
 		modelRows.push({
 			__group: true,
-			_label: (LT.inclusions.manager())
+			_label: (LT.inclusions.manager()),
+			_key: "inc"
 		});
 
 		// Included modules
@@ -1818,7 +1819,8 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		// Group header: Excluded
 		modelRows.push({
 			__group: true,
-			_label: (LT.exclusions())
+			_label: (LT.exclusions()),
+			_key: "exc"
 		});
 
 		// Excluded modules (mark legacy duplicate if also in inclusions)
@@ -1881,17 +1883,19 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 		let rowsHtml = "";
 		for (const sec of sections) {
+			const secKey = foundry.utils.escapeHTML(sec.header?._key ?? "");
 			if (sec.header) {
+				const secCount = sec.moduleRows.length + sec.settingRows.length;
 				rowsHtml += `
-					<tr class="bbmm-x-group">
-						<td colspan="3">${foundry.utils.escapeHTML(String(sec.header._label ?? ""))}</td>
+					<tr class="bbmm-x-group bbmm-x-sec-collapsed" data-section-hdr="${secKey}">
+						<td colspan="3"><i class="fas fa-chevron-down bbmm-x-sec-chev"></i>${foundry.utils.escapeHTML(String(sec.header._label ?? ""))} <span class="bbmm-x-sec-count">(${secCount})</span></td>
 					</tr>
 				`;
 			}
 
 			for (const r of sec.moduleRows) {
 				rowsHtml += `
-					<tr>
+					<tr data-section="${secKey}" style="display:none">
 						<td class="c-type">${r.type}</td>
 						<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">${foundry.utils.escapeHTML(r.identifier)}</td>
 						<td class="c-del">
@@ -1926,7 +1930,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				const listKey = foundry.utils.escapeHTML(nsRows[0]?._list ?? "");
 				const groupId = `${listKey}-${foundry.utils.escapeHTML(ns)}`;
 				rowsHtml += `
-					<tr class="bbmm-grp-hdr bbmm-grp-collapsed" data-group-hdr="${groupId}">
+					<tr class="bbmm-grp-hdr bbmm-grp-collapsed" data-section="${secKey}" data-group-hdr="${groupId}" style="display:none">
 						<td colspan="3">
 							<i class="fas fa-chevron-down bbmm-grp-chev"></i>
 							${modTitle}
@@ -1937,7 +1941,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				for (const r of nsRows) {
 					const settingLabel = foundry.utils.escapeHTML(this._getSettingLabel(r._ns, r._key));
 					rowsHtml += `
-						<tr class="bbmm-grp-row" data-group-row="${groupId}" style="display:none">
+						<tr class="bbmm-grp-row" data-section="${secKey}" data-group-row="${groupId}" style="display:none">
 							<td class="c-type">${r.type}</td>
 							<td class="c-id" title="${foundry.utils.escapeHTML(r._id ?? "")}">${settingLabel}</td>
 							<td class="c-del">
@@ -1971,7 +1975,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 				.bbmm-x-scroller{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border-light-2);border-radius:8px;background:rgba(255,255,255,.02)}
 				.bbmm-x-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:.95rem}
 
-				.bbmm-x-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
+				.bbmm-x-table thead th{position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1f1f1f);color:var(--color-text-light-heading,#ccc);border-bottom:2px solid var(--color-border-light-2);padding:8px 10px;text-align:left}
 				.bbmm-x-table thead th:first-child{width:90px}
 				.bbmm-x-table thead th:last-child{width:44px;text-align:right}
 
@@ -1983,12 +1987,13 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					white-space:nowrap;
 					overflow:hidden;
 					text-overflow:ellipsis;
-					color:#9bd;
+					color:var(--color-text-hyperlink, rgb(41, 135, 230));
 				}
 				.bbmm-x-table .c-id{
 					width:auto;
 					font-family:ui-monospace,Menlo,Consolas,monospace;
-					word-break:break-word
+					word-break:break-word;
+					color:var(--color-text-primary, inherit);
 				}
 				.bbmm-x-table .c-del{text-align:right}
 				.bbmm-x-table .bbmm-x-del{
@@ -2002,16 +2007,24 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					width:100%;height:36px;padding:0 14px;border-radius:8px;font-weight:600;
 				}
 
+				.bbmm-x-group{cursor:pointer;user-select:none}
 				.bbmm-x-group td{
 					font-size:1rem;
 					font-weight:700;
 					text-transform:uppercase;
 					letter-spacing:.07em;
-					background:rgba(255,255,255,.12);
+					background:rgba(255,255,255,.82);
+					color:#111;
 					border-top:2px solid var(--color-border-light-2);
 					border-bottom:1px solid var(--color-border-light-2);
 					padding:6px 10px;
 				}
+				@media (prefers-color-scheme:light){
+					.bbmm-x-group td{background:#2a2a2a;color:#eee}
+				}
+				.bbmm-x-sec-chev{margin-right:6px;transition:transform .15s;display:inline-block}
+				.bbmm-x-group.bbmm-x-sec-collapsed .bbmm-x-sec-chev{transform:rotate(-90deg)}
+				.bbmm-x-sec-count{opacity:.75;font-weight:400;font-size:.9em;margin-left:4px}
 
 				.bbmm-x-advanced{
 					display:flex;
@@ -2084,6 +2097,12 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			if (hdr.dataset.groupHdr) expandedGroups.add(hdr.dataset.groupHdr);
 		}
 
+		// Snapshot which sections are collapsed
+		const collapsedSections = new Set();
+		for (const hdr of (this.element?.querySelectorAll?.(".bbmm-x-group.bbmm-x-sec-collapsed") ?? [])) {
+			if (hdr.dataset.sectionHdr) collapsedSections.add(hdr.dataset.sectionHdr);
+		}
+
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
 
@@ -2094,6 +2113,16 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			hdr.classList.remove("bbmm-grp-collapsed");
 			for (const row of content.querySelectorAll(`.bbmm-grp-row[data-group-row="${CSS.escape(groupId)}"]`)) {
 				row.style.display = "";
+			}
+		}
+
+		// Restore previously collapsed sections
+		for (const secId of collapsedSections) {
+			const hdr = content.querySelector(`.bbmm-x-group[data-section-hdr="${CSS.escape(secId)}"]`);
+			if (!hdr) continue;
+			hdr.classList.add("bbmm-x-sec-collapsed");
+			for (const row of content.querySelectorAll(`[data-section="${CSS.escape(secId)}"]`)) {
+				row.style.display = "none";
 			}
 		}
 
@@ -2120,6 +2149,24 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			this._delegated = true;
 
 			content.addEventListener("click", async (ev) => {
+				// Section header (Inclusions / Exclusions) toggle
+				const secHdr = ev.target?.closest?.(".bbmm-x-group");
+				if (secHdr) {
+					ev.preventDefault();
+					ev.stopPropagation();
+					const secId = secHdr.dataset.sectionHdr;
+					const isCollapsed = secHdr.classList.toggle("bbmm-x-sec-collapsed");
+					for (const row of content.querySelectorAll(`[data-section="${CSS.escape(secId)}"]`)) {
+						if (!isCollapsed && row.classList.contains("bbmm-grp-row")) {
+							// Only re-show if its namespace group is expanded
+							const groupHdr = content.querySelector(`.bbmm-grp-hdr[data-group-hdr="${CSS.escape(row.dataset.groupRow ?? "")}"]`);
+							if (groupHdr?.classList.contains("bbmm-grp-collapsed")) continue;
+						}
+						row.style.display = isCollapsed ? "none" : "";
+					}
+					return;
+				}
+
 				// Setting namespace group header toggle
 				const groupHdr = ev.target?.closest?.(".bbmm-grp-hdr");
 				if (groupHdr) {
@@ -2406,6 +2453,3 @@ export function openAddModuleExclusionApp() {
 export function openAddSettingExclusionApp() {
 	new BBMMAddSettingExclusionAppV2().render(true);
 }
-
-
-
