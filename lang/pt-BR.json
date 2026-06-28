@@ -540,7 +540,9 @@
 			"titleConfirmUpdate":   "Atualizar Preset de Bloqueio"
 		},
 		"lockConfigurator": {
-			"title":              "BBMM: Configurador de Bloqueios",
+			"title":              "BBMM: Gerenciador de Bloqueios",
+			"menuName":           "Configurações do Gerenciador de Bloqueios",
+      		"menuLabel":          "Configurações do Gerenciador de Bloqueios",
 			"filterPlaceholder":  "Filtrar bloqueios...",
 			"colLockType":        "Tipo de Bloqueio",
 			"colNamespace":       "Espaço de Nomes",
@@ -554,10 +556,10 @@
 			"unlocked":           "Desbloqueado \"{key}\".",
 			"unlockBtn":          "Desbloquear",
 			"addLocks":           "Adicionar Bloqueio(s)",
-			"gmOnly":             "O Configurador de Bloqueios está disponível apenas para o Mestre.",
-			"failedOpen":         "Falha ao abrir o Configurador de Bloqueios (consulte o console).",
+			"gmOnly":             "O Gerenciador de Bloqueios está disponível apenas para o Mestre.",
+			"failedOpen":         "Falha ao abrir o Gerenciador de Bloqueios (consulte o console).",
 			"warnTitle":          "Ferramenta Avançada — Prossiga com Cautela",
-			"warnBody":           "O Configurador de Bloqueios é uma ferramenta avançada. Configurações que armazenam dados brutos (objetos, arrays ou blocos JSON) podem quebrar um módulo ou até mesmo o jogo se forem bloqueadas com um valor incorreto. Prossiga apenas se tiver certeza do que está fazendo.",
+			"warnBody":           "O Gerenciador de Bloqueios é uma ferramenta avançada. Configurações que armazenam dados brutos (objetos, arrays ou blocos JSON) podem quebrar um módulo ou até mesmo o jogo se forem bloqueadas com um valor incorreto. Prossiga apenas se tiver certeza do que está fazendo.",
 			"warnProceed":        "Entendo os riscos, abrir mesmo assim"
 		},
 		"lockPicker": {
@@ -575,7 +577,10 @@
 			"saveLocks":          "Salvar Bloqueios",
 			"lockBtn":            "Bloquear",
 			"softLockBtn":        "Bloqueio Suave",
-			"invalidJSON":        "JSON inválido — não foi possível interpretar o valor."
+			"invalidJSON":        "JSON inválido — não foi possível interpretar o valor.",
+			"jsonEditorBtn":      "Editar JSON…",
+      		"jsonEditorTitle":    "Editar JSON — {key}",
+      		"jsonEditorApply":    "Aplicar"
 		},
 		"_importExport": {
 			"allPresets": "Todos os Presets",
