@@ -2084,7 +2084,7 @@ export async function openSettingsPresetManager() {
             </tr>
         `;
         }).join("")
-        : `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.noPresets?.() ?? "No presets saved."}</td></tr>`;
+        : `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
     // Content markup — save section at top, scrollable list below
     const content = `
