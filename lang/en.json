@@ -514,7 +514,7 @@
 			"colName":              "Name",
 			"colCount":             "Locks",
 			"colCreated":           "Last Updated",
-			"noPresets":            "No lock presets saved yet.",
+			"noPresets":            "No presets saved yet.",
 			"footerNote":           "Loading a preset adds or updates locks for each setting in the preset. Other existing locks are not affected. This DOES NOT copy the setting that was locked, only the lock!",
 			"saved":                "Saved lock preset '{name}' ({count} locks).",
 			"loaded":               "Applied lock preset '{name}' ({count} locks applied, {skipped} skipped).",

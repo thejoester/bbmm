@@ -530,7 +530,7 @@ export async function openPresetManager() {
 				</tr>
 			`;
 			}).join("")
-			: `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.noPresets?.() ?? "No presets saved."}</td></tr>`;
+			: `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
 		// Dialog content — save section at top, scrollable list below
 		const content = `
