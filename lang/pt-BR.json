@@ -514,7 +514,7 @@
 			"colName":              "Nome",
 			"colCount":             "Bloqueios",
 			"colCreated":           "Última Atualização",
-			"noPresets":            "Nenhum preset de bloqueio salva ainda.",
+			"noPresets":            "Nenhum preset salvo ainda.",
 			"footerNote":           "Carregar um preset adiciona ou atualiza os bloqueios para cada configuração no preset. Outros bloqueios existentes não são afetados. Isso NÃO copia a configuração que estava bloqueada, apenas o bloqueio!",
 			"saved":                "Configuração de bloqueio '{name}' salva ({count} bloqueios).",
 			"loaded":               "Preset de bloqueio '{name}' aplicado ({count} bloqueios aplicados, {skipped} ignorados).",
