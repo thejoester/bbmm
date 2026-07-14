@@ -5,7 +5,10 @@ const SETTING_SETTINGS_PRESETS = "settingsPresetsUser"; // user-scoped store def
 const PRESET_MANAGER_ID = "bbmm-settings-preset-manager"; // stable window id
 let _settingsPresetManagerLastPos = null; // Remembers window position across reopens
 const SETTINGS_PRESETS_STORAGE_FILE = "settings-presets.json";
-let _settingsPresetCache = null;
+const PLAYER_PRESET_MANAGER_ID = "bbmm-player-settings-preset-manager"; // stable window id (player manager)
+let _settingsPresetManagerLastPosPlayer = null; // Remembers player window position across reopens
+let _settingsPresetCache = null;	// GM: persistent storage store
+let _playerPresetCache = null;		// Player: user-scoped setting store
 
 const BBMM_V2_WINDOWS = new Map(); // id -> app
 
@@ -257,10 +260,11 @@ function hlp_defaultPresetName() {
     )} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/* Find existing preset key case-insensitively =========================== */
-function hlp_findExistingSettingsPresetKey(name) {
+/* Find existing preset key case-insensitively ===========================
+	- presets defaults to the GM store; pass the player store to search it instead
+======================================================================= */
+function hlp_findExistingSettingsPresetKey(name, presets = svc_getSettingsPresets()) {
     const wanted = hlp_normalizePresetName(name);
-    const presets = svc_getSettingsPresets();
     for (const k of Object.keys(presets)) {
         if (hlp_normalizePresetName(k) === wanted) return k;
     }
@@ -996,36 +1000,10 @@ function svc_getSettingsPresets() {
         : {};
 }
 
-/* Save all presets to settings store ============================ */
+/* Save all presets to settings store (GM: persistent storage) ======= */
 async function svc_setSettingsPresets(obj) {
     const clean = hlp_sanitizeSettingsPresets(obj);
     _settingsPresetCache = clean;
-
-    // Non-GM: user-scoped store
-    if (!game.user.isGM) {
-        try {
-            DL(
-                "settings-presets.js | svc_setSettingsPresets(): writing bbmm.settingsPresetsUser (non-GM path)"
-            );
-            await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, clean);
-            DL(
-                "settings-presets.js | svc_setSettingsPresets(): OK (non-GM path)"
-            );
-            return;
-        } catch (e) {
-            DL(
-                3,
-                "settings-presets.js | svc_setSettingsPresets(): FAILED (non-GM path)",
-                {
-                    name: e?.name,
-                    message: e?.message,
-                    stack: e?.stack,
-                    key: `${BBMM_ID}.${SETTING_SETTINGS_PRESETS}`,
-                }
-            );
-            throw e;
-        }
-    }
 
     // GM: persistent storage JSON only (NO flags, NO migration)
     const ok = await hlp_writeSettingsPresetsToStorage(clean);
@@ -1158,23 +1136,6 @@ export async function svc_loadSettingsPresets(opts = {}) {
         _settingsPresetCache = null;
     }
 
-    // Non-GM: user-scoped store
-    if (!game.user.isGM) {
-        try {
-            _settingsPresetCache = hlp_sanitizeSettingsPresets(
-                game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {}
-            );
-            DL(`${FN} non-GM loaded from user setting store`, {
-                count: Object.keys(_settingsPresetCache || {}).length,
-            });
-            return _settingsPresetCache;
-        } catch (err) {
-            _settingsPresetCache = {};
-            DL(2, `${FN} non-GM failed to load user setting store`, err);
-            return _settingsPresetCache;
-        }
-    }
-
     // GM: load from persistent storage JSON ONLY
     try {
         const fromStorage = await hlp_readSettingsPresetsFromStorage();
@@ -1190,6 +1151,110 @@ export async function svc_loadSettingsPresets(opts = {}) {
         DL(2, `${FN} GM failed to load from persistent storage`, err);
         return _settingsPresetCache;
     }
+}
+
+/* =======================================================================
+	{PLAYER SETTINGS PRESETS}
+	Separate, user-scoped store (game.settings "settingsPresetsUser").
+	Always a player feature; no persistent storage, no GM branching.
+======================================================================= */
+
+/* Get cached player presets =========================================== */
+function svc_getPlayerSettingsPresets() {
+    return _playerPresetCache && typeof _playerPresetCache === "object"
+        ? _playerPresetCache
+        : {};
+}
+
+/* Load player presets from user-scoped setting ======================== */
+export async function svc_loadPlayerSettingsPresets(opts = {}) {
+    const FN = "settings-presets.js | svc_loadPlayerSettingsPresets():";
+    const force = Boolean(opts?.force);
+
+    // Cache guard
+    if (!force && _playerPresetCache !== null) {
+        DL(`${FN} cache hit`, {
+            count: Object.keys(_playerPresetCache || {}).length,
+        });
+        return _playerPresetCache;
+    }
+
+    if (force) {
+        DL(`${FN} force reload requested, clearing cache`);
+        _playerPresetCache = null;
+    }
+
+    try {
+        _playerPresetCache = hlp_sanitizeSettingsPresets(
+            game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS) || {}
+        );
+        DL(`${FN} loaded from user setting store`, {
+            count: Object.keys(_playerPresetCache || {}).length,
+        });
+        return _playerPresetCache;
+    } catch (err) {
+        _playerPresetCache = {};
+        DL(2, `${FN} failed to load user setting store`, err);
+        return _playerPresetCache;
+    }
+}
+
+/* Save player presets to user-scoped setting ========================== */
+export async function svc_setPlayerSettingsPresets(obj) {
+    const clean = hlp_sanitizeSettingsPresets(obj);
+    _playerPresetCache = clean;
+
+    try {
+        DL("settings-presets.js | svc_setPlayerSettingsPresets(): writing bbmm.settingsPresetsUser");
+        await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS, clean);
+        DL("settings-presets.js | svc_setPlayerSettingsPresets(): OK");
+    } catch (e) {
+        DL(3, "settings-presets.js | svc_setPlayerSettingsPresets(): FAILED", {
+            name: e?.name,
+            message: e?.message,
+            stack: e?.stack,
+            key: `${BBMM_ID}.${SETTING_SETTINGS_PRESETS}`,
+        });
+        throw e;
+    }
+}
+
+/* Save a player preset with conflict resolution ======================= */
+async function svc_savePlayerSettingsPreset(name, payload) {
+    const rawInput = String(name).trim();
+    let finalName = rawInput;
+
+    // Guard: if cache is empty, re-read before writing to avoid wiping existing presets
+    if (!_playerPresetCache || Object.keys(_playerPresetCache).length === 0) {
+        await svc_loadPlayerSettingsPresets();
+    }
+
+    const all = svc_getPlayerSettingsPresets();
+    const existingKey = hlp_findExistingSettingsPresetKey(rawInput, all);
+
+    const storedPayload = payload;
+    // If a preset with this name exists already, decide how to handle it.
+    if (existingKey) {
+        const choice = await svc_askSettingsPresetConflict(existingKey);
+        if (choice === "cancel") return { status: "cancel" };
+        if (choice === "overwrite") finalName = existingKey;
+        if (choice === "rename") {
+            const newName = await ui_promptRenamePreset(rawInput);
+            if (!newName) return { status: "cancel" };
+            finalName = newName;
+        }
+    }
+
+    // Preserve "entries" flattening behavior
+    const flatView = hlp_normalizeToEntries(storedPayload)?.entries ?? [];
+    const stored = flatView.length
+        ? { ...storedPayload, entries: flatView }
+        : storedPayload;
+
+    all[finalName] = stored;
+    await svc_setPlayerSettingsPresets(all);
+
+    return { status: "saved", name: finalName };
 }
 
 /* =======================================================================
@@ -1984,8 +2049,14 @@ class BBMMImportWizard extends AppV2 {
     }
 }
 
-/* Settings Preset Manager ============================================= */
+/* Settings Preset Manager (GM) ======================================== */
 export async function openSettingsPresetManager() {
+    // GM-only: players use openPlayerSettingsPresetManager() instead.
+    if (!game.user.isGM) {
+        DL(2, "settings-presets.js | openSettingsPresetManager(): blocked for non-GM");
+        return;
+    }
+
     await svc_loadSettingsPresets(); // Ensure presets are loaded
 
     // Stable id for this manager window so we can find/close it reliably
@@ -2338,6 +2409,11 @@ export async function openSettingsPresetManager() {
 
                 // LOAD -> apply the selected preset to current settings
                 if (action === "load") {
+                    // Hardening: applying a GM preset writes world-scope settings
+                    if (!game.user.isGM) {
+                        DL(2, "settings-presets.js | openSettingsPresetManager(): load blocked for non-GM");
+                        return;
+                    }
                     if (!selected)
                         return ui.notifications.warn(
                             `${LT.selectSettingsPresetLoad()}.`
@@ -2650,6 +2726,550 @@ export async function openSettingsPresetManager() {
     dlg.render(true);
 }
 
+/* Player Settings Preset Manager ======================================
+	Player-only counterpart of openSettingsPresetManager(). Reads/writes the
+	user-scoped store via the svc_*PlayerSettingsPresets functions only. No GM
+	branching, no hidden-settings warning, apply is ungated (it only ever
+	touches the player's own client/user settings).
+======================================================================= */
+export async function openPlayerSettingsPresetManager() {
+    await svc_loadPlayerSettingsPresets(); // Ensure presets are loaded
+
+    // Helper: find an existing window by id, checking v2 registry first if present
+    const getWindowById = (id) => {
+        try {
+            if (
+                globalThis.BBMM_V2_WINDOWS &&
+                typeof globalThis.BBMM_V2_WINDOWS.get === "function"
+            ) {
+                const v2 = globalThis.BBMM_V2_WINDOWS.get(id);
+                if (v2) return v2;
+            }
+        } catch (e) {
+            DL(
+                2,
+                "settings-presets.js | openPlayerSettingsPresetManager(): v2 registry lookup failed",
+                e
+            );
+        }
+        return (
+            Object.values(ui.windows ?? {}).find((w) => w?.id === id) ?? null
+        );
+    };
+
+    // Close any existing instance so we reopen a fresh one
+    const existing = getWindowById(PLAYER_PRESET_MANAGER_ID);
+    if (existing) {
+        DL(
+            "settings-presets.js | openPlayerSettingsPresetManager(): closing existing instance before reopen"
+        );
+        try {
+            await existing.close({ force: true });
+        } catch (e) {
+            DL(
+                2,
+                "settings-presets.js | openPlayerSettingsPresetManager(): failed to close existing instance",
+                e
+            );
+        }
+    }
+
+    // Build list from user-scoped preset map
+    const map = svc_getPlayerSettingsPresets();
+    const list = [];
+
+    for (const [name, preset] of Object.entries(map)) {
+        if (!name) continue;
+        list.push({
+            id: name,
+            name,
+            preset: preset && typeof preset === "object" ? preset : {},
+        });
+    }
+
+    // Sort alphabetically
+    list.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Index for fast lookup on click actions
+    const presetIndex = {};
+    for (const p of list) presetIndex[p.id] = p;
+
+    DL(
+        "settings-presets.js | openPlayerSettingsPresetManager(): presets list built",
+        {
+            total: list.length,
+        }
+    );
+
+    // Build table rows — one per preset, with per-row action buttons
+    const rows = list.length
+        ? list.map((p) => {
+            const fullName = hlp_esc(p.name);
+            const displayName = p.name.length > 40
+                ? hlp_esc(p.name.slice(0, 37)) + "..."
+                : fullName;
+            const titleAttr = p.name.length > 40 ? ` title="${fullName}"` : "";
+            return `
+            <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+                <td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"${titleAttr}>${displayName}</td>
+                <td style="padding:.25rem .5rem;">
+                    <div style="display:flex;gap:.25rem;justify-content:flex-end;flex-wrap:wrap;">
+                        <button type="button" data-action="load"    data-preset-id="${hlp_esc(p.id)}">${LT.buttons.load()}</button>
+                        <button type="button" data-action="preview" data-preset-id="${hlp_esc(p.id)}">${LT.buttons.preview()}</button>
+                        <button type="button" data-action="update"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.update()}</button>
+                        <button type="button" data-action="rename"  data-preset-id="${hlp_esc(p.id)}">${LT.errors.rename()}</button>
+                        <button type="button" data-action="delete"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.delete()}</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+        }).join("")
+        : `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets?.() ?? "No presets saved."}</td></tr>`;
+
+    // Content markup — save section at top, scrollable list below
+    const content = `
+        <section class="bbmm-preset-manager-root" style="min-width:645px;display:flex;flex-direction:column;gap:.75rem;">
+            <p style="margin:0;">${LT.presetSaveCurrentSettings()}:</p>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+                <input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
+                <button type="button" data-action="save-current">${LT.buttons.saveCurrentSettings()}</button>
+            </div>
+            <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
+                <label><input type="checkbox" name="includeDisabled" checked> ${LT.incDisabledModules()}</label>
+                <label><input type="checkbox" name="includeHidden"> ${LT.includeHidden()}</label>
+            </div>
+            <div style="font-size:.85em;color:var(--color-text-light-7);">${LT.noteSaveBeforeLoad()}.</div>
+            <div style="overflow-y:auto;max-height:210px;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead style="position:sticky;top:0;background:var(--color-bg,#1a1a1a);z-index:1;">
+                        <tr style="border-bottom:1px solid var(--color-border-dark-5);">
+                            <th style="text-align:left;padding:.25rem .5rem;">${LT.savedSettingsPresets()}</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </section>
+    `;
+
+    // Construct the DialogV2
+    const dlg = new foundry.applications.api.DialogV2({
+        id: PLAYER_PRESET_MANAGER_ID,
+        window: { title: LT.titleSettingsPresetMgr() },
+        position: _settingsPresetManagerLastPosPlayer
+            ? { top: _settingsPresetManagerLastPosPlayer.top, left: _settingsPresetManagerLastPosPlayer.left, width: _settingsPresetManagerLastPosPlayer.width, height: "auto" }
+            : { width: 805, height: "auto" },
+        content,
+        buttons: [
+            { action: "close", label: LT.buttons.close(), default: true },
+        ],
+    });
+
+    const onRender = (app) => {
+        if (app !== dlg) return;
+        Hooks.off("renderDialogV2", onRender);
+
+        try {
+            dlg.setPosition({ height: "auto" });
+        } catch {}
+
+        const root = app.element;
+        const form = root?.querySelector("form");
+        if (!form) return;
+
+        // Inject help button into title bar
+        try {
+            hlp_injectHeaderHelpButton(app, {
+                uuid: BBMM_README_UUID,
+                iconClass: "fas fa-circle-question",
+                title: LT.buttons.help?.() ?? "Help",
+            });
+        } catch (e) {
+            DL(2, `settings-presets.js | help injection failed`, e);
+        }
+
+        // Ensure all action buttons are non-submitting buttons
+        form.querySelectorAll("button[data-action]").forEach((b) =>
+            b.setAttribute("type", "button")
+        );
+
+        // Reopen the manager preserving the current window position
+        function reopenPreserving() {
+            try {
+                const pos = app.position;
+                if (pos) _settingsPresetManagerLastPosPlayer = { top: pos.top, left: pos.left, width: pos.width };
+            } catch {}
+            app.close();
+            openPlayerSettingsPresetManager();
+        }
+
+        // Single delegated click handler for all actions
+        form.addEventListener("click", async (ev) => {
+            const btn = ev.target;
+            if (!(btn instanceof HTMLButtonElement)) return;
+            const action = btn.dataset.action || "";
+            if (
+                ![
+                    "save-current",
+                    "load",
+                    "update",
+                    "rename",
+                    "delete",
+                    "preview",
+                ].includes(action)
+            )
+                return;
+
+            ev.preventDefault();
+            ev.stopPropagation();
+            ev.stopImmediatePropagation();
+
+            const txt = root.querySelector('input[name="newName"]');
+            const chk = root.querySelector('input[name="includeDisabled"]');
+
+            const selected = btn.dataset.presetId ?? "";
+            const newName = txt ? String(txt.value ?? "").trim() : "";
+            const includeDisabled = !!(chk && chk.checked);
+
+            DL(
+                `settings-presets.js | openPlayerSettingsPresetManager(): \naction = ${action} \nselected = ${selected} \nnewName = ${newName} \nincludeDisabled = ${includeDisabled}`
+            );
+
+            // Read "include hidden" request (no GM warning for the player manager)
+            const chkHidden = root.querySelector('input[name="includeHidden"]');
+            const includeHiddenFinal = !!(chkHidden && chkHidden.checked);
+
+            // Guard: name required for save-current
+            if (action === "save-current" && !newName) {
+                ui.notifications.warn(`${LT.promptNameSettingsPreset()}.`);
+                return;
+            }
+
+            try {
+                // SAVE CURRENT -> collect current settings and save as new preset
+                if (action === "save-current") {
+                    const payload = await svc_collectAllModuleSettings({
+                        includeDisabled,
+                        includeHidden: includeHiddenFinal,
+                    });
+                    hlp_schemaCorrectNonPlainTypes(payload);
+
+                    const res = await svc_savePlayerSettingsPreset(
+                        `${newName}`,
+                        payload
+                    );
+                    if (res?.status !== "saved") return;
+
+                    ui.notifications.info(
+                        `${LT.savedSettingsPreset({ name: res.name })}.`
+                    );
+
+                    reopenPreserving();
+                    return;
+                }
+
+                // UPDATE -> collect current settings and overwrite selected preset
+                if (action === "update") {
+                    if (!selected) {
+                        ui.notifications.warn(`${LT.selectSettingsPreset()}.`);
+                        return;
+                    }
+
+                    const payload = await svc_collectAllModuleSettings({
+                        includeDisabled,
+                        includeHidden: includeHiddenFinal,
+                    });
+                    hlp_schemaCorrectNonPlainTypes(payload);
+
+                    const res = await svc_savePlayerSettingsPreset(
+                        `${selected}`,
+                        payload
+                    );
+                    if (res?.status !== "saved") return;
+
+                    ui.notifications.info(
+                        `${LT.updatedSettingsPreset({ name: selected })}.`
+                    );
+
+                    reopenPreserving();
+                    return;
+                }
+
+                // LOAD -> apply the selected preset to current settings
+                if (action === "load") {
+                    if (!selected)
+                        return ui.notifications.warn(
+                            `${LT.selectSettingsPresetLoad()}.`
+                        );
+                    const picked = presetIndex[selected];
+                    const preset = picked?.preset;
+                    if (!preset) return;
+
+                    const skippedMissing = [];
+
+                    const ok = await foundry.applications.api.DialogV2.confirm({
+                        window: { title: LT.titleApplySettingsPreset() },
+                        content: `<p>${LT.titleApplySettingsPreset()} <b>${hlp_esc(
+                            selected
+                        )}</b>?</p>`,
+                        ok: { label: LT.buttons.apply() },
+                        modal: true,
+                    });
+                    if (!ok) return;
+
+                    let payload = preset;
+
+                    const flat = Array.isArray(preset?.items)
+                        ? preset.items
+                        : Array.isArray(preset?.entries)
+                        ? preset.entries
+                        : null;
+
+                    if (!preset?.type && flat) {
+                        const out = {
+                            type: "bbmm-settings",
+                            created: new Date().toISOString(),
+                            world: {},
+                            client: {},
+                            user: {},
+                        };
+
+                        for (const e of flat) {
+                            if (
+                                !e ||
+                                typeof e.namespace !== "string" ||
+                                typeof e.key !== "string"
+                            )
+                                continue;
+
+                            if (!hlp_isRegisteredSetting(e.namespace, e.key)) {
+                                skippedMissing.push(`${e.namespace}.${e.key}`);
+                                continue;
+                            }
+
+                            const scope =
+                                e.scope === "world"
+                                    ? "world"
+                                    : e.scope === "user"
+                                    ? "user"
+                                    : "client";
+                            out[scope][e.namespace] ??= {};
+                            out[scope][e.namespace][e.key] = e.value;
+                        }
+
+                        payload = out;
+                    }
+
+                    // Safety: ignore accidental nested world wrappers
+                    if (payload?.type === "bbmm-settings") {
+                        const stripWorldNameNest = (bucket) => {
+                            const keys = Object.keys(bucket || {});
+                            if (keys.length === 1) {
+                                const k = keys[0];
+                                const maybe = bucket[k];
+                                if (
+                                    maybe &&
+                                    typeof maybe === "object" &&
+                                    Object.values(maybe).every(
+                                        (v) => v && typeof v === "object"
+                                    )
+                                ) {
+                                    return maybe;
+                                }
+                            }
+                            return bucket;
+                        };
+                        payload.world = stripWorldNameNest(payload.world);
+                        payload.client = stripWorldNameNest(payload.client);
+                        payload.user = stripWorldNameNest(payload.user);
+                    }
+
+                    if (skippedMissing.length) {
+                        ui.notifications?.warn(
+                            `${LT.skippedSettingsApply({
+                                count: skippedMissing.length,
+                            })}.`
+                        );
+                    }
+
+                    // Apply (world-scope entries are skipped inside svc_applySettingsExport for non-GM)
+                    await svc_applySettingsExport(payload);
+                    return;
+                }
+
+                // PREVIEW -> diff of what would change if we loaded the selected preset
+                if (action === "preview") {
+                    if (!selected)
+                        return ui.notifications.warn(
+                            `${LT.selectSettingsPresetLoad()}.`
+                        );
+                    const preset = svc_getPlayerSettingsPresets()[selected];
+                    if (!preset) return;
+
+                    try {
+                        let payload = preset;
+                        const flat = Array.isArray(preset?.items)
+                            ? preset.items
+                            : Array.isArray(preset?.entries)
+                            ? preset.entries
+                            : null;
+
+                        if (!preset?.type && flat) {
+                            const out = {
+                                type: "bbmm-settings",
+                                created: new Date().toISOString(),
+                                world: {},
+                                client: {},
+                                user: {},
+                            };
+                            for (const e of flat) {
+                                if (
+                                    !e ||
+                                    typeof e.namespace !== "string" ||
+                                    typeof e.key !== "string"
+                                )
+                                    continue;
+
+                                if (
+                                    !hlp_isRegisteredSetting(e.namespace, e.key)
+                                )
+                                    continue;
+
+                                const scope =
+                                    e.scope === "world"
+                                        ? "world"
+                                        : e.scope === "user"
+                                        ? "user"
+                                        : "client";
+                                out[scope][e.namespace] ??= {};
+                                out[scope][e.namespace][e.key] = e.value;
+                            }
+                            payload = out;
+                        }
+
+                        const rows = await svc_planSettingsChanges(payload);
+                        ui_openPresetPreview(rows, selected);
+                    } catch (err) {
+                        DL(3, "settings-presets.js | player preview failed", err);
+                        ui.notifications.error(
+                            LT.errors.failedOpenPreview?.() ??
+                                "Failed to open preview."
+                        );
+                    }
+                    return;
+                }
+
+                // RENAME -> rename selected preset only
+                if (action === "rename") {
+                    if (!selected) {
+                        ui.notifications.warn(`${LT.selectSettingsPreset()}.`);
+                        return;
+                    }
+
+                    const all =
+                        foundry.utils.duplicate(svc_getPlayerSettingsPresets()) || {};
+
+                    const oldKey =
+                        hlp_findExistingSettingsPresetKey(selected, all) ?? selected;
+                    const oldPreset = all[oldKey];
+                    if (!oldPreset) {
+                        ui.notifications.warn(`${LT.selectSettingsPreset()}.`);
+                        return;
+                    }
+
+                    let attemptName = await ui_promptRenamePreset(oldKey);
+                    if (!attemptName) return;
+
+                    let finalKey = null;
+
+                    while (true) {
+                        const wanted = String(attemptName).trim();
+                        if (!wanted) return;
+
+                        const existingKey =
+                            hlp_findExistingSettingsPresetKey(wanted, all);
+
+                        if (!existingKey || existingKey === oldKey) {
+                            finalKey = wanted;
+                            break;
+                        }
+
+                        const choice = await svc_askSettingsPresetConflict(
+                            existingKey
+                        );
+                        if (choice === "cancel") return;
+
+                        if (choice === "overwrite") {
+                            finalKey = existingKey;
+                            break;
+                        }
+
+                        attemptName = await ui_promptRenamePreset(wanted);
+                        if (!attemptName) return;
+                    }
+
+                    if (!finalKey) return;
+
+                    all[finalKey] = oldPreset;
+                    if (oldKey !== finalKey) delete all[oldKey];
+
+                    await svc_setPlayerSettingsPresets(all);
+
+                    ui.notifications.info(
+                        `${LT.renameSettingPreset()}: "${oldKey}" -> "${finalKey}".`
+                    );
+
+                    reopenPreserving();
+                    return;
+                }
+
+                // DELETE -> delete the selected preset after confirmation
+                if (action === "delete") {
+                    if (!selected)
+                        return ui.notifications.warn(
+                            `${LT.errors.selectSettingPresetDelete()}.`
+                        );
+                    const ok = await foundry.applications.api.DialogV2.confirm({
+                        window: { title: LT.titleDelSettingsPreset() },
+                        content: `<p>${LT.promptDelSettingsPreset({
+                            name: hlp_esc(selected),
+                        })}?</p>`,
+                        ok: { label: LT.buttons.delete() },
+                    });
+                    if (!ok) return;
+
+                    const all = svc_getPlayerSettingsPresets();
+                    delete all[selected];
+                    await svc_setPlayerSettingsPresets(all);
+                    ui.notifications.info(
+                        `${LT.deletedSettingsPreset({ name: selected })}.`
+                    );
+
+                    reopenPreserving();
+                    return;
+                }
+            } catch (err) {
+                DL(
+                    3,
+                    "settings-presets.js | openPlayerSettingsPresetManager(): action failed",
+                    {
+                        action,
+                        name: err?.name,
+                        message: err?.message,
+                        stack: err?.stack,
+                    }
+                );
+                ui.notifications.error(`${LT.errors.errorOccured()}.`);
+            }
+        });
+    };
+    Hooks.on("renderDialogV2", onRender);
+
+    // Render
+    dlg.render(true);
+}
+
 // Expose API + migrate presets on load (GM only)
 Hooks.once("ready", async () => {
     await (globalThis.bbmm?._dataFilesReady ?? Promise.resolve());
@@ -2657,7 +3277,12 @@ Hooks.once("ready", async () => {
     if (!mod) return;
     mod.api ??= {};
     mod.api.openSettingsPresetManager = openSettingsPresetManager;
+    mod.api.openPlayerSettingsPresetManager = openPlayerSettingsPresetManager;
     mod.api.loadSettingsPresets = svc_loadSettingsPresets;
+
+    // Public namespace so macros can open the player manager
+    globalThis.bbmm ??= {};
+    Object.assign(globalThis.bbmm, { openPlayerSettingsPresetManager });
 
     // GM-only: players should not be writing to module persistent storage
     if (!game.user.isGM) return;

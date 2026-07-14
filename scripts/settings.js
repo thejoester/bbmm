@@ -1,5 +1,5 @@
 import { openPresetManager } from './module-presets.js';
-import { openSettingsPresetManager, svc_loadSettingsPresets } from './settings-presets.js';
+import { openSettingsPresetManager, openPlayerSettingsPresetManager, svc_loadSettingsPresets, svc_loadPlayerSettingsPresets, svc_setPlayerSettingsPresets } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp, hlp_readUserInclusions } from "./inclusions.js";
 import { hlp_readUserExclusions } from "./exclusions.js";
@@ -276,8 +276,8 @@ export function injectBBMMHeaderButton(root) {
 			{ action: "help", label: (LT.buttons.help?.() ?? "Help"), onClick: () => hlp_openManualByUuid(BBMM_README_UUID) }
 		]
 		: [
-			// Module Presets
-			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
+			// Settings Presets (players get the user-scoped manager)
+			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openPlayerSettingsPresetManager() },
 			// Import / Export
 			{
 				action: "importExport",
@@ -821,7 +821,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 							}
 							presets = await res.json();
 						} else {
-							presets = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS_U) ?? {};
+							presets = await svc_loadPlayerSettingsPresets({ force: true });
 						}
 
 						const names = Object.keys(presets ?? {}).sort((a, b) => a.localeCompare(b));
@@ -1009,7 +1009,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 						}
 
 						try {
-							await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS_U, current);
+							await svc_setPlayerSettingsPresets(current);
 							DL(1, `${FN} imported presets into user setting`, { added, renamed });
 							ui.notifications.info(`Imported ${added} settings preset(s).${renamed ? ` Renamed ${renamed}.` : ""}`);
 						} catch (err) {
@@ -1019,14 +1019,16 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 						}
 					}
 
-					// Force refresh the Settings Presets cache
+					// Force refresh the appropriate preset cache and reopen its manager if open
 					try {
-						await svc_loadSettingsPresets({ force: true });
-
-						// If the Settings Preset Manager is open, reopen it to rebuild the list
-						const existing = Object.values(ui.windows ?? {}).find(w => w?.id === "bbmm-settings-preset-manager") ?? null;
-						if (existing) {
-							await openSettingsPresetManager();
+						if (game.user.isGM) {
+							await svc_loadSettingsPresets({ force: true });
+							const existing = Object.values(ui.windows ?? {}).find(w => w?.id === "bbmm-settings-preset-manager") ?? null;
+							if (existing) await openSettingsPresetManager();
+						} else {
+							await svc_loadPlayerSettingsPresets({ force: true });
+							const existing = Object.values(ui.windows ?? {}).find(w => w?.id === "bbmm-player-settings-preset-manager") ?? null;
+							if (existing) await openPlayerSettingsPresetManager();
 						}
 					} catch (err) {
 						DL(2, "settings.js | BBMMImportExportDialog._onRender(): post-import refresh failed", err);
@@ -1809,7 +1811,7 @@ Hooks.once("init", () => {
 				}
 			});
 			
-			// MENU: open the Preset Manager
+			// MENU: open the Preset Manager (GM gets the world manager, players get the user-scoped one)
 			game.settings.registerMenu(BBMM_ID, "settingsPresetManager", {
 				name: LT.settingsPresetsBtn(),
 				label: LT.lblOpenSettingsPresets(),
@@ -1826,13 +1828,14 @@ Hooks.once("init", () => {
 						});
 					}
 					async render(...args) {
-						await openSettingsPresetManager();
+						if (game.user.isGM) await openSettingsPresetManager();
+						else await openPlayerSettingsPresetManager();
 						return this;
 					}
 					async _updateObject() {}
 				}
 			});
-			
+
 			// MENU: Lock Preset Manager
 			game.settings.registerMenu(BBMM_ID, "lockPresetManager", {
 				name: LT.lockPresets.menuLabel(),
