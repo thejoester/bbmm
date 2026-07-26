@@ -1,8 +1,6 @@
-/* BBMM Inclusions (Hidden Settings) =========================================
-	- Lets GM include specific *hidden* settings (config:false) in preset saves
-	- Mirrors the UX of exclusions manager but scoped to settings-only
-	- Persistent storage: bbmm-data/user-inclusions.json
-============================================================================ */
+/* ==========================================================================
+	BBMM: Inclusions (hidden settings)
+========================================================================== */
 
 import { DL, BBMM_README_UUID  } from './settings.js';
 import { LT, BBMM_ID } from "./localization.js";

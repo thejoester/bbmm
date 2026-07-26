@@ -1,9 +1,9 @@
-/* BBMM — Changelog on Login ==================================================
-	- Shows module changelogs to the GM on login for any modules that have
-	- been updated and have a changelog file or URL.
-============================================================================ */
+/* ==========================================================================
+	BBMM: Changelog on Login
+	Shows updated modules' changelogs to the GM on login.
+========================================================================== */
 
-import { DL, BBMM_README_UUID } from "./settings.js";
+import { DL, BBMM_README_UUID, injectBBMMHeaderButton } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 import { hlp_esc, hlp_injectHeaderHelpButton } from "./helpers.js";
 
@@ -220,26 +220,12 @@ function _bbmmSizeFrameOnce(frame, app) {
 	}
 }
 
-/* ============================================================================
-	Convert basic subset of Markdown to HTML
-	- Headers (#, ##, ###, etc)
-	- Bullet lists (-, *, + with indents)
-	- Bold (**text** or __text__)
-	- Italics (*text* or _text_)
-	- Inline code (`code`)
-	- Links ([label](https://url) and <https://url>)
-============================================================================ */
+/* Minimal Markdown -> HTML: headers, lists, bold, italic, inline code, links */
 function _bbmmMarkdownToHtml(md) {
 	try {
 		
 		function inlineToHtml(text) {
-				/* ==========================================================================
-				Order matters:
-				1) Protect code spans
-				2) Apply emphasis (** / *)
-				3) Convert markdown links & autolinks
-				4) Escape remaining non-tag text
- 				============================================================================*/
+			// order matters: protect code spans, then emphasis, then links, then escape
 			const escHTML = hlp_esc;
 			const escAttr = hlp_esc;
 
@@ -255,13 +241,13 @@ function _bbmmMarkdownToHtml(md) {
 
 				let seg = parts[i];
 
-				// 2) Emphasis — do bold first, then italics (avoid overlapping)
+				// emphasis: bold before italics, avoids overlap
 				seg = seg.replace(/\*\*([^*]+?)\*\*/g, (_m, t) => `<strong>${escHTML(t)}</strong>`);
 				seg = seg.replace(/\*([^*]+?)\*/g,       (_m, t) => `<em>${escHTML(t)}</em>`);
 				seg = seg.replace(/__([^_]+?)__/g,       (_m, t) => `<strong>${escHTML(t)}</strong>`);
 				seg = seg.replace(/_([^_]+?)_/g,         (_m, t) => `<em>${escHTML(t)}</em>`);
 
-				// 3) Markdown links: [label](https://url) — format label with emphasis already applied
+				// 3) Markdown links: [label](https://url), label may already have emphasis applied
 				seg = seg.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_m, label, url) => {
 					// label may already contain <strong>/<em>; do NOT escape tags, only attributes
 					return `<a href="${escAttr(url)}">${label}</a>`;
@@ -364,7 +350,9 @@ async function _bbmmRenderMarkdownOnly(md) {
 	}
 }
 
-/* Main Workflow ============================================================ */
+/* ==========================================================================
+	Changelog journal window
+========================================================================== */
 class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 	constructor(entries) {
 		const MIN_W = 480;
@@ -678,6 +666,13 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 				});
 			} catch (e) {
 				DL(2, `changelogs.js | help injection failed`, e);
+			}
+
+			// BBMM toolbox opener in the title bar
+			try {
+				injectBBMMHeaderButton(this.element);
+			} catch (e) {
+				DL(2, `changelogs.js | BBMM header button injection failed`, e);
 			}
 
 			const frame = (root.closest?.(".app, .window-app")) || root.parentElement;
@@ -1078,15 +1073,9 @@ async function _bbmmUnmarkChangelogSeen(moduleId) {
 	}
 }
 
-/* ============================================================================
-	{HELPER}
-	manually open a specific module's changelog
-============================================================================ */
-/* ============================================================================
-	{APP}
-	Changelog Filename Manager — lets users add/remove filename patterns
-	that BBMM searches for when detecting a module's changelog file.
-============================================================================ */
+/* ==========================================================================
+	{APP} Changelog Filename Manager
+========================================================================== */
 class BBMMChangelogFilesApp extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({

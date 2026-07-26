@@ -5,9 +5,9 @@ import { LT, BBMM_ID } from "./localization.js";
 /* Cache the effective skip map until invalidated */
 let _skipMapCache = null;
 
-/* ---------------------------------------------------------------------- */
-/* General helpers										                  */
-/* ---------------------------------------------------------------------- */
+/* ==========================================================================
+	General helpers
+========================================================================== */
 
 // Tiny safe HTML escaper for labels/values
 export function hlp_esc(s) {
@@ -26,7 +26,7 @@ export function hlp_timestampStr(d = new Date()) {
 	return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
-// Helper to export to .json file
+// export to .json file
 export async function hlp_saveJSONFile(data, filename) {
 	if (typeof saveDataToFile === "function") {
 		return saveDataToFile(JSON.stringify(data, null, 2), "application/json", filename);
@@ -81,19 +81,16 @@ export function hlp_normalizePresetName(s) {
 	return String(s).normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-/* ---------------------------------------------------------------------- */
-/* Exclusion helpers (used by settings and module presets)                */
-/* ---------------------------------------------------------------------- */ 
+/* ==========================================================================
+	Exclusion helpers
+========================================================================== */
 
 export function invalidateSkipMap() {
 	// Call this if you change bbmm.userExclusions or EXPORT_SKIP at runtime
 	_skipMapCache = null;
 }
 
-/*
-	Build effective skip map from EXPORT_SKIP + bbmm.userExclusions.
-	No DL() here; we log only when we actually skip something.
-*/
+// build effective skip map from EXPORT_SKIP + user exclusions
 export function getSkipMap() {
 	if (_skipMapCache) return _skipMapCache;
 
@@ -280,7 +277,7 @@ export function hlp_injectHeaderHelpButton(app, opts = {}) {
 		a.dataset.action = "bbmm-help";
 		a.dataset.uuid = uuid;
 
-		// IMPORTANT: this text is OURS (localized), not user input, so no escape needed.
+		// our localized text, not user input, so no escape needed
 		a.title = String(opts.title || (LT?.buttons?.help?.() ?? "Help"));
 
 		const iconClass = String(opts.iconClass || "fas fa-circle-question");

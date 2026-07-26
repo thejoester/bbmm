@@ -2,11 +2,7 @@ import { DL, BBMM_README_UUID, EXPORT_SKIP } from "./settings.js";
 import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, getSkipMap, isExcludedWith, hlp_injectHeaderHelpButton, } from "./helpers.js";
 import { LT, BBMM_ID } from "./localization.js";
 const SETTING_SETTINGS_PRESETS = "settingsPresetsUser"; // user-scoped store defined in settings.js
-const PRESET_MANAGER_ID = "bbmm-settings-preset-manager"; // stable window id
-let _settingsPresetManagerLastPos = null; // Remembers window position across reopens
 const SETTINGS_PRESETS_STORAGE_FILE = "settings-presets.json";
-const PLAYER_PRESET_MANAGER_ID = "bbmm-player-settings-preset-manager"; // stable window id (player manager)
-let _settingsPresetManagerLastPosPlayer = null; // Remembers player window position across reopens
 let _settingsPresetCache = null;	// GM: persistent storage store
 let _playerPresetCache = null;		// Player: user-scoped setting store
 
@@ -260,9 +256,7 @@ function hlp_defaultPresetName() {
     )} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/* Find existing preset key case-insensitively ===========================
-	- presets defaults to the GM store; pass the player store to search it instead
-======================================================================= */
+/* Find an existing preset key, case-insensitively (defaults to the GM store) */
 function hlp_findExistingSettingsPresetKey(name, presets = svc_getSettingsPresets()) {
     const wanted = hlp_normalizePresetName(name);
     for (const k of Object.keys(presets)) {
@@ -544,14 +538,7 @@ function hlp_diffHighlight(oldVal, newVal) {
 	{SERVICES}
 ======================================================================= */
 
-/* Collect all Settings - except excluded ================================
-	Collect module settings by scope, 
-		optionally restricting to active modules.
-	- Skips config:false entries
-	- GM: all scopes Non‑GM: client only
-	- includeDisabled=false -> skip modules that are not active 
-		(except core/system)
-======================================================================= */
+/* Collect module settings by scope (GM: all scopes, non-GM: client only) */
 async function svc_collectAllModuleSettings({ includeDisabled = false, includeHidden = false } = {}) {
     // Build a bbmm-settings envelope
     const isGM = game.user.isGM;
@@ -1020,10 +1007,7 @@ async function svc_setSettingsPresets(obj) {
     DL("settings-presets.js | svc_setSettingsPresets(): OK (GM storage path)");
 }
 
-/* plan settings changes ================================================= 
-	- Build a list of setting changes between live settings and  
-		bbmm-export envelope 
-======================================================================= */
+/* Plan setting changes between live settings and a bbmm-export envelope */
 async function svc_planSettingsChanges(env) {
     const rows = [];
     try {
@@ -2050,62 +2034,16 @@ class BBMMImportWizard extends AppV2 {
 }
 
 /* Settings Preset Manager (GM) ======================================== */
-export async function openSettingsPresetManager() {
-    // GM-only: players use openPlayerSettingsPresetManager() instead.
-    if (!game.user.isGM) {
-        DL(2, "settings-presets.js | openSettingsPresetManager(): blocked for non-GM");
-        return;
-    }
+// Toolbox pane: GM Settings Preset Manager (migrated from openSettingsPresetManager).
+export async function mountSettingsPresetGM(container) {
+    const root = container;
+    let _index = {};
 
-    await svc_loadSettingsPresets(); // Ensure presets are loaded
+    const rerender = async () => {
+        await svc_loadSettingsPresets();
 
-    // Stable id for this manager window so we can find/close it reliably
-    const PRESET_MANAGER_ID = "bbmm-settings-preset-manager";
-
-    // Helper: find an existing window by id, checking v2 registry first if present
-    const getWindowById = (id) => {
-        try {
-            // Check v2 registry if present
-            if (
-                globalThis.BBMM_V2_WINDOWS &&
-                typeof globalThis.BBMM_V2_WINDOWS.get === "function"
-            ) {
-                const v2 = globalThis.BBMM_V2_WINDOWS.get(id);
-                if (v2) return v2;
-            }
-        } catch (e) {
-            // If anything goes wrong reading the registry, ignore and fall back
-            DL(
-                2,
-                "settings-presets.js | openSettingsPresetManager(): v2 registry lookup failed",
-                e
-            );
-        }
-        // Fallback
-        return (
-            Object.values(ui.windows ?? {}).find((w) => w?.id === id) ?? null
-        );
-    };
-
-    // Close any existing instance so we reopen a fresh one
-    const existing = getWindowById(PRESET_MANAGER_ID);
-    if (existing) {
-        DL(
-            "settings-presets.js | openSettingsPresetManager(): Settings Preset Manager: closing existing instance before reopen"
-        );
-        try {
-            await existing.close({ force: true });
-        } catch (e) {
-            DL(
-                2,
-                "settings-presets.js | openSettingsPresetManager(): failed to close existing instance",
-                e
-            );
-        }
-    }
-
-    // Build list from flat persistent storage map (global presets)
-    const map = svc_getSettingsPresets();
+        // Build list from flat persistent storage map (global presets)
+        const map = svc_getSettingsPresets();
     const list = [];
 
     for (const [name, preset] of Object.entries(map)) {
@@ -2132,7 +2070,7 @@ export async function openSettingsPresetManager() {
         }
     );
 
-    // Build table rows — one per preset, with per-row action buttons
+    // table rows, one per preset with per-row action buttons
     const rows = list.length
         ? list.map((p) => {
             const fullName = hlp_esc(p.name);
@@ -2157,9 +2095,9 @@ export async function openSettingsPresetManager() {
         }).join("")
         : `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
-    // Content markup — save section at top, scrollable list below
+    // content markup: save section at top, scrollable list below
     const content = `
-        <section class="bbmm-preset-manager-root" style="min-width:645px;display:flex;flex-direction:column;gap:.75rem;">
+        <section class="bbmm-preset-manager-root" style="width:100%;display:flex;flex-direction:column;gap:.75rem;">
             <p style="margin:0;">${LT.presetSaveCurrentSettings()}:</p>
             <div style="display:flex;gap:.5rem;align-items:center;">
                 <input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
@@ -2184,61 +2122,12 @@ export async function openSettingsPresetManager() {
         </section>
     `;
 
-    // Construct the DialogV2
-    const dlg = new foundry.applications.api.DialogV2({
-        id: PRESET_MANAGER_ID,
-        window: { title: LT.titleSettingsPresetMgr() },
-        position: _settingsPresetManagerLastPos
-            ? { top: _settingsPresetManagerLastPos.top, left: _settingsPresetManagerLastPos.left, width: _settingsPresetManagerLastPos.width, height: "auto" }
-            : { width: 805, height: "auto" },
-        content,
-        buttons: [
-            { action: "close", label: LT.buttons.close(), default: true },
-        ],
-    });
+        container.innerHTML = content;
+        _index = presetIndex;
+    };
 
-    // Render it
-    const onRender = (app) => {
-        if (app !== dlg) return;
-        Hooks.off("renderDialogV2", onRender);
-
-        // Recalculate height without resetting position
-        try {
-            dlg.setPosition({ height: "auto" });
-        } catch {}
-
-        const root = app.element;
-        const form = root?.querySelector("form");
-        if (!form) return;
-
-        // Inject help button into title bar
-        try {
-            hlp_injectHeaderHelpButton(app, {
-                uuid: BBMM_README_UUID,
-                iconClass: "fas fa-circle-question",
-                title: LT.buttons.help?.() ?? "Help",
-            });
-        } catch (e) {
-            DL(2, `settings-presets.js | help injection failed`, e);
-        }
-
-        // Ensure all action buttons are non-submitting buttons
-        form.querySelectorAll("button[data-action]").forEach((b) =>
-            b.setAttribute("type", "button")
-        );
-
-        // Reopen the manager preserving the current window position
-        function reopenPreserving() {
-            try {
-                const pos = app.position;
-                if (pos) _settingsPresetManagerLastPos = { top: pos.top, left: pos.left, width: pos.width };
-            } catch {}
-            app.close();
-            openSettingsPresetManager();
-        }
-
-        // Single delegated click handler for all actions
-        form.addEventListener("click", async (ev) => {
+    // Single delegated click handler for all actions (bound once).
+    container.addEventListener("click", async (ev) => {
             const btn = ev.target;
             if (!(btn instanceof HTMLButtonElement)) return;
             const action = btn.dataset.action || "";
@@ -2349,7 +2238,7 @@ export async function openSettingsPresetManager() {
                     );
 
                     // Refresh list
-                    reopenPreserving();
+                    rerender();
                     return;
                 }
 
@@ -2403,7 +2292,7 @@ export async function openSettingsPresetManager() {
                     );
 
                     // Refresh list
-                    reopenPreserving();
+                    rerender();
                     return;
                 }
 
@@ -2418,7 +2307,7 @@ export async function openSettingsPresetManager() {
                         return ui.notifications.warn(
                             `${LT.selectSettingsPresetLoad()}.`
                         );
-                    const picked = presetIndex[selected];
+                    const picked = _index[selected];
                     const preset = picked?.preset;
                     if (!preset) return;
 
@@ -2674,7 +2563,7 @@ export async function openSettingsPresetManager() {
                     );
 
                     // Refresh list
-                    reopenPreserving();
+                    rerender();
                     return;
                 }
 
@@ -2701,7 +2590,7 @@ export async function openSettingsPresetManager() {
                     );
 
                     // Refresh list
-                    reopenPreserving();
+                    rerender();
                     return;
                 }
             } catch (err) {
@@ -2719,11 +2608,8 @@ export async function openSettingsPresetManager() {
                 ui.notifications.error(`${LT.errors.errorOccured()}.`);
             }
         });
-    };
-    Hooks.on("renderDialogV2", onRender);
 
-    // Render
-    dlg.render(true);
+    await rerender();
 }
 
 /* Player Settings Preset Manager ======================================
@@ -2732,50 +2618,16 @@ export async function openSettingsPresetManager() {
 	branching, no hidden-settings warning, apply is ungated (it only ever
 	touches the player's own client/user settings).
 ======================================================================= */
-export async function openPlayerSettingsPresetManager() {
-    await svc_loadPlayerSettingsPresets(); // Ensure presets are loaded
+// Toolbox pane: Player Settings Preset Manager (migrated from openPlayerSettingsPresetManager).
+export async function mountSettingsPresetPlayer(container) {
+    const root = container;
+    let _index = {};
 
-    // Helper: find an existing window by id, checking v2 registry first if present
-    const getWindowById = (id) => {
-        try {
-            if (
-                globalThis.BBMM_V2_WINDOWS &&
-                typeof globalThis.BBMM_V2_WINDOWS.get === "function"
-            ) {
-                const v2 = globalThis.BBMM_V2_WINDOWS.get(id);
-                if (v2) return v2;
-            }
-        } catch (e) {
-            DL(
-                2,
-                "settings-presets.js | openPlayerSettingsPresetManager(): v2 registry lookup failed",
-                e
-            );
-        }
-        return (
-            Object.values(ui.windows ?? {}).find((w) => w?.id === id) ?? null
-        );
-    };
+    const rerender = async () => {
+        await svc_loadPlayerSettingsPresets();
 
-    // Close any existing instance so we reopen a fresh one
-    const existing = getWindowById(PLAYER_PRESET_MANAGER_ID);
-    if (existing) {
-        DL(
-            "settings-presets.js | openPlayerSettingsPresetManager(): closing existing instance before reopen"
-        );
-        try {
-            await existing.close({ force: true });
-        } catch (e) {
-            DL(
-                2,
-                "settings-presets.js | openPlayerSettingsPresetManager(): failed to close existing instance",
-                e
-            );
-        }
-    }
-
-    // Build list from user-scoped preset map
-    const map = svc_getPlayerSettingsPresets();
+        // Build list from user-scoped preset map
+        const map = svc_getPlayerSettingsPresets();
     const list = [];
 
     for (const [name, preset] of Object.entries(map)) {
@@ -2801,7 +2653,7 @@ export async function openPlayerSettingsPresetManager() {
         }
     );
 
-    // Build table rows — one per preset, with per-row action buttons
+    // table rows, one per preset with per-row action buttons
     const rows = list.length
         ? list.map((p) => {
             const fullName = hlp_esc(p.name);
@@ -2826,9 +2678,9 @@ export async function openPlayerSettingsPresetManager() {
         }).join("")
         : `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
-    // Content markup — save section at top, scrollable list below
+    // content markup: save section at top, scrollable list below
     const content = `
-        <section class="bbmm-preset-manager-root" style="min-width:645px;display:flex;flex-direction:column;gap:.75rem;">
+        <section class="bbmm-preset-manager-root" style="width:100%;display:flex;flex-direction:column;gap:.75rem;">
             <p style="margin:0;">${LT.presetSaveCurrentSettings()}:</p>
             <div style="display:flex;gap:.5rem;align-items:center;">
                 <input name="newName" type="text" placeholder="${LT.newSettingPresetName()}…" style="flex:1;">
@@ -2853,59 +2705,12 @@ export async function openPlayerSettingsPresetManager() {
         </section>
     `;
 
-    // Construct the DialogV2
-    const dlg = new foundry.applications.api.DialogV2({
-        id: PLAYER_PRESET_MANAGER_ID,
-        window: { title: LT.titleSettingsPresetMgr() },
-        position: _settingsPresetManagerLastPosPlayer
-            ? { top: _settingsPresetManagerLastPosPlayer.top, left: _settingsPresetManagerLastPosPlayer.left, width: _settingsPresetManagerLastPosPlayer.width, height: "auto" }
-            : { width: 805, height: "auto" },
-        content,
-        buttons: [
-            { action: "close", label: LT.buttons.close(), default: true },
-        ],
-    });
+        container.innerHTML = content;
+        _index = presetIndex;
+    };
 
-    const onRender = (app) => {
-        if (app !== dlg) return;
-        Hooks.off("renderDialogV2", onRender);
-
-        try {
-            dlg.setPosition({ height: "auto" });
-        } catch {}
-
-        const root = app.element;
-        const form = root?.querySelector("form");
-        if (!form) return;
-
-        // Inject help button into title bar
-        try {
-            hlp_injectHeaderHelpButton(app, {
-                uuid: BBMM_README_UUID,
-                iconClass: "fas fa-circle-question",
-                title: LT.buttons.help?.() ?? "Help",
-            });
-        } catch (e) {
-            DL(2, `settings-presets.js | help injection failed`, e);
-        }
-
-        // Ensure all action buttons are non-submitting buttons
-        form.querySelectorAll("button[data-action]").forEach((b) =>
-            b.setAttribute("type", "button")
-        );
-
-        // Reopen the manager preserving the current window position
-        function reopenPreserving() {
-            try {
-                const pos = app.position;
-                if (pos) _settingsPresetManagerLastPosPlayer = { top: pos.top, left: pos.left, width: pos.width };
-            } catch {}
-            app.close();
-            openPlayerSettingsPresetManager();
-        }
-
-        // Single delegated click handler for all actions
-        form.addEventListener("click", async (ev) => {
+    // Single delegated click handler for all actions (bound once).
+    container.addEventListener("click", async (ev) => {
             const btn = ev.target;
             if (!(btn instanceof HTMLButtonElement)) return;
             const action = btn.dataset.action || "";
@@ -2965,7 +2770,7 @@ export async function openPlayerSettingsPresetManager() {
                         `${LT.savedSettingsPreset({ name: res.name })}.`
                     );
 
-                    reopenPreserving();
+                    rerender();
                     return;
                 }
 
@@ -2992,7 +2797,7 @@ export async function openPlayerSettingsPresetManager() {
                         `${LT.updatedSettingsPreset({ name: selected })}.`
                     );
 
-                    reopenPreserving();
+                    rerender();
                     return;
                 }
 
@@ -3002,7 +2807,7 @@ export async function openPlayerSettingsPresetManager() {
                         return ui.notifications.warn(
                             `${LT.selectSettingsPresetLoad()}.`
                         );
-                    const picked = presetIndex[selected];
+                    const picked = _index[selected];
                     const preset = picked?.preset;
                     if (!preset) return;
 
@@ -3220,7 +3025,7 @@ export async function openPlayerSettingsPresetManager() {
                         `${LT.renameSettingPreset()}: "${oldKey}" -> "${finalKey}".`
                     );
 
-                    reopenPreserving();
+                    rerender();
                     return;
                 }
 
@@ -3246,7 +3051,7 @@ export async function openPlayerSettingsPresetManager() {
                         `${LT.deletedSettingsPreset({ name: selected })}.`
                     );
 
-                    reopenPreserving();
+                    rerender();
                     return;
                 }
             } catch (err) {
@@ -3263,12 +3068,39 @@ export async function openPlayerSettingsPresetManager() {
                 ui.notifications.error(`${LT.errors.errorOccured()}.`);
             }
         });
-    };
-    Hooks.on("renderDialogV2", onRender);
 
-    // Render
-    dlg.render(true);
+    await rerender();
 }
+
+/* =============================================================================
+	Role-aware Settings Preset Manager: one toolbox tab, GM or player content.
+	openSettingsPresetManager() / openPlayerSettingsPresetManager() both deep-link
+	to it; mount() branches on isGM.
+============================================================================= */
+
+export async function openSettingsPresetManager() {
+    globalThis.bbmm?.openBBMMToolbox?.({ tool: "settingsPresets" });
+}
+
+export async function openPlayerSettingsPresetManager() {
+    globalThis.bbmm?.openBBMMToolbox?.({ tool: "settingsPresets" });
+}
+
+async function mountSettingsPresets(container) {
+    if (game.user.isGM) return mountSettingsPresetGM(container);
+    return mountSettingsPresetPlayer(container);
+}
+
+globalThis.bbmm ??= {};
+globalThis.bbmm.toolboxTools ??= [];
+globalThis.bbmm.toolboxTools.push({
+    id: "settingsPresets",
+    icon: "fa-solid fa-sliders",
+    label: () => LT.toolbox.tabSettingsPresets(),
+    visible: () => true,
+    group: null,
+    mount: async (container) => { await mountSettingsPresets(container); }
+});
 
 // Expose API + migrate presets on load (GM only)
 Hooks.once("ready", async () => {

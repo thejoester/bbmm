@@ -1,10 +1,6 @@
-/* BBMM: Manage Modules list restyle ===========================================
-   	- Hook: renderModuleManagement
-	- Goals:
-		• Make each module entry a compact, cardlike row (similar to changelog left column)
-		• Whole row visually selectable (does not toggle enable/disable yet)
-		• Keep this purely presentational (no core behavior changes)
-============================================================================== */
+/* ==========================================================================
+	BBMM: Manage Modules list restyle (presentational only)
+========================================================================== */
 import { DL, BBMM_README_UUID, injectBBMMHeaderButton, openTagManager as _openTagManagerFromSettings } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 import { hlp_esc, hlp_injectHeaderHelpButton, hlp_saveJSONFile, hlp_pickLocalJSONFile } from "./helpers.js";
@@ -335,204 +331,204 @@ function _bbmmIsEmptyNoteHTML(html) {
 	}
 }
 
-// ── BBMMTagManagerApp ─────────────────────────────────────────────────────────
+// ── Tag Manager (toolbox pane) ────────────────────────────────────────────────
 
-class BBMMTagManagerApp extends foundry.applications.api.ApplicationV2 {
-	constructor() {
-		super({
-			id: "bbmm-tag-manager",
-			window: { title: LT.moduleManagement.tagMgrTitle(), resizable: true },
-			position: { width: 560, height: 500 }
-		});
-	}
+/* =============================================================================
+	Tag Manager - toolbox pane (migrated from BBMMTagManagerApp).
+	Content-building and CRUD are module-level so the toolbox mounts them in a
+	pane; mountTagManager(container) is the tool's mount() entry. rerender()
+	rebuilds the pane in place, replacing the old this.render() call. Sub-dialogs
+	(BBMMModuleTagsApp, BBMMBulkTagAssignApp) still pop over as standalone windows.
+============================================================================= */
 
-	async _renderHTML() {
-		const data = _getTagData();
-		const noTags = !data.tags.length;
-		let tagsHTML = noTags
-			? `<p class="bbmm-tag-empty">${hlp_esc(LT.moduleManagement.tagMgrNoTags())}</p>`
-			: data.tags.map(tag => {
-				const subs = data.subtags.filter(s => s.tagId === tag.id);
-				const subsHTML = subs.map(sub => `
-					<div class="bbmm-subtag-row" data-subtag-id="${hlp_esc(sub.id)}">
-						<span class="bbmm-subtag-label"><i class="fa-solid fa-circle-dot fa-xs"></i> ${hlp_esc(sub.label)}</span>
-						<button type="button" class="bbmm-bulk-assign" data-tag-id="${hlp_esc(tag.id)}" data-subtag-id="${hlp_esc(sub.id)}" title="${hlp_esc(LT.moduleManagement.tagMgrAssignToModules())}"><i class="fa-solid fa-plus"></i></button>
-						<button type="button" class="bbmm-subtag-rename" data-subtag-id="${hlp_esc(sub.id)}" title="Rename">${hlp_esc(LT.errors.rename())}</button>
-						<button type="button" class="bbmm-subtag-delete" data-subtag-id="${hlp_esc(sub.id)}" title="Delete"><i class="fa-solid fa-xmark"></i></button>
+// Build the tag-manager content element (was BBMMTagManagerApp#_renderHTML).
+function _tm_buildDOM() {
+	const data = _getTagData();
+	const noTags = !data.tags.length;
+	let tagsHTML = noTags
+		? `<p class="bbmm-tag-empty">${hlp_esc(LT.moduleManagement.tagMgrNoTags())}</p>`
+		: data.tags.map(tag => {
+			const subs = data.subtags.filter(s => s.tagId === tag.id);
+			const subsHTML = subs.map(sub => `
+				<div class="bbmm-subtag-row" data-subtag-id="${hlp_esc(sub.id)}">
+					<span class="bbmm-subtag-label"><i class="fa-solid fa-circle-dot fa-xs"></i> ${hlp_esc(sub.label)}</span>
+					<button type="button" class="bbmm-bulk-assign" data-tag-id="${hlp_esc(tag.id)}" data-subtag-id="${hlp_esc(sub.id)}" title="${hlp_esc(LT.moduleManagement.tagMgrAssignToModules())}"><i class="fa-solid fa-plus"></i></button>
+					<button type="button" class="bbmm-subtag-rename" data-subtag-id="${hlp_esc(sub.id)}" title="Rename">${hlp_esc(LT.errors.rename())}</button>
+					<button type="button" class="bbmm-subtag-delete" data-subtag-id="${hlp_esc(sub.id)}" title="Delete"><i class="fa-solid fa-xmark"></i></button>
+				</div>
+			`).join("");
+			return `
+				<div class="bbmm-tag-block" data-tag-id="${hlp_esc(tag.id)}">
+					<div class="bbmm-tag-row">
+						<span class="bbmm-tag-label"><i class="fa-solid fa-tag fa-sm"></i> ${hlp_esc(tag.label)}</span>
+						<button type="button" class="bbmm-bulk-assign" data-tag-id="${hlp_esc(tag.id)}" title="${hlp_esc(LT.moduleManagement.tagMgrAssignToModules())}"><i class="fa-solid fa-plus"></i></button>
+						<button type="button" class="bbmm-tag-rename" data-tag-id="${hlp_esc(tag.id)}" title="Rename">${hlp_esc(LT.errors.rename())}</button>
+						<button type="button" class="bbmm-tag-delete" data-tag-id="${hlp_esc(tag.id)}" title="Delete"><i class="fa-solid fa-xmark"></i></button>
 					</div>
-				`).join("");
-				return `
-					<div class="bbmm-tag-block" data-tag-id="${hlp_esc(tag.id)}">
-						<div class="bbmm-tag-row">
-							<span class="bbmm-tag-label"><i class="fa-solid fa-tag fa-sm"></i> ${hlp_esc(tag.label)}</span>
-							<button type="button" class="bbmm-bulk-assign" data-tag-id="${hlp_esc(tag.id)}" title="${hlp_esc(LT.moduleManagement.tagMgrAssignToModules())}"><i class="fa-solid fa-plus"></i></button>
-							<button type="button" class="bbmm-tag-rename" data-tag-id="${hlp_esc(tag.id)}" title="Rename">${hlp_esc(LT.errors.rename())}</button>
-							<button type="button" class="bbmm-tag-delete" data-tag-id="${hlp_esc(tag.id)}" title="Delete"><i class="fa-solid fa-xmark"></i></button>
-						</div>
-						${subsHTML}
-						<div class="bbmm-subtag-add-row">
-							<input type="text" class="bbmm-subtag-input" data-tag-id="${hlp_esc(tag.id)}" placeholder="${hlp_esc(LT.moduleManagement.tagMgrSubtagPlaceholder())}">
-							<button type="button" class="bbmm-subtag-add-btn" data-tag-id="${hlp_esc(tag.id)}">${hlp_esc(LT.moduleManagement.tagMgrAddSubtag())}</button>
-						</div>
+					${subsHTML}
+					<div class="bbmm-subtag-add-row">
+						<input type="text" class="bbmm-subtag-input" data-tag-id="${hlp_esc(tag.id)}" placeholder="${hlp_esc(LT.moduleManagement.tagMgrSubtagPlaceholder())}">
+						<button type="button" class="bbmm-subtag-add-btn" data-tag-id="${hlp_esc(tag.id)}">${hlp_esc(LT.moduleManagement.tagMgrAddSubtag())}</button>
 					</div>
-				`;
-			}).join("");
+				</div>
+			`;
+		}).join("");
 
-		const root = document.createElement("div");
-		root.className = "bbmm-tag-manager-content";
-		root.innerHTML = `
-			<div class="bbmm-tag-list">${tagsHTML}</div>
-			<div class="bbmm-tag-add-row">
-				<input type="text" id="bbmm-tag-input" placeholder="${hlp_esc(LT.moduleManagement.tagMgrTagPlaceholder())}">
-				<button type="button" id="bbmm-tag-add-btn">${hlp_esc(LT.moduleManagement.tagMgrAddTag())}</button>
-			</div>
-		`;
-		return root;
-	}
+	const root = document.createElement("div");
+	root.className = "bbmm-tag-manager-content";
+	root.innerHTML = `
+		<div class="bbmm-tag-list">${tagsHTML}</div>
+		<div class="bbmm-tag-add-row">
+			<input type="text" id="bbmm-tag-input" placeholder="${hlp_esc(LT.moduleManagement.tagMgrTagPlaceholder())}">
+			<button type="button" id="bbmm-tag-add-btn">${hlp_esc(LT.moduleManagement.tagMgrAddTag())}</button>
+		</div>
+	`;
+	return root;
+}
 
-	_replaceHTML(result, content) {
-		content.replaceChildren(result);
-		this._attachListeners(result);
-	}
+// Wire listeners on a freshly built content element; rerender() rebuilds in place.
+function _tm_wire(content, rerender) {
+	// Add tag (button or Enter)
+	const tagInput = content.querySelector("#bbmm-tag-input");
+	content.querySelector("#bbmm-tag-add-btn")?.addEventListener("click", () => _tm_addTag(tagInput, rerender));
+	tagInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); _tm_addTag(tagInput, rerender); }});
 
-	_attachListeners(content) {
-		// Add tag (button or Enter)
-		const tagInput = content.querySelector("#bbmm-tag-input");
-		content.querySelector("#bbmm-tag-add-btn")?.addEventListener("click", () => this._addTag(tagInput));
-		tagInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this._addTag(tagInput); }});
+	// Tag / subtag: rename / delete / bulk-assign
+	content.addEventListener("click", async (ev) => {
+		const bulkBtn = ev.target.closest?.(".bbmm-bulk-assign[data-tag-id]");
+		if (bulkBtn) return openBulkTagAssignApp(bulkBtn.dataset.tagId, bulkBtn.dataset.subtagId || undefined);
 
-		// Tag: rename / delete
-		content.addEventListener("click", async (ev) => {
-			const bulkBtn = ev.target.closest?.(".bbmm-bulk-assign[data-tag-id]");
-			if (bulkBtn) return openBulkTagAssignApp(bulkBtn.dataset.tagId, bulkBtn.dataset.subtagId || undefined);
+		const renameBtn = ev.target.closest?.(".bbmm-tag-rename[data-tag-id]");
+		if (renameBtn) return _tm_renameTag(renameBtn.dataset.tagId, rerender);
 
-			const renameBtn = ev.target.closest?.(".bbmm-tag-rename[data-tag-id]");
-			if (renameBtn) return this._renameTag(renameBtn.dataset.tagId);
+		const deleteBtn = ev.target.closest?.(".bbmm-tag-delete[data-tag-id]");
+		if (deleteBtn) return _tm_deleteTag(deleteBtn.dataset.tagId, rerender);
 
-			const deleteBtn = ev.target.closest?.(".bbmm-tag-delete[data-tag-id]");
-			if (deleteBtn) return this._deleteTag(deleteBtn.dataset.tagId);
-
-			const addSubBtn = ev.target.closest?.(".bbmm-subtag-add-btn[data-tag-id]");
-			if (addSubBtn) {
-				const input = content.querySelector(`.bbmm-subtag-input[data-tag-id="${addSubBtn.dataset.tagId}"]`);
-				return this._addSubtag(addSubBtn.dataset.tagId, input);
-			}
-
-			const renameSubBtn = ev.target.closest?.(".bbmm-subtag-rename[data-subtag-id]");
-			if (renameSubBtn) return this._renameSubtag(renameSubBtn.dataset.subtagId);
-
-			const deleteSubBtn = ev.target.closest?.(".bbmm-subtag-delete[data-subtag-id]");
-			if (deleteSubBtn) return this._deleteSubtag(deleteSubBtn.dataset.subtagId);
-		});
-
-		// Subtag: add on Enter
-		content.querySelectorAll(".bbmm-subtag-input").forEach(input => {
-			input.addEventListener("keydown", (e) => {
-				if (e.key === "Enter") { e.preventDefault(); this._addSubtag(input.dataset.tagId, input); }
-			});
-		});
-	}
-
-	async _addTag(input) {
-		const label = input?.value?.trim();
-		if (!label) return;
-		const data = _getTagData();
-		const id = _uniqueSlug(_slugify(label), data.tags.map(t => t.id));
-		data.tags.push({ id, label });
-		await _saveTagData(data);
-		input.value = "";
-		this.render();
-	}
-
-	async _renameTag(tagId) {
-		const data = _getTagData();
-		const tag = data.tags.find(t => t.id === tagId);
-		if (!tag) return;
-		const val = await foundry.applications.api.DialogV2.prompt({
-			window: { title: LT.moduleManagement.tagMgrRenameTag() },
-			content: `<input type="text" name="label" value="${hlp_esc(tag.label)}" style="width:100%">`,
-			ok: { label: LT.buttons.save(), callback: (_ev, btn) => btn.form?.elements?.label?.value?.trim() ?? "" }
-		});
-		if (!val || val === tag.label) return;
-		tag.label = val;
-		await _saveTagData(data);
-		this.render();
-		_bbmmRefreshModuleManagerApp();
-	}
-
-	async _deleteTag(tagId) {
-		const data = _getTagData();
-		const tag = data.tags.find(t => t.id === tagId);
-		if (!tag) return;
-		const subCount = data.subtags.filter(s => s.tagId === tagId).length;
-		const confirm = await foundry.applications.api.DialogV2.confirm({
-			window: { title: LT.moduleManagement.tagMgrDeleteTagTitle() },
-			content: `<p>${hlp_esc(LT.moduleManagement.tagMgrDeleteTagConfirm({ label: tag.label, subtags: subCount }))}</p>`
-		});
-		if (!confirm) return;
-		data.tags = data.tags.filter(t => t.id !== tagId);
-		data.subtags = data.subtags.filter(s => s.tagId !== tagId);
-		for (const [modId, arr] of Object.entries(data.assignments)) {
-			data.assignments[modId] = arr.filter(a => a.tagId !== tagId);
-			if (!data.assignments[modId].length) delete data.assignments[modId];
+		const addSubBtn = ev.target.closest?.(".bbmm-subtag-add-btn[data-tag-id]");
+		if (addSubBtn) {
+			const input = content.querySelector(`.bbmm-subtag-input[data-tag-id="${addSubBtn.dataset.tagId}"]`);
+			return _tm_addSubtag(addSubBtn.dataset.tagId, input, rerender);
 		}
-		await _saveTagData(data);
-		this.render();
-		_bbmmRefreshModuleManagerApp();
-	}
 
-	async _addSubtag(tagId, input) {
-		const label = input?.value?.trim();
-		if (!label) return;
-		const data = _getTagData();
-		const id = _uniqueSlug(_slugify(label), data.subtags.map(s => s.id));
-		data.subtags.push({ id, label, tagId });
-		await _saveTagData(data);
-		input.value = "";
-		this.render();
-	}
+		const renameSubBtn = ev.target.closest?.(".bbmm-subtag-rename[data-subtag-id]");
+		if (renameSubBtn) return _tm_renameSubtag(renameSubBtn.dataset.subtagId, rerender);
 
-	async _renameSubtag(subtagId) {
-		const data = _getTagData();
-		const sub = data.subtags.find(s => s.id === subtagId);
-		if (!sub) return;
-		const val = await foundry.applications.api.DialogV2.prompt({
-			window: { title: LT.moduleManagement.tagMgrRenameSubtag() },
-			content: `<input type="text" name="label" value="${hlp_esc(sub.label)}" style="width:100%">`,
-			ok: { label: LT.buttons.save(), callback: (_ev, btn) => btn.form?.elements?.label?.value?.trim() ?? "" }
+		const deleteSubBtn = ev.target.closest?.(".bbmm-subtag-delete[data-subtag-id]");
+		if (deleteSubBtn) return _tm_deleteSubtag(deleteSubBtn.dataset.subtagId, rerender);
+	});
+
+	// Subtag: add on Enter
+	content.querySelectorAll(".bbmm-subtag-input").forEach(input => {
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") { e.preventDefault(); _tm_addSubtag(input.dataset.tagId, input, rerender); }
 		});
-		if (!val || val === sub.label) return;
-		sub.label = val;
-		await _saveTagData(data);
-		this.render();
-		_bbmmRefreshModuleManagerApp();
-	}
+	});
+}
 
-	async _deleteSubtag(subtagId) {
-		const data = _getTagData();
-		const sub = data.subtags.find(s => s.id === subtagId);
-		if (!sub) return;
-		const confirm = await foundry.applications.api.DialogV2.confirm({
-			window: { title: LT.moduleManagement.tagMgrDeleteSubtagTitle() },
-			content: `<p>${hlp_esc(LT.moduleManagement.tagMgrDeleteSubtagConfirm({ label: sub.label }))}</p>`
-		});
-		if (!confirm) return;
-		data.subtags = data.subtags.filter(s => s.id !== subtagId);
-		// Demote assignments: remove subtagId reference, keep tagId
-		for (const [modId, arr] of Object.entries(data.assignments)) {
-			data.assignments[modId] = arr.map(a =>
-				a.subtagId === subtagId ? { tagId: a.tagId } : a
-			);
-		}
-		await _saveTagData(data);
-		this.render();
-		_bbmmRefreshModuleManagerApp();
-	}
+async function _tm_addTag(input, rerender) {
+	const label = input?.value?.trim();
+	if (!label) return;
+	const data = _getTagData();
+	const id = _uniqueSlug(_slugify(label), data.tags.map(t => t.id));
+	data.tags.push({ id, label });
+	await _saveTagData(data);
+	input.value = "";
+	rerender();
+}
 
-	async _onRender(context, options) {
-		await super._onRender(context, options);
-		try { injectBBMMHeaderButton(this.element); } catch (e) { DL(2, "BBMMTagManagerApp | header button inject failed", e); }
+async function _tm_renameTag(tagId, rerender) {
+	const data = _getTagData();
+	const tag = data.tags.find(t => t.id === tagId);
+	if (!tag) return;
+	const val = await foundry.applications.api.DialogV2.prompt({
+		window: { title: LT.moduleManagement.tagMgrRenameTag() },
+		content: `<input type="text" name="label" value="${hlp_esc(tag.label)}" style="width:100%">`,
+		ok: { label: LT.buttons.save(), callback: (_ev, btn) => btn.form?.elements?.label?.value?.trim() ?? "" }
+	});
+	if (!val || val === tag.label) return;
+	tag.label = val;
+	await _saveTagData(data);
+	rerender();
+	_bbmmRefreshModuleManagerApp();
+}
+
+async function _tm_deleteTag(tagId, rerender) {
+	const data = _getTagData();
+	const tag = data.tags.find(t => t.id === tagId);
+	if (!tag) return;
+	const subCount = data.subtags.filter(s => s.tagId === tagId).length;
+	const confirm = await foundry.applications.api.DialogV2.confirm({
+		window: { title: LT.moduleManagement.tagMgrDeleteTagTitle() },
+		content: `<p>${hlp_esc(LT.moduleManagement.tagMgrDeleteTagConfirm({ label: tag.label, subtags: subCount }))}</p>`
+	});
+	if (!confirm) return;
+	data.tags = data.tags.filter(t => t.id !== tagId);
+	data.subtags = data.subtags.filter(s => s.tagId !== tagId);
+	for (const [modId, arr] of Object.entries(data.assignments)) {
+		data.assignments[modId] = arr.filter(a => a.tagId !== tagId);
+		if (!data.assignments[modId].length) delete data.assignments[modId];
 	}
+	await _saveTagData(data);
+	rerender();
+	_bbmmRefreshModuleManagerApp();
+}
+
+async function _tm_addSubtag(tagId, input, rerender) {
+	const label = input?.value?.trim();
+	if (!label) return;
+	const data = _getTagData();
+	const id = _uniqueSlug(_slugify(label), data.subtags.map(s => s.id));
+	data.subtags.push({ id, label, tagId });
+	await _saveTagData(data);
+	input.value = "";
+	rerender();
+}
+
+async function _tm_renameSubtag(subtagId, rerender) {
+	const data = _getTagData();
+	const sub = data.subtags.find(s => s.id === subtagId);
+	if (!sub) return;
+	const val = await foundry.applications.api.DialogV2.prompt({
+		window: { title: LT.moduleManagement.tagMgrRenameSubtag() },
+		content: `<input type="text" name="label" value="${hlp_esc(sub.label)}" style="width:100%">`,
+		ok: { label: LT.buttons.save(), callback: (_ev, btn) => btn.form?.elements?.label?.value?.trim() ?? "" }
+	});
+	if (!val || val === sub.label) return;
+	sub.label = val;
+	await _saveTagData(data);
+	rerender();
+	_bbmmRefreshModuleManagerApp();
+}
+
+async function _tm_deleteSubtag(subtagId, rerender) {
+	const data = _getTagData();
+	const sub = data.subtags.find(s => s.id === subtagId);
+	if (!sub) return;
+	const confirm = await foundry.applications.api.DialogV2.confirm({
+		window: { title: LT.moduleManagement.tagMgrDeleteSubtagTitle() },
+		content: `<p>${hlp_esc(LT.moduleManagement.tagMgrDeleteSubtagConfirm({ label: sub.label }))}</p>`
+	});
+	if (!confirm) return;
+	data.subtags = data.subtags.filter(s => s.id !== subtagId);
+	// Demote assignments: remove subtagId reference, keep tagId
+	for (const [modId, arr] of Object.entries(data.assignments)) {
+		data.assignments[modId] = arr.map(a =>
+			a.subtagId === subtagId ? { tagId: a.tagId } : a
+		);
+	}
+	await _saveTagData(data);
+	rerender();
+	_bbmmRefreshModuleManagerApp();
+}
+
+// Toolbox mount entry: build + wire into the pane, rebuild in place on change.
+function mountTagManager(container) {
+	const rerender = () => {
+		const dom = _tm_buildDOM();
+		container.replaceChildren(dom);
+		_tm_wire(dom, rerender);
+	};
+	rerender();
 }
 
 // ── BBMMModuleTagsApp ─────────────────────────────────────────────────────────
@@ -976,9 +972,22 @@ class BBMMBulkTagAssignApp extends foundry.applications.api.ApplicationV2 {
 // ── Tag app openers (exposed on globalThis.bbmm) ──────────────────────────────
 
 function openTagManager() {
-	try { new BBMMTagManagerApp().render(true); }
+	// Deep-link into the toolbox (the Tag Manager is now a toolbox pane).
+	try { globalThis.bbmm?.openBBMMToolbox?.({ tool: "tags" }); }
 	catch (err) { DL(3, `module-management.js | openTagManager(): ${err?.message ?? err}`, err); }
 }
+
+// Register the Tag Manager as a toolbox tool (read by toolbox.js at open time).
+globalThis.bbmm ??= {};
+globalThis.bbmm.toolboxTools ??= [];
+globalThis.bbmm.toolboxTools.push({
+	id: "tags",
+	icon: "fa-solid fa-tags",
+	label: () => LT.moduleManagement.tagMgrLabel(),
+	visible: () => game.user.isGM,
+	group: null,
+	mount: async (container) => { mountTagManager(container); }
+});
 
 function openModuleTagsApp(moduleId) {
 	try { new BBMMModuleTagsApp(moduleId).render(true); }

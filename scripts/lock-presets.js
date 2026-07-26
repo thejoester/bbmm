@@ -3,11 +3,9 @@ import { LT, BBMM_ID } from "./localization.js";
 import { hlp_esc, hlp_injectHeaderHelpButton } from "./helpers.js";
 
 const LOCK_PRESETS_FILE   = "lock-presets.json";
-const LOCK_PRESETS_APP_ID = "bbmm-lock-preset-manager";
 const BBMM_SYNC_CH        = "module.bbmm";
 
 let _lockPresetCache = null;
-let _lockPresetManagerLastPos = null;
 
 /* =======================================================================
 	{FILE I/O}
@@ -63,10 +61,7 @@ async function svc_setLockPresets(obj) {
 	await _writeLockPresets(clean);
 }
 
-/* Capture all current all-user locks and save them as a named preset ===
-	- Reads userSettingSync for entries with no userIds (all-user scope)
-	- Stores namespace, key, lockType — no values
-======================================================================= */
+/* Save current locks as a named preset (lock type only, no values) */
 async function svc_saveCurrentLocksAsPreset(name, skipOverwriteConfirm = false) {
 	const rawName = String(name ?? "").trim();
 	if (!rawName) {
@@ -77,8 +72,6 @@ async function svc_saveCurrentLocksAsPreset(name, skipOverwriteConfirm = false) 
 	const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
 	let locks = [];
 	for (const [_id, entry] of Object.entries(syncMap)) {
-		// Skip per-user (partial) locks
-		if (Array.isArray(entry.userIds) && entry.userIds.length > 0) continue;
 		locks.push({
 			namespace: entry.namespace,
 			key:       entry.key,
@@ -156,12 +149,8 @@ async function svc_saveCurrentLocksAsPreset(name, skipOverwriteConfirm = false) 
 	return { status: "saved", name: rawName };
 }
 
-/* Apply a named preset — reads current values and applies locks ========
-	- For each entry, reads the current setting value
-	- Soft locks: bumped rev, emit bbmm-sync-push (soft)
-	- Hard locks: write to map, emit bbmm-sync-push + bbmm-sync-refresh
-	- Additive: only touches settings in the preset; existing locks remain
-======================================================================= */
+/* Apply a named preset: read current values, apply locks.
+   Additive, only touches settings in the preset; existing locks remain. */
 async function svc_applyLockPreset(name, wipeFirst = false) {
 	const all    = svc_getLockPresets();
 	const preset = all[name];
@@ -405,13 +394,14 @@ function ui_openLockPresetPreview(presetName) {
 ======================================================================= */
 
 export async function openLockPresetManager() {
-	try {
-		// Close any existing instance
-		const existing = Object.values(ui.windows ?? {}).find(w => w?.id === LOCK_PRESETS_APP_ID);
-		if (existing) {
-			try { await existing.close({ force: true }); } catch {}
-		}
+	globalThis.bbmm?.openBBMMToolbox?.({ tool: "lockPresets" });
+}
 
+// Toolbox pane: Lock Presets (migrated from the openLockPresetManager DialogV2).
+async function mountLockPresets(container) {
+	const root = container;
+
+	const rerender = async () => {
 		await svc_loadLockPresets(true);
 		const presets = svc_getLockPresets();
 		const list    = Object.entries(presets)
@@ -437,7 +427,7 @@ export async function openLockPresetManager() {
 			: `<tr><td colspan="3" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets()}</td></tr>`;
 
 		const content = `
-			<section style="min-width:520px;display:flex;flex-direction:column;gap:.75rem;">
+			<section style="width:100%;display:flex;flex-direction:column;gap:.75rem;">
 				<div style="display:flex;gap:.5rem;align-items:center;">
 					<input name="newPresetName" type="text"
 						placeholder="${hlp_esc(LT.lockPresets.namePlaceholder())}"
@@ -460,46 +450,11 @@ export async function openLockPresetManager() {
 			</section>
 		`;
 
-		const dlg = new foundry.applications.api.DialogV2({
-			id:       LOCK_PRESETS_APP_ID,
-			window:   { title: LT.lockPresets.title() },
-			position: _lockPresetManagerLastPos
-				? { top: _lockPresetManagerLastPos.top, left: _lockPresetManagerLastPos.left, width: _lockPresetManagerLastPos.width, height: "auto" }
-				: { width: 660, height: "auto" },
-			content,
-			buttons:  [{ action: "close", label: LT.buttons.close(), default: true }],
-		});
+		container.innerHTML = content;
+	};
 
-		const onRender = (app) => {
-			if (app !== dlg) return;
-			Hooks.off("renderDialogV2", onRender);
-
-			try {
-				hlp_injectHeaderHelpButton(app, {
-					uuid:      BBMM_README_UUID,
-					iconClass: "fas fa-circle-question",
-					title:     LT.buttons.help?.() ?? "Help",
-				});
-			} catch (e) {
-				DL(2, "lock-presets.js | help button injection failed", e);
-			}
-
-			const root = app.element;
-			const form = root?.querySelector("form");
-			if (!form) return;
-
-			form.querySelectorAll("button[data-action]").forEach(b => b.setAttribute("type", "button"));
-
-			function reopenPreserving() {
-				try {
-					const pos = app.position;
-					if (pos) _lockPresetManagerLastPos = { top: pos.top, left: pos.left, width: pos.width };
-				} catch {}
-				app.close();
-				openLockPresetManager();
-			}
-
-			form.addEventListener("click", async (ev) => {
+	// Single delegated click handler (bound once).
+	container.addEventListener("click", async (ev) => {
 				const btn = ev.target;
 				if (!(btn instanceof HTMLButtonElement)) return;
 				const action = btn.dataset.action;
@@ -513,7 +468,7 @@ export async function openLockPresetManager() {
 					const nameInput = root.querySelector('input[name="newPresetName"]');
 					const inputVal  = nameInput ? String(nameInput.value ?? "").trim() : "";
 					const res       = await svc_saveCurrentLocksAsPreset(inputVal);
-					if (res?.status === "saved") reopenPreserving();
+					if (res?.status === "saved") rerender();
 					return;
 				}
 
@@ -567,7 +522,7 @@ export async function openLockPresetManager() {
 					});
 					if (!confirmed) return;
 					const res = await svc_updateLockPreset(presetName);
-					if (res?.status === "saved") reopenPreserving();
+					if (res?.status === "saved") rerender();
 					return;
 				}
 
@@ -575,7 +530,7 @@ export async function openLockPresetManager() {
 					const newName = await ui_promptRenameLockPreset(presetName);
 					if (!newName) return;
 					await svc_renameLockPreset(presetName, newName);
-					reopenPreserving();
+					rerender();
 					return;
 				}
 
@@ -589,23 +544,28 @@ export async function openLockPresetManager() {
 					});
 					if (!confirmed) return;
 					await svc_deleteLockPreset(presetName);
-					reopenPreserving();
+					rerender();
 					return;
 				}
 			});
-		};
 
-		Hooks.on("renderDialogV2", onRender);
-		dlg.render(true);
-		return dlg;
-
-	} catch (err) {
-		DL(3, "lock-presets.js | openLockPresetManager(): failed", err);
-	}
+	await rerender();
 }
 
 /* Register on globalThis.bbmm ========================================= */
 Hooks.once("init", () => {
 	globalThis.bbmm ??= {};
 	Object.assign(globalThis.bbmm, { openLockPresetManager });
+});
+
+// Register the Lock Presets pane as a toolbox tool.
+globalThis.bbmm ??= {};
+globalThis.bbmm.toolboxTools ??= [];
+globalThis.bbmm.toolboxTools.push({
+	id: "lockPresets",
+	icon: "fa-solid fa-layer-group",
+	label: () => LT.toolbox.tabLockPresets(),
+	visible: () => game.user.isGM,
+	group: null,
+	mount: async (container) => { await mountLockPresets(container); }
 });

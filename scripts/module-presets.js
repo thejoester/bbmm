@@ -2,7 +2,6 @@ import { DL, BBMM_README_UUID } from './settings.js';
 import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, hlp_injectHeaderHelpButton } from './helpers.js';
 import { LT, BBMM_ID } from "./localization.js";
 const MODULE_SETTING_PRESETS = "modulePresetsUser";  // { [name]: string[] }  enabled module ids
-let _presetManagerLastPos = null; // Remembers window position across reopens
 
 /*	===============================================
 	HELPERS 
@@ -400,37 +399,45 @@ function ui_openModulePresetPreview(preset) {
 		DL(`module-presets.js | ui_openModulePresetPreview(): preset="${preset?.name}", modules=${preset?.modules?.length ?? 0}`);
 
 		const esc = hlp_esc;
-		const modules = Array.isArray(preset?.modules) ? preset.modules : [];
+		const enabledIds = new Set(Array.isArray(preset?.modules) ? preset.modules : []);
 
-		const rows = modules
-			.map((id) => {
-				const mod = game.modules.get(id);
-				return { id, title: mod?.title || id, installed: !!mod };
-			})
-			.sort((a, b) => {
-				if (a.installed !== b.installed) return a.installed ? 1 : -1;
-				return a.title.localeCompare(b.title);
-			});
+		// Every installed module, marked enabled/disabled per the preset
+		const rows = [];
+		for (const m of game.modules) {
+			rows.push({ id: m.id, title: m.title || m.id, state: enabledIds.has(m.id) ? "enabled" : "disabled" });
+		}
+		// Preset ids that aren't installed anymore
+		for (const id of enabledIds) {
+			if (!game.modules.get(id)) rows.push({ id, title: id, state: "missing" });
+		}
 
-		const missingCount = rows.filter((r) => !r.installed).length;
-		const missingText = LT.moduleMissing();
+		const stateRank = { enabled: 0, disabled: 1, missing: 2 };
+		rows.sort((a, b) => (stateRank[a.state] - stateRank[b.state]) || a.title.localeCompare(b.title));
+
+		const enabledCount = rows.filter((r) => r.state === "enabled").length;
+		const missingCount = rows.filter((r) => r.state === "missing").length;
+
+		const ICONS = {
+			enabled:  `<i class="fa-solid fa-circle-check" style="color:#4caf50;" title="${esc(LT.previewEnabled())}"></i>`,
+			disabled: `<i class="fa-solid fa-ban" style="color:#f55;" title="${esc(LT.previewDisabled())}"></i>`,
+			missing:  `<i class="fa-solid fa-circle-xmark" style="color:#f55;" title="${esc(LT.previewMissing())}"></i>`
+		};
 
 		const CELL_STYLE = "padding:.25rem .5rem;min-width:0;overflow:hidden;word-break:break-word;";
-		const ROW_STYLE = "display:grid;grid-template-columns:1fr auto;align-items:center;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;";
+		const ICON_CELL  = "padding:.25rem .1rem .25rem .5rem;text-align:center;";
+		const ROW_STYLE  = "display:grid;grid-template-columns:auto 1fr;align-items:center;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;";
 
 		const body = rows.map((r) => {
-			const nameColor = r.installed ? "" : "color:#f55;";
-			const badge = r.installed
-				? ""
-				: `<span style="color:#f55;font-size:11px;white-space:nowrap;padding-left:.5rem;">${esc(missingText)}</span>`;
+			const nameColor = r.state === "missing" ? "color:#f55;" : "";
 			return `<div style="${ROW_STYLE}">
+				<div style="${ICON_CELL}">${ICONS[r.state]}</div>
 				<div style="${CELL_STYLE}${nameColor}" title="${esc(r.id)}">${esc(r.title)}</div>
-				<div style="${CELL_STYLE}text-align:right;">${badge}</div>
 			</div>`;
 		}).join("");
 
-		const missingNote = missingCount > 0 ? ` (${LT.modulesMissing({ count: missingCount })})` : "";
-		const subtitle = `${esc(preset.displayName)} — ${rows.length} module${rows.length === 1 ? "" : "s"}${missingNote}`;
+		const parts = [LT.modulesEnabled({ count: enabledCount })];
+		if (missingCount > 0) parts.push(LT.modulesMissing({ count: missingCount }));
+		const subtitle = `${esc(preset.displayName)}: ${parts.join(", ")}`;
 
 		const content = `
 			<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.5rem;">
@@ -457,145 +464,100 @@ function ui_openModulePresetPreview(preset) {
 	}
 }
 
-//	Open Dialog to manage presets
+//	Open the Module Presets manager (deep-links into the toolbox pane).
 export async function openPresetManager() {
-	DL("module-presets.js | openPresetManager: start");
+	DL("module-presets.js | openPresetManager: deep-link to toolbox");
+	globalThis.bbmm?.openBBMMToolbox?.({ tool: "modulePresets" });
+}
 
-	// Make sure the in-memory cache is populated before we build the list
-	await hlp_loadPresets();
+/* =============================================================================
+	Module Presets - toolbox pane (migrated from the openPresetManager DialogV2).
+	The dialog's content string becomes the pane innerHTML, its render-callback
+	wiring becomes _mp_wire(), and reopenPreserving() becomes an in-place
+	rerender(). Sub-dialogs (apply/reload confirm, rename prompt, conflict) stay
+	as DialogV2 popups over the toolbox.
+============================================================================= */
 
-	// Build list and index of presets
-	async function hlp_buildPresetList() {
-		// This populates _presetCache but DOES NOT return the presets map.
-		await hlp_loadPresets();
-
-		// Always build from the cache
-		const map = hlp_getPresets();
-
-		/**	Build list of presets 
-		 * @type {Array<{ id: string, name: string, displayName: string, modules: string[] }>} 
-		*/
-		const list = [];
-
-		for (const [name, modules] of Object.entries(map)) {
-			if (!name || !Array.isArray(modules)) continue;
-
-			list.push({
-				id: name,
-				name,
-				displayName: name,
-				modules: modules.filter(x => typeof x === "string")
-			});
-		}
-
-		// Sort alphabetically
-		list.sort((a, b) => a.name.localeCompare(b.name));
-
-		/** Build index of presets by id
-		 * @type {Record<string, { id: string, name: string, displayName: string, modules: string[] }>} 
-		*/
-		const index = {};
-		for (const p of list) index[p.id] = p;
-
-		return { list, index };
+// Build the sorted preset list + id index from the loaded cache.
+function _mp_buildList() {
+	const map = hlp_getPresets();
+	const list = [];
+	for (const [name, modules] of Object.entries(map)) {
+		if (!name || !Array.isArray(modules)) continue;
+		list.push({ id: name, name, displayName: name, modules: modules.filter(x => typeof x === "string") });
 	}
+	list.sort((a, b) => a.name.localeCompare(b.name));
+	const index = {};
+	for (const p of list) index[p.id] = p;
+	return { list, index };
+}
 
-	(async () => {
-		const { list, index } = await hlp_buildPresetList();
-
-		DL("module-presets.js | openPresetManager: presets loaded", {
-			count: list.length
-		});
-
-		// Build table rows — one per preset, with per-row action buttons
-		const rows = list.length
-			? list.map(p => {
-				const fullName = hlp_esc(p.name);
-				const displayName = p.name.length > 40
-					? hlp_esc(p.name.slice(0, 37)) + "..."
-					: fullName;
-				const titleAttr = p.name.length > 40 ? ` title="${fullName}"` : "";
-				return `
-				<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
-					<td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"${titleAttr}>${displayName}</td>
-					<td style="padding:.25rem .5rem;">
-						<div style="display:flex;gap:.25rem;justify-content:flex-end;flex-wrap:wrap;">
-							<button type="button" data-action="load"    data-preset-id="${hlp_esc(p.id)}">${LT.buttons.load()}</button>
-							<button type="button" data-action="preview" data-preset-id="${hlp_esc(p.id)}">${LT.buttons.preview()}</button>
-							<button type="button" data-action="update"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.update()}</button>
-							<button type="button" data-action="rename"  data-preset-id="${hlp_esc(p.id)}">${LT.errors.rename()}</button>
-							<button type="button" data-action="delete"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.delete()}</button>
-						</div>
-					</td>
-				</tr>
-			`;
-			}).join("")
-			: `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets?.() ?? "No presets saved."}</td></tr>`;
-
-		// Dialog content — save section at top, scrollable list below
-		const content = `
-			<section style="min-width:600px;display:flex;flex-direction:column;gap:.75rem;">
-				<p style="margin:0;">${LT.presetSaveCurrentModules()}:</p>
-				<div style="display:flex;gap:.5rem;align-items:center;">
-					<input name="newName" type="text" placeholder="${LT.newPresetName()}…" style="flex:1;">
-					<button type="button" data-action="save-current">${LT.buttons.saveCurrent()}</button>
-				</div>
-				<div style="overflow-y:auto;max-height:210px;">
-					<table style="width:100%;border-collapse:collapse;">
-						<thead style="position:sticky;top:0;background:var(--color-bg,#1a1a1a);z-index:1;">
-							<tr style="border-bottom:1px solid var(--color-border-dark-5);">
-								<th style="text-align:left;padding:.25rem .5rem;">${LT.savedPresets()}</th>
-								<th></th>
-							</tr>
-						</thead>
-						<tbody>${rows}</tbody>
-					</table>
-				</div>
-			</section>
+// Build the pane content HTML (was the DialogV2 content string).
+function _mp_buildContentHTML(list) {
+	const rows = list.length
+		? list.map(p => {
+			const fullName = hlp_esc(p.name);
+			const displayName = p.name.length > 40
+				? hlp_esc(p.name.slice(0, 37)) + "..."
+				: fullName;
+			const titleAttr = p.name.length > 40 ? ` title="${fullName}"` : "";
+			return `
+			<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+				<td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"${titleAttr}>${displayName}</td>
+				<td style="padding:.25rem .5rem;">
+					<div style="display:flex;gap:.25rem;justify-content:flex-end;flex-wrap:wrap;">
+						<button type="button" data-action="load"    data-preset-id="${hlp_esc(p.id)}">${LT.buttons.load()}</button>
+						<button type="button" data-action="preview" data-preset-id="${hlp_esc(p.id)}">${LT.buttons.preview()}</button>
+						<button type="button" data-action="update"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.update()}</button>
+						<button type="button" data-action="rename"  data-preset-id="${hlp_esc(p.id)}">${LT.errors.rename()}</button>
+						<button type="button" data-action="delete"  data-preset-id="${hlp_esc(p.id)}">${LT.buttons.delete()}</button>
+					</div>
+				</td>
+			</tr>
 		`;
+		}).join("")
+		: `<tr><td colspan="2" style="text-align:center;font-style:italic;padding:.5rem;">${LT.lockPresets.noPresets?.() ?? "No presets saved."}</td></tr>`;
 
-		const dlg = new foundry.applications.api.DialogV2({
-			window: { title: LT.modulePresets() },
-			content,
-			buttons: [{ action: "close", label: LT.buttons.close(), default: true }],
-			position: _presetManagerLastPos
-				? { top: _presetManagerLastPos.top, left: _presetManagerLastPos.left, width: _presetManagerLastPos.width, height: "auto" }
-				: { width: 805, height: "auto" }
-		});
+	return `
+		<section style="width:100%;display:flex;flex-direction:column;gap:.75rem;">
+			<p style="margin:0;">${LT.presetSaveCurrentModules()}:</p>
+			<div style="display:flex;gap:.5rem;align-items:center;">
+				<input name="newName" type="text" placeholder="${LT.newPresetName()}…" style="flex:1;">
+				<button type="button" data-action="save-current">${LT.buttons.saveCurrent()}</button>
+			</div>
+			<div style="overflow-y:auto;max-height:210px;">
+				<table style="width:100%;border-collapse:collapse;">
+					<thead style="position:sticky;top:0;background:var(--color-bg,#1a1a1a);z-index:1;">
+						<tr style="border-bottom:1px solid var(--color-border-dark-5);">
+							<th style="text-align:left;padding:.25rem .5rem;">${LT.savedPresets()}</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>${rows}</tbody>
+				</table>
+			</div>
+		</section>
+	`;
+}
 
-		const onRender = (app) => {
-			if (app !== dlg) return;
-			Hooks.off("renderDialogV2", onRender);
+// Toolbox mount entry: prime cache, build the pane, wire actions, rebuild on change.
+export async function mountModulePresets(container) {
+	// Bind the click handler ONCE; rerender only refreshes innerHTML + the live index.
+	let _index = {};
+	const rerender = async () => {
+		await hlp_loadPresets();
+		const built = _mp_buildList();
+		_index = built.index;
+		container.innerHTML = _mp_buildContentHTML(built.list);
+	};
+	_mp_wire(container, () => _index, rerender);
+	await rerender();
+}
 
-			DL("module-presets.js | renderDialogV2 fired for Preset Manager");
-
-			const form = app.element?.querySelector("form");
-			if (!form) { DL(2, "module-presets.js | openPresetManager(): form not found"); return; }
-
-			// Inject help button into title bar
-			try {
-				hlp_injectHeaderHelpButton(app, {
-					uuid: BBMM_README_UUID,
-					iconClass: "fas fa-circle-question",
-					title: LT.buttons.help?.() ?? "Help"
-				});
-			} catch (e) {
-				DL(2, `module-presets.js | help injection failed`, e);
-			}
-
-			form.querySelectorAll('button[data-action]').forEach(b => b.setAttribute("type", "button"));
-
-			// Reopen the manager preserving the current window position
-			function reopenPreserving() {
-				try {
-					const pos = app.position;
-					if (pos) _presetManagerLastPos = { top: pos.top, left: pos.left, width: pos.width };
-				} catch {}
-				app.close();
-				openPresetManager();
-			}
-
-			form.addEventListener("click", async (ev) => {
+// Delegated click wiring for the pane (was the DialogV2 render-callback handler).
+// getIndex() returns the current preset index so the single handler stays fresh.
+function _mp_wire(container, getIndex, rerender) {
+	container.addEventListener("click", async (ev) => {
 				const btn = ev.target;
 				if (!(btn instanceof HTMLButtonElement)) return;
 
@@ -609,7 +571,7 @@ export async function openPresetManager() {
 
 				try {
 					const presetId = btn.dataset.presetId ?? "";
-					const picked = presetId ? index[presetId] : null;
+					const picked = presetId ? getIndex()[presetId] : null;
 
 					// Preview preset
 					if (action === "preview") {
@@ -620,7 +582,7 @@ export async function openPresetManager() {
 
 					// Save current enabled modules as new preset
 					if (action === "save-current") {
-						const raw = form.elements.namedItem("newName")?.value ?? "";
+						const raw = container.querySelector('input[name="newName"]')?.value ?? "";
 						const newName = String(raw).trim();
 						if (!newName) return ui.notifications.warn(`${LT.warnEnterName()}.`);
 
@@ -631,7 +593,7 @@ export async function openPresetManager() {
 						if (res?.status !== "saved") return;
 
 						ui.notifications.info(`${LT.savedSummary({ name: res.name, count: enabled.length })}.`);
-						reopenPreserving();
+						rerender();
 						return;
 					}
 
@@ -678,7 +640,7 @@ export async function openPresetManager() {
 						if (res?.status !== "saved") return;
 
 						ui.notifications.info(`${LT.updatedSummary({ name: picked.name, count: enabled.length })}.`);
-						reopenPreserving();
+						rerender();
 						return;
 					}
 
@@ -787,7 +749,7 @@ export async function openPresetManager() {
 						await hlp_setPresets(presets);
 
 						ui.notifications.info(`${LT.renamePreset()}: "${oldKey}" -> "${finalName}".`);
-						reopenPreserving();
+						rerender();
 						return;
 					}
 
@@ -808,7 +770,7 @@ export async function openPresetManager() {
 						await hlp_setPresets(p);
 
 						ui.notifications.info(`${LT.deletedPreset()} "${picked.name}".`);
-						reopenPreserving();
+						rerender();
 						return;
 					}
 
@@ -819,12 +781,19 @@ export async function openPresetManager() {
 					ui.notifications.error(`${LT.errors.errorOccured()}.`);
 				}
 			});
-		};
-
-		Hooks.on("renderDialogV2", onRender);
-		dlg.render(true);
-	})();
 }
+
+// Register the Module Presets pane as a toolbox tool.
+globalThis.bbmm ??= {};
+globalThis.bbmm.toolboxTools ??= [];
+globalThis.bbmm.toolboxTools.push({
+	id: "modulePresets",
+	icon: "fa-solid fa-boxes-stacked",
+	label: () => LT.toolbox.tabModulePresets(),
+	visible: () => game.user.isGM,
+	group: null,
+	mount: async (container) => { await mountModulePresets(container); }
+});
 
 Hooks.once("ready", async () => {
 	await (globalThis.bbmm?._dataFilesReady ?? Promise.resolve());

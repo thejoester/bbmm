@@ -1,17 +1,14 @@
-/* 
-BBMM Localization — dynamic LT
-- Works with any bbmm.* key path found in en.json
-- LT.errors.conflictTitle()          -> localize "bbmm.errors.conflictTitle"
-- LT.errors.presetExists({name:...}) -> format  "bbmm.errors.presetExists" with {name} 
-*/
+/* ==========================================================================
+	BBMM Localization: dynamic LT proxy
+	LT.errors.conflictTitle()      -> localize "bbmm.errors.conflictTitle"
+	LT.errors.presetExists({name}) -> format   "bbmm.errors.presetExists"
+========================================================================== */
 
 import { DL } from "./settings.js";
 
 export const BBMM_ID = "bbmm";
 
-/*
-	L: localize a key (no placeholders)
-*/
+// localize a key, no placeholders
 export function L(key) {
 	try {
 		// If translations not loaded yet, just return the key without warning
@@ -27,9 +24,7 @@ export function L(key) {
 	}
 }
 
-/*
-	LF: format a key with {placeholders}
-*/
+// format a key with {placeholders}
 export function LF(key, data = {}) {
 	// Debug
 	//DL("LF(): start");
@@ -43,12 +38,7 @@ export function LF(key, data = {}) {
 	}
 }
 
-/*
-	Dynamic LT:
-	- Any property chain becomes a key path under "bbmm"
-	- Call with no args => L()
-	- Call with an object => LF()
-*/
+// dynamic LT: property chain -> "bbmm.*" key path; call() -> L(), call({...}) -> LF()
 function makeNode(key) {
 	// Callable function: LT.something(...) -> localize/format
 	const fn = (data) => {
