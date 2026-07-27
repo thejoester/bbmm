@@ -20,15 +20,15 @@ This module was originally inspired by [Module Management+](https://github.com/m
 - Quick Settings Access: per-module button that opens the Settings menu directly to that module's tab
 - Lock Module state: lock module so state (enabled/disabled) will not be affected by Activate/Deactivate all modules.
 
-<img width="60%" height="60%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/enhanced-module-management.webp" />
+<img width="60%" height="60%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/enhanced-module-management.webp" />
 
 ### New Module Detection
 - Detects when new module(s) has been installed and prompts to enable. 
- <img width="50%" height="50%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/new-module-detection.webp?raw=true" />
+ <img width="50%" height="50%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/new-module-detection.webp?raw=true" />
 
 ### Changelog report
 - Opens report on login for GM with latest change logs for modules that contain a changelog file.
-<img width="70%" height="70%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/changelog-report.webp?raw=true" />
+<img width="70%" height="70%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/changelog-report.webp?raw=true" />
 
 ### BBMM Toolbox
 Most of BBMM's tools now live in one window, with a tab list down the left side:
@@ -38,16 +38,16 @@ Module Presets, Settings Presets, Lock Presets, Inclusions / Exclusions, Setting
 - Save module state (enabled/disabled) as a preset.
 - Load / update / delete preset.
 
-<img width="70%" height="70%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/module-presets1.webp?raw=true" />
+<img width="70%" height="70%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/module-presets1.webp?raw=true" />
 <br>
-<img width="40%" height="40%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/module-presets2.webp?raw=true" />
+<img width="40%" height="40%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/module-presets2.webp?raw=true" />
 
 ### Settings Presets
 - GMs manage shared world presets; players get their own personal presets that only affect their own settings.
 - Save settings state as a preset.
 - Load / update / delete preset.
 - Choose which modules or specific settings to import.
-<img width="70%" height="70%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/settings-presets1.webp?raw=true" />
+<img width="70%" height="70%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/settings-presets1.webp?raw=true" />
 
 ### Setting Locks & Sync
 - User/client-scope settings each get a Lock and a Sync icon in the settings window.
@@ -56,18 +56,18 @@ Module Presets, Settings Presets, Lock Presets, Inclusions / Exclusions, Setting
 - **Lock Manager (Settings Locks tab):** browse and manage every active lock in one place; add locks (including hidden settings), edit a lock's value/type, or remove it.
 - **Lock Presets:** save a set of locks as a preset and apply it in any world.
 - **Controls (keybind) Sync:** sync or soft-lock keybindings to chosen players.
-<img width="40%" height="40%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/setting-lock1.webp?raw=true" />
-<img width="40%" height="40%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/setting-lock2.webp?raw=true" />
-<img width="60%" height="60%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/setting-lock3.webp?raw=true" />
+<img width="40%" height="40%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/setting-lock1.webp?raw=true" />
+<img width="40%" height="40%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/setting-lock2.webp?raw=true" />
+<img width="60%" height="60%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/setting-lock3.webp?raw=true" />
 
 ### Include & Exclude modules & settings (Advanced feature)
 - Include: Add hidden settings to include on presets, imports, and exports. 
 - Exclude: Add settings and modules to ignore on presets, imports, and exports.
-<img width="60%" height="60%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/inclusions-exclusions1.webp?raw=true" />
+<img width="60%" height="60%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/inclusions-exclusions1.webp?raw=true" />
 
 ### Import / Export
   - Export and import module presets, settings presets, inclusion/exclusion lists, module tags, and your keybindings as .json.
-<img width="60%" height="60%" alt="image" src="https://github.com/thejoester/bbmm/blob/1.4-test/docs/img/import-export.webp?raw=true" />
+<img width="60%" height="60%" alt="image" src="https://github.com/thejoester/bbmm/blob/main/docs/img/import-export.webp?raw=true" />
 
 ## Credits
 I would like to extend a thanks to the following people for helping contribute to this module!
