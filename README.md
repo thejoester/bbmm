@@ -13,7 +13,7 @@ This module was originally inspired by [Module Management+](https://github.com/m
 ### For documentation please see [the Wiki](https://github.com/thejoester/bbmm/wiki)
 
 ## Features
-### Advanced Module Management
+### Enhanced Module Management
 - Redesigned Module List: compact card-style layout replaces Foundry's default module list for faster scanning
 - Module Tags: create custom tags and subtags, assign them to modules for organized grouping and filtering
 - Module Notes: attach rich-text notes to individual modules; falls back to the module's own description if no note exists
@@ -21,17 +21,28 @@ This module was originally inspired by [Module Management+](https://github.com/m
 - Lock Module state: lock module so state (enabled/disabled) will not be affected by Activate/Deactivate all modules. 
 <img width="60%" height="60%" alt="image" src="https://github.com/user-attachments/assets/7f8ba8d2-b0f1-470b-a1fb-6f4cb6911a69" />
 
+### New Module Detection
+- Detects when new module(s) has been installed and prompts to enable. 
+ <img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/8441b303-0746-4c73-b820-38d9a90a46ad" />
+
+### Changelog report
+- Opens report on login for GM with latest change logs for modules that contain a changelog file.
+<img width="70%" height="70%" alt="image" src="https://github.com/user-attachments/assets/4ff3761e-aa80-42c2-9729-f6d4479d5747" />
+
+### BBMM Toolbox
+Most of BBMM's tools now live in one window, with a tab list down the left side:
+Module Presets, Settings Presets, Lock Presets, Inclusions / Exclusions, Settings Locks, Tag Manager, and Import / Export, plus a GM-only Utilities tab and a Read Me tab. Open it from the **BBMM** button in the Module Management / settings header. Players only see the tools that apply to them.
+
 ### Module Presets
 - Save module state (enabled/disabled) as a preset.
 - Load / update / delete preset.
-- Export module state to .json.
-- import .json to preset.
 
 <img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/115ae28b-fcab-4ff8-8538-a2d49e0ce2b6" />
 <br>
 <img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/9b3c2e6f-85a6-4b7c-9664-48b288a1868d" />
 
 ### Settings Presets
+- GMs manage shared world presets; players get their own personal presets that only affect their own settings.
 - Save settings state as a preset.
 - Load / update / delete preset.
 - Export settings state to .json
@@ -39,11 +50,13 @@ This module was originally inspired by [Module Management+](https://github.com/m
 - Choose which modules or specific settings to import.
 <img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/c16735dc-fa68-4d1b-ac8f-4ff7ce7415d0" />
 
-### Settings/Controls Sync
-- For user/client scope settings will have a Lock and a sync icon
-  - Lock (toggle): will force player setting to match GM, and hide from player settings.
-  - Sync: Will push GM setting to currently connected player(s).
-- Controls (keybinds) Sync
+### Setting Locks & Sync
+- User/client-scope settings each get a Lock and a Sync icon in the settings window.
+  - **Lock:** opens a dialog to Hard Lock (players can't change it) or Soft Lock (pushes a recommended value players can still change) to a value you choose.
+  - **Sync:** pushes your value to connected players.
+- **Lock Manager (Settings Locks tab):** browse and manage every active lock in one place; add locks (including hidden settings), edit a lock's value/type, or remove it.
+- **Lock Presets:** save a set of locks as a preset and apply it in any world.
+- **Controls (keybind) Sync:** sync or soft-lock keybindings to chosen players.
 <img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/28a1c8a5-12df-440c-b125-bdc940e65ca1" />
 
 ### Include & Exclude modules & settings (Advanced feature)
@@ -51,19 +64,14 @@ This module was originally inspired by [Module Management+](https://github.com/m
 - Exclude: Add settings and modules to ignore on presets, imports, and exports.
 <img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/cab6f371-f382-49bd-a8b3-205714e60dde" />
 
-### Changelog report
-- Opens report on login for GM with latest change logs for modules that contain a changelog file.
-<img width="70%" height="70%" alt="image" src="https://github.com/user-attachments/assets/4ff3761e-aa80-42c2-9729-f6d4479d5747" />
-
-### New Module Detection
-- Detects when new module(s) has been installed and prompts to enable. 
- <img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/8441b303-0746-4c73-b820-38d9a90a46ad" />
+### Import / Export
+  - Export and import module presets, settings presets, inclusion/exclusion lists, module tags, and your keybindings as .json.
 
 ## Credits
 I would like to extend a thanks to the following people for helping contribute to this module!
 
 ### Translations
-- French (fr): [Retculo](https://gitlocalize.com/users/rectulo)
+- French (fr): [Rectulo](https://gitlocalize.com/users/rectulo)
 - Italian (it): [GregoryWarn](https://github.com/thejoester/bbmm/issues?q=is%3Apr+author%3AGregoryWarn)
 - Polish (pl): [Lioheart](https://gitlocalize.com/users/Lioheart)
 - Brazilian Portuguese (pt-BR): [FarenRavirar](https://github.com/FarenRavirar) / [Kharmans](https://github.com/Kharmans)!
