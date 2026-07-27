@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0-test1] - 2026-07-26
+## [1.4.0] - 2026-07-26
 
 ### Added
 - **BBMM Toolbox:** Most of BBMM's tools now live in one window. A list of tabs runs down the left side (Module Presets, Settings Presets, Lock Presets, Inclusions / Exclusions, Settings Locks, Tag Manager, Import / Export), and clicking a tab opens that tool on the right. This replaces the old setup where each manager opened in its own separate window.
