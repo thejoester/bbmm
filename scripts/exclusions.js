@@ -1,9 +1,8 @@
 
-/* BBMM Exclusions ============================================================
-	- Lists all modules not already excluded
-	- Shows Enabled/Disabled state
-	- "Exclude" updates setting, closes, then re-opens manager
-============================================================================ */
+/* ==========================================================================
+	BBMM: Exclusions & Inclusions
+	Manager UI for per-module and per-setting exclusions/inclusions.
+========================================================================== */
 
 import { DL, BBMM_README_UUID, injectBBMMHeaderButton } from './settings.js';
 import { LT } from "./localization.js";
@@ -93,11 +92,9 @@ export async function hlp_writeUserExclusions(obj) {
 	}
 }
 
-/* BBMMAddModuleExclusionAppV2 ==================================================
-	- Lists all modules not already excluded
-	- Columns: Module (title or namespace), State (enabled/disabled), Action
-	- Exclude adds module ID to userExclusions.modules, then reopens manager
-============================================================================== */
+/* ==========================================================================
+	Add-module-exclusion picker
+========================================================================== */
 class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({
@@ -223,7 +220,7 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 					text-align:right;padding-right:8px
 				}
 
-				/* Exclude button — roomy */
+				/* Exclude button, roomy */
 				.bbmm-am-table .bbmm-exc-act{
 					display:inline-flex;align-items:center;justify-content:center;
 					min-width:80px;height:32px;padding:0 12px;
@@ -384,11 +381,9 @@ class BBMMAddModuleExclusionAppV2 extends foundry.applications.api.ApplicationV2
 
 }
 
-/* BBMMAddSettingExclusionAppV2 ===============================================
-	- Lists all CONFIG settings not already excluded
-	- Columns: Module (title or namespace), Setting (friendly name or key), Action
-	- Exclude adds {namespace,key} to userExclusions.settings, then reopens manager
-============================================================================ */
+/* ==========================================================================
+	Add-setting-exclusion picker
+========================================================================== */
 class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV2 {
 	constructor() {
 		super({
@@ -1290,9 +1285,9 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 	}
 }
 
-/* BBMMExclusionsAppV2 ========================================================
-    - Lists current exclusions from persistent settings
-   ========================================================================= */
+/* ==========================================================================
+	Exclusions & Inclusions manager
+========================================================================== */
 class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 	
 	constructor() {
@@ -1309,7 +1304,70 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		this._minH = 300;
 		this._maxH = 700;
 	}
-	
+
+	/* ==========================================================================
+		{TOOLBOX EMBED SUPPORT}
+		_bbmmEmbed holds the pane container when mounted as a toolbox pane.
+	========================================================================== */
+
+	// Re-read data and rebuild: full window render, or in-place pane rebuild.
+	async _refresh() {
+		if (this._bbmmEmbed) return this._bbmmMountInto(this._bbmmEmbed);
+		return this.render(true);
+	}
+
+	// Standalone: close the window. Embedded: no-op (sub-dialogs pop over the toolbox).
+	_requestClose() {
+		if (this._bbmmEmbed) return;
+		try { this.close({ force: true }); } catch {}
+	}
+
+	// Mount into a toolbox pane container. Reuses _renderHTML + _bind; skips window chrome.
+	// Listeners bind to a persistent inner wrapper (not the pane, which the toolbox
+	// reuses across tools) so unmount discards them and there is no double-binding.
+	async _bbmmMountInto(container) {
+		this._bbmmEmbed = container;
+
+		// First mount (or after the pane was cleared): make a fresh wrapper to bind to.
+		if (!this._paneWrap || !container.contains(this._paneWrap)) {
+			this._paneWrap = document.createElement("div");
+			this._paneWrap.className = "bbmm-exclusions-app";
+			container.replaceChildren(this._paneWrap);
+			this._delegated = false;
+		}
+		const wrap = this._paneWrap;
+
+		// Snapshot expand/collapse state before wiping (for in-place refresh)
+		const expandedGroups = new Set();
+		for (const hdr of (wrap.querySelectorAll?.(".bbmm-grp-hdr:not(.bbmm-grp-collapsed)") ?? [])) {
+			if (hdr.dataset.groupHdr) expandedGroups.add(hdr.dataset.groupHdr);
+		}
+		const collapsedSections = new Set();
+		for (const hdr of (wrap.querySelectorAll?.(".bbmm-x-group.bbmm-x-sec-collapsed") ?? [])) {
+			if (hdr.dataset.sectionHdr) collapsedSections.add(hdr.dataset.sectionHdr);
+		}
+
+		const html = await this._renderHTML();
+		wrap.innerHTML = html;
+
+		// Restore previously expanded groups
+		for (const groupId of expandedGroups) {
+			const hdr = wrap.querySelector(`.bbmm-grp-hdr[data-group-hdr="${CSS.escape(groupId)}"]`);
+			if (!hdr) continue;
+			hdr.classList.remove("bbmm-grp-collapsed");
+			for (const row of wrap.querySelectorAll(`.bbmm-grp-row[data-group-row="${CSS.escape(groupId)}"]`)) row.style.display = "";
+		}
+		// Restore previously collapsed sections
+		for (const secId of collapsedSections) {
+			const hdr = wrap.querySelector(`.bbmm-x-group[data-section-hdr="${CSS.escape(secId)}"]`);
+			if (!hdr) continue;
+			hdr.classList.add("bbmm-x-sec-collapsed");
+			for (const row of wrap.querySelectorAll(`[data-section="${CSS.escape(secId)}"]`)) row.style.display = "none";
+		}
+
+		this._bind(wrap);
+	}
+
 	/* ============================================================================
 		{IMPORT / EXPORT}
 	============================================================================ */
@@ -1547,7 +1605,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		ui.notifications?.info(game.i18n.format("bbmm._importExport.importSuccess", { target }));
 		DL(`exclusions.js | import: imported ${target}`, { schemaVersion, target, targetVersion, foundryVersion, entriesCount: entries.length });
 
-		await this.render(true);
+		await this._refresh();
 	}
 
 	/* ============================================================================
@@ -2070,9 +2128,9 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					</table>
 				</div>
 
-				<div class="bbmm-footer">
+				${this._bbmmEmbed ? "" : `<div class="bbmm-footer">
 					<button type="button" class="bbmm-footer-close" data-action="close">${LT.buttons.close()}</button>
-				</div>
+				</div>`}
 			</section>
 		`;
 
@@ -2144,11 +2202,15 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			DL(2, "exclusions.js | _replaceHTML(): bbmm header inject failed", e);
 		}
 
-		// avoid double-binding across re-renders
-		if (!this._delegated) {
-			this._delegated = true;
+		this._bind(content);
+	}
 
-			content.addEventListener("click", async (ev) => {
+	// Delegated click wiring; bound once to the persistent content/pane element.
+	_bind(content) {
+		if (this._delegated) return;
+		this._delegated = true;
+
+		content.addEventListener("click", async (ev) => {
 				// Section header (Inclusions / Exclusions) toggle
 				const secHdr = ev.target?.closest?.(".bbmm-x-group");
 				if (secHdr) {
@@ -2206,13 +2268,13 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 				// Close (bottom button) or header X
 				if (action === "close" || action === "cancel" || btn.classList.contains("bbmm-close")) {
-					try { this.close({ force: true }); } catch {}
+					this._requestClose();
 					return;
 				}
 
 				// Open Add Setting Exclusion
 				if (action === "add-setting") {
-					try { this.close({ force: true }); } catch {}
+					this._requestClose();
 					setTimeout(() => {
 						try { (globalThis.bbmm?.openAddSettingExclusionApp || globalThis.openAddSettingExclusionApp)?.(); }
 						catch (e) { DL(3, "exclusions.js | openAddSettingExclusionApp(): failed", e); }
@@ -2222,7 +2284,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 
 				// Open Add Module Exclusion
 				if (action === "add-module") {
-					try { this.close({ force: true }); } catch {}
+					this._requestClose();
 					setTimeout(() => {
 						try { (globalThis.bbmm?.openAddModuleExclusionApp || globalThis.openAddModuleExclusionApp)?.(); }
 						catch (e) { DL(3, "exclusions.js | openAddModuleExclusionApp(): failed", e); }
@@ -2230,7 +2292,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					return;
 				}
 
-				// Immediate delete — NO PROMPT
+				// immediate delete, no prompt
 				if (btn.classList.contains("bbmm-x-del")) {
 					const list = btn.dataset.list || "exc"; // "inc" or "exc"
 					const dupe = (btn.dataset.dupe === "1"); // legacy duplicate flag (only matters for exclusions)
@@ -2269,7 +2331,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 								try { this._incData = data; } catch {}
 								try { Hooks.callAll("bbmmInclusionsChanged", { type: "module", namespace: ns, removed: true }); } catch {}
 								DL(`exclusions.js | delete(inclusion module): ${ns}`);
-								await this.render(true);
+								await this._refresh();
 								return;
 							}
 
@@ -2296,7 +2358,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 								try { this._incData = data; } catch {}
 								try { Hooks.callAll("bbmmInclusionsChanged", { type: "setting", namespace: ns, key, removed: true }); } catch {}
 								DL(`exclusions.js | delete(inclusion setting): ${ns}.${key}`);
-								await this.render(true);
+								await this._refresh();
 								return;
 							}
 
@@ -2350,7 +2412,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 								}
 							}
 
-							await this.render(true);
+							await this._refresh();
 							return;
 						}
 
@@ -2395,7 +2457,7 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 								}
 							}
 
-							await this.render(true);
+							await this._refresh();
 							return;
 						}
 
@@ -2436,15 +2498,31 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 					return;
 				}
 			});
-		}
 	}
 
 }
 
 // PUBLIC LAUNCHERS
-export function openExclusionsManagerApp() { 
-	new BBMMExclusionsAppV2().render(true);
+export function openExclusionsManagerApp() {
+	// Deep-link into the toolbox (Exclusions & Inclusions is now a toolbox pane).
+	globalThis.bbmm?.openBBMMToolbox?.({ tool: "exclusions" });
 }
+
+// Register the Exclusions & Inclusions pane as a toolbox tool.
+globalThis.bbmm ??= {};
+globalThis.bbmm.toolboxTools ??= [];
+globalThis.bbmm.toolboxTools.push({
+	id: "exclusions",
+	icon: "fa-solid fa-filter",
+	label: () => LT.toolbox.tabExclusions(),
+	visible: () => game.user.isGM,
+	group: null,
+	mount: async (container) => {
+		const app = new BBMMExclusionsAppV2();
+		await app._bbmmMountInto(container);
+		// No listeners outside the container; toolbox clears it on unmount.
+	}
+});
 
 export function openAddModuleExclusionApp() {
 	new BBMMAddModuleExclusionAppV2().render(true);

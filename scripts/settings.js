@@ -1,5 +1,5 @@
 import { openPresetManager } from './module-presets.js';
-import { openSettingsPresetManager, svc_loadSettingsPresets } from './settings-presets.js';
+import { openSettingsPresetManager, openPlayerSettingsPresetManager, svc_loadSettingsPresets, svc_loadPlayerSettingsPresets, svc_setPlayerSettingsPresets } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { openInclusionsManagerApp, hlp_readUserInclusions } from "./inclusions.js";
 import { hlp_readUserExclusions } from "./exclusions.js";
@@ -206,7 +206,6 @@ function injectSettingsSectionHeaders(html) {
 //  Inject BBMM button into a Foundry window header
 export function injectBBMMHeaderButton(root) {
 	
-	//Only run as GM for now - until we migrate
 	// if (!game.user.isGM) return;
 	
 	// Resolve the root element (jQuery or HTMLElement)
@@ -227,210 +226,28 @@ export function injectBBMMHeaderButton(root) {
 	// Prevent duplicate header menu
 	if (controls.querySelector(".bbmm-header-menu-btn")) return;
 
-	// Create main button (looks like a normal header control)
+	// Single direct opener for the BBMM Toolbox (no dropdown). Changelog Files
+	// and Import/Export live in the Configure Settings menu buttons.
 	const btn = document.createElement("button");
 	btn.type = "button";
 	btn.className = "header-control bbmm-header-menu-btn";
-	// btn.setAttribute("data-tooltip", LT.buttons.bbmmBtnToolTip());
 	btn.setAttribute("aria-label", LT.buttons.bbmmBtnToolTip());
-	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i><span>BBMM</span><i class="fa-solid fa-caret-down"></i>`;
-
-
-	// Create dropdown menu, but attach it to BODY so it doesn't get clipped by the header
-	const menu = document.createElement("div");
-	menu.className = "bbmm-header-dropdown";
-	menu.hidden = true;
-
-	const isGM = game.user.isGM;
-
-	const items = isGM
-		? [
-			{ action: "modules", label: LT.modulePresetMgr(), onClick: () => openPresetManager() },
-			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
-			{ action: "lockPresets", label: LT.lockPresets.menuLabel(), onClick: () => openLockPresetManager() },
-			{ divider: true },
-			{ action: "exclusions", label: LT.exclusionsMgr(), onClick: () => openExclusionsManager() },
-			/*{ action: "inclusions", label: LT.inclusionsMgr(), onClick: () => openInclusionsManagerApp() },*/
-			{ action: "lockManager", label: LT.lockConfigurator.menuLabel(), onClick: () => globalThis.bbmm?.openLockConfigurator?.() },
-			{ action: "tags", label: LT.moduleManagement.tagMgrLabel(), onClick: () => openTagManager() },
-			{ divider: true },
-			{ action: "changelogFiles", label: LT.changelog.filesMgrLabel(), onClick: () => openChangelogFilesManager() },
-			// Import / Export
-			{
-				action: "importExport",
-				label: LT.buttons.importExport(),
-				onClick: () => {
-					try {
-						const menu = game.settings.menus.get(`${BBMM_ID}.importExport`);
-						if (!menu || !menu.type) {
-							DL(3, "settings.js | BBMM header dropdown: importExport menu not found", `${BBMM_ID}.importExport`);
-							return;
-						}
-
-						new menu.type().render(true);
-					} catch (err) {
-						DL(3, "settings.js | BBMM header dropdown: failed to open importExport menu", err);
-					}
-				}
-			},
-			{ action: "help", label: (LT.buttons.help?.() ?? "Help"), onClick: () => hlp_openManualByUuid(BBMM_README_UUID) }
-		]
-		: [
-			// Module Presets
-			{ action: "settings", label: LT.settingsPresetMgr(), onClick: () => openSettingsPresetManager() },
-			// Import / Export
-			{
-				action: "importExport",
-				label: LT.buttons.importExport(),
-				onClick: () => {
-					try {
-						const menu = game.settings.menus.get(`${BBMM_ID}.importExport`);
-						if (!menu || !menu.type) {
-							DL(3, "settings.js | BBMM header dropdown: importExport menu not found", `${BBMM_ID}.importExport`);
-							return;
-						}
-
-						new menu.type().render(true);
-					} catch (err) {
-						DL(3, "settings.js | BBMM header dropdown: failed to open importExport menu", err);
-					}
-				}
-			},
-			// Help
-			{ action: "help", label: (LT.buttons.help?.() ?? "Help"), onClick: () => hlp_openManualByUuid(BBMM_README_UUID) }
-		];
-
-	for (const it of items) {
-		if (it.divider) {
-			menu.appendChild(document.createElement("hr"));
-			continue;
-		}
-
-		const mi = document.createElement("button");
-		mi.type = "button";
-		mi.className = "bbmm-header-item";
-		mi.dataset.action = it.action;
-		mi.textContent = it.label;
-
-		mi.addEventListener("click", (ev) => {
-			ev.preventDefault();
-			ev.stopPropagation();
-			menu.hidden = true;
-
-			try {
-				it.onClick();
-			} catch (e) {
-				DL(3, `settings.js | BBMM header dropdown: click failed (${it.action})`, e);
-			}
-		});
-
-		menu.appendChild(mi);
-	}
-
-	// Position menu under the button (fixed, so no clipping)
-	function positionMenu() {
-		const r = btn.getBoundingClientRect();
-		menu.style.top = `${Math.round(r.bottom + 4)}px`;
-
-		// Align RIGHT edge of menu to RIGHT edge of button
-		let left = r.right - menu.offsetWidth;
-
-		// Clamp to viewport
-		left = Math.max(8, Math.min(left, window.innerWidth - menu.offsetWidth - 8));
-
-		menu.style.left = `${Math.round(left)}px`;
-	}
+	btn.innerHTML = `<i class="fa-solid fa-layer-group"></i><span>BBMM</span>`;
 
 	btn.addEventListener("click", (ev) => {
 		ev.preventDefault();
 		ev.stopPropagation();
-
-		menu.hidden = !menu.hidden;
-		if (!menu.hidden) {
-
-			// Pull actual computed UI colors from the window and apply to the dropdown (force opaque)
-			try {
-				const clampOpaque = (c) => {
-					if (!c) return c;
-					if (c === "transparent") return "rgba(0, 0, 0, 1)";
-					const m = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+)\s*)?\)$/i);
-					if (!m) return c;
-					const r = Number(m[1]);
-					const g = Number(m[2]);
-					const b = Number(m[3]);
-					const a = (m[4] === undefined) ? 1 : Number(m[4]);
-					if (!Number.isFinite(a) || a >= 0.999) return `rgb(${r}, ${g}, ${b})`;
-					return `rgb(${r}, ${g}, ${b})`;
-				};
-
-				const isTransparent = (c) => {
-					if (!c) return true;
-					if (c === "transparent") return true;
-					if (c === "rgba(0, 0, 0, 0)") return true;
-					return /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0(\.0+)?\s*\)$/i.test(c);
-				};
-
-				const src = root.querySelector(".window-content") || header || root;
-				let bg = getComputedStyle(src).backgroundColor;
-				let fg = getComputedStyle(src).color;
-
-				// If the content background is fully transparent, fall back to the header background
-				if (isTransparent(bg)) {
-					const src2 = header || root;
-					bg = getComputedStyle(src2).backgroundColor;
-					fg = getComputedStyle(src2).color;
-				}
-
-				menu.style.backgroundColor = clampOpaque(bg);
-				menu.style.color = fg;
-
-			} catch (e) {
-				DL(2, "settings.js | injectBBMMHeaderButton(): failed to resolve menu colors", e);
-			}
-
-			positionMenu();
+		try {
+			globalThis.bbmm?.openBBMMToolbox?.();
+		} catch (e) {
+			DL(3, "settings.js | BBMM header button: failed to open toolbox", e);
 		}
 	});
-
-	// Close menu when clicking elsewhere
-	const onDocClick = (ev) => {
-		if (ev.target === btn || menu.contains(ev.target)) return;
-		menu.hidden = true;
-	};
-	document.addEventListener("click", onDocClick, { capture: true });
-
-	// Reposition on resize/scroll while open
-	const onWindowMove = () => {
-		if (!menu.hidden) positionMenu();
-	};
-	window.addEventListener("resize", onWindowMove);
-	window.addEventListener("scroll", onWindowMove, true);
-
-	// Cleanup when the window is removed from DOM
-	const obs = new MutationObserver(() => {
-		if (!document.body.contains(root)) {
-			try {
-				document.removeEventListener("click", onDocClick, { capture: true });
-			} catch (e) {}
-			try {
-				window.removeEventListener("resize", onWindowMove);
-				window.removeEventListener("scroll", onWindowMove, true);
-			} catch (e) {}
-			try {
-				menu.remove();
-			} catch (e) {}
-			obs.disconnect();
-		}
-	});
-	obs.observe(document.body, { childList: true, subtree: true });
 
 	// Insert before the Close button if present
 	const closeBtn = controls.querySelector('button.header-control[data-action="close"]');
 	if (closeBtn) controls.insertBefore(btn, closeBtn);
 	else controls.appendChild(btn);
-
-	// Add dropdown to body
-	document.body.appendChild(menu);
 
 	// Minimal style (inject once)
 	if (!document.getElementById("bbmm-header-style")) {
@@ -448,57 +265,11 @@ export function injectBBMMHeaderButton(root) {
 			header.window-header .header-control.bbmm-header-menu-btn i {
 				font-size: 0.9em;
 			}
-
-			.bbmm-header-dropdown {
-				position: fixed;
-				z-index: 100000;
-				display: flex;
-				flex-direction: column;
-				gap: 0.25rem;
-
-				min-width: 260px;
-				padding: .75rem;
-
-				border: 1px solid var(--color-border-dark);
-				border-radius: 0.6rem;
-
-				/* Background/text colors are set inline when opening (computed from the UI, forced opaque) */
-				box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-			}
-
-			.bbmm-header-dropdown .bbmm-header-item {
-				display: block;
-				width: 100%;
-				text-align: left;
-
-				padding: 0.5rem 0.75rem;
-				border-radius: 0.4rem;
-
-				background: transparent;
-				color: inherit;
-				border: 0;
-
-				cursor: pointer;
-				white-space: nowrap;
-				font-size: 0.95rem;
-				line-height: 1.2;
-			}
-
-			.bbmm-header-dropdown .bbmm-header-item:hover {
-				background: rgba(255, 94, 0, 0.55);
-			}
-
-			.bbmm-header-dropdown hr {
-				border: none;
-				border-top: 1px solid var(--color-border-dark);
-				margin: 0.15rem 0;
-				opacity: 0.5;
-			}
 		`;
 		document.head.appendChild(style);
 	}
 
-	DL("settings.js | BBMM header dropdown injected");
+	DL("settings.js | BBMM header toolbox button injected");
 }
 
 // Open Exclusions Manager
@@ -527,18 +298,6 @@ export function openChangelogFilesManager() {
 	}
 }
 
-// Open Hidden Client Setting Sync Manager
-export function openhiddenSettingSyncManager() {
-	DL("settings.js | openhiddenSettingSyncManager(): fired");
-	try {
-		const fn = globalThis.bbmm?.openhiddenSettingSyncManagerApp;
-		if (typeof fn === "function") return fn();
-		DL(3, "settings.js | openhiddenSettingSyncManager(): launcher not found");
-	} catch (err) {
-		DL(3, "settings.js | openhiddenSettingSyncManager(): failed", err);
-	}
-}
-
 function openLockPresetManager() {
 	DL("settings.js | openLockPresetManager(): fired");
 	try {
@@ -550,7 +309,7 @@ function openLockPresetManager() {
 	}
 }
 
-// Open a small chooser dialog, then launch the selected manager
+// Open Tag Manager dialog
 export function openTagManager() {
 	DL("settings.js | openTagManager(): fired");
 	try {
@@ -562,88 +321,17 @@ export function openTagManager() {
 	}
 }
 
-// Open BBMM Launcher Dialog
+// Back-compat: the old launcher dialog is replaced by the BBMM Toolbox.
+// Kept as a thin opener so existing macros / window.openBBMMLauncher references work.
 export async function openBBMMLauncher() {
-	DL("settings.js | openBBMMLauncher()");
-
-	const choice = await new Promise((resolve) => {
-		(async () => {
-			const dlg = new foundry.applications.api.DialogV2({
-				window: { title: LT.moduleName() },
-				classes: ["bbmm-launcher-dialog"],
-				content: ``,
-				buttons: [
-					{ action: "modules",        label: LT.modulePresetMgr(), default: true },
-					{ action: "settings",       label: LT.settingsPresetMgr() },
-					{ action: "exclusions",     label: LT.exclusionsMgr() },
-					{ action: "lockManager", label: LT.lockConfigurator.menuLabel() },
-					{ action: "lockPresets",    label: LT.lockPresets.menuLabel() },
-					{ action: "tags",           label: LT.moduleManagement.tagMgrLabel() },
-					{ action: "changelogFiles", label: LT.changelog.filesMgrLabel() },
-					{ action: "importExport",   label: LT.buttons.importExport() },
-					{ action: "help",           label: (LT.buttons.help?.() ?? "Help") },
-					{ action: "cancel",         label: LT.buttons.cancel() }
-				],
-				submit: (res) => resolve(res ?? "cancel"),
-				rejectClose: false,
-				position: { width: 400, height: "auto" }
-			});
-
-			// Render FIRST so dlg.element exists
-			await dlg.render(true);
-
-			// Inject help button into title bar AFTER render
-			try {
-				hlp_injectHeaderHelpButton(dlg, {
-					uuid: BBMM_README_UUID,
-					iconClass: "fas fa-circle-question",
-					title: LT.buttons.help?.() ?? "Help"
-				});
-			} catch (e) {
-				DL(2, "settings.js | openBBMMLauncher(): help injection failed", e);
-			}
-		})();
-	});
-
-	DL(`settings.js | openBBMMLauncher(): choice = ${choice}`);
-
-	if (choice === "modules") {
-		openPresetManager();
-	} else if (choice === "settings") {
-		openSettingsPresetManager();
-	} else if (choice === "exclusions") {
-		openExclusionsManager();
-	} else if (choice === "lockManager") {
-		globalThis.bbmm?.openLockConfigurator?.();
-	} else if (choice === "lockPresets") {
-		openLockPresetManager();
-	} else if (choice === "tags") {
-		openTagManager();
-	} else if (choice === "changelogFiles") {
-		openChangelogFilesManager();
-	} else if (choice === "importExport") {
-		try {
-			const menu = game.settings.menus.get(`${BBMM_ID}.importExport`);
-			if (!menu || !menu.type) {
-				DL(3, "settings.js | openBBMMLauncher: importExport menu not found", `${BBMM_ID}.importExport`);
-				return;
-			}
-			new menu.type().render(true);
-		} catch (err) {
-			DL(3, "settings.js | openBBMMLauncher: failed to open importExport menu", err);
-		}
-	} else if (choice === "help") {
-		hlp_openManualByUuid(BBMM_README_UUID);
-	}
-	// "cancel" -> do nothing
+	DL("settings.js | openBBMMLauncher(): deep-link to toolbox");
+	globalThis.bbmm?.openBBMMToolbox?.();
 }
 
 // BBMM Import / Export Dialog
-class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
-	constructor() {
-		super({
-			window: { title: `${LT.moduleInit()} ${LT.buttons.importExport()}` },
-			content: `
+// Import / Export content (was the BBMMImportExportDialog constructor content).
+function _ie_contentHTML() {
+	return `
 				<div style="display:flex;flex-direction:column;gap:.75rem;">
 					${game.user.isGM ? `
 					<div style="display:flex;align-items:center;gap:.75rem;">
@@ -687,37 +375,15 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 						</div>
 					</div>
 				</div>
-			`,
+	`;
+}
 
-			buttons: [
-				{ action: "close", label: LT.buttons.close(), default: true }
-			],
-			submit: () => "close"
-		});
-	}
+// Delegated click wiring for the Import/Export pane (was _onRender's handler).
+function _ie_wire(container) {
+	if (container.dataset.bbmmIeBound === "1") return;
+	container.dataset.bbmmIeBound = "1";
 
-	async _onRender(context, options) {
-		await super._onRender(context, options);
-
-		const root = this.element;
-		if (!root) return;
-
-		// Inject help button into title bar
-		try {
-			hlp_injectHeaderHelpButton(this, {
-				uuid: BBMM_README_UUID,
-				iconClass: "fas fa-circle-question",
-				title: LT.buttons.help?.() ?? "Help"
-			});
-		} catch (e) {
-			DL(2, `settings-presets.js | help injection failed`, e);
-		}
-
-		// Prevent double-binding on re-render
-		if (root.dataset.bbmmIeBound === "1") return;
-		root.dataset.bbmmIeBound = "1";
-
-		root.addEventListener("click", async (ev) => {
+	container.addEventListener("click", async (ev) => {
 			const btn = ev.target?.closest?.("button[data-action]");
 			if (!btn) return;
 
@@ -821,7 +487,7 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 							}
 							presets = await res.json();
 						} else {
-							presets = game.settings.get(BBMM_ID, SETTING_SETTINGS_PRESETS_U) ?? {};
+							presets = await svc_loadPlayerSettingsPresets({ force: true });
 						}
 
 						const names = Object.keys(presets ?? {}).sort((a, b) => a.localeCompare(b));
@@ -1002,14 +668,14 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 								}
 							}
 
-							// Strip world bucket — players can't apply world settings and it saves space
+							// strip world bucket, players can't apply world settings and it saves space
 							const stripped = { ...presetRaw, world: {} };
 							current[finalName] = stripped;
 							added++;
 						}
 
 						try {
-							await game.settings.set(BBMM_ID, SETTING_SETTINGS_PRESETS_U, current);
+							await svc_setPlayerSettingsPresets(current);
 							DL(1, `${FN} imported presets into user setting`, { added, renamed });
 							ui.notifications.info(`Imported ${added} settings preset(s).${renamed ? ` Renamed ${renamed}.` : ""}`);
 						} catch (err) {
@@ -1019,14 +685,16 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 						}
 					}
 
-					// Force refresh the Settings Presets cache
+					// Force refresh the appropriate preset cache and reopen its manager if open
 					try {
-						await svc_loadSettingsPresets({ force: true });
-
-						// If the Settings Preset Manager is open, reopen it to rebuild the list
-						const existing = Object.values(ui.windows ?? {}).find(w => w?.id === "bbmm-settings-preset-manager") ?? null;
-						if (existing) {
-							await openSettingsPresetManager();
+						if (game.user.isGM) {
+							await svc_loadSettingsPresets({ force: true });
+							const existing = Object.values(ui.windows ?? {}).find(w => w?.id === "bbmm-settings-preset-manager") ?? null;
+							if (existing) await openSettingsPresetManager();
+						} else {
+							await svc_loadPlayerSettingsPresets({ force: true });
+							const existing = Object.values(ui.windows ?? {}).find(w => w?.id === "bbmm-player-settings-preset-manager") ?? null;
+							if (existing) await openPlayerSettingsPresetManager();
 						}
 					} catch (err) {
 						DL(2, "settings.js | BBMMImportExportDialog._onRender(): post-import refresh failed", err);
@@ -1123,12 +791,35 @@ class BBMMImportExportDialog extends foundry.applications.api.DialogV2 {
 					return;
 				}
 			} catch (err) {
-				DL(3, "settings.js | BBMMImportExportDialog._onRender(): action failed", { action, name: err?.name, message: err?.message, stack: err?.stack });
+				DL(3, "settings.js | Import/Export: action failed", { action, name: err?.name, message: err?.message, stack: err?.stack });
 				ui.notifications.error(LT.errors.importExportFailed());
 			}
 		});
-	}
 }
+
+// Toolbox mount entry: Import / Export pane.
+export async function mountImportExport(container) {
+	container.innerHTML = _ie_contentHTML();
+	_ie_wire(container);
+}
+
+// Deep-link opener.
+export function openImportExport() {
+	globalThis.bbmm?.openBBMMToolbox?.({ tool: "importExport" });
+}
+
+// Register the Import / Export pane as a toolbox tool (visible to everyone).
+globalThis.bbmm ??= {};
+globalThis.bbmm.openImportExport = openImportExport;
+globalThis.bbmm.toolboxTools ??= [];
+globalThis.bbmm.toolboxTools.push({
+	id: "importExport",
+	icon: "fa-solid fa-file-import",
+	label: () => LT.buttons.importExport(),
+	visible: () => true,
+	group: null,
+	mount: async (container) => { await mountImportExport(container); }
+});
 
 // Export inclusions/exclusions as a single file, with an optional filter by namespace (module)
 async function bbmm_exportIncExcBundle() {
@@ -1269,7 +960,7 @@ async function bbmm_importIncExcBundle() {
 	let inInc, inExc;
 	const isFlat = !raw?.inclusions && !raw?.exclusions && (Array.isArray(raw?.settings) || Array.isArray(raw?.modules));
 	if (isFlat) {
-		// Legacy flat file — determine direction from filename
+		// legacy flat file, determine direction from filename
 		const name = file.name.toLowerCase();
 		if (name.includes("exclusion")) {
 			inInc = {};
@@ -1785,168 +1476,30 @@ Hooks.once("init", () => {
 				}
 			});
 
-			// MENU: open the Preset Manager
-			game.settings.registerMenu(BBMM_ID, "modulePresetManager", {
-				name: LT.modulePresetsBtn(),
-				label: LT.lblOpenModulePresets(),
-				icon: "fas fa-layer-group",
-				restricted: true,
-				type: class extends FormApplication {
-					constructor(...args){ super(...args); }
-					static get defaultOptions() {
-						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-module-preset-manager",
-							title: LT.titleModulePresets(),
-							template: null, // We’ll use DialogV2 instead
-							width: 600
-						});
-					}
-					async render(...args) {
-						await openPresetManager();
-						return this;
-					}
-					async _updateObject() {}
-				}
-			});
-			
-			// MENU: open the Preset Manager
-			game.settings.registerMenu(BBMM_ID, "settingsPresetManager", {
-				name: LT.settingsPresetsBtn(),
-				label: LT.lblOpenSettingsPresets(),
+			// MENU: open the BBMM Toolbox (single entry point for the migrated managers)
+			game.settings.registerMenu(BBMM_ID, "toolbox", {
+				name: LT.toolbox.title(),
+				label: LT.toolbox.title(),
 				icon: "fas fa-layer-group",
 				restricted: false,
 				type: class extends FormApplication {
 					constructor(...args){ super(...args); }
 					static get defaultOptions() {
 						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-settings-preset-manager",
-							title: LT.titleSettingsPresets(),
-							template: null, // We’ll use DialogV2 instead
-							width: 600
-						});
-					}
-					async render(...args) {
-						await openSettingsPresetManager();
-						return this;
-					}
-					async _updateObject() {}
-				}
-			});
-			
-			// MENU: Lock Preset Manager
-			game.settings.registerMenu(BBMM_ID, "lockPresetManager", {
-				name: LT.lockPresets.menuLabel(),
-				label: LT.lockPresets.menuLabel(),
-				icon: "fas fa-lock",
-				restricted: true,
-				type: class extends FormApplication {
-					constructor(...args){ super(...args); }
-					static get defaultOptions() {
-						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-lock-preset-manager-opener",
-							title: LT.lockPresets.title(),
-							template: null,
-							width: 600
-						});
-					}
-					async render(...args) {
-						try {
-							const fn = globalThis.bbmm?.openLockPresetManager;
-							if (typeof fn !== "function") {
-								DL(3, "settings.js | lockPresetManager menu: global opener not found");
-								return this;
-							}
-							fn();
-						} catch (err) {
-							DL(3, "settings.js | lockPresetManager menu: failed", err);
-						}
-						return this;
-					}
-					async _updateObject() {}
-				}
-			});
-			
-			// MENU: Exclusions manager
-			game.settings.registerMenu(BBMM_ID,"exclusionsManager",{
-				name: LT.exclusionsMgr(),
-				label: LT.lblExclusionsMgr(),
-				icon: "fas fa-filter",
-				restricted: true,
-				type: class extends FormApplication {
-					constructor(...args){ super(...args); }
-					static get defaultOptions() {
-						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-exclusions-manager",
-							title: LT.titleExclusionsMgr(),
-							template: null, 
-							width: 600
-						});
-					}
-					async render(...args) {
-						await openExclusionsManager();
-						return this;
-					}
-					async _updateObject() {}
-				}
-			});
-
-			// MENU: Settings Lock Manager
-			game.settings.registerMenu(BBMM_ID, "lockManager", {
-				name: LT.lockConfigurator.menuName(),
-				label: LT.lockConfigurator.menuLabel(),
-				icon: "fas fa-lock",
-				restricted: true,
-				type: class extends FormApplication {
-					constructor(...args){ super(...args); }
-					static get defaultOptions() {
-						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-lock-manager-opener",
-							title: LT.lockConfigurator?.title?.() ?? "Lock Manager",
-							template: null,
-							width: 600
-						});
-					}
-					async render(...args) {
-						try {
-							const fn = globalThis.bbmm?.openLockConfigurator;
-
-							if (typeof fn !== "function") {
-								DL(3, "settings.js | lockManager registerMenu: global opener not found", globalThis.bbmm);
-								ui.notifications?.error(LT.lockConfigurator?.failedOpen?.() ?? "Lock Manager not available.");
-								return this;
-							}
-
-							fn();
-						} catch (err) {
-							DL(2, "settings.js | Lock Manager open failed", err);
-						}
-						return this;
-					}
-					async _updateObject() {}
-				}
-			});
-
-			// MENU: Module Tag Manager
-			game.settings.registerMenu(BBMM_ID, "tagManager", {
-				name: LT.moduleManagement.tagMgrName(),
-				label: LT.moduleManagement.tagMgrLabel(),
-				icon: "fas fa-tags",
-				restricted: true,
-				type: class extends FormApplication {
-					constructor(...args){ super(...args); }
-					static get defaultOptions() {
-						return foundry.utils.mergeObject(super.defaultOptions, {
-							id: "bbmm-tag-manager-opener",
-							title: LT.moduleManagement.tagMgrTitle(),
+							id: "bbmm-toolbox-opener",
+							title: LT.toolbox.title(),
 							template: null,
 							width: 500
 						});
 					}
-					async render(...args) { openTagManager(); return this; }
+					async render(...args) {
+						globalThis.bbmm?.openBBMMToolbox?.();
+						return this;
+					}
 					async _updateObject() {}
 				}
 			});
-			
+
 			// MENU: Changelog Filename Manager
 			game.settings.registerMenu(BBMM_ID, "changelogFilesManager", {
 				name: LT.changelog.filesMgrName(),
@@ -1969,16 +1522,6 @@ Hooks.once("init", () => {
 					}
 					async _updateObject() {}
 				}
-			});
-
-			// MENU: Import / Export
-			game.settings.registerMenu(BBMM_ID, "importExport", {
-				name: LT.buttons.importExport(),
-				label: LT.buttons.importExport(),
-				hint: LT._settings.importExportHint(),
-				icon: "fas fa-file-import",
-				type: BBMMImportExportDialog,
-				restricted: false
 			});
 
 			// World toggle to Show changelog on GM login
@@ -2169,7 +1712,7 @@ Hooks.once("ready", async () => {
 				const check = await fetch(`bbmm-data/${filename}`, { cache: "no-store" });
 				fileExists = check.ok;
 			} catch (_) {
-				// Network error or file not found — treat as missing
+				// network error or file not found, treat as missing
 			}
 
 			if (fileExists) {
@@ -2192,7 +1735,7 @@ Hooks.once("ready", async () => {
 	// Prime exclusions cache for getSkipMap() users
 	try { await hlp_readUserExclusions(); } catch (err) { DL(2, "settings.js | ready | preload exclusions failed", err); }
 
-	// check folder migration - Remove after version 0.7.0
+	// check folder migration (move compendiums into BBMM folder)
 	try { await checkFolderMigration();} catch (err) {DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);}
 
 	// Hook into settings and manage modules window to add app button in header

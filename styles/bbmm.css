@@ -366,9 +366,6 @@
 /* Pending: green tint - staged lock not yet applied */
 .bbmm-pending { color: #22c55e !important; }
 
-/* Partial: dark blue tint */
-.bbmm-lock-icons .bbmm-partial { color: #1f449c; }
-
 /* ─────────────────────────────────────────────────────────────
 	Lock Dialog
    ───────────────────────────────────────────────────────────── */
@@ -1262,3 +1259,168 @@
 .bbmm-mm-toolbar .bbmm-filter-clear i.fa-solid {
 	pointer-events: none;
 }
+/* =========================================================================
+	BBMM Toolbox (master-detail window)
+========================================================================= */
+.bbmm-toolbox-app .window-content {
+	padding: 0 !important;
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;			/* fill the window frame, don't shrink-wrap content */
+	min-height: 0;
+	overflow: hidden;
+}
+
+.bbmm-tb-root {
+	display: flex;
+	flex-direction: row;
+	flex: 1 1 auto;			/* fill window-content so the nav is always full height */
+	height: 100%;
+	min-height: 0;
+}
+
+/* Left: fixed-width vertical tool list */
+.bbmm-tb-nav {
+	flex: 0 0 220px;
+	width: 220px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: .4rem;
+	overflow-y: auto;
+	border-right: 1px solid #444;
+	background: rgba(0, 0, 0, .18);
+}
+
+.bbmm-tb-navrow,
+.bbmm-tb-group {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	width: 100%;
+	padding: .4rem .55rem;
+	border: 1px solid transparent;
+	border-radius: .35rem;
+	background: transparent;
+	text-align: left;
+	line-height: 1.2;
+	cursor: pointer;
+}
+
+.bbmm-tb-navrow i,
+.bbmm-tb-group i { flex: 0 0 auto; width: 1.1em; text-align: center; opacity: .85; }
+.bbmm-tb-navlabel { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bbmm-tb-navrow:hover,
+.bbmm-tb-group:hover { background: rgba(255, 255, 255, .07); }
+
+.bbmm-tb-navrow.active {
+	background: rgba(120, 170, 255, .18);
+	border-color: rgba(120, 170, 255, .45);
+	font-weight: 600;
+}
+
+.bbmm-tb-nested { padding-left: 1.5rem; }
+.bbmm-tb-hidden { display: none; }
+.bbmm-tb-chev { font-size: .8em; opacity: .7; }
+
+.bbmm-tb-nav-empty { padding: 1rem; opacity: .6; font-style: italic; }
+
+.bbmm-tb-divider {
+	border: none;
+	border-top: 1px solid #444;
+	margin: .35rem .2rem;
+	opacity: .6;
+}
+
+/* Preset tables (sticky <thead>) and the Lock Manager header (.bbmm-lc-head) both
+   hardcode a dark background via an inline style whose CSS var often doesn't
+   resolve, leaving dark-on-dark text in light mode. Force a readable bg/text pair
+   keyed off Foundry's theme class (body.theme-light / .theme-dark) - NOT
+   prefers-color-scheme, which tracks the OS, not the Foundry theme. Dark default. */
+.bbmm-tb-pane thead[style*="sticky"],
+.bbmm-tb-pane .bbmm-lc-head {
+	background: #1f1f1f !important;
+	color: #e8e8e8 !important;
+}
+.bbmm-tb-pane .bbmm-lc-head .h { color: #e8e8e8 !important; }
+
+.theme-light .bbmm-tb-pane thead[style*="sticky"],
+.theme-light .bbmm-tb-pane .bbmm-lc-head {
+	background: #ececec !important;
+	color: #1a1a1a !important;
+}
+.theme-light .bbmm-tb-pane .bbmm-lc-head .h { color: #1a1a1a !important; }
+
+/* Right: detail pane, scrolls internally */
+.bbmm-tb-pane {
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 0;
+	overflow-y: auto;
+	padding: .5rem;
+	display: flex;
+	flex-direction: column;
+}
+
+.bbmm-tb-placeholder {
+	margin: auto;
+	padding: 2rem;
+	text-align: center;
+	opacity: .7;
+}
+.bbmm-tb-placeholder.bbmm-tb-error { color: #ff9a9a; opacity: 1; }
+
+/* Utilities pane: clickable macro rows */
+.bbmm-tb-util { padding: .5rem; }
+.bbmm-tb-util-title { margin: .2rem 0 .6rem; font-size: 1.05rem; }
+.bbmm-tb-util-list { display: flex; flex-direction: column; gap: 4px; }
+.bbmm-tb-util-row {
+	display: flex;
+	align-items: center;
+	gap: .55rem;
+	width: 100%;
+	padding: .5rem .65rem;
+	border: 1px solid #444;
+	border-radius: .35rem;
+	background: rgba(255, 255, 255, .04);
+	text-align: left;
+	cursor: pointer;
+}
+.bbmm-tb-util-row:hover { background: rgba(120, 170, 255, .15); border-color: rgba(120, 170, 255, .45); }
+.bbmm-tb-util-icon { flex: 0 0 auto; width: 1.1em; text-align: center; opacity: .8; }
+.bbmm-tb-util-label { flex: 1 1 auto; }
+
+/* Read Me pane */
+.bbmm-tb-readme { padding: 1rem; display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; }
+.bbmm-tb-readme-intro { margin: 0; opacity: .85; }
+.bbmm-tb-readme-open {
+	display: inline-flex;
+	align-items: center;
+	gap: .5rem;
+	padding: .5rem .9rem;
+	border: 1px solid rgba(120, 170, 255, .45);
+	border-radius: .35rem;
+	background: rgba(120, 170, 255, .18);
+	cursor: pointer;
+}
+.bbmm-tb-readme-open:hover { background: rgba(120, 170, 255, .28); }
+
+.theme-light .bbmm-tb-util-row { border-color: #b8b8b8; background: rgba(0, 0, 0, .03); }
+.theme-light .bbmm-tb-util-row:hover { background: rgba(60, 120, 220, .12); border-color: rgba(60, 120, 220, .4); }
+.theme-light .bbmm-tb-readme-open { border-color: rgba(60, 120, 220, .4); background: rgba(60, 120, 220, .14); }
+.theme-light .bbmm-tb-readme-open:hover { background: rgba(60, 120, 220, .22); }
+
+/* Light theme (Foundry body.theme-light): hardcoded dark chrome softened here. */
+.theme-light .bbmm-tb-nav {
+	border-right-color: #b8b8b8;
+	background: rgba(0, 0, 0, .05);
+}
+.theme-light .bbmm-tb-divider { border-top-color: #b8b8b8; }
+.theme-light .bbmm-tb-navrow:hover,
+.theme-light .bbmm-tb-group:hover { background: rgba(0, 0, 0, .06); }
+.theme-light .bbmm-tb-navrow.active {
+	background: rgba(60, 120, 220, .16);
+	border-color: rgba(60, 120, 220, .4);
+}
+.theme-light .bbmm-tb-placeholder.bbmm-tb-error { color: #b00020; }

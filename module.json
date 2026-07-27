@@ -26,8 +26,8 @@
         "scripts/lock-presets.js",
         "scripts/module-management.js",
         "scripts/changelogs.js",
-        "scripts/hidden-setting-sync.js",
-        "scripts/macros.js"
+        "scripts/macros.js",
+        "scripts/toolbox.js"
     ],
     "socket": true,
     "persistentStorage": true,
@@ -88,8 +88,8 @@
     },
     "description": "Advanced Module management tool. Settings Presets, Module Presets, User settings sync/lock, Change log reports, and more!",
     "url": "https://github.com/thejoester/bbmm/",
-    "manifest": "https://github.com/thejoester/bbmm/releases/download/0.6.5-test1/module.json",
-    "download": "https://github.com/thejoester/bbmm/releases/download/0.6.5-test1/bbmm.zip",
+    "manifest": "https://github.com/thejoester/bbmm/releases/latest/download/module.json",
+    "download": "https://github.com/thejoester/bbmm/releases/download/1.3.2/bbmm.zip",
     "readme": "https://github.com/thejoester/bbmm/blob/main/CHANGELOG.md",
     "bugs": "https://github.com/thejoester/bbmm/issues",
     "changelog": "https://github.com/thejoester/bbmm/blob/main/README.md"

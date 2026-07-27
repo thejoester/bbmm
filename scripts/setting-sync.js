@@ -1,9 +1,6 @@
-/*  BBMM Setting Lock===========================================================
-	- GM: adds Person icon + Lock icon to every *user/client* setting
-	- GM clicking Lock icon: toggle in bbmm.userSettingSync (store/remove GM value)
-	- Player: on ready, apply diffs; show reload dialog if needed
-	- GM updates: broadcast a lightweight trigger; clients pull & apply
-============================================================================== */
+/* ==========================================================================
+	BBMM: Setting Lock / Sync
+========================================================================== */
 
 import { DL } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
@@ -27,24 +24,19 @@ import { hlp_esc } from "./helpers.js";
         {SETTINGS SYNC HELPERS}
 ============================================================================ */
 
-	/*  Detect if unlock is queued =================================================
-		Detect if an lock removal is queued for a given id.
-		- Returns true if there is a 'lock' op for this id with userIds=[]
-	============================================================================== */
+	// true if an unlock (or legacy soft-disable) op is queued for this id
 	function _bbmmIsUnlockQueued(id) {
 		try {
 			return _bbmmPendingOps.some(op =>
 			op?.id === id && (
-				(op.op === "lock" && Array.isArray(op.userIds) && op.userIds.length === 0) ||
+				op.op === "unlock" ||
 				(op.op === "soft" && op.soft === false)
 			)
 			);
 		} catch { return false; }
 	}
 
-	/*  Detect if auto-force-reload is enabled =======================================
-		- Returns true if the GM has enabled auto-force-reload setting
-	============================================================================== */
+	// true if the GM enabled auto-force-reload
 	function hlp_shouldAutoForceReload() {
 		try {
 			return Boolean(game.settings.get(BBMM_ID, "autoForceReload"));
@@ -61,15 +53,11 @@ import { hlp_esc } from "./helpers.js";
 	function _bbmmSetLockIconState(iconEl, state) {
 		try {
 			iconEl.classList.remove(
-				"fa-lock-open", "fa-user-lock", "fa-lock",
-				"fa-solid", "fa-regular", "bbmm-active", "bbmm-partial", "bbmm-diverged", "bbmm-pending", "fa-arrows-rotate"
+				"fa-lock-open", "fa-lock",
+				"fa-solid", "fa-regular", "bbmm-active", "bbmm-diverged", "bbmm-pending", "fa-arrows-rotate"
 			);
 
 			switch (state) {
-				case "lockSelected":
-					iconEl.className = "fa-solid fa-user-lock bbmm-partial bbmm-click";
-					iconEl.title = LT.lockPartialTip();
-					break;
 				case "softLock":
 					// If FA build lacks 'fa-regular fa-lock', the fallback color still shows via bbmm-active
 					iconEl.className = "fa-regular fa-lock bbmm-active bbmm-click";
@@ -86,10 +74,6 @@ import { hlp_esc } from "./helpers.js";
 				case "staged-soft":
 					iconEl.className = "fa-regular fa-lock bbmm-pending bbmm-click";
 					iconEl.title = LT.lockDialog?.stageLock?.() || "Staged: soft lock";
-					break;
-				case "staged-partial":
-					iconEl.className = "fa-solid fa-user-lock bbmm-pending bbmm-click";
-					iconEl.title = LT.lockDialog?.stageLock?.() || "Staged: partial lock";
 					break;
 				case "controlSoft":
 					// Use the proper class tokens (no leading dot) and keep the clickable marker so the icon stays visible
@@ -121,10 +105,26 @@ import { hlp_esc } from "./helpers.js";
 	/* Build sync icon tooltip ==================================================== */
 	function _bbmmBuildSyncTooltip() {
 		try {
-			return `Click: ${LT.sync.PushHint()}\nShift+Click: ${LT.sync.ShiftSyncUser()}`;
+			return LT.sync.ConfirmPushAll();
 		} catch (err) {
 			DL(2, "_bbmmBuildSyncTooltip(): error", err);
-			return LT.sync.PushHint();
+			return "Push current value to all connected players";
+		}
+	}
+
+	/* Confirm + queue a push of the current value to all players ================= */
+	async function _bbmmConfirmPushToAll(id, ns, key, iconEl) {
+		try {
+			const ok = await foundry.applications.api.DialogV2.confirm({
+				window: { title: LT.sync?.ConfirmPushTitle?.() || "Push to Players", modal: true },
+				content: `<p>${LT.sync?.ConfirmPushAll?.() || "Push current value to all connected players?"}</p>`
+			});
+			if (!ok) return;
+			_bbmmQueueOp({ op: "push", id, namespace: ns, key });
+			_bbmmUpdateApplyButton(iconEl?.closest("form") ?? document.querySelector("form#client-settings"));
+			ui.notifications?.info?.(LT.sync?.QueuedPushAll?.() || "Queued push to all players.");
+		} catch (err) {
+			DL(2, "setting-sync.js | _bbmmConfirmPushToAll(): error", err);
 		}
 	}
 
@@ -218,18 +218,7 @@ import { hlp_esc } from "./helpers.js";
 				try { curVal = existing?.value !== undefined ? existing.value : game.settings.get(ns, key); }
 				catch { curVal = undefined; }
 
-				const nonGMs = (game.users?.contents || []).filter(u => !u.isGM);
-				const preUserIds = existing?.userIds ?? [];
-				const isPartialExisting = Array.isArray(preUserIds) && preUserIds.length > 0 && preUserIds.length < nonGMs.length;
 				const defaultLockType = existing?.lockType ?? (existing?.soft ? "soft" : "hard");
-
-				const userRows = nonGMs.map(u => {
-					const checked = (preUserIds.length === 0 || preUserIds.includes(u.id)) ? " checked" : "";
-					return `<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;padding:.15rem 0;">
-						<input type="checkbox" class="bbmm-ld-user" value="${hlp_esc(u.id)}"${checked}>
-						<span>${hlp_esc(u.name ?? "(unnamed)")}</span>
-					</label>`;
-				}).join("");
 
 				const content = `
 <div style="display:flex;flex-direction:column;gap:.75rem;min-width:480px;">
@@ -248,16 +237,6 @@ import { hlp_esc } from "./helpers.js";
 			<input type="radio" name="bbmm-ld-type" value="soft"${defaultLockType === "soft" ? " checked" : ""}>
 			<span><strong>${LT.lockDialog?.softLock?.() || "Soft Lock"}</strong> - ${LT.lockDialog?.softLockDesc?.() || "Pushes recommended value; players may still change it"}</span>
 		</label>
-	</div>
-	<div class="bbmm-ld-targeting">
-		<div style="font-weight:600;margin-bottom:.25rem;">${LT.lockDialog?.targetPlayers?.() || "Target Players"}</div>
-		<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:.35rem;">
-			<input type="checkbox" id="bbmm-ld-all-players" ${!isPartialExisting ? "checked" : ""}>
-			<span>${LT.lockDialog?.allPlayers?.() || "All Players"}</span>
-		</label>
-		<div class="bbmm-ld-user-list" style="padding-left:1rem;display:${isPartialExisting ? "flex" : "none"};flex-direction:column;gap:.1rem;">
-			${userRows}
-		</div>
 	</div>
 </div>`;
 
@@ -278,21 +257,12 @@ import { hlp_esc } from "./helpers.js";
 									const lockTypeEl = root.querySelector('input[name="bbmm-ld-type"]:checked');
 									const lockType = lockTypeEl?.value === "soft" ? "soft" : "hard";
 
-									const allPlayersEl = root.querySelector("#bbmm-ld-all-players");
-									let userIds;
-									if (allPlayersEl?.checked) {
-										userIds = nonGMs.map(u => u.id);
-									} else {
-										userIds = Array.from(root.querySelectorAll('.bbmm-ld-user:checked')).map(el => el.value);
-									}
-
 									if (lockType === "soft") {
 										_bbmmQueueOp({ op: "soft", id, namespace: ns, key, soft: true, value });
 										_bbmmSetLockIconState(iconEl, "staged-soft");
 									} else {
-										_bbmmQueueOp({ op: "lock", id, namespace: ns, key, value, userIds });
-										const isPartial = userIds.length > 0 && userIds.length < nonGMs.length;
-										_bbmmSetLockIconState(iconEl, isPartial ? "staged-partial" : "staged-lock");
+										_bbmmQueueOp({ op: "lock", id, namespace: ns, key, value });
+										_bbmmSetLockIconState(iconEl, "staged-lock");
 									}
 
 									_bbmmUpdateApplyButton(iconEl.closest("form") ?? document.querySelector("form#client-settings"));
@@ -308,30 +278,6 @@ import { hlp_esc } from "./helpers.js";
 				});
 
 				await dlg.render(true);
-
-				// Wire "All Players" toggle to show/hide user list
-				try {
-					const root = dlg.element?.[0] ?? dlg.element ?? document;
-					const allChk = root.querySelector("#bbmm-ld-all-players");
-					const userList = root.querySelector(".bbmm-ld-user-list");
-					if (allChk && userList) {
-						allChk.addEventListener("change", () => {
-							userList.style.display = allChk.checked ? "none" : "flex";
-						});
-					}
-					// Dim targeting section when Soft Lock is selected (soft locks are always global)
-					const typeRadios = root.querySelectorAll('input[name="bbmm-ld-type"]');
-					const targetingEl = root.querySelector(".bbmm-ld-targeting");
-					const updateTargetingVisibility = () => {
-						const isSoft = root.querySelector('input[name="bbmm-ld-type"][value="soft"]')?.checked;
-						if (targetingEl) targetingEl.style.opacity = isSoft ? ".4" : "1";
-						if (targetingEl) targetingEl.style.pointerEvents = isSoft ? "none" : "";
-					};
-					typeRadios.forEach(r => r.addEventListener("change", updateTargetingVisibility));
-					updateTargetingVisibility();
-				} catch (wireErr) {
-					DL(2, "BBMMLockDialog stage wire error", wireErr);
-				}
 			} catch (err) {
 				DL(2, "BBMMLockDialog._showStage(): error", err);
 			}
@@ -347,16 +293,6 @@ import { hlp_esc } from "./helpers.js";
 				try { valPreview = entry?.value !== undefined ? JSON.stringify(entry.value) : "—"; }
 				catch { valPreview = String(entry?.value ?? "—"); }
 
-				const userIds = Array.isArray(entry?.userIds) && entry.userIds.length ? entry.userIds : null;
-				const nonGMs = (game.users?.contents || []).filter(u => !u.isGM);
-				let targetLabel;
-				if (!userIds) {
-					targetLabel = LT.lockDialog?.allPlayers?.() || "All Players";
-				} else {
-					const names = userIds.map(uid => game.users?.get(uid)?.name || uid).join(", ");
-					targetLabel = `${userIds.length} / ${nonGMs.length}: ${names}`;
-				}
-
 				const content = `
 <div style="display:flex;flex-direction:column;gap:.6rem;min-width:400px;">
 	<div>${BBMMLockDialog._settingLabel(id, cfg, ns)}</div>
@@ -365,15 +301,12 @@ import { hlp_esc } from "./helpers.js";
 		<span>${hlp_esc(lockTypeLabel)}</span>
 		<span style="font-weight:600;">${LT.lockDialog?.lockedValue?.() || "Locked Value"}</span>
 		<code style="font-size:.85em;word-break:break-all;">${hlp_esc(valPreview)}</code>
-		<span style="font-weight:600;">${LT.lockDialog?.targetPlayers?.() || "Players"}</span>
-		<span>${hlp_esc(targetLabel)}</span>
 	</div>
 </div>`;
 
 				const existingData = {
 					lockType: isSoft ? "soft" : "hard",
-					value: entry?.value,
-					userIds: Array.isArray(entry?.userIds) ? entry.userIds : []
+					value: entry?.value
 				};
 
 				const dlg = new foundry.applications.api.DialogV2({
@@ -392,8 +325,7 @@ import { hlp_esc } from "./helpers.js";
 							action: "unlock",
 							label: LT.lockDialog?.unlock?.() || "Unlock",
 							callback: async () => {
-								_bbmmQueueOp({ op: "soft", id, namespace: ns, key, soft: false });
-								_bbmmQueueOp({ op: "lock", id, namespace: ns, key, value: undefined, userIds: [] });
+								_bbmmQueueOp({ op: "unlock", id, namespace: ns, key });
 								_bbmmSetLockIconState(iconEl, "unlocked");
 								_bbmmUpdateApplyButton(iconEl.closest("form") ?? document.querySelector("form#client-settings"));
 								ui.notifications?.info?.(LT.infoClearedLocks?.() || "Lock removed.");
@@ -415,7 +347,7 @@ import { hlp_esc } from "./helpers.js";
 	function _bbmmUpdateApplyButton(form) {
 		try {
 			if (!form) return;
-			const lockOps = _bbmmPendingOps.filter(o => o.op === "lock" || o.op === "soft");
+			const lockOps = _bbmmPendingOps.filter(o => o.op === "lock" || o.op === "soft" || o.op === "unlock" || o.op === "push");
 			const count = lockOps.length;
 
 			let btn = form.querySelector("#bbmm-apply-pending");
@@ -455,23 +387,22 @@ import { hlp_esc } from "./helpers.js";
 	/*  Queue a pending lock or push operation until "Save Changes" ================ */
 	function _bbmmQueueOp(entry) {
 		try {
-			// Remove conflicting op type for this id
-			const opposite = entry.op === "soft" ? "lock" :
-							entry.op === "lock" ? "soft" : null;
-			if (opposite) {
+			// Remove conflicting op types for this id.
+			// lock <-> soft are mutually exclusive; unlock cancels both lock and soft.
+			const conflicts = entry.op === "soft" ? ["lock", "unlock"] :
+							entry.op === "lock" ? ["soft", "unlock"] :
+							entry.op === "unlock" ? ["lock", "soft"] : [];
+			if (conflicts.length) {
 			for (let i = _bbmmPendingOps.length - 1; i >= 0; i--) {
 				const op = _bbmmPendingOps[i];
-				if (op?.id === entry.id && op.op === opposite) {
+				if (op?.id === entry.id && conflicts.includes(op.op)) {
 				_bbmmPendingOps.splice(i, 1);
 				}
 			}
 			}
 
 			// Normalize
-			const clean = {
-			...entry,
-			userIds: Array.isArray(entry.userIds) ? entry.userIds.slice() : []
-			};
+			const clean = { ...entry };
 
 			// Replace same-type op if already queued
 			const idx = _bbmmPendingOps.findIndex(
@@ -502,6 +433,20 @@ import { hlp_esc } from "./helpers.js";
 			// Collect pushes to emit AFTER saving
 			const softPushes = [];
 			const hardPushes = [];
+
+			// UNLOCK ops (explicit lock/soft removal)
+			for (const op of _bbmmPendingOps.filter(o => o.op === "unlock")) {
+				const { id } = op;
+				if (map[id]) {
+					delete map[id];
+					mapChanged = true;
+					DL(`setting-sync.js |  bbmm-apply: UNLOCK ${id}`);
+				}
+				if (id in revMap) {
+					delete revMap[id];
+					revChanged = true;
+				}
+			}
 
 			// SOFT ops (rev-aware)
 			for (const op of _bbmmPendingOps.filter(o => o.op === "soft")) {
@@ -545,65 +490,21 @@ import { hlp_esc } from "./helpers.js";
 				DL(`setting-sync.js |  bbmm-apply: soft SET ${id} rev=${newRev}`, value);
 			}
 
-			// HARD/PARTIAL LOCK ops
+			// HARD LOCK ops (always global, applies to every non-GM player)
 			for (const op of _bbmmPendingOps.filter(o => o.op === "lock")) {
 				try {
-					const { id, namespace, key, value, userIds } = op;
+					const { id, namespace, key, value } = op;
 					const cfg = game.settings.settings.get(id);
 					if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
 
-					// Current world's non-GM targets
-					const allTargets = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
-					const selected = (Array.isArray(userIds) ? userIds : []).filter(uid => allTargets.includes(uid));
-
-					// SPECIAL CASE: no players exist yet — store as a GLOBAL LOCK so it applies
-					// to future players when they appear.
-					if (allTargets.length === 0) {
-						map[id] = {
-							namespace,
-							key,
-							value,
-							requiresReload: !!cfg?.requiresReload
-						};
-						mapChanged = true;
-						DL(`setting-sync.js |  bbmm-apply: lock ${id} (no players yet → global)`);
-						continue;
-					}
-
-					// No selected users out of existing non-GM users ⇒ remove lock
-					// (This path is now only reached when there ARE players but none were selected.)
-					if (selected.length === 0) {
-						if (map[id]) {
-							delete map[id];
-							mapChanged = true;
-							DL(`setting-sync.js |  bbmm-apply: lock REMOVE ${id} (no selected users)`);
-						}
-						continue;
-					}
-
-					// All current non-GM users covered ⇒ store as global (omit userIds)
-					if (selected.length === allTargets.length) {
-						map[id] = {
-							namespace,
-							key,
-							value,
-							requiresReload: !!cfg?.requiresReload
-						};
-						mapChanged = true;
-						DL(`setting-sync.js |  bbmm-apply: lock ${id} (all users → global)`);
-						continue;
-					}
-
-					// Partial coverage ⇒ store specific userIds
 					map[id] = {
 						namespace,
 						key,
 						value,
-						userIds: selected,
 						requiresReload: !!cfg?.requiresReload
 					};
 					mapChanged = true;
-					DL(`setting-sync.js |  bbmm-apply: lock ${id} (partial users=${selected.length}/${allTargets.length})`);
+					DL(`setting-sync.js |  bbmm-apply: lock ${id} (global)`);
 				} catch (e) {
 					DL(2, "setting-sync.js |  bbmm-apply: lock loop error", e);
 				}
@@ -647,10 +548,10 @@ import { hlp_esc } from "./helpers.js";
 				}
 			}
 
-			// Emit queued hard pushes AFTER map save
+			// Emit queued hard pushes AFTER map save (always to all players)
 			if (hardPushes.length && game.socket) {
 				for (const op of hardPushes) {
-					const { id, namespace, key, userIds } = op;
+					const { id, namespace, key } = op;
 					const value = game.settings.get(namespace, key);
 					game.socket.emit(BBMM_SYNC_CH, {
 						t: "bbmm-sync-push",
@@ -659,9 +560,9 @@ import { hlp_esc } from "./helpers.js";
 						key,
 						value,
 						requiresReload: !!game.settings.settings.get(id)?.requiresReload,
-						targets: Array.isArray(userIds) && userIds.length ? userIds : null
+						targets: null
 					});
-					DL(`setting-sync.js |  bbmm-apply: push ${id} (targets=${(op.userIds || []).length || "all"})`);
+					DL(`setting-sync.js |  bbmm-apply: push ${id} (targets=all)`);
 				}
 			}
 
@@ -677,7 +578,10 @@ import { hlp_esc } from "./helpers.js";
 		catch { return true; } // safe default if setting not found
 	}
 
-	/*  Get lock state for a setting: "none", "partial", or "all" ================== */	
+	/*  Get lock state for a setting: "none", "soft", or "all" ====================
+		All locks are global (apply to every non-GM player). Legacy entries that
+		still carry a userIds array read as "all" until migration clears them.
+	============================================================================== */
 	function bbmmGetLockState(id, map) {
 		try {
 			const rec = map?.[id];
@@ -686,28 +590,8 @@ import { hlp_esc } from "./helpers.js";
 			// Soft lock takes precedence for icon state
 			if (rec?.soft === true) return "soft";
 
-			// Current non-GM targets in this world
-			const targets = (() => {
-				try {
-					const users = game.users?.contents || [];
-					return users.filter(u => !u.isGM).map(u => u.id);
-				} catch { return []; }
-			})();
-
-			const arr = Array.isArray(rec.userIds) ? rec.userIds : null;
-
-			// If no explicit user list is stored, treat as global lock
-			if (!arr || !arr.length) {
-				// IMPORTANT: if there are no non-GM users yet, we still consider this "all"
-				// so the GM sees a solid lock that will apply to future players.
-				return "all";
-			}
-
-			// Normal coverage check when a user list exists
-			const set = new Set(arr);
-			let covered = 0;
-			for (const uid of targets) if (set.has(uid)) covered++;
-			return covered >= targets.length ? "all" : "partial";
+			// Any hard-lock entry applies to all players
+			return "all";
 		} catch (_e) {
 			return "all";
 		}
@@ -729,184 +613,106 @@ import { hlp_esc } from "./helpers.js";
 		}
 	}
 
-	/* ============================================================================
-		{EXPORTED API: Hidden Client Setting Sync}
-		- Used by the Hidden Client Sync Manager UI
-		- Centralizes write logic so UI doesn't duplicate setting-sync rules
-	============================================================================ */
-
-	function _bbmmIsUserClientHiddenSetting(cfg) {
+	/*  Pretty label for a namespace ============================================== */
+	function _bbmmNsLabel(ns) {
 		try {
-			if (!cfg) return false;
-			if (cfg.__isMenu) return false;
-			if (String(cfg.scope ?? "") !== "client" && String(cfg.scope ?? "") !== "user") return false;
-			if (cfg.config !== false) return false; // hidden setting (not shown in normal config UI)
-			const ns = String(cfg.namespace ?? "");
-			const key = String(cfg.key ?? "");
-			if (!ns || !key) return false;
-			return true;
-		} catch {
-			return false;
-		}
+			if (ns === "core") return "Core Foundry";
+			if (ns === game.system?.id) return game.system?.title || ns;
+			return game.modules?.get(ns)?.title || ns;
+		} catch { return ns; }
 	}
 
-	function _bbmmMakeSettingId(ns, key) {
-		return `${String(ns)}.${String(key)}`;
-	}
-
-	/* Add Soft Lock immediately ===================================================
-		- Stores in bbmm.userSettingSync:
-			{ namespace, key, value, requiresReload, soft:true, rev }
-		- Bumps bbmm.softLockRevMap[id]
-		- Broadcasts refresh trigger
-	============================================================================ */
-	export async function bbmmAddUserSettingSoftLock({ ns, key }) {
+	/* Migration: legacy per-player locks -> all-players or delete.
+	   Idempotent; prompts the GM once per login until none remain. */
+	async function checkPartialLockMigration() {
 		try {
-			if (!game.user?.isGM) return false;
-
-			const id = _bbmmMakeSettingId(ns, key);
-			const cfg = game.settings.settings.get(id);
-			if (!_bbmmIsUserClientHiddenSetting(cfg)) {
-				DL(2, "setting-sync.js | bbmmAddUserSettingSoftLock(): not a hidden client setting", { id });
-				return false;
-			}
+			if (!game.user?.isGM) return;
 
 			const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
-			if (map[id]) {
-				DL(2, "setting-sync.js | bbmmAddUserSettingSoftLock(): already synced/locked", { id, existing: map[id] });
-				return false;
-			}
+			const partials = Object.entries(map).filter(([, e]) => Array.isArray(e?.userIds) && e.userIds.length > 0);
+			if (!partials.length) return;
 
-			let value;
-			try { value = game.settings.get(ns, key); }
-			catch (err) {
-				DL(2, "setting-sync.js | bbmmAddUserSettingSoftLock(): failed reading setting value", { id, err });
-				return false;
-			}
+			// Build a readable list of affected locks
+			const nonGMTotal = (game.users?.contents || []).filter(u => !u.isGM).length;
+			const listHTML = partials.map(([id, e]) => {
+				const cfg = game.settings.settings.get(id);
+				const settingName = cfg?.name ? (game.i18n.localize(cfg.name) || e.key) : (e.key || id);
+				const count = Array.isArray(e.userIds) ? e.userIds.length : 0;
+				return `<li><strong>${hlp_esc(settingName)}</strong> <span style="opacity:.7">(${hlp_esc(_bbmmNsLabel(e.namespace || id.slice(0, id.indexOf("."))))})</span> — ${count} / ${nonGMTotal}</li>`;
+			}).join("");
 
-			const revMap = game.settings.get(BBMM_ID, "softLockRevMap") || {};
-			const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
-			const newRev = currentRev + 1;
+			const content = `
+<div style="display:flex;flex-direction:column;gap:.6rem;">
+	<p>${LT.migration?.partialIntro?.() || "One or more setting locks target specific players. Per-player locks were removed in 1.4.0."}</p>
+	<ul style="margin:.25rem 0 .25rem 1.2rem;">${listHTML}</ul>
+</div>`;
 
-			map[id] = {
-				namespace: String(ns),
-				key: String(key),
-				value,
-				requiresReload: !!cfg?.requiresReload,
-				soft: true,
-				rev: newRev
-			};
-
-			revMap[id] = newRev;
-
-			await game.settings.set(BBMM_ID, "userSettingSync", map);
-			await game.settings.set(BBMM_ID, "softLockRevMap", revMap);
-
-			DL(`setting-sync.js | bbmmAddUserSettingSoftLock(): soft lock added ${id} rev=${newRev}`, value);
-
-			// Same trigger used elsewhere
-			bbmmBroadcastTrigger();
-
-			// Optional: one-time soft push like queued ops do (rev-aware on client)
-			if (game.socket) {
-				const targets = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
-				game.socket.emit(BBMM_SYNC_CH, {
-					t: "bbmm-sync-push",
-					soft: true,
-					softRev: newRev,
-					namespace: String(ns),
-					key: String(key),
-					value,
-					targets,
-					requiresReload: !!cfg?.requiresReload
+			let choice = "later";
+			try {
+				choice = await foundry.applications.api.DialogV2.wait({
+					window: { title: LT.migration?.partialTitle?.() || "Per-Player Locks Removed", modal: true },
+					content,
+					buttons: [
+						{ action: "apply",  label: LT.migration?.partialApplyAll?.() || "Apply to All Players", default: true },
+						{ action: "delete", label: LT.migration?.partialDelete?.() || "Delete Locks" },
+						{ action: "later",  label: LT.migration?.partialLater?.() || "Decide Later" }
+					],
+					rejectClose: false
 				});
-				DL(`setting-sync.js | bbmmAddUserSettingSoftLock(): soft PUSH ${id} rev=${newRev}`);
+			} catch { choice = "later"; }
+
+			if (choice === "later" || !choice) {
+				DL("setting-sync.js | checkPartialLockMigration(): deferred");
+				return;
 			}
 
-			return true;
+			if (choice === "apply") {
+				const hardPushes = [];
+				for (const [id, e] of partials) {
+					delete e.userIds;                       // becomes a global lock
+					map[id] = e;
+					hardPushes.push({ id, namespace: e.namespace || id.slice(0, id.indexOf(".")), key: e.key || id.slice(id.indexOf(".") + 1) });
+				}
+				await game.settings.set(BBMM_ID, "userSettingSync", map);
+				bbmmBroadcastTrigger();
+
+				// Push each value so players not previously covered pick it up immediately
+				if (game.socket) {
+					for (const hp of hardPushes) {
+						let value;
+						try { value = game.settings.get(hp.namespace, hp.key); } catch { value = map[hp.id]?.value; }
+						game.socket.emit(BBMM_SYNC_CH, {
+							t: "bbmm-sync-push",
+							id: hp.id,
+							namespace: hp.namespace,
+							key: hp.key,
+							value,
+							requiresReload: !!game.settings.settings.get(hp.id)?.requiresReload,
+							targets: null
+						});
+					}
+				}
+				DL(`setting-sync.js | checkPartialLockMigration(): applied ${partials.length} lock(s) to all players`);
+				ui.notifications?.info?.(LT.migration?.partialDone?.({ count: partials.length }) || `Applied ${partials.length} lock(s) to all players.`);
+				return;
+			}
+
+			if (choice === "delete") {
+				for (const [id] of partials) delete map[id];
+				await game.settings.set(BBMM_ID, "userSettingSync", map);
+				bbmmBroadcastTrigger();
+				DL(`setting-sync.js | checkPartialLockMigration(): deleted ${partials.length} partial lock(s)`);
+				ui.notifications?.info?.(LT.migration?.partialDeleted?.({ count: partials.length }) || `Deleted ${partials.length} per-player lock(s).`);
+				return;
+			}
 		} catch (err) {
-			DL(3, "setting-sync.js | bbmmAddUserSettingSoftLock(): failed", err);
-			return false;
+			DL(2, "setting-sync.js | checkPartialLockMigration(): error", err);
 		}
 	}
 
-	/* Add Lock All immediately ====================================================
-		- Stores in bbmm.userSettingSync:
-			{ namespace, key, value, requiresReload }
-		- Uses existing rule:
-			- If no non-GM users yet => store global lock anyway
-			- If all users => global lock (no userIds)
-		- Broadcasts refresh trigger
-	============================================================================ */
-	export async function bbmmAddUserSettingLockAll({ ns, key }) {
-		try {
-			if (!game.user?.isGM) return false;
-
-			const id = _bbmmMakeSettingId(ns, key);
-			const cfg = game.settings.settings.get(id);
-			if (!_bbmmIsUserClientHiddenSetting(cfg)) {
-				DL(2, "setting-sync.js | bbmmAddUserSettingLockAll(): not a hidden client setting", { id });
-				return false;
-			}
-
-			const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
-			if (map[id]) {
-				DL(2, "setting-sync.js | bbmmAddUserSettingLockAll(): already synced/locked", { id, existing: map[id] });
-				return false;
-			}
-
-			let value;
-			try { value = game.settings.get(ns, key); }
-			catch (err) {
-				DL(2, "setting-sync.js | bbmmAddUserSettingLockAll(): failed reading setting value", { id, err });
-				return false;
-			}
-
-			// Non-GM users
-			const allTargets = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
-
-			// Store global lock (no userIds) same as _bbmmApplyPendingOps lockAll path
-			map[id] = {
-				namespace: String(ns),
-				key: String(key),
-				value,
-				requiresReload: !!cfg?.requiresReload
-			};
-
-			await game.settings.set(BBMM_ID, "userSettingSync", map);
-
-			DL(`setting-sync.js | bbmmAddUserSettingLockAll(): lockAll added ${id} (targets=${allTargets.length || "none-yet"})`, value);
-
-			bbmmBroadcastTrigger();
-
-			// Optional: immediate hard push to online users (targets=null => all)
-			if (game.socket) {
-				game.socket.emit(BBMM_SYNC_CH, {
-					t: "bbmm-sync-push",
-					id,
-					namespace: String(ns),
-					key: String(key),
-					value,
-					requiresReload: !!cfg?.requiresReload,
-					targets: null
-				});
-				DL(`setting-sync.js | bbmmAddUserSettingLockAll(): hard PUSH ${id}`);
-			}
-
-			return true;
-		} catch (err) {
-			DL(3, "setting-sync.js | bbmmAddUserSettingLockAll(): failed", err);
-			return false;
-		}
-	}
-
-	/* 	Class: BBMMUserPicker ======================================================
-		- Shows a per-user selection dialog for Lock/Sync
-		- preChecked: array of user IDs OR the string 
-		"*" to pre-check all non-GM users
-		- onlyOnline: when true, only show users currently 
-		online/connected (for Sync)
-	==============================================================================*/
+	/* ==========================================================================
+		Class: BBMMUserPicker (per-user picker, controls/keybind sync only)
+	========================================================================== */
 	class BBMMUserPicker {
 		constructor({ title, settingId, valuePreview, confirmLabel, preChecked, onlyOnline = false, minimal = false, onConfirm }) {
 			this.title = title;
@@ -1067,7 +873,7 @@ import { hlp_esc } from "./helpers.js";
 							action: "confirm",
 							label: this.confirmLabel || LT.dialogQueue(),
 							default: true,
-							// Allow zero selection to mean "unlock"/"no targets"
+							// Allow zero selection to mean "no targets"
 							callback: async (event, button, dialog) => {
 								const root = dialog.element ?? dialog;
 								const picks = Array.from(root.querySelectorAll('input[name="u"]'))
@@ -1120,11 +926,9 @@ import { hlp_esc } from "./helpers.js";
         { SETTINGS SYNC HOOKS}
 ============================================================================ */
 
-	/* ============================================================================
-			{ HOOK: Init }
-			- Capture all registered settings at init 
-			(for decoration/lock support)
-	=============================================================================*/
+	/* ==========================================================================
+		{ HOOK: Init } capture registered settings for lock support
+	========================================================================== */
 	Hooks.once("init", () => {
 		try {
 			// Capture registrations  
@@ -1162,10 +966,9 @@ import { hlp_esc } from "./helpers.js";
 		}
 	});
 
-	/* ============================================================================
-			{ HOOK: closeSettingsConfig } 
-			- Capture GM setting changes      
-	==============================================================================*/
+	/* ==========================================================================
+		{ HOOK: closeSettingsConfig } capture GM setting changes
+	========================================================================== */
 	Hooks.on("closeSettingsConfig", async (app) => {
 		try {
 
@@ -1229,10 +1032,9 @@ import { hlp_esc } from "./helpers.js";
 	});
 
 
-	/* ============================================================================
-			{ HOOK: setSetting } 
-			- Player guard: prevent changing locked settings
-	==============================================================================*/
+	/* ==========================================================================
+		{ HOOK: setSetting } player guard against changing locked settings
+	========================================================================== */
 	Hooks.on("setSetting", async (namespace, key, value) => {
 		try {
 
@@ -1275,9 +1077,7 @@ import { hlp_esc } from "./helpers.js";
 			const entry = map[id];
 			if (!entry) return; // not locked at all
 
-			// Respect per-user locks: if userIds exist but don't include me > not locked for me
-			const list = Array.isArray(entry.userIds) ? entry.userIds : null;
-			if (list && !list.includes(game.user.id)) return;
+			// A lock entry means the setting is locked for every non-GM player.
 
 			// Revert if different from GM value
 			const equal = objectsEqual(value, entry.value);
@@ -1315,7 +1115,6 @@ import { hlp_esc } from "./helpers.js";
 			if (!game.user?.isGM) {
 				// NOTE: requires a user-scoped setting "softLockLedger" ({ "<ns>.<key>": "<JSON rec value>" })
 				const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
-				const myId = game.user?.id;
 				const hideLocked = (() => { try { return game.settings.get(BBMM_ID, "hideLockedSettings") !== false; } catch { return true; } })();
 
 				let seen = 0, hidden = 0;
@@ -1410,18 +1209,9 @@ import { hlp_esc } from "./helpers.js";
 					}
 
 					// If not a hard lock, leave visible
-					if (!(state === "all" || state === "partial")) continue;
+					if (state !== "all") continue;
 
-					/* Hard-lock handling =============================================
-						- 'all' => hide for everyone
-						- 'partial' => hide only if THIS player is in the targeted list
-					===================================================================*/
-					const list = Array.isArray(ent?.userIds) ? ent.userIds : null;
-					const shouldHide =
-						(state === "all") ||
-						(state === "partial" && list && myId && list.includes(myId));
-
-					if (!shouldHide) continue;
+					// Hard locks apply to every player, so hide for everyone.
 
 					if (hideLocked) {
 						hideNode(group);
@@ -1501,9 +1291,6 @@ import { hlp_esc } from "./helpers.js";
 					if (state === "all") {
 						lockIcon = makeIcon(LT.lockAllTip(), "fa-solid fa-lock", true);
 						lockIcon.classList.add("bbmm-active");
-					} else if (state === "partial") {
-						lockIcon = makeIcon(LT.lockPartialTip(), "fa-solid fa-user-lock", true);
-						lockIcon.classList.add("bbmm-partial");
 					} else if (state === "soft") {
 						const softTitle = LT.name_SoftLock?.() || "Soft Lock";
 						lockIcon = makeIcon(softTitle, "fa-regular fa-lock", true);
@@ -1520,7 +1307,7 @@ import { hlp_esc } from "./helpers.js";
 								const dot = id.indexOf(".");
 								const liveVal = game.settings.get(id.slice(0, dot), id.slice(dot + 1));
 								if (!objectsEqual(liveVal, rec.value)) {
-									lockIcon.classList.remove("bbmm-active", "bbmm-partial");
+									lockIcon.classList.remove("bbmm-active");
 									lockIcon.classList.add("bbmm-diverged");
 									lockIcon.title += `\n${LT.lockDivergedTip?.() || "Your current value differs from the locked value."}`;
 								}
@@ -1537,20 +1324,8 @@ import { hlp_esc } from "./helpers.js";
 							const dot = id.indexOf(".");
 							const ns = id.slice(0, dot);
 							const key = id.slice(1 + dot);
-							const val = game.settings.get(ns, key);
 
-							const picker = new BBMMUserPicker({
-								title: LT.titleSyncForUsers(),
-								settingId: id,
-								valuePreview: val,
-								confirmLabel: LT.dialogQueueSync(),
-								onlyOnline: true,
-								onConfirm: async (userIds) => {
-									_bbmmQueueOp({ op: "push", id, namespace: ns, key, value: val, userIds });
-									ui.notifications.info(LT.infoQueuedSync({ module: id, count: userIds.length }));
-								}
-							});
-							picker.show();
+							_bbmmConfirmPushToAll(id, ns, key, pushIcon);
 						} catch (err) {
 							DL(2, "setting-sync.js | bbmm-setting-lock(push): click error", err);
 						}
@@ -1570,7 +1345,7 @@ import { hlp_esc } from "./helpers.js";
 					attached++;
 				}
 
-				/* GM: late-pass — attach icons to any user/client rows still missing them === */
+				/* GM late-pass: attach icons to user/client rows still missing them */
 				try {
 					const allLabels = form.querySelectorAll?.('label[for^="settings-config-"]') || [];
 					let lateAttached = 0;
@@ -1618,9 +1393,6 @@ import { hlp_esc } from "./helpers.js";
 						if (state === "all") {
 							lockIcon = mk(LT.lockAllTip(), "fa-solid fa-lock");
 							lockIcon.classList.add("bbmm-active");
-						} else if (state === "partial") {
-							lockIcon = mk(LT.lockPartialTip(), "fa-solid fa-user-lock");
-							lockIcon.classList.add("bbmm-partial");
 						} else if (state === "soft") {
 							const softTitle = (LT.name_SoftLock());
 							lockIcon = mk(softTitle, "fa-regular fa-lock");
@@ -1637,7 +1409,7 @@ import { hlp_esc } from "./helpers.js";
 									const dot = id.indexOf(".");
 									const liveVal = game.settings.get(id.slice(0, dot), id.slice(dot + 1));
 									if (!objectsEqual(liveVal, rec.value)) {
-										lockIcon.classList.remove("bbmm-active", "bbmm-partial");
+										lockIcon.classList.remove("bbmm-active");
 										lockIcon.classList.add("bbmm-diverged");
 										lockIcon.title += `\n${LT.lockDivergedTip?.() || "Your current value differs from the locked value."}`;
 									}
@@ -1661,20 +1433,7 @@ import { hlp_esc } from "./helpers.js";
 							try {
 								ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
 								const dot = id.indexOf("."), ns = id.slice(0, dot), key = id.slice(dot + 1);
-								const val = game.settings.get(ns, key);
-								const picker = new BBMMUserPicker({
-									title: LT.titleSyncForUsers?.() || "Sync to Users",
-									settingId: id,
-									valuePreview: val,
-									confirmLabel: LT.dialogQueueSync?.() || "Queue Sync",
-									onlyOnline: true,
-									onConfirm: async (userIds) => {
-										_bbmmQueueOp({ op: "push", id, namespace: ns, key, value: val, userIds });
-										const msg = LT.infoQueuedSync?.({ module: id, count: userIds.length }) || `Queued sync for ${id} to ${userIds.length} users`;
-										ui.notifications.info(msg);
-									}
-								});
-								picker.render(true);
+								_bbmmConfirmPushToAll(id, ns, key, syncIcon);
 							} catch (err) { DL(2, `setting-sync.js | late-pass sync click error for ${id}`, err); }
 						});
 						bar.appendChild(syncIcon);
@@ -1736,10 +1495,8 @@ import { hlp_esc } from "./helpers.js";
 				return;
 			}
 
-			/* SETTINGS — apply pending SOFT locks at login (players only; jump ledger to world rev)
-			   Deferred until after all modules have fully registered their settings:
-			   - Primary:  Hooks.once("canvasReady") — fires after canvas init, well after all ready hooks
-			   - Fallback: setTimeout 2000ms — used when canvas is disabled or no scene is active */
+			/* Apply pending SOFT locks at login (players only), deferred until modules
+			   finish registering: canvasReady, or a 2000ms fallback if the canvas is off. */
 			if (!game.user?.isGM) {
 				const _softLoginApply = async () => { try {
 					const map    = game.settings.get(BBMM_ID, "userSettingSync") || {};
@@ -1797,10 +1554,8 @@ import { hlp_esc } from "./helpers.js";
 			/* GM BLOCK ======================================================================== */
 			if (game.user?.isGM) {
 
-				/* 	BBMM Lock: resnap userSettingSync ==========================================
-					- GM only
-					- Lock values are frozen; only refresh requiresReload if it drifted
-				============================================================================ */
+				/* BBMM Lock: resnap userSettingSync (GM only).
+				   Lock values are frozen; only refresh requiresReload if it drifted. */
 				const bbmmResnapUserSync = async () => {
 					try {
 						if (!game.user?.isGM) return;
@@ -1864,11 +1619,15 @@ import { hlp_esc } from "./helpers.js";
 
 				// GM: keep world map fresh, inject CSS, etc.
 				await bbmmResnapUserSync();
+
+				// One-time migration: convert legacy per-player (partial) locks to all-players
+				await checkPartialLockMigration();
+
 				DL("setting-sync.js |  bbmm-setting-lock: injected CSS");
 				return;
 			}
 
-			// Player: apply GM-enforced settings (initial) — SKIP soft entries (soft = push-on-enable only)
+			// Player: apply GM-enforced settings (initial), skip soft entries (soft = push-on-enable only)
 			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
 			console.log("[BBMM] Player login-apply: checking", Object.keys(syncMap).length, "locked settings");
 			const initialEntries = Object.values(syncMap);
@@ -2452,12 +2211,9 @@ import { hlp_esc } from "./helpers.js";
 		}
 	}
 
-	/*  Wire Control Config UI ======================================================
-		Decorate Controls Configuration window with Sync/Lock icons.
-		- Attach icons next to labels or controls.
-		- Handle click/shift/right gestures for lock/sync actions.
-		- Skip restricted/uneditable bindings.
-	============================================================================= */
+	/* ==========================================================================
+		Wire Control Config UI (Sync/Lock icons on the Controls window)
+	========================================================================== */
 	function _bbmmCtrlWireConfig(app, html) {
 		try {
 			// GM only; players see nothing
@@ -2544,7 +2300,7 @@ import { hlp_esc } from "./helpers.js";
 				} catch {}
 
 
-				// LEFT CLICK -> open minimal user picker, then IMMEDIATELY SYNC (no queue)
+				// LEFT CLICK -> open user picker, then push current bindings to the selected players
 				syncIcon.addEventListener("click", async (ev) => {
 					try {
 						ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
@@ -2567,29 +2323,30 @@ import { hlp_esc } from "./helpers.js";
 							return;
 						}
 
-						// CLICK => PICK USERS AND PUSH CURRENT BINDINGS (no locks)
-						DL(`controls: ${ns}.${action} | push to selected users`);
+						// CLICK => PICK PLAYERS AND PUSH CURRENT BINDINGS (no locks)
+						// Keybind sync keeps per-player targeting, unlike settings locks/sync.
+						DL(`controls: ${ns}.${action} | push to selected players`);
 						const cur = _bbmmCtrlBindings(ns, action); // snapshot current bindings
 
 						const picker = new BBMMUserPicker({
-						title: LT.titleSyncForUsers(),
-						settingId: `${ns}.${action}`,
-						valuePreview: cur,
-						confirmLabel: LT.buttons.btnSync(),
-						onlyOnline: true,
-						preChecked: "*",
-						onConfirm: async (userIds) => {
-							const targets = Array.isArray(userIds) ? userIds : [];
-							// one-shot push (no lock) — players apply immediately
-							game.socket?.emit?.(BBMM_SYNC_CH, {
-								t: "bbmm-ctrl-push",
-								namespace: ns,
-								action,
-								value: cur,
-								targets
-							});
-							ui.notifications?.info?.(`Synced ${ns}.${action} to ${targets.length} users.`);
-						}
+							title: LT.titleSyncForUsers(),
+							settingId: `${ns}.${action}`,
+							valuePreview: cur,
+							confirmLabel: LT.buttons.btnSync(),
+							onlyOnline: true,
+							preChecked: "*",
+							onConfirm: async (userIds) => {
+								const targets = Array.isArray(userIds) ? userIds : [];
+								// one-shot push (no lock), players apply immediately
+								game.socket?.emit?.(BBMM_SYNC_CH, {
+									t: "bbmm-ctrl-push",
+									namespace: ns,
+									action,
+									value: cur,
+									targets
+								});
+								ui.notifications?.info?.(`Synced ${ns}.${action} to ${targets.length} users.`);
+							}
 						});
 						picker.show();
 					} catch (err) {
@@ -2633,6 +2390,846 @@ import { hlp_esc } from "./helpers.js";
 			DL(`ctrlWireConfig(): groups=${groups.length}, attached=${attached}, skipped=${skipped}`);
 		} catch (err) { DL(2, 'ctrlWireConfig() failed', err); }
 	}
+
+/* =============================================================================
+	{ LOCK MANAGER }
+	Moved here from macros.js so the manager lives next to the sync/socket logic
+	it drives. Class renamed BBMMLockConfigurator -> BBMMLockManager. The picker
+	(BBMMLockPicker) is a sub-popup used only by the manager and moves with it.
+============================================================================= */
+
+	// single-line preview of any value (local copy; macros.js keeps its own)
+	function toPreview(v) {
+		try {
+			if (v === undefined) return "undefined";
+			if (v === null) return "null";
+			if (typeof v === "string") return v;
+			if (typeof v === "number" || typeof v === "boolean") return String(v);
+			return JSON.stringify(v);
+		} catch { return String(v); }
+	}
+
+	/* ==========================================================================
+		Lock write helper, shared by BBMMLockManager + BBMMLockPicker
+	========================================================================== */
+	async function _lc_writeLockChanges({ toAdd = [], toRemove = [] } = {}) {
+		const map    = game.settings.get(BBMM_ID, "userSettingSync") || {};
+		const revMap = game.settings.get(BBMM_ID, "softLockRevMap")  || {};
+		const nonGMIds = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+
+		let hardCount = 0, softCount = 0, removeCount = 0;
+		const softPushes = [], hardPushes = [];
+		let needsRefresh = false;
+
+		for (const { namespace, key } of toRemove) {
+			const id = `${namespace}.${key}`;
+			if (map[id]) { delete map[id]; removeCount++; needsRefresh = true; }
+		}
+
+		for (const { namespace, key, lockType, value } of toAdd) {
+			const id  = `${namespace}.${key}`;
+			const cfg = game.settings.settings.get(id);
+			if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) continue;
+
+			if (lockType === "locked") {
+				map[id] = { namespace, key, value, requiresReload: !!cfg.requiresReload };
+				hardPushes.push({ namespace, key, value, requiresReload: !!cfg.requiresReload });
+				hardCount++; needsRefresh = true;
+			} else if (lockType === "soft") {
+				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
+				const newRev     = currentRev + 1;
+				map[id]          = { namespace, key, value, requiresReload: !!cfg.requiresReload, soft: true, rev: newRev };
+				revMap[id]       = newRev;
+				softPushes.push({ namespace, key, value, requiresReload: !!cfg.requiresReload, softRev: newRev });
+				softCount++; needsRefresh = true;
+			}
+		}
+
+		await game.settings.set(BBMM_ID, "userSettingSync", map);
+		if (softPushes.length) await game.settings.set(BBMM_ID, "softLockRevMap", revMap);
+
+		if (game.socket && needsRefresh) {
+			setTimeout(() => game.socket.emit(BBMM_SYNC_CH, { t: "bbmm-sync-refresh" }), 300);
+			for (const sp of softPushes) {
+				game.socket.emit(BBMM_SYNC_CH, {
+					t: "bbmm-sync-push", soft: true, softRev: sp.softRev,
+					namespace: sp.namespace, key: sp.key, value: sp.value,
+					targets: nonGMIds, requiresReload: sp.requiresReload
+				});
+			}
+			for (const hp of hardPushes) {
+				game.socket.emit(BBMM_SYNC_CH, {
+					t: "bbmm-sync-push",
+					namespace: hp.namespace, key: hp.key, value: hp.value,
+					targets: null, requiresReload: hp.requiresReload
+				});
+			}
+		}
+
+		return { hardCount, softCount, removeCount };
+	}
+
+	/* ==========================================================================
+		Lock Manager, main window (list of current locks)
+	========================================================================== */
+	class BBMMLockManager extends foundry.applications.api.ApplicationV2 {
+		constructor() {
+			super({
+				id: "bbmm-lock-configurator",
+				window: { title: LT.lockConfigurator.title() },
+				width: 700,
+				height: 500,
+				resizable: true
+			});
+			this.filter = "";
+		}
+
+		_nsLabel(ns) {
+			if (ns === "core") return "Core Foundry";
+			if (ns === game.system?.id) return game.system?.title || ns;
+			return game.modules.get(ns)?.title || ns;
+		}
+
+		_loadRows() {
+			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			const rows = [];
+			for (const [id, entry] of Object.entries(syncMap)) {
+				const cfg = game.settings.settings.get(id);
+				const ns  = entry.namespace || id.slice(0, id.indexOf("."));
+				const key = entry.key      || id.slice(id.indexOf(".") + 1);
+				rows.push({
+					id,
+					namespace:   ns,
+					key,
+					lockType:    entry.soft ? "soft" : "locked",
+					value:       entry.value,
+					nsLabel:     this._nsLabel(ns),
+					settingName: cfg?.name ? (game.i18n.localize(cfg.name) || key) : key,
+					hint:        cfg?.hint ? (game.i18n.localize(cfg.hint) || "") : "",
+					isHidden:    cfg ? (cfg.config === false) : false
+				});
+			}
+			rows.sort((a, b) => a.namespace.localeCompare(b.namespace) || a.key.localeCompare(b.key));
+			return rows;
+		}
+
+		_rowHTML(r) {
+			const lockedSel = r.lockType === "locked" ? " selected" : "";
+			const softSel   = r.lockType === "soft"   ? " selected" : "";
+			const badge     = r.isHidden
+				? `<span class="bbmm-lc-hbadge">${LT.lockConfigurator.hiddenBadge()}</span>`
+				: "";
+			return `
+				<div class="bbmm-lc-row" data-id="${hlp_esc(r.id)}">
+					<div class="bbmm-lc-cell c-lock">
+						<select class="bbmm-lc-type" data-id="${hlp_esc(r.id)}">
+							<option value="locked"${lockedSel}>${LT.lockConfigurator.lockTypeLocked()}</option>
+							<option value="soft"${softSel}>${LT.lockConfigurator.lockTypeSoft()}</option>
+						</select>
+					</div>
+					<div class="bbmm-lc-cell c-ns" title="${hlp_esc(r.nsLabel)}">${hlp_esc(r.nsLabel)}</div>
+					<div class="bbmm-lc-cell c-setting">
+						<div class="bbmm-lc-name">${hlp_esc(r.settingName)} ${badge}</div>
+						${r.hint ? `<div class="bbmm-lc-hint">${hlp_esc(r.hint)}</div>` : ""}
+					</div>
+					<div class="bbmm-lc-cell c-value" title="${hlp_esc(toPreview(r.value))}"><code>${hlp_esc(toPreview(r.value))}</code></div>
+					<div class="bbmm-lc-cell c-actions">
+						<button type="button" class="bbmm-lc-edit" data-id="${hlp_esc(r.id)}">${LT.lockConfigurator.editBtn()}</button>
+					</div>
+				</div>`;
+		}
+
+		_getFilteredRows(allRows) {
+			const q = (this.filter || "").trim().toLowerCase();
+			if (!q) return allRows;
+			return allRows.filter(r =>
+				r.namespace.toLowerCase().includes(q) ||
+				r.key.toLowerCase().includes(q) ||
+				r.settingName.toLowerCase().includes(q)
+			);
+		}
+
+		_rerenderRows() {
+			if (!this._root) return;
+			const bodyEl  = this._root.querySelector("#bbmm-lc-body");
+			const countEl = this._root.querySelector("#bbmm-lc-count");
+			if (!bodyEl) return;
+			const allRows      = this._loadRows();
+			const filteredRows = this._getFilteredRows(allRows);
+			bodyEl.innerHTML   = filteredRows.length
+				? filteredRows.map(r => this._rowHTML(r)).join("")
+				: `<div class="bbmm-lc-empty">${LT.lockConfigurator.noLocks()}</div>`;
+			if (countEl) countEl.textContent = LT.lockConfigurator.activeCount({ count: allRows.length });
+		}
+
+		async _switchLockType(id, newLockType) {
+			if (!game.user?.isGM) return;
+			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			const entry   = syncMap[id];
+			if (!entry) return;
+			await _lc_writeLockChanges({
+				toAdd:    [{ namespace: entry.namespace, key: entry.key, lockType: newLockType, value: entry.value }],
+				toRemove: []
+			});
+			this._rerenderRows();
+		}
+
+		async _unlockSetting(id) {
+			if (!game.user?.isGM) { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
+			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			const entry   = syncMap[id];
+			if (!entry) return;
+			await _lc_writeLockChanges({ toAdd: [], toRemove: [{ namespace: entry.namespace, key: entry.key }] });
+			ui.notifications.info(LT.lockConfigurator.unlocked({ key: entry.key }));
+			this._rerenderRows();
+		}
+
+		// Edit dialog: same value/type editor as the settings-sheet lock dialog, applied now
+		async _editSetting(id) {
+			if (!game.user?.isGM) { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
+			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			const entry   = syncMap[id];
+			if (!entry) return;
+
+			const ns     = entry.namespace;
+			const key    = entry.key;
+			const cfg    = game.settings.settings.get(id);
+			const curVal = entry.value;
+			const isSoft = !!entry.soft;
+
+			const content = `
+				<div style="display:flex;flex-direction:column;gap:.75rem;min-width:480px;">
+					<div>${BBMMLockDialog._settingLabel(id, cfg, ns)}</div>
+					<div>
+						<div style="font-weight:600;margin-bottom:.25rem;">${LT.lockDialog.lockedValue()}</div>
+						<div class="bbmm-ld-value-wrap">${_bbmmBuildValueInput(cfg, curVal)}</div>
+					</div>
+					<div>
+						<div style="font-weight:600;margin-bottom:.25rem;">${LT.lockDialog.lockType()}</div>
+						<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:.2rem;">
+							<input type="radio" name="bbmm-ld-type" value="hard"${!isSoft ? " checked" : ""}>
+							<span><strong>${LT.lockDialog.hardLock()}</strong> - ${LT.lockDialog.hardLockDesc()}</span>
+						</label>
+						<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+							<input type="radio" name="bbmm-ld-type" value="soft"${isSoft ? " checked" : ""}>
+							<span><strong>${LT.lockDialog.softLock()}</strong> - ${LT.lockDialog.softLockDesc()}</span>
+						</label>
+					</div>
+				</div>`;
+
+			const dlg = new foundry.applications.api.DialogV2({
+				window: { title: LT.lockDialog.editLock(), modal: true, width: 500 },
+				content,
+				buttons: [
+					{
+						action: "save",
+						label: LT.buttons.save(),
+						default: true,
+						callback: async (event, button, dialog) => {
+							const root  = dialog.element ?? dialog;
+							const value = _bbmmReadValueInput(root, cfg, curVal);
+							if (value === undefined) return false;	// invalid JSON, keep dialog open
+							const typeEl   = root.querySelector('input[name="bbmm-ld-type"]:checked');
+							const lockType = typeEl?.value === "soft" ? "soft" : "locked";
+							await _lc_writeLockChanges({ toAdd: [{ namespace: ns, key, lockType, value }], toRemove: [] });
+							this._rerenderRows();
+							return true;
+						}
+					},
+					{
+						action: "unlock",
+						label: LT.lockDialog.unlock(),
+						callback: async () => { await this._unlockSetting(id); return true; }
+					},
+					{ action: "cancel", label: LT.buttons.cancel() }
+				]
+			});
+			await dlg.render(true);
+		}
+
+		_openPicker() {
+			new BBMMLockPicker(this).render(true);
+		}
+
+		async _renderHTML() {
+			const allRows      = this._loadRows();
+			const filteredRows = this._getFilteredRows(allRows);
+			const bodyHTML     = filteredRows.length
+				? filteredRows.map(r => this._rowHTML(r)).join("")
+				: `<div class="bbmm-lc-empty">${LT.lockConfigurator.noLocks()}</div>`;
+
+			const cols = "130px 130px 1fr 140px 76px";
+			const css  = `
+				#bbmm-lock-configurator .window-content{display:flex;flex-direction:column;padding:.4rem !important}
+				#bbmm-lock-configurator .bbmm-lc-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.4rem}
+				#bbmm-lock-configurator .bbmm-lc-toolbar{display:flex;gap:.5rem;align-items:center}
+				#bbmm-lock-configurator .bbmm-lc-toolbar input{flex:1}
+				#bbmm-lock-configurator .bbmm-lc-head{display:grid;grid-template-columns:${cols};border:1px solid var(--color-border,#444);border-radius:.4rem .4rem 0 0;background:var(--color-bg-header,#1e1e1e)}
+				#bbmm-lock-configurator .bbmm-lc-head .h{padding:.25rem .4rem;border-bottom:1px solid #444;font-weight:600;line-height:1.2}
+				#bbmm-lock-configurator .bbmm-lc-body{display:block;flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--color-border,#444);border-top:0;border-radius:0 0 .4rem .4rem}
+				#bbmm-lock-configurator .bbmm-lc-row{display:grid;grid-template-columns:${cols};border-bottom:1px solid #333;align-items:start}
+				#bbmm-lock-configurator .bbmm-lc-cell{padding:.25rem .4rem;min-width:0}
+				#bbmm-lock-configurator .c-ns{font-size:.85em;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+				#bbmm-lock-configurator .c-value code{font-size:.8em;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+				#bbmm-lock-configurator .bbmm-lc-name{font-weight:500}
+				#bbmm-lock-configurator .bbmm-lc-hint{font-size:.8em;opacity:.6;margin-top:.1rem}
+				#bbmm-lock-configurator .bbmm-lc-hbadge{display:inline-block;padding:.05em .35em;border-radius:3px;font-size:.75em;background:rgba(255,200,0,.2);border:1px solid rgba(255,200,0,.35);margin-left:.25rem;vertical-align:middle}
+				#bbmm-lock-configurator .bbmm-lc-empty{padding:2rem;text-align:center;opacity:.6;font-style:italic}
+				#bbmm-lock-configurator .bbmm-lc-footer{display:flex;justify-content:space-between;align-items:center;padding:.35rem .4rem 0;border-top:1px solid #333;flex-shrink:0}
+			`;
+
+			return (
+				`<style>${css}</style>` +
+				`<div class="bbmm-lc-root">` +
+					`<div class="bbmm-lc-toolbar">` +
+						`<input id="bbmm-lc-filter" type="text" placeholder="${hlp_esc(LT.lockConfigurator.filterPlaceholder())}" value="${hlp_esc(this.filter ?? "")}" />` +
+						`<button type="button" id="bbmm-lc-add-top">${LT.lockConfigurator.addLocks()}</button>` +
+					`</div>` +
+					`<div class="bbmm-lc-head">` +
+						`<div class="h">${LT.lockConfigurator.colLockType()}</div>` +
+						`<div class="h">${LT.lockConfigurator.colNamespace()}</div>` +
+						`<div class="h">${LT.lockConfigurator.colSetting()}</div>` +
+						`<div class="h">${LT.lockConfigurator.colValue()}</div>` +
+						`<div class="h"></div>` +
+					`</div>` +
+					`<div class="bbmm-lc-body" id="bbmm-lc-body">${bodyHTML}</div>` +
+					`<div class="bbmm-lc-footer">` +
+						`<span id="bbmm-lc-count">${LT.lockConfigurator.activeCount({ count: allRows.length })}</span>` +
+						`<button type="button" id="bbmm-lc-add-bottom">${LT.lockConfigurator.addLocks()}</button>` +
+					`</div>` +
+				`</div>`
+			);
+		}
+
+		async _replaceHTML(result, _options) {
+			const content = this.element.querySelector(".window-content") || this.element;
+			Object.assign(content.style, { display:"flex", flexDirection:"column", height:"100%", minHeight:"0" });
+
+			try {
+				const winEl = this.element;
+				winEl.style.minWidth  = "500px";
+				winEl.style.maxWidth  = "1000px";
+				winEl.style.minHeight = "300px";
+				winEl.style.maxHeight = "700px";
+				winEl.style.overflow  = "hidden";
+			} catch {}
+
+			content.innerHTML = result;
+			this._root = content;
+
+			this._bind(this._root);
+
+			try { this.setPosition({ height: "auto", left: null, top: null }); } catch {}
+		}
+
+		// Delegated listeners; bound once to the persistent root (window-content or pane wrapper).
+		_bind(root) {
+			if (this._delegated) { this._rerenderRows(); return; }
+			this._delegated = true;
+
+			// All events bound to root so they survive future innerHTML replacements of children
+			let debTimer = null;
+			root.addEventListener("input", (ev) => {
+				const el = ev.target.closest?.("#bbmm-lc-filter");
+				if (!el) return;
+				clearTimeout(debTimer);
+				debTimer = setTimeout(() => { this.filter = el.value ?? ""; this._rerenderRows(); }, 150);
+			}, { passive: true });
+
+			root.addEventListener("click", (ev) => {
+				if (ev.target.closest?.("#bbmm-lc-add-top") || ev.target.closest?.("#bbmm-lc-add-bottom")) {
+					this._openPicker(); return;
+				}
+				const btn = ev.target.closest?.(".bbmm-lc-edit");
+				if (btn) this._editSetting(btn.dataset.id);
+			});
+
+			root.addEventListener("change", (ev) => {
+				const sel = ev.target.closest?.(".bbmm-lc-type");
+				if (sel) this._switchLockType(sel.dataset.id, sel.value);
+			});
+		}
+
+		// Mount into a toolbox pane. Reuses _renderHTML + _bind; binds to a persistent
+		// inner wrapper whose id scopes the inline styles, so switching tabs can't double-bind.
+		async _bbmmMountInto(container) {
+			this._bbmmEmbed = container;
+			if (!this._paneWrap || !container.contains(this._paneWrap)) {
+				this._paneWrap = document.createElement("div");
+				this._paneWrap.id = "bbmm-lock-configurator";
+				container.replaceChildren(this._paneWrap);
+				this._delegated = false;
+			}
+			const wrap = this._paneWrap;
+			wrap.innerHTML = await this._renderHTML();
+			this._root = wrap;
+			this._bind(wrap);
+		}
+	}
+
+	/* ==========================================================================
+		Lock Picker, add-locks dialog (sub-popup of the Lock Manager)
+	========================================================================== */
+	class BBMMLockPicker extends foundry.applications.api.ApplicationV2 {
+		constructor(parentConfigurator) {
+			super({
+				id: "bbmm-lock-picker",
+				window: { title: LT.lockPicker.title() },
+				width: 1825,
+				height: 600,
+				resizable: true
+			});
+			this._parent          = parentConfigurator;
+			this._staged          = new Map();
+			this._selectedNs      = "";
+			this.filter           = "";
+			this._showUnlabeled   = false;
+		}
+
+		_nsLabel(ns) {
+			if (ns === "core") return "Core Foundry";
+			if (ns === game.system?.id) return game.system?.title || ns;
+			return game.modules.get(ns)?.title || ns;
+		}
+
+		_listNamespaces() {
+			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			const nsSet   = new Set();
+			for (const [fullKey, cfg] of game.settings.settings.entries()) {
+				if (cfg.__isMenu) continue;
+				if (cfg.scope !== "user" && cfg.scope !== "client") continue;
+				if (syncMap[fullKey]) continue;
+				if (this._staged.has(fullKey)) continue;
+				const idx = fullKey.indexOf(".");
+				if (idx <= 0) continue;
+				nsSet.add(fullKey.slice(0, idx));
+			}
+			const list = Array.from(nsSet);
+			list.sort((a, b) => {
+				if (a === "core") return -1; if (b === "core") return 1;
+				const sysId = game.system?.id;
+				if (a === sysId) return -1; if (b === sysId) return 1;
+				return this._nsLabel(a).localeCompare(this._nsLabel(b));
+			});
+			return list;
+		}
+
+		_loadNamespaceRows(ns) {
+			if (!ns) return [];
+			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			const rows    = [];
+			for (const [fullKey, cfg] of game.settings.settings.entries()) {
+				const idx = fullKey.indexOf(".");
+				if (idx <= 0) continue;
+				if (fullKey.slice(0, idx) !== ns) continue;
+				if (cfg.__isMenu) continue;
+				if (cfg.scope !== "user" && cfg.scope !== "client") continue;
+				if (syncMap[fullKey]) continue;
+				if (this._staged.has(fullKey)) continue;
+				const key            = fullKey.slice(idx + 1);
+				const rawName        = cfg.name ? game.i18n.localize(cfg.name) : "";
+				const isUnlabeled    = !rawName || (rawName === cfg.name && cfg.name.includes("."));
+				if (isUnlabeled && !this._showUnlabeled) continue;
+				const settingName    = isUnlabeled ? key : rawName;
+				let value;
+				try { value = game.settings.get(ns, key); } catch { value = null; }
+				rows.push({
+					id:          fullKey,
+					namespace:   ns,
+					key,
+					cfg,
+					value,
+					settingName,
+					hint:        cfg.hint ? (game.i18n.localize(cfg.hint) || "") : "",
+					isHidden:    cfg.config === false,
+					isUnlabeled
+				});
+			}
+			rows.sort((a, b) => {
+				if (a.isHidden !== b.isHidden) return a.isHidden ? 1 : -1;
+				return a.key.localeCompare(b.key);
+			});
+			return rows;
+		}
+
+		_valueInputHTML(cfg, value) {
+			// boolean type check first, also catches typeof boolean values
+			if (cfg.type === Boolean || typeof value === "boolean") {
+				return `<input type="checkbox" class="bbmm-lp-val"${value ? " checked" : ""}>`;
+			}
+
+			// Choices: plain object, array, function, or DataField-style (cfg.type.choices)
+			// Normalize whatever shape we find into a plain { key: label } object
+			const _resolveChoices = (raw) => {
+				if (!raw) return null;
+				if (typeof raw === "function") { try { raw = raw(); } catch { return null; } }
+				if (Array.isArray(raw)) {
+					// Array of strings: value === label; array of {value,label} objects
+					const obj = {};
+					for (const item of raw) {
+						if (item && typeof item === "object" && "value" in item) obj[String(item.value)] = String(item.label ?? item.value);
+						else obj[String(item)] = String(item);
+					}
+					return Object.keys(obj).length ? obj : null;
+				}
+				if (typeof raw === "object" && !Array.isArray(raw) && Object.keys(raw).length) return raw;
+				return null;
+			};
+			let choices = _resolveChoices(cfg.choices) ?? _resolveChoices(cfg.type?.choices);
+			if (choices) {
+				const strVal = String(value ?? "");
+				const opts   = Object.entries(choices)
+					.map(([k, label]) => `<option value="${hlp_esc(k)}"${strVal === k ? " selected" : ""}>${hlp_esc(game.i18n.localize(String(label)))}</option>`)
+					.join("");
+				return `<select class="bbmm-lp-val">${opts}</select>`;
+			}
+
+			// Number: explicit type or typeof fallback
+			if (cfg.type === Number || typeof value === "number") {
+				return `<input type="number" class="bbmm-lp-val" step="any" value="${hlp_esc(String(value ?? 0))}">`;
+			}
+
+			// String: explicit type or typeof fallback
+			if (cfg.type === String || typeof value === "string") {
+				return `<input type="text" class="bbmm-lp-val" value="${hlp_esc(String(value ?? ""))}">`;
+			}
+
+			// Fallback for objects/arrays/unknown: preview + pop-out JSON editor
+			let jsonStr = "";
+			try { jsonStr = JSON.stringify(value); } catch { jsonStr = String(value ?? ""); }
+			let prettyPreview = "";
+			try { prettyPreview = JSON.stringify(value, null, 2); } catch { prettyPreview = jsonStr; }
+			return `<div class="bbmm-json-editor-wrap" style="display:flex;flex-direction:column;gap:.2rem;min-width:0;">` +
+				`<code class="bbmm-json-preview" style="display:block;white-space:pre-wrap;word-break:break-all;font-size:.8em;opacity:.85;max-height:13em;overflow-y:auto;">${hlp_esc(prettyPreview)}</code>` +
+				`<button type="button" class="bbmm-json-edit-btn" style="align-self:flex-start;white-space:nowrap;">${LT.lockPicker.jsonEditorBtn?.() ?? "Edit JSON…"}</button>` +
+				`<input type="hidden" class="bbmm-lp-val" value="${hlp_esc(jsonStr)}">` +
+				`</div>`;
+		}
+
+		_readInputValue(inputEl, cfg) {
+			if (!inputEl) return undefined;
+			if (inputEl.type === "checkbox") return inputEl.checked;
+			if (inputEl.tagName === "TEXTAREA" || inputEl.type === "hidden") {
+				try { return JSON.parse(inputEl.value); }
+				catch { ui.notifications.warn(LT.lockPicker.invalidJSON()); return undefined; }
+			}
+			if (inputEl.type === "number") {
+				const n = Number(inputEl.value);
+				return Number.isFinite(n) ? n : 0;
+			}
+			return inputEl.value;
+		}
+
+		_rowHTML(r) {
+			const hiddenBadge    = r.isHidden
+				? `<span class="bbmm-lp-hbadge">${LT.lockPicker.hiddenBadge()}</span>`
+				: "";
+			const unlabeledBadge = r.isUnlabeled
+				? `<span class="bbmm-lp-ulbadge">${LT.lockPicker.unlabeledBadge()}</span>`
+				: "";
+			const badge = hiddenBadge + unlabeledBadge;
+			return `
+				<div class="bbmm-lp-row" data-id="${hlp_esc(r.id)}" data-ns="${hlp_esc(r.namespace)}" data-key="${hlp_esc(r.key)}">
+					<div class="bbmm-lp-cell c-setting">
+						<div class="bbmm-lp-name">${hlp_esc(r.settingName)} ${badge}</div>
+						${r.hint ? `<div class="bbmm-lp-hint">${hlp_esc(r.hint)}</div>` : ""}
+					</div>
+					<div class="bbmm-lp-cell c-value">${this._valueInputHTML(r.cfg, r.value)}</div>
+					<div class="bbmm-lp-cell c-actions">
+						<button type="button" class="bbmm-lp-lock" data-id="${hlp_esc(r.id)}">${LT.lockPicker.lockBtn()}</button>
+						<button type="button" class="bbmm-lp-soft" data-id="${hlp_esc(r.id)}">${LT.lockPicker.softLockBtn()}</button>
+					</div>
+				</div>`;
+		}
+
+		_stageRow(id, lockType, rowEl) {
+			const cfg     = game.settings.settings.get(id);
+			const inputEl = rowEl.querySelector(".bbmm-lp-val");
+			const value   = this._readInputValue(inputEl, cfg);
+			if (value === undefined) return;
+			this._staged.set(id, { namespace: rowEl.dataset.ns, key: rowEl.dataset.key, lockType, value });
+			rowEl.remove();
+			this._updateStagingBadge();
+		}
+
+		_updateStagingBadge() {
+			if (!this._root) return;
+			const count   = this._staged.size;
+			const badge   = this._root.querySelector("#bbmm-lp-staged");
+			const summary = this._root.querySelector("#bbmm-lp-staged-summary");
+			const saveBtn = this._root.querySelector("#bbmm-lp-save");
+			const rowsEl  = this._root.querySelector("#bbmm-lp-rows");
+
+			if (badge) {
+				badge.textContent   = count > 0 ? LT.lockPicker.stagedCount({ count }) : "";
+				badge.style.display = count > 0 ? "" : "none";
+			}
+			if (summary) summary.textContent = LT.lockPicker.stagedSummary({ count });
+			if (saveBtn) saveBtn.disabled    = count === 0;
+
+			if (rowsEl && !rowsEl.querySelector(".bbmm-lp-row")) {
+				rowsEl.innerHTML = `<div class="bbmm-lp-empty">${LT.lockPicker.noSettings()}</div>`;
+			}
+		}
+
+		async _openJsonEditor(hiddenInput, keyLabel) {
+			let pretty = "";
+			try { pretty = JSON.stringify(JSON.parse(hiddenInput.value), null, 2); }
+			catch { pretty = hiddenInput.value; }
+
+			const newVal = await new Promise((resolve) => {
+				new foundry.applications.api.DialogV2({
+					window: { title: LT.lockPicker.jsonEditorTitle({ key: keyLabel }), modal: false },
+					position: { width: 500 },
+					content: `<textarea name="jsonVal" style="width:100%;min-height:280px;font-family:monospace;font-size:.85em;resize:vertical;box-sizing:border-box;">${hlp_esc(pretty)}</textarea>`,
+					buttons: [
+						{ action: "apply", label: LT.lockPicker.jsonEditorApply?.() ?? "Apply", default: true, callback: (_ev, btn) => resolve(btn.form.elements.jsonVal?.value ?? "") },
+						{ action: "cancel", label: LT.lockPicker.cancel?.() ?? "Cancel", callback: () => resolve(null) },
+					],
+					submit: () => {},
+					rejectClose: false,
+				}).render(true);
+			});
+
+			if (newVal === null) return;
+
+			try { JSON.parse(newVal); }
+			catch { ui.notifications.warn(LT.lockPicker.invalidJSON()); return; }
+
+			hiddenInput.value = newVal;
+			const previewEl = hiddenInput.closest(".bbmm-json-editor-wrap")?.querySelector(".bbmm-json-preview");
+			if (previewEl) {
+				try { previewEl.textContent = JSON.stringify(JSON.parse(newVal), null, 2); }
+				catch { previewEl.textContent = newVal; }
+			}
+		}
+
+		_renderNamespaceRows(ns) {
+			const rowsEl = this._root?.querySelector("#bbmm-lp-rows");
+			if (!rowsEl) return;
+			const q    = (this.filter || "").trim().toLowerCase();
+			let rows   = this._loadNamespaceRows(ns);
+			if (q) rows = rows.filter(r => r.key.toLowerCase().includes(q) || r.settingName.toLowerCase().includes(q));
+			rowsEl.innerHTML = rows.length
+				? rows.map(r => this._rowHTML(r)).join("")
+				: `<div class="bbmm-lp-empty">${LT.lockPicker.noSettings()}</div>`;
+		}
+
+		async _saveLocks() {
+			if (!game.user?.isGM)   { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
+			if (!this._staged.size) { ui.notifications.warn(LT.lockPicker.nothingStaged()); return; }
+			const { hardCount, softCount } = await _lc_writeLockChanges({ toAdd: [...this._staged.values()], toRemove: [] });
+			ui.notifications.info(LT.lockPicker.saved({ hard: hardCount, soft: softCount }));
+			this._staged.clear();
+			try { this._parent?._rerenderRows(); } catch {}
+			await this.close();
+		}
+
+		async _renderHTML() {
+			const namespaces = this._listNamespaces();
+			if (!this._selectedNs && namespaces.length) this._selectedNs = namespaces[0];
+
+			const nsOpts = namespaces.map(ns =>
+				`<option value="${hlp_esc(ns)}"${ns === this._selectedNs ? " selected" : ""}>${hlp_esc(this._nsLabel(ns))}</option>`
+			).join("");
+
+			const rows   = this._selectedNs ? this._loadNamespaceRows(this._selectedNs) : [];
+			const q      = (this.filter || "").trim().toLowerCase();
+			const filt   = q ? rows.filter(r => r.key.toLowerCase().includes(q) || r.settingName.toLowerCase().includes(q)) : rows;
+			const bodyHTML = filt.length
+				? filt.map(r => this._rowHTML(r)).join("")
+				: `<div class="bbmm-lp-empty">${LT.lockPicker.noSettings()}</div>`;
+
+			const staged = this._staged.size;
+
+			return (
+				`<div class="bbmm-lp-root">` +
+					`<div class="bbmm-lp-toolbar">` +
+						`<select id="bbmm-lp-ns">${nsOpts}</select>` +
+						`<input id="bbmm-lp-filter" type="text" placeholder="${hlp_esc(LT.lockPicker.filterPlaceholder())}" value="${hlp_esc(this.filter ?? "")}" />` +
+						`<label class="bbmm-lp-unlabeled-label" title="${hlp_esc(LT.lockPicker.includeUnlabeledTooltip())}">` +
+							`<input type="checkbox" id="bbmm-lp-unlabeled"${this._showUnlabeled ? " checked" : ""}>` +
+							hlp_esc(LT.lockPicker.includeUnlabeled()) +
+						`</label>` +
+						`<span id="bbmm-lp-staged" class="bbmm-lp-sbadge" style="${staged > 0 ? "" : "display:none;"}">${staged > 0 ? LT.lockPicker.stagedCount({ count: staged }) : ""}</span>` +
+					`</div>` +
+					`<div class="bbmm-lp-body" id="bbmm-lp-body">` +
+						`<div class="bbmm-lp-head">` +
+							`<div class="h">${LT.lockPicker.colSetting()}</div>` +
+							`<div class="h">${LT.lockPicker.colValue()}</div>` +
+							`<div class="h"></div>` +
+						`</div>` +
+						`<div id="bbmm-lp-rows">${bodyHTML}</div>` +
+					`</div>` +
+					`<div class="bbmm-lp-footer">` +
+						`<span id="bbmm-lp-staged-summary">${LT.lockPicker.stagedSummary({ count: staged })}</span>` +
+						`<div class="bbmm-lp-fbtns">` +
+							`<button type="button" id="bbmm-lp-cancel">${LT.lockPicker.cancel()}</button>` +
+							`<button type="button" id="bbmm-lp-save"${staged === 0 ? " disabled" : ""}>${LT.lockPicker.saveLocks()}</button>` +
+						`</div>` +
+					`</div>` +
+				`</div>`
+			);
+		}
+
+		static _LP_COLS = "525px 400px 150px";
+
+		static _ensureStyles() {
+			const id = "bbmm-lock-picker-styles";
+			if (document.getElementById(id)) return;
+			const cols = BBMMLockPicker._LP_COLS;
+			const css = `
+				#bbmm-lock-picker .window-content{display:flex;flex-direction:column;padding:.4rem !important}
+				#bbmm-lock-picker .bbmm-lp-root{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:.4rem;overflow-x:hidden}
+				#bbmm-lock-picker .bbmm-lp-toolbar{display:flex;gap:.5rem;align-items:center}
+				#bbmm-lock-picker .bbmm-lp-toolbar select{flex:0 1 200px;min-width:100px;max-width:200px}
+				#bbmm-lock-picker .bbmm-lp-toolbar input{flex:1;min-width:0}
+				#bbmm-lock-picker .bbmm-lp-sbadge{display:inline-block;padding:.1em .5em;border-radius:3px;font-size:.85em;background:rgba(80,160,80,.3);border:1px solid rgba(80,160,80,.4)}
+				#bbmm-lock-picker .bbmm-lp-body{display:block;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;border:1px solid var(--color-border,#444);border-radius:.4rem}
+				#bbmm-lock-picker .bbmm-lp-head{display:grid;grid-template-columns:${cols};position:sticky;top:0;z-index:1;background:var(--color-bg-header,#1e1e1e);border-bottom:1px solid #444}
+				#bbmm-lock-picker .bbmm-lp-head .h{padding:.25rem .4rem;font-weight:600;min-width:0;overflow:hidden}
+				#bbmm-lock-picker .bbmm-lp-row{display:grid;grid-template-columns:${cols};border-bottom:1px solid #333;align-items:start;overflow:hidden}
+				#bbmm-lock-picker .bbmm-lp-cell{padding:.25rem .4rem;min-width:0;overflow:hidden}
+				#bbmm-lock-picker .bbmm-lp-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+				#bbmm-lock-picker .bbmm-lp-hint{font-size:.8em;opacity:.6;margin-top:.1rem;overflow-wrap:break-word;word-break:break-word;white-space:normal}
+				#bbmm-lock-picker .bbmm-lp-hbadge{display:inline-block;padding:.05em .35em;border-radius:3px;font-size:.75em;background:rgba(255,200,0,.2);border:1px solid rgba(255,200,0,.35);margin-left:.25rem;vertical-align:middle}
+				#bbmm-lock-picker .bbmm-lp-ulbadge{display:inline-block;padding:.05em .35em;border-radius:3px;font-size:.75em;background:rgba(200,100,255,.2);border:1px solid rgba(200,100,255,.35);margin-left:.25rem;vertical-align:middle}
+				#bbmm-lock-picker .bbmm-lp-unlabeled-label{display:flex;align-items:center;gap:.3rem;white-space:nowrap;cursor:pointer;font-size:.9em;flex-shrink:0}
+				#bbmm-lock-picker .c-value .bbmm-lp-val{width:100%}
+				#bbmm-lock-picker .c-actions{display:flex;gap:.25rem;align-items:center;flex-wrap:wrap;padding-top:.2rem}
+				#bbmm-lock-picker .bbmm-lp-empty{padding:2rem;text-align:center;opacity:.6;font-style:italic}
+				#bbmm-lock-picker .bbmm-lp-footer{display:flex;justify-content:space-between;align-items:center;padding:.35rem .4rem 0;border-top:1px solid #333;flex-shrink:0}
+				#bbmm-lock-picker .bbmm-lp-fbtns{display:flex;gap:.5rem}
+			`;
+			const el = document.createElement("style");
+			el.id = id;
+			el.textContent = css;
+			document.head.appendChild(el);
+		}
+
+		async _replaceHTML(result, _options) {
+			BBMMLockPicker._ensureStyles();
+
+			const content = this.element.querySelector(".window-content") || this.element;
+			Object.assign(content.style, { display:"flex", flexDirection:"column", height:"100%", minHeight:"0" });
+
+			try {
+				const winEl = this.element;
+				winEl.style.minWidth  = "600px";
+				winEl.style.minHeight = "400px";
+				winEl.style.maxHeight = "750px";
+				winEl.style.overflow  = "hidden";
+			} catch {}
+
+			content.innerHTML = result;
+			this._root = content;
+
+			if (this._delegated) return;
+			this._delegated = true;
+
+			const root = this._root;
+
+			root.addEventListener("change", (ev) => {
+				const ns = ev.target.closest?.("#bbmm-lp-ns");
+				if (ns) {
+					this._selectedNs = ns.value || "";
+					this.filter = "";
+					const f = root.querySelector("#bbmm-lp-filter");
+					if (f) f.value = "";
+					this._renderNamespaceRows(this._selectedNs);
+					return;
+				}
+				const unlabeled = ev.target.closest?.("#bbmm-lp-unlabeled");
+				if (unlabeled) {
+					this._showUnlabeled = unlabeled.checked;
+					this._renderNamespaceRows(this._selectedNs);
+					return;
+				}
+			});
+
+			let debTimer = null;
+			root.addEventListener("input", (ev) => {
+				const el = ev.target.closest?.("#bbmm-lp-filter");
+				if (!el) return;
+				clearTimeout(debTimer);
+				debTimer = setTimeout(() => { this.filter = el.value ?? ""; this._renderNamespaceRows(this._selectedNs); }, 150);
+			}, { passive: true });
+
+			root.addEventListener("click", (ev) => {
+				const editBtn = ev.target.closest?.(".bbmm-json-edit-btn");
+				if (editBtn) {
+					const wrap = editBtn.closest?.(".bbmm-json-editor-wrap");
+					const hiddenInput = wrap?.querySelector(".bbmm-lp-val");
+					const row = editBtn.closest?.(".bbmm-lp-row");
+					if (hiddenInput) this._openJsonEditor(hiddenInput, row?.dataset?.key ?? "");
+					return;
+				}
+				const lock = ev.target.closest?.(".bbmm-lp-lock");
+				if (lock) { const row = lock.closest?.(".bbmm-lp-row"); if (row) { this._stageRow(lock.dataset.id, "locked", row); return; } }
+				const soft = ev.target.closest?.(".bbmm-lp-soft");
+				if (soft) { const row = soft.closest?.(".bbmm-lp-row"); if (row) { this._stageRow(soft.dataset.id, "soft", row); return; } }
+				if (ev.target.closest?.("#bbmm-lp-save"))   { this._saveLocks(); return; }
+				if (ev.target.closest?.("#bbmm-lp-cancel")) { this.close(); return; }
+			});
+
+			try { this.setPosition({ height: "auto", left: null, top: null }); } catch {}
+		}
+	}
+
+	/* ==========================================================================
+		Lock Manager openers + API registration
+		openLockManager() is the canonical opener; openLockConfigurator() is kept
+		as a back-compat alias for existing macros / globalThis.bbmm references.
+	========================================================================== */
+	export async function openLockManager() {
+		globalThis.bbmm?.openBBMMToolbox?.({ tool: "lockManager" });
+	}
+
+	// Back-compat alias
+	export async function openLockConfigurator() {
+		return openLockManager();
+	}
+
+	// Toolbox pane: mounts BBMMLockManager into the pane.
+	async function mountLockManager(container) {
+		if (!game.user?.isGM) {
+			container.innerHTML = `<div class="bbmm-tb-placeholder">${LT.lockConfigurator.gmOnly()}</div>`;
+			return;
+		}
+
+		try {
+			const app = new BBMMLockManager();
+			await app._bbmmMountInto(container);
+		} catch (err) {
+			DL(3, "setting-sync.js | mountLockManager(): error", err);
+			container.innerHTML = `<div class="bbmm-tb-placeholder">${LT.lockConfigurator.failedOpen()}</div>`;
+		}
+	}
+
+	Hooks.once("init", () => {
+		try {
+			globalThis.bbmm ??= {};
+			globalThis.bbmm.openLockManager = openLockManager;
+			globalThis.bbmm.openLockConfigurator = openLockConfigurator;
+			const mod = game.modules.get(BBMM_ID);
+			if (mod) { mod.api = mod.api || {}; Object.assign(mod.api, { openLockManager, openLockConfigurator }); }
+			DL("setting-sync.js | init(): Lock Manager API registered");
+		} catch (err) {
+			DL(3, "setting-sync.js | init(): failed to register Lock Manager API", err);
+		}
+	});
+
+	// Register the Lock Manager as a toolbox tool.
+	globalThis.bbmm ??= {};
+	globalThis.bbmm.toolboxTools ??= [];
+	globalThis.bbmm.toolboxTools.push({
+		id: "lockManager",
+		icon: "fa-solid fa-lock",
+		label: () => LT.toolbox.tabLockManager(),
+		visible: () => game.user.isGM,
+		group: null,
+		mount: async (container) => { await mountLockManager(container); }
+	});
 
 /* =============================================================================
 	{ CONTROLS SYNC HOOKS}
