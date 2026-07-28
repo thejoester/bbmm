@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-07-28
+
+### Fixed
+- **macro - Setting Preset Inspector:** Inspecting a preset whose name contains an apostrophe (or other special characters) no longer breaks the window; the list scrolls correctly again. The preset name is now sanitized before it is used as the window's element id.
+
 ## [1.4.0] - 2026-07-26
 
 ### Added

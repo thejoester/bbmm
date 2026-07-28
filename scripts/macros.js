@@ -741,8 +741,10 @@ async function getAllSettingsPresets() {
 
 class BBMMPresetInspector extends foundry.applications.api.ApplicationV2 {
 	constructor({ name, items }) {
+		// sanitize name for DOM id, invalid chars (', space, etc.) break the #id CSS selectors and kill scrolling
+		const safeId = `bbmm-preset-inspector-${String(name ?? "").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 		super({
-			id: `bbmm-preset-inspector-${name}`,
+			id: safeId,
 			window: {title: LT.macro.inspectSettingsPresetName({name})},
 			width: 1200,
 			height: 600,
