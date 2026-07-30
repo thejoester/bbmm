@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - **Localization:**
-  - Corrected grammar in `em.json`.
+  - Corrected grammar in `en.json`.
   - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 
 ## [1.4.1] - 2026-07-28
