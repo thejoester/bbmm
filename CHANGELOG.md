@@ -4,27 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-07-29
+
+### Changed
+- **Localization:**
+  - Corrected grammar in `en.json`.
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
 ## [1.4.1] - 2026-07-28
 
 ### Fixed
-- **macro - Setting Preset Inspector:** Inspecting a preset whose name contains an apostrophe (or other special characters) no longer breaks the window; the list scrolls correctly again. The preset name is now sanitized before it is used as the window's element id.
+- **Macro - Setting Preset Inspector:** 
+  - Inspecting a preset whose name contains an apostrophe (or other special characters) no longer breaks the window; the list scrolls correctly again. The preset name is now sanitized before it is used as the window's element id.
 
 ## [1.4.0] - 2026-07-26
 
 ### Added
-- **BBMM Toolbox:** Most of BBMM's tools now live in one window. A list of tabs runs down the left side (Module Presets, Settings Presets, Lock Presets, Inclusions / Exclusions, Settings Locks, Tag Manager, Import / Export), and clicking a tab opens that tool on the right. This replaces the old setup where each manager opened in its own separate window.
-  - The **BBMM** button in the header now opens the Toolbox directly, no more dropdown menu.
-  - Players only see the tools that apply to them.
-  - **Utilities tab (GM only):** The BBMM utility macros (Game Settings Inspector, Setting Preset Inspector, Setting Lock Push Tool, and more) are now a click away on the Utilities tab, no need to dig through the compendium.
-  - **Read Me tab:** Opens the built-in BBMM manual.
-  - **Setting Sync:** After updating, GMs who still have older per-player locks get a one-time prompt on login to either apply those locks to all players or remove them (or decide later, and the prompt comes back next login).
+- **BBMM Toolbox:** 
+  - Most of BBMM's tools now live in one window. A list of tabs runs down the left side (Module Presets, Settings Presets, Lock Presets, Inclusions / Exclusions, Settings Locks, Tag Manager, Import / Export), and clicking a tab opens that tool on the right. This replaces the old setup where each manager opened in its own separate window.
+    - The **BBMM** button in the header now opens the Toolbox directly, no more dropdown menu.
+    - Players only see the tools that apply to them.
+    - **Utilities tab (GM only):** The BBMM utility macros (Game Settings Inspector, Setting Preset Inspector, Setting Lock Push Tool, and more) are now a click away on the Utilities tab, no need to dig through the compendium.
+    - **Read Me tab:** Opens the built-in BBMM manual.
+    - **Setting Sync:** After updating, GMs who still have older per-player locks get a one-time prompt on login to either apply those locks to all players or remove them (or decide later, and the prompt comes back next login).
 
 ### Changed
-- **Settings Presets:** The Settings Presets tab now opens the right version automatically. GMs manage the shared world presets as before; players get their own personal presets that only affect their own settings. No difference in how you use it.
-- **Module Presets:** Preview list shows more information, listing all modules and indicating which will be enabled, disabled, or if they are missing. 
-- **Settings Locks:** Each lock now has an **Edit** button (replacing Unlock) that opens the same editor you get from clicking a lock in the settings window: change the locked value, switch between Hard and Soft lock, or remove the lock, all in one place.
-- **Changelog Report:** Added the **BBMM** button to the report's header so you can jump straight to the Toolbox.
-- **Journal:** Updated the built-in manual to cover the Toolbox and the current set of tools.
+- **Settings Presets:** 
+  - The Settings Presets tab now opens the right version automatically. GMs manage the shared world presets as before; players get their own personal presets that only affect their own settings. No difference in how you use it.
+- **Module Presets:** 
+  - Preview list shows more information, listing all modules and indicating which will be enabled, disabled, or if they are missing. 
+- **Settings Locks:** 
+  - Each lock now has an **Edit** button (replacing Unlock) that opens the same editor you get from clicking a lock in the settings window: change the locked value, switch between Hard and Soft lock, or remove the lock, all in one place.
+- **Changelog Report:** 
+  - Added the **BBMM** button to the report's header so you can jump straight to the Toolbox.
+- **Journal:** 
+  - Updated the built-in manual to cover the Toolbox and the current set of tools.
 
 ### Removed
 - **Per-player lock targeting:** Locks now always apply to all players, which makes Lock Presets work reliably when moved between worlds. (Keybind sync still lets you choose which players to push to.)
