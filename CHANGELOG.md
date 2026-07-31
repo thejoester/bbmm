@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-07-31
+
+### Fixed
+- **Module Management:** 
+  - The settings gear now appears for modules whose only configuration is a menu registered with `registerMenu()`. ([Issue #243](https://github.com/thejoester/bbmm/issues/243))
+
 ## [1.4.2] - 2026-07-29
 
 ### Changed
@@ -14,8 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [1.4.1] - 2026-07-28
 
 ### Fixed
-- **Macro - Setting Preset Inspector:** 
-  - Inspecting a preset whose name contains an apostrophe (or other special characters) no longer breaks the window; the list scrolls correctly again. The preset name is now sanitized before it is used as the window's element id.
+- **macro - Setting Preset Inspector:** Inspecting a preset whose name contains an apostrophe (or other special characters) no longer breaks the window; the list scrolls correctly again. The preset name is now sanitized before it is used as the window's element id.
 
 ## [1.4.0] - 2026-07-26
 
@@ -26,7 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - Players only see the tools that apply to them.
     - **Utilities tab (GM only):** The BBMM utility macros (Game Settings Inspector, Setting Preset Inspector, Setting Lock Push Tool, and more) are now a click away on the Utilities tab, no need to dig through the compendium.
     - **Read Me tab:** Opens the built-in BBMM manual.
-    - **Setting Sync:** After updating, GMs who still have older per-player locks get a one-time prompt on login to either apply those locks to all players or remove them (or decide later, and the prompt comes back next login).
+- **Setting Sync:** After updating, GMs who still have older per-player locks get a one-time prompt on login to either apply those locks to all players or remove them (or decide later, and the prompt comes back next login).
 
 ### Changed
 - **Settings Presets:** 
@@ -39,9 +44,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Added the **BBMM** button to the report's header so you can jump straight to the Toolbox.
 - **Journal:** 
   - Updated the built-in manual to cover the Toolbox and the current set of tools.
+- **Localization:** 
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 
 ### Removed
-- **Per-player lock targeting:** Locks now always apply to all players, which makes Lock Presets work reliably when moved between worlds. (Keybind sync still lets you choose which players to push to.)
+- **Per-player lock targeting:** 
+  - Locks now always apply to all players, which makes Lock Presets work reliably when moved between worlds. 
 
 ## [1.3.2] - 2026-07-03
 
