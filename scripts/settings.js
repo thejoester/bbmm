@@ -460,12 +460,12 @@ function _ie_wire(container) {
 						const fname = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-bbmm-module-preset-${safeName}.json`;
 
 						await hlp_saveJSONFile({ [presetName]: one }, fname);
-						ui.notifications.info(LT.notifications.exportedModulePreset());
+						ui.notifications.info(LT._importExport.exportedModulePreset());
 						DL(1, `${FN} exported single preset`, { presetName, fname });
 
 					} catch (err) {
 						DL(3, `${FN} failed`, err);
-						ui.notifications.error(LT._importExport.importExportFailed());
+						ui.notifications.error(LT.errors.importExportFailed());
 					}
 					return;
 				}
@@ -952,7 +952,7 @@ async function bbmm_importIncExcBundle() {
 		raw = JSON.parse(await file.text());
 	} catch (err) {
 		DL(3, `${FN} invalid json import file`, err);
-		ui.notifications?.error(LT.errors.invalidJsonFile());
+		ui.notifications?.error(LT.errors.invalidJSONFile());
 		return;
 	}
 
