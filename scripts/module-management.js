@@ -158,14 +158,22 @@ function _uniqueSlug(base, existingIds) {
 	return `${base}-${n}`;
 }
 
-/* Return true if the module has at least one configurable setting (config === true). */
+/* Return true if the module exposes anything in Configure Settings: a config:true setting or a registered menu. */
 function _bbmmModuleHasConfigSettings(modId) {
 	try {
 		if (!modId) return false;
+		const prefix = `${modId}.`;
+		// config:true settings (keys look like "<moduleId>.<settingKey>")
 		for (const [fullKey, cfg] of game.settings.settings) {
-			// keys look like "<moduleId>.<settingKey>"
-			if (!fullKey?.startsWith(`${modId}.`)) continue;
+			if (!fullKey?.startsWith(prefix)) continue;
 			if (cfg?.config === true) return true;
+		}
+		// registerMenu() entries live in a separate map; they render a button in the module tab
+		for (const [fullKey, menu] of game.settings.menus) {
+			if (!fullKey?.startsWith(prefix)) continue;
+			// restricted menus only render for GMs
+			if (menu?.restricted && !game.user?.isGM) continue;
+			return true;
 		}
 		return false;
 	} catch (err) {
