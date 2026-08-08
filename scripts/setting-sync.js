@@ -2398,7 +2398,7 @@ import { hlp_esc } from "./helpers.js";
 	(BBMMLockPicker) is a sub-popup used only by the manager and moves with it.
 ============================================================================= */
 
-	// single-line preview of any value (local copy; macros.js keeps its own)
+	// single-line preview of any value (module-local; also used by the Lock Report below)
 	function toPreview(v) {
 		try {
 			if (v === undefined) return "undefined";
@@ -3211,8 +3211,9 @@ import { hlp_esc } from "./helpers.js";
 			globalThis.bbmm ??= {};
 			globalThis.bbmm.openLockManager = openLockManager;
 			globalThis.bbmm.openLockConfigurator = openLockConfigurator;
+			globalThis.bbmm.openLockReport = openLockReport;
 			const mod = game.modules.get(BBMM_ID);
-			if (mod) { mod.api = mod.api || {}; Object.assign(mod.api, { openLockManager, openLockConfigurator }); }
+			if (mod) { mod.api = mod.api || {}; Object.assign(mod.api, { openLockManager, openLockConfigurator, openLockReport, openKeybindInspector }); }
 			DL("setting-sync.js | init(): Lock Manager API registered");
 		} catch (err) {
 			DL(3, "setting-sync.js | init(): failed to register Lock Manager API", err);
@@ -3260,3 +3261,454 @@ import { hlp_esc } from "./helpers.js";
 			setTimeout(() => _bbmmCtrlWireConfig(app, html), 50);
 		} catch (err) { DL(2, 'renderControlsConfig failed', err); }
 	});
+
+/* ==========================================================================
+	Keybinds Inspector (moved from macros.js)
+========================================================================== */
+class BBMMKeybindInspector extends foundry.applications.api.ApplicationV2 {
+	constructor() {
+		super({
+			id: "bbmm-keybind-inspector",
+			window: { title: LT.macro.titleKeybindInspecor() },
+			width: 900,
+			height: 580,
+			resizable: true
+		});
+		this.filter = "";
+		this._rows = [];
+	}
+
+	// Collect keybind actions from game.keybindings
+	_collect() {
+		const out = [];
+		try {
+			const isMap = (x) => x && typeof x === "object" && x instanceof Map;
+
+			// v13: single Map id -> info. Fallback to _actions if needed.
+			const kb = game.keybindings || {};
+			let actions = kb.actions;
+			if (!isMap(actions) && isMap(kb._actions)) actions = kb._actions;
+			if (!isMap(actions)) {
+				DL(2, "setting-sync.js | BBMMKeybindInspector._collect(): actions map missing");
+				return out;
+			}
+
+			// localization helper
+			function localizeMaybe(val) {
+				if (val == null) return "";
+				if (typeof val !== "string") return String(val);
+				try {
+					const loc = game.i18n?.localize?.(val);
+					return loc && loc !== val ? loc : val;
+				} catch { return val; }
+			}
+
+			// binding formatters
+			function normalizeBinding(b) {
+				if (!b) return null;
+				if (typeof b === "object" && "key" in b) {
+					return { key: String(b.key ?? ""), modifiers: { ...(b.modifiers ?? {}) } };
+				}
+				if (Array.isArray(b)) {
+					const [key, mods] = b;
+					return { key: String(key ?? ""), modifiers: (mods && typeof mods === "object") ? mods : {} };
+				}
+				if (typeof b === "string") return { key: b, modifiers: {} };
+				return null;
+			}
+			function fmtBinding(b) {
+				if (!b) return "";
+				const parts = [];
+				const m = b.modifiers || {};
+				if (m.ctrl) parts.push("Ctrl");
+				if (m.shift) parts.push("Shift");
+				if (m.alt) parts.push("Alt");
+				if (m.meta) parts.push("Meta");
+				if (b.key) parts.push(String(b.key).toUpperCase());
+				return parts.join("+");
+			}
+			function fmtBindingsList(arr) {
+				return (arr ?? [])
+					.map(normalizeBinding).filter(Boolean)
+					.map(fmtBinding).filter(Boolean)
+					.join(", ");
+			}
+
+			for (const [id, info] of actions.entries()) {
+				const ns = String(info?.namespace ?? id.split(".")[0] ?? "");
+				const action = String(info?.action ?? id.split(".").slice(1).join(".") ?? "");
+
+				const editableList = fmtBindingsList(info?.editable);
+				const uneditableList = fmtBindingsList(info?.uneditable);
+				const preview = [editableList, uneditableList].filter(Boolean).join(", ") || "(none)";
+
+				const name = localizeMaybe(info?.name);
+				const hint = localizeMaybe(info?.hint);
+				const restricted = !!info?.restricted;
+				const reservedMods = Array.isArray(info?.reservedModifiers) ? info.reservedModifiers.join(", ") : "";
+
+				out.push({
+					ns,
+					action,
+					name,
+					hint,
+					keys: preview,
+					restricted: restricted ? "✓" : "",
+					editable: editableList,
+					uneditable: uneditableList,
+					mods: reservedMods,
+					__lc: {
+						ns: ns.toLowerCase(),
+						action: action.toLowerCase(),
+						name: String(name ?? "").toLowerCase(),
+						hint: String(hint ?? "").toLowerCase(),
+						keys: preview.toLowerCase(),
+						mods: reservedMods.toLowerCase()
+					}
+				});
+			}
+
+			DL("setting-sync.js | BBMMKeybindInspector._collect(): collected actions", { count: out.length });
+		} catch (e) {
+			DL(2, "setting-sync.js | BBMMKeybindInspector._collect(): failed", e);
+		}
+
+		return out.sort((a, b) => (a.ns.localeCompare(b.ns) || a.action.localeCompare(b.action)));
+	}
+
+	_renderRows() {
+		const q = (this.filter || "").trim().toLowerCase();
+		const rows = q
+			? this._rows.filter(r =>
+				r.__lc.ns.includes(q) ||
+				r.__lc.action.includes(q) ||
+				r.__lc.name.includes(q) ||
+				r.__lc.hint.includes(q) ||
+				r.__lc.keys.includes(q) ||
+				r.__lc.mods.includes(q))
+			: this._rows;
+
+		return rows.map(r => `
+			<div class="row">
+				<div class="c-name" title="${hlp_esc(r.name)}">${hlp_esc(r.name)}</div>
+				<div class="c-hint" title="${hlp_esc(r.hint)}">${hlp_esc(r.hint)}</div>
+				<div class="c-ns" title="${hlp_esc(r.ns)}">${hlp_esc(r.ns)}</div>
+				<div class="c-action" title="${hlp_esc(r.action)}">${hlp_esc(r.action)}</div>
+				<div class="c-keys" title="${hlp_esc(r.keys)}"><code>${hlp_esc(r.keys)}</code></div>
+				<div class="c-flag">${r.restricted}</div>
+				<div class="c-editable" title="${hlp_esc(r.editable)}">${hlp_esc(r.editable)}</div>
+				<div class="c-uneditable" title="${hlp_esc(r.uneditable)}">${hlp_esc(r.uneditable)}</div>
+				<div class="c-mods" title="${hlp_esc(r.mods)}">${hlp_esc(r.mods)}</div>
+			</div>
+		`).join("");
+	}
+
+	async _renderHTML() {
+		this._rows = this._collect();
+
+		// Name, Hint, Namespace, Action, Keys, Restricted, Editable, Uneditable, Reserved Mods
+		const cols = "grid-template-columns: 1.2fr 1.4fr 1.0fr 1.0fr 1.2fr 0.7fr 1.1fr 1.1fr 1.0fr;";
+		const css = `
+			#${this.id} .window-content { display:flex; flex-direction:column; padding:.4rem !important; }
+			#${this.id} .bbmm-kb-root { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:.4rem; }
+			#${this.id} .bbmm-toolbar { display:flex; gap:.4rem; align-items:center; }
+			#${this.id} .bbmm-toolbar input { flex:1; }
+			#${this.id} .grid-head { display:grid; grid-template-columns:1.2fr 1.4fr 1fr 1fr 1.2fr .7fr 1.1fr 1.1fr 1fr; border:1px solid var(--color-border,#444); border-radius:.4rem .4rem 0 0; background:var(--color-bg-header,#1e1e1e); }
+			#${this.id} .grid-head .h { padding:.25rem .4rem; border-bottom:1px solid #444; font-weight:600; line-height:1.2; user-select:none; }
+			#${this.id} .grid-body { display:block; flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--color-border,#444); border-top:0; border-radius:0 0 .4rem .4rem; }
+			#${this.id} .grid-body .row { display:grid; grid-template-columns:1.2fr 1.4fr 1fr 1fr 1.2fr .7fr 1.1fr 1.1fr 1fr; border-bottom:1px solid #333; }
+			#${this.id} .grid-body .row > div { padding:.2rem .4rem; min-width:0; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+			`;
+
+		return (
+			`<style>${css}</style>` +
+			`<div class="bbmm-kb-root">` +
+				`<div class="bbmm-toolbar">` +
+					`<input id="bbmm-kb-filter" type="text" placeholder="${LT.macro.keybindFilterPlaceholder()}" value="${hlp_esc(this.filter ?? "")}" />` +
+					`<span class="count">${LT.macro.showing()} <span id="bbmm-kb-count">${this._rows.length}</span></span>` +
+				`</div>` +
+				`<div class="grid-head">` +
+					`<div class="h">${LT.macro.columnName()}</div>` +
+					`<div class="h">${LT.macro.columnHint()}</div>` +
+					`<div class="h">${LT.macro.columnNamespace()}</div>` +
+					`<div class="h">${LT.macro.columnAction()}</div>` +
+					`<div class="h">${LT.macro.columnKeys()}</div>` +
+					`<div class="h">${LT.macro.columnRestricted()}</div>` +
+					`<div class="h">${LT.macro.columnEditable()}</div>` +
+					`<div class="h">${LT.macro.columnUneditable()}</div>` +
+					`<div class="h">${LT.macro.columnMods()}</div>` +
+				`</div>` +
+				`<div class="grid-body" id="bbmm-kb-body">${this._renderRows()}</div>` +
+			`</div>`
+		);
+	}
+
+	async _replaceHTML(result, _options) {
+		const contentRegion = this.element.querySelector(".window-content") || this.element;
+		contentRegion.style.display = "flex";
+		contentRegion.style.flexDirection = "column";
+		contentRegion.style.height = "100%";
+		contentRegion.style.minHeight = "0";
+
+		try {
+			const winEl = this.element;
+			winEl.style.minWidth = "520px";
+			winEl.style.maxWidth = "1200px";
+			winEl.style.minHeight = "360px";
+			winEl.style.maxHeight = "740px";
+			winEl.style.overflow = "hidden";
+			DL("setting-sync.js | BBMMKeybindInspector: size clamps applied");
+		} catch (e) { DL(2, "setting-sync.js | BBMMKeybindInspector: clamps failed", e); }
+
+		contentRegion.innerHTML = result;
+		this._root = contentRegion;
+
+		if (this._delegated) return;
+		this._delegated = true;
+
+		const root = this._root;
+		const body = root.querySelector("#bbmm-kb-body");
+		const count = root.querySelector("#bbmm-kb-count");
+
+		const rerender = () => {
+			if (body) body.innerHTML = this._renderRows();
+			if (count) count.textContent = String((this.filter||"") ? (body?.children.length || 0) : this._rows.length);
+		};
+
+		const inputEl = root.querySelector("#bbmm-kb-filter");
+		let t = null;
+		inputEl?.addEventListener("input", (ev) => {
+			const val = ev.currentTarget.value ?? "";
+			clearTimeout(t);
+			t = setTimeout(() => {
+				this.filter = val;
+				rerender();
+			}, 150);
+		}, { passive: true });
+
+		try { this.setPosition({ height: "auto", left: null, top: null }); } catch {}
+	}
+}
+
+/* ==========================================================================
+	Lock Report - read-only view of all current locks, with push-to-players
+	(moved from macros.js; uses the local toPreview + BBMM_SYNC_CH above)
+========================================================================== */
+class BBMMLockReport extends foundry.applications.api.ApplicationV2 {
+	constructor() {
+		super({
+			id: "bbmm-lock-report",
+			window: { title: LT.lockReport.title() },
+			width: 720,
+			height: 500,
+			resizable: true
+		});
+	}
+
+	_nsLabel(ns) {
+		if (ns === "core") return "Core Foundry";
+		if (ns === game.system?.id) return game.system?.title || ns;
+		return game.modules.get(ns)?.title || ns;
+	}
+
+	_loadRows() {
+		const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+		const rows    = [];
+		for (const [id, entry] of Object.entries(syncMap)) {
+			const cfg = game.settings.settings.get(id);
+			const ns  = entry.namespace || id.slice(0, id.indexOf("."));
+			const key = entry.key       || id.slice(id.indexOf(".") + 1);
+
+			const lockTypeLabel = entry.soft
+				? LT.lockConfigurator.lockTypeSoft()
+				: LT.lockConfigurator.lockTypeLocked();
+
+			rows.push({
+				id,
+				namespace:   ns,
+				key,
+				lockKind:    entry.soft ? "soft" : "locked",
+				lockTypeLabel,
+				value:       entry.value,
+				nsLabel:     this._nsLabel(ns),
+				settingName: cfg?.name ? (game.i18n.localize(cfg.name) || key) : key
+			});
+		}
+		rows.sort((a, b) => a.namespace.localeCompare(b.namespace) || a.key.localeCompare(b.key));
+		return rows;
+	}
+
+	_rowHTML(r) {
+		const typeClass =
+			r.lockKind === "soft" ? "bbmm-lr-type-soft" :
+			"bbmm-lr-type-locked";
+		return `
+			<div class="bbmm-lr-row">
+				<div class="bbmm-lr-cell c-type ${typeClass}">${hlp_esc(r.lockTypeLabel)}</div>
+				<div class="bbmm-lr-cell c-ns" title="${hlp_esc(r.nsLabel)}">${hlp_esc(r.nsLabel)}</div>
+				<div class="bbmm-lr-cell c-setting" title="${hlp_esc(r.key)}">${hlp_esc(r.settingName)}</div>
+				<div class="bbmm-lr-cell c-value"><code title="${hlp_esc(toPreview(r.value))}">${hlp_esc(toPreview(r.value))}</code></div>
+			</div>`;
+	}
+
+	async _pushAll() {
+		if (!game.user?.isGM)  { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
+		if (!game.socket) return;
+
+		let map    = game.settings.get(BBMM_ID, "userSettingSync") || {};
+		let revMap = game.settings.get(BBMM_ID, "softLockRevMap")  || {};
+		const nonGMIds = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+
+		const softPushes = [];
+		const hardPushes = [];
+		let mapChanged = false, revChanged = false;
+		let softCount = 0, hardCount = 0;
+
+		for (const [id, entry] of Object.entries(map)) {
+			const dot = id.indexOf(".");
+			if (dot <= 0) continue;
+			const ns  = id.slice(0, dot);
+			const key = id.slice(dot + 1);
+			const cfg = game.settings.settings.get(id);
+			if (!cfg) continue;
+
+			if (entry.soft) {
+				// Bump rev so offline players re-apply on next login and online players accept the push
+				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
+				const newRev     = currentRev + 1;
+				map[id]          = { ...entry, rev: newRev };
+				revMap[id]       = newRev;
+				mapChanged = true;
+				revChanged = true;
+				softPushes.push({ namespace: ns, key, value: entry.value, requiresReload: !!cfg.requiresReload, softRev: newRev });
+				softCount++;
+			} else {
+				// Hard lock: push to all non-GM users
+				hardPushes.push({ namespace: ns, key, value: entry.value, requiresReload: !!cfg.requiresReload, targets: null });
+				hardCount++;
+			}
+		}
+
+		const total = softCount + hardCount;
+		if (total === 0) { ui.notifications.warn(LT.lockReport.pushNone()); return; }
+
+		if (mapChanged) await game.settings.set(BBMM_ID, "userSettingSync", map);
+		if (revChanged) await game.settings.set(BBMM_ID, "softLockRevMap", revMap);
+
+		for (const sp of softPushes) {
+			game.socket.emit(BBMM_SYNC_CH, {
+				t: "bbmm-sync-push",
+				soft: true, softRev: sp.softRev,
+				namespace: sp.namespace, key: sp.key,
+				value: sp.value, targets: nonGMIds,
+				requiresReload: sp.requiresReload
+			});
+		}
+		for (const hp of hardPushes) {
+			game.socket.emit(BBMM_SYNC_CH, {
+				t: "bbmm-sync-push",
+				namespace: hp.namespace, key: hp.key,
+				value: hp.value, targets: hp.targets,
+				requiresReload: hp.requiresReload
+			});
+		}
+		// Refresh trigger picks up hard locks on clients that haven't received a direct push
+		setTimeout(() => game.socket.emit(BBMM_SYNC_CH, { t: "bbmm-sync-refresh" }), 200);
+
+		ui.notifications.info(LT.lockReport.pushSuccess({ total, hardcount: hardCount, softcount: softCount }));
+	}
+
+	async _renderHTML() {
+		const rows    = this._loadRows();
+		const bodyHTML = rows.length
+			? rows.map(r => this._rowHTML(r)).join("")
+			: `<div class="bbmm-lr-empty">${LT.lockConfigurator.noLocks()}</div>`;
+
+		const cols = "110px 160px 1fr 170px";
+		const css  = `
+			#bbmm-lock-report .window-content { display:flex; flex-direction:column; padding:.4rem !important; }
+			#bbmm-lock-report .bbmm-lr-root { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:.4rem; }
+			#bbmm-lock-report .bbmm-lr-head { display:grid; grid-template-columns:${cols}; border:1px solid var(--color-border,#444); border-radius:.4rem .4rem 0 0; background:var(--color-bg-header,#1e1e1e); }
+			#bbmm-lock-report .bbmm-lr-head .h { padding:.25rem .4rem; border-bottom:1px solid #444; font-weight:600; line-height:1.2; }
+			#bbmm-lock-report .bbmm-lr-body { display:block; flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--color-border,#444); border-top:0; border-radius:0 0 .4rem .4rem; }
+			#bbmm-lock-report .bbmm-lr-row { display:grid; grid-template-columns:${cols}; border-bottom:1px solid #333; align-items:center; }
+			#bbmm-lock-report .bbmm-lr-cell { padding:.25rem .4rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.2; }
+			#bbmm-lock-report .c-value code { font-size:.82em; opacity:.85; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+			#bbmm-lock-report .bbmm-lr-type-locked { font-weight:600; color:var(--color-positive,#5fbf7f); }
+			#bbmm-lock-report .bbmm-lr-type-soft { font-style:italic; opacity:.85; }
+			#bbmm-lock-report .bbmm-lr-empty { padding:2rem; text-align:center; opacity:.6; font-style:italic; }
+			#bbmm-lock-report .bbmm-lr-footer { display:flex; justify-content:space-between; align-items:center; padding:.35rem .4rem 0; border-top:1px solid #333; flex-shrink:0; }
+			#bbmm-lock-report .bbmm-lr-fbtns { display:flex; gap:.5rem; }
+		`;
+
+		return (
+			`<style>${css}</style>` +
+			`<div class="bbmm-lr-root">` +
+				`<div class="bbmm-lr-head">` +
+					`<div class="h">${LT.lockConfigurator.colLockType()}</div>` +
+					`<div class="h">${LT.lockReport.colModule()}</div>` +
+					`<div class="h">${LT.lockConfigurator.colSetting()}</div>` +
+					`<div class="h">${LT.lockConfigurator.colValue()}</div>` +
+				`</div>` +
+				`<div class="bbmm-lr-body">${bodyHTML}</div>` +
+				`<div class="bbmm-lr-footer">` +
+					`<span>${LT.lockConfigurator.activeCount({ count: rows.length })}</span>` +
+					`<div class="bbmm-lr-fbtns">` +
+						`<button type="button" id="bbmm-lr-close">${LT.buttons.close()}</button>` +
+						`<button type="button" id="bbmm-lr-push"${rows.length === 0 ? " disabled" : ""}>${LT.lockReport.pushBtn()}</button>` +
+					`</div>` +
+				`</div>` +
+			`</div>`
+		);
+	}
+
+	async _replaceHTML(result, _options) {
+		const content = this.element.querySelector(".window-content") || this.element;
+		Object.assign(content.style, { display:"flex", flexDirection:"column", height:"100%", minHeight:"0" });
+
+		try {
+			const winEl = this.element;
+			winEl.style.minWidth  = "480px";
+			winEl.style.maxWidth  = "960px";
+			winEl.style.minHeight = "280px";
+			winEl.style.maxHeight = "700px";
+			winEl.style.overflow  = "hidden";
+		} catch {}
+
+		content.innerHTML = result;
+		this._root = content;
+
+		if (this._delegated) return;
+		this._delegated = true;
+
+		const root = this._root;
+
+		root.addEventListener("click", (ev) => {
+			if (ev.target.closest?.("#bbmm-lr-close")) { this.close(); return; }
+			if (ev.target.closest?.("#bbmm-lr-push")) { this._pushAll(); return; }
+		});
+
+		try { this.setPosition({ height: "auto", left: null, top: null }); } catch {}
+	}
+}
+
+export function openKeybindInspector() {
+	try {
+		DL("setting-sync.js | openKeybindInspector(): launching");
+		new BBMMKeybindInspector().render(true);
+	} catch (err) {
+		DL(3, "setting-sync.js | openKeybindInspector(): error", err);
+		ui.notifications.error(LT.macro.failedOpenKeybindInspector());
+	}
+}
+
+export function openLockReport() {
+	try {
+		if (!game.user?.isGM) { ui.notifications.warn(LT.lockConfigurator.gmOnly()); return; }
+		DL("setting-sync.js | openLockReport(): launching");
+		new BBMMLockReport().render(true);
+	} catch (err) {
+		DL(3, "setting-sync.js | openLockReport(): error", err);
+		ui.notifications.error(LT.lockReport.failedOpen());
+	}
+}

@@ -5,7 +5,7 @@
 import { DL, BBMM_README_UUID  } from './settings.js';
 import { LT, BBMM_ID } from "./localization.js";
 import { getSkipMap, isExcludedWith, hlp_injectHeaderHelpButton } from './helpers.js';
-import { copyPlainText } from "./macros.js";
+import { copyPlainText } from "./helpers.js";
 
 export { hlp_readUserInclusions, hlp_writeUserInclusions };
 

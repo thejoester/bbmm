@@ -363,15 +363,12 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		const startW = Math.max(MIN_W, Math.min(MAX_W, vvW));
 
 		const _vh = (window?.visualViewport?.height ?? window?.innerHeight ?? 900);
-		const _height = _vh < 800 ? 500 : 640;
+		const _height = _vh < 800 ? 620 : 800;
 
 		super({
 			id: "bbmm-changelog-journal",
-			window: { title: LT.changelog.window_title(), modal: true },
-			width: startW,
-			minWidth: MIN_W,
-			height: _height,
-			resizable: false,
+			window: { title: LT.changelog.window_title(), modal: true, resizable: false },
+			position: { width: startW, height: _height },
 			classes: ["bbmm-changelog-journal"]
 		});
 

@@ -6,7 +6,7 @@
 
 import { DL, BBMM_README_UUID, injectBBMMHeaderButton } from './settings.js';
 import { LT } from "./localization.js";
-import { copyPlainText } from "./macros.js";
+import { copyPlainText } from "./helpers.js";
 import { hlp_injectHeaderHelpButton, invalidateSkipMap } from "./helpers.js";
 import { hlp_readUserInclusions, hlp_writeUserInclusions } from "./inclusions.js";
 

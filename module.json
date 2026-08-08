@@ -26,7 +26,6 @@
         "scripts/lock-presets.js",
         "scripts/module-management.js",
         "scripts/changelogs.js",
-        "scripts/macros.js",
         "scripts/toolbox.js"
     ],
     "socket": true,
