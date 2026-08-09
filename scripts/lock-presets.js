@@ -385,15 +385,6 @@ function ui_promptRenameLockPreset(defaultName) {
 	});
 }
 
-function _fmtDate(ts) {
-	if (!ts) return "";
-	try {
-		const d   = new Date(ts);
-		const pad = n => `${n}`.padStart(2, "0");
-		return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-	} catch { return ""; }
-}
-
 /* =======================================================================
 	{PREVIEW}
 ======================================================================= */

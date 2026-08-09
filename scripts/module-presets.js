@@ -258,12 +258,7 @@ function hlp_validateModuleState(modIds) {
 	return { unknown, depIssues };
 }
 
-// Slugify string for filenames
-function hlp_slugify(s) {
-	return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-// Get required dependency ids declared by a module 
+// Get required dependency ids declared by a module
 function hlp_getRequiredIds(mod) {
 	// Supports both legacy and modern manifest styles
 	const data = mod?.manifest || mod?.data?.manifest || {};

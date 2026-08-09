@@ -1,7 +1,7 @@
 import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager, openPlayerSettingsPresetManager, svc_loadSettingsPresets, svc_loadPlayerSettingsPresets, svc_setPlayerSettingsPresets } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
-import { openInclusionsManagerApp, hlp_readUserInclusions, hlp_readUserExclusions } from "./inclusions-exclusions.js";
+import { hlp_readUserInclusions, hlp_readUserExclusions } from "./inclusions-exclusions.js";
 import { 
 	hlp_openManualByUuid, 
 	hlp_injectHeaderHelpButton, 
@@ -17,11 +17,6 @@ import {
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
 export const BBMM_README_UUID = "Compendium.bbmm.bbmm-journal.JournalEntry.HlNgBs29jBCBnzbP";
-
-/* Controls Sync Globals ======================================================*/
-export const CTRL_STORE_KEY = "userControlSync";				// world: { [id]: {rev, lock?, soft?} }
-export const CTRL_REV_STORE = "softLockRevMap_controls";		// world: { [id]: number }
-export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
 
 // folder name for compendium organization
 const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
@@ -269,20 +264,6 @@ export function injectBBMMHeaderButton(root) {
 	}
 
 	DL("settings.js | BBMM header toolbox button injected");
-}
-
-// Open Exclusions Manager
-export function openExclusionsManager() {
-	// Wrapper that calls the actual app launcher if present
-	DL("settings.js | openExclusionsManager(): fired");
-	try {
-		const fn = globalThis.bbmm?.openExclusionsManagerApp ?? globalThis.openExclusionsManagerApp;
-		if (typeof fn === "function") return fn();
-		DL(3, "settings.js | openExclusionsManager(): launcher not found");
-	ui.notifications?.warn(LT?.exclusionsNotAvailable?.() ?? `${LT.errors.exclusionsMgrNotFound()}.`);
-	} catch (e) {
-		DL(3, "settings.js | openExclusionsManager(): error", e);
-	}
 }
 
 // Open Changelog Filename Manager
