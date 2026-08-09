@@ -1,8 +1,7 @@
 import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager, openPlayerSettingsPresetManager, svc_loadSettingsPresets, svc_loadPlayerSettingsPresets, svc_setPlayerSettingsPresets } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
-import { openInclusionsManagerApp, hlp_readUserInclusions } from "./inclusions.js";
-import { hlp_readUserExclusions } from "./exclusions.js";
+import { openInclusionsManagerApp, hlp_readUserInclusions, hlp_readUserExclusions } from "./inclusions-exclusions.js";
 import { 
 	hlp_openManualByUuid, 
 	hlp_injectHeaderHelpButton, 
