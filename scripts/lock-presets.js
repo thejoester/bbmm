@@ -1,6 +1,6 @@
 import { DL, BBMM_README_UUID } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
-import { hlp_esc, hlp_injectHeaderHelpButton } from "./helpers.js";
+import { hlp_esc, hlp_injectHeaderHelpButton, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_timestampStr } from "./helpers.js";
 
 const LOCK_PRESETS_FILE   = "lock-presets.json";
 const BBMM_SYNC_CH        = "module.bbmm";
@@ -59,6 +59,88 @@ async function svc_setLockPresets(obj) {
 	const clean = (obj && typeof obj === "object") ? obj : {};
 	_lockPresetCache = clean;
 	await _writeLockPresets(clean);
+}
+
+/* =======================================================================
+	{IMPORT / EXPORT}
+======================================================================= */
+
+// export all lock presets to a .json file
+export async function bbmm_exportLockPresetsAll() {
+	const FN = "lock-presets.js | bbmm_exportLockPresetsAll():";
+	try {
+		const data = await svc_loadLockPresets(true);
+		const payload = { type: "bbmm-lock-presets", version: 1, data: data ?? {} };
+		await hlp_saveJSONFile(payload, `bbmm-lock-presets-${hlp_timestampStr()}.json`);
+		DL(1, `${FN} exported lock presets`, { count: Object.keys(data ?? {}).length });
+	} catch (err) {
+		DL(3, `${FN} failed`, err);
+		ui.notifications.error(`${LT.errors.errorOccured()}.`);
+	}
+}
+
+// import lock presets (merge into existing, rename on name collision)
+export async function bbmm_importLockPresetsAll() {
+	const FN = "lock-presets.js | bbmm_importLockPresetsAll():";
+
+	const file = await hlp_pickLocalJSONFile();
+	if (!file) return;
+
+	let parsed;
+	try {
+		parsed = JSON.parse(await file.text());
+	} catch (err) {
+		DL(3, `${FN} invalid json import file`, err);
+		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+		return;
+	}
+
+	// Accept either the wrapped envelope or a bare { [name]: preset } map
+	let data;
+	if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.type === "bbmm-lock-presets") {
+		data = parsed.data;
+	} else {
+		data = parsed;
+	}
+
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		DL(3, `${FN} invalid import shape`, data);
+		ui.notifications.error(`${LT.errors.invalidJSONFile()}.`);
+		return;
+	}
+
+	// Load current presets so we MERGE instead of overwrite
+	const current = { ...(await svc_loadLockPresets(true)) };
+
+	const suffixBase = ` (imported ${hlp_timestampStr()})`;
+	let added = 0;
+	let renamed = 0;
+
+	for (const [name, presetRaw] of Object.entries(data)) {
+		if (!name || typeof name !== "string") continue;
+		if (!presetRaw || typeof presetRaw !== "object" || Array.isArray(presetRaw)) continue;
+		if (!Array.isArray(presetRaw.locks)) continue;
+
+		let finalName = name;
+		if (Object.prototype.hasOwnProperty.call(current, finalName)) {
+			finalName = `${name}${suffixBase}`;
+			renamed++;
+			let i = 2;
+			while (Object.prototype.hasOwnProperty.call(current, finalName)) {
+				finalName = `${name}${suffixBase} (${i})`;
+				i++;
+			}
+		}
+
+		current[finalName] = presetRaw;
+		added++;
+	}
+
+	await svc_setLockPresets(current);
+	DL(1, `${FN} imported lock presets (merged)`, { added, renamed });
+	let msg = LT.lockPresets.imported({ added });
+	if (renamed) msg += LT.lockPresets.importedRenamed({ renamed });
+	ui.notifications.info(msg);
 }
 
 /* Save current locks as a named preset (lock type only, no values) */
@@ -301,15 +383,6 @@ function ui_promptRenameLockPreset(defaultName) {
 			rejectClose: false,
 		}).render(true);
 	});
-}
-
-function _fmtDate(ts) {
-	if (!ts) return "";
-	try {
-		const d   = new Date(ts);
-		const pad = n => `${n}`.padStart(2, "0");
-		return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-	} catch { return ""; }
 }
 
 /* =======================================================================
@@ -555,7 +628,7 @@ async function mountLockPresets(container) {
 /* Register on globalThis.bbmm ========================================= */
 Hooks.once("init", () => {
 	globalThis.bbmm ??= {};
-	Object.assign(globalThis.bbmm, { openLockPresetManager });
+	Object.assign(globalThis.bbmm, { openLockPresetManager, bbmm_exportLockPresetsAll, bbmm_importLockPresetsAll });
 });
 
 // Register the Lock Presets pane as a toolbox tool.

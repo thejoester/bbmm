@@ -6,9 +6,8 @@
 
 import { DL, BBMM_README_UUID, injectBBMMHeaderButton } from './settings.js';
 import { LT } from "./localization.js";
-import { copyPlainText } from "./macros.js";
-import { hlp_injectHeaderHelpButton, invalidateSkipMap } from "./helpers.js";
-import { hlp_readUserInclusions, hlp_writeUserInclusions } from "./inclusions.js";
+import { copyPlainText, toPreview, toPretty } from "./helpers.js";
+import { hlp_injectHeaderHelpButton, invalidateSkipMap, getSkipMap, isExcludedWith } from "./helpers.js";
 
 // CONSTANTS
 const EXC_BUNDLE_SCHEMA_VERSION = 1; // Import/Export bundle schema
@@ -506,32 +505,6 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		if (totalEl) totalEl.textContent = String(total);
 	}
 
-	// Compact value preview for table
-	_toPreview(v) {
-		try {
-			if (v === undefined) return "undefined";
-			if (v === null) return "null";
-			if (typeof v === "string") return v;
-			if (typeof v === "number" || typeof v === "boolean") return String(v);
-			return JSON.stringify(v);
-		} catch {
-			return String(v);
-		}
-	}
-
-	// Pretty-printed value for expanded view
-	_toPretty(v) {
-		try {
-			if (typeof v === "string") {
-				try { return JSON.stringify(JSON.parse(v), null, 2); }
-				catch { return v; }
-			}
-			return JSON.stringify(v, null, 2);
-		} catch {
-			return String(v);
-		}
-	}
-
 	// Warm visible previews by lazy-loading values
 	_warmVisiblePreviews(limitPerTick = 50) {
 		if (this._warmRunning) return;
@@ -574,9 +547,9 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 				try {
 					const v = game.settings.get(r.namespace, r.key);
 						r.__value = v;
-						r.__preview = this._toPreview(v);
+						r.__preview = toPreview(v);
 
-						const pretty = this._toPretty(v);
+						const pretty = toPretty(v);
 						r.__pretty = pretty;
 
 						// Determine if large
@@ -1167,8 +1140,8 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 								try {
 									const v = game.settings.get(r.ns, r.key);
 									r.__value = v;
-									r.__preview = this._toPreview(v);
-									r.__pretty = this._toPretty(v);
+									r.__preview = toPreview(v);
+									r.__pretty = toPretty(v);
 									r.__valLoaded = true;
 
 									const codeEl = rowEl.querySelector(".val-preview code");
@@ -1241,8 +1214,8 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 							try {
 								const v = game.settings.get(ns, key);
-								const preview = this._toPreview(v);
-								const pretty = this._toPretty(v);
+								const preview = toPreview(v);
+								const pretty = toPretty(v);
 
 								// Update the visible preview code cell (if it exists)
 								const codeEl = rowEl.querySelector(".val-preview code");
@@ -1322,6 +1295,29 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		try { this.close({ force: true }); } catch {}
 	}
 
+	// Re-apply expanded sections/groups after a re-render. Both render collapsed by default,
+	// so we only re-expand; group rows show only when their namespace group is also expanded.
+	_restoreExpandState(root, expandedSections, expandedGroups) {
+		// Groups: restore class only; the section pass below drives row display.
+		for (const groupId of expandedGroups) {
+			const hdr = root.querySelector(`.bbmm-grp-hdr[data-group-hdr="${CSS.escape(groupId)}"]`);
+			hdr?.classList.remove("bbmm-grp-collapsed");
+		}
+		// Sections: reveal child rows; group rows only if their group is also expanded.
+		for (const secId of expandedSections) {
+			const hdr = root.querySelector(`.bbmm-x-group[data-section-hdr="${CSS.escape(secId)}"]`);
+			if (!hdr) continue;
+			hdr.classList.remove("bbmm-x-sec-collapsed");
+			for (const row of root.querySelectorAll(`[data-section="${CSS.escape(secId)}"]`)) {
+				if (row.classList.contains("bbmm-grp-row")) {
+					const groupHdr = root.querySelector(`.bbmm-grp-hdr[data-group-hdr="${CSS.escape(row.dataset.groupRow ?? "")}"]`);
+					if (groupHdr?.classList.contains("bbmm-grp-collapsed")) continue;
+				}
+				row.style.display = "";
+			}
+		}
+	}
+
 	// Mount into a toolbox pane container. Reuses _renderHTML + _bind; skips window chrome.
 	// Listeners bind to a persistent inner wrapper (not the pane, which the toolbox
 	// reuses across tools) so unmount discards them and there is no double-binding.
@@ -1337,33 +1333,20 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 		}
 		const wrap = this._paneWrap;
 
-		// Snapshot expand/collapse state before wiping (for in-place refresh)
+		// Snapshot expanded state before wiping (sections + groups; both render collapsed by default)
 		const expandedGroups = new Set();
 		for (const hdr of (wrap.querySelectorAll?.(".bbmm-grp-hdr:not(.bbmm-grp-collapsed)") ?? [])) {
 			if (hdr.dataset.groupHdr) expandedGroups.add(hdr.dataset.groupHdr);
 		}
-		const collapsedSections = new Set();
-		for (const hdr of (wrap.querySelectorAll?.(".bbmm-x-group.bbmm-x-sec-collapsed") ?? [])) {
-			if (hdr.dataset.sectionHdr) collapsedSections.add(hdr.dataset.sectionHdr);
+		const expandedSections = new Set();
+		for (const hdr of (wrap.querySelectorAll?.(".bbmm-x-group:not(.bbmm-x-sec-collapsed)") ?? [])) {
+			if (hdr.dataset.sectionHdr) expandedSections.add(hdr.dataset.sectionHdr);
 		}
 
 		const html = await this._renderHTML();
 		wrap.innerHTML = html;
 
-		// Restore previously expanded groups
-		for (const groupId of expandedGroups) {
-			const hdr = wrap.querySelector(`.bbmm-grp-hdr[data-group-hdr="${CSS.escape(groupId)}"]`);
-			if (!hdr) continue;
-			hdr.classList.remove("bbmm-grp-collapsed");
-			for (const row of wrap.querySelectorAll(`.bbmm-grp-row[data-group-row="${CSS.escape(groupId)}"]`)) row.style.display = "";
-		}
-		// Restore previously collapsed sections
-		for (const secId of collapsedSections) {
-			const hdr = wrap.querySelector(`.bbmm-x-group[data-section-hdr="${CSS.escape(secId)}"]`);
-			if (!hdr) continue;
-			hdr.classList.add("bbmm-x-sec-collapsed");
-			for (const row of wrap.querySelectorAll(`[data-section="${CSS.escape(secId)}"]`)) row.style.display = "none";
-		}
+		this._restoreExpandState(wrap, expandedSections, expandedGroups);
 
 		this._bind(wrap);
 	}
@@ -2149,40 +2132,20 @@ class BBMMExclusionsAppV2 extends foundry.applications.api.ApplicationV2 {
 			winEl.style.overflow  = "hidden";
 		} catch (e) { DL(2, "exclusions.js | Manager: size clamp failed", e); }
 
-		// Snapshot which groups are expanded before wiping content
+		// Snapshot expanded state before wiping content (sections + groups render collapsed by default)
 		const expandedGroups = new Set();
 		for (const hdr of (this.element?.querySelectorAll?.(".bbmm-grp-hdr:not(.bbmm-grp-collapsed)") ?? [])) {
 			if (hdr.dataset.groupHdr) expandedGroups.add(hdr.dataset.groupHdr);
 		}
-
-		// Snapshot which sections are collapsed
-		const collapsedSections = new Set();
-		for (const hdr of (this.element?.querySelectorAll?.(".bbmm-x-group.bbmm-x-sec-collapsed") ?? [])) {
-			if (hdr.dataset.sectionHdr) collapsedSections.add(hdr.dataset.sectionHdr);
+		const expandedSections = new Set();
+		for (const hdr of (this.element?.querySelectorAll?.(".bbmm-x-group:not(.bbmm-x-sec-collapsed)") ?? [])) {
+			if (hdr.dataset.sectionHdr) expandedSections.add(hdr.dataset.sectionHdr);
 		}
 
 		const content = this.element.querySelector(".window-content") || this.element;
 		content.innerHTML = result;
 
-		// Restore previously expanded groups
-		for (const groupId of expandedGroups) {
-			const hdr = content.querySelector(`.bbmm-grp-hdr[data-group-hdr="${CSS.escape(groupId)}"]`);
-			if (!hdr) continue;
-			hdr.classList.remove("bbmm-grp-collapsed");
-			for (const row of content.querySelectorAll(`.bbmm-grp-row[data-group-row="${CSS.escape(groupId)}"]`)) {
-				row.style.display = "";
-			}
-		}
-
-		// Restore previously collapsed sections
-		for (const secId of collapsedSections) {
-			const hdr = content.querySelector(`.bbmm-x-group[data-section-hdr="${CSS.escape(secId)}"]`);
-			if (!hdr) continue;
-			hdr.classList.add("bbmm-x-sec-collapsed");
-			for (const row of content.querySelectorAll(`[data-section="${CSS.escape(secId)}"]`)) {
-				row.style.display = "none";
-			}
-		}
+		this._restoreExpandState(content, expandedSections, expandedGroups);
 
 		// Inject help button into title bar
 		try {
@@ -2530,4 +2493,112 @@ export function openAddModuleExclusionApp() {
 
 export function openAddSettingExclusionApp() {
 	new BBMMAddSettingExclusionAppV2().render(true);
+}
+
+/* ==========================================================================
+	BBMM: Inclusions (hidden settings)
+========================================================================== */
+
+export { hlp_readUserInclusions, hlp_writeUserInclusions };
+
+// Persistent storage (lists)
+const FILE_USER_INCLUSIONS = "user-inclusions.json";
+
+let _incCache = null;
+let _incCacheLoaded = false;
+
+
+/* ============================================================================
+	{HELPERS}
+============================================================================ */
+
+// Sanitize inclusion object
+function _sanitizeInclusions(raw) {
+	const out = { settings: [], modules: [] };
+	if (!raw || typeof raw !== "object") return out;
+
+	if (Array.isArray(raw.settings)) {
+		out.settings = raw.settings
+			.filter(s => s && typeof s === "object")
+			.map(s => ({
+				namespace: String(s.namespace ?? "").trim(),
+				key: String(s.key ?? "").trim()
+			}))
+			.filter(s => s.namespace && s.key);
+	}
+
+	if (Array.isArray(raw.modules)) {
+		out.modules = raw.modules
+			.filter(x => typeof x === "string")
+			.map(x => x.trim())
+			.filter(Boolean);
+	}
+
+	return out;
+}
+
+// Get storage URL for user inclusions file
+function _inclusionsStorageUrl() {
+	return foundry.utils.getRoute(`bbmm-data/${FILE_USER_INCLUSIONS}`);
+}
+
+// Read user inclusions from storage (with caching)
+async function hlp_readUserInclusions({ force = false } = {}) {
+	if (!force && _incCacheLoaded && _incCache) return _incCache;
+
+	const _setEmpty = () => {
+		_incCache = _sanitizeInclusions(null);
+		_incCacheLoaded = true;
+		return _incCache;
+	};
+
+	try {
+		const res = await fetch(_inclusionsStorageUrl(), { cache: "no-store" });
+		if (!res.ok) {
+			DL(2, `inclusions.js | hlp_readUserInclusions(): fetch not ok (${res.status})`);
+			return _setEmpty();
+		}
+
+		const data = await res.json();
+		_incCache = _sanitizeInclusions(data);
+		_incCacheLoaded = true;
+
+		DL("inclusions.js | hlp_readUserInclusions(): loaded", {
+			settings: _incCache.settings.length,
+			modules: _incCache.modules.length
+		});
+
+		return _incCache;
+	} catch (err) {
+		DL(2, "inclusions.js | hlp_readUserInclusions(): failed, using empty", err);
+		return _setEmpty();
+	}
+}
+
+// Write user inclusions to storage
+async function hlp_writeUserInclusions(obj) {
+	const clean = _sanitizeInclusions(obj);
+	const payload = JSON.stringify(clean ?? { settings: [], modules: [] }, null, 2);
+	const file = new File([payload], FILE_USER_INCLUSIONS, { type: "application/json" });
+
+	try {
+		const res = await foundry.applications.apps.FilePicker.implementation.upload("data", `bbmm-data`, file, { notify: false });
+		if (!res || (!res.path && !res.url)) {
+			DL(3, `inclusions.js | hlp_writeUserInclusions(): upload returned no path/url`, res);
+			return false;
+		}
+
+		_incCache = clean;
+		_incCacheLoaded = true;
+
+		DL("inclusions.js | hlp_writeUserInclusions(): wrote", {
+			settings: clean.settings.length,
+			modules: clean.modules.length
+		});
+
+		return true;
+	} catch (err) {
+		DL(3, "inclusions.js | hlp_writeUserInclusions(): uploadPersistent failed", err);
+		return false;
+	}
 }

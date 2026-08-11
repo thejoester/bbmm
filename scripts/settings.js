@@ -1,8 +1,7 @@
 import { openPresetManager } from './module-presets.js';
 import { openSettingsPresetManager, openPlayerSettingsPresetManager, svc_loadSettingsPresets, svc_loadPlayerSettingsPresets, svc_setPlayerSettingsPresets } from './settings-presets.js';
 import { LT, BBMM_ID } from "./localization.js";
-import { openInclusionsManagerApp, hlp_readUserInclusions } from "./inclusions.js";
-import { hlp_readUserExclusions } from "./exclusions.js";
+import { hlp_readUserInclusions, hlp_readUserExclusions } from "./inclusions-exclusions.js";
 import { 
 	hlp_openManualByUuid, 
 	hlp_injectHeaderHelpButton, 
@@ -18,11 +17,6 @@ import {
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
 export const BBMM_README_UUID = "Compendium.bbmm.bbmm-journal.JournalEntry.HlNgBs29jBCBnzbP";
-
-/* Controls Sync Globals ======================================================*/
-export const CTRL_STORE_KEY = "userControlSync";				// world: { [id]: {rev, lock?, soft?} }
-export const CTRL_REV_STORE = "softLockRevMap_controls";		// world: { [id]: number }
-export const CTRL_TOGGLE = "enableControlSync";					// world: boolean
 
 // folder name for compendium organization
 const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
@@ -272,20 +266,6 @@ export function injectBBMMHeaderButton(root) {
 	DL("settings.js | BBMM header toolbox button injected");
 }
 
-// Open Exclusions Manager
-export function openExclusionsManager() {
-	// Wrapper that calls the actual app launcher if present
-	DL("settings.js | openExclusionsManager(): fired");
-	try {
-		const fn = globalThis.bbmm?.openExclusionsManagerApp ?? globalThis.openExclusionsManagerApp;
-		if (typeof fn === "function") return fn();
-		DL(3, "settings.js | openExclusionsManager(): launcher not found");
-	ui.notifications?.warn(LT?.exclusionsNotAvailable?.() ?? `${LT.errors.exclusionsMgrNotFound()}.`);
-	} catch (e) {
-		DL(3, "settings.js | openExclusionsManager(): error", e);
-	}
-}
-
 // Open Changelog Filename Manager
 export function openChangelogFilesManager() {
 	DL("settings.js | openChangelogFilesManager(): fired");
@@ -298,6 +278,7 @@ export function openChangelogFilesManager() {
 	}
 }
 
+// Open Lock Preset manager
 function openLockPresetManager() {
 	DL("settings.js | openLockPresetManager(): fired");
 	try {
@@ -355,6 +336,14 @@ function _ie_contentHTML() {
 						<div style="display:flex;gap:.5rem;">
 							<button type="button" data-action="bbmm-inc-import" style="width:auto;">${LT.buttons.import()}</button>
 							<button type="button" data-action="bbmm-inc-export" style="width:auto;">${LT.buttons.export()}</button>
+						</div>
+					</div>
+
+					<div style="display:flex;align-items:center;gap:.75rem;">
+						<div style="min-width:160px;font-weight:700;">${LT.lockPresetsBtn()}:</div>
+						<div style="display:flex;gap:.5rem;">
+							<button type="button" data-action="bbmm-lock-import" style="width:auto;">${LT.buttons.import()}</button>
+							<button type="button" data-action="bbmm-lock-export" style="width:auto;">${LT.buttons.export()}</button>
 						</div>
 					</div>
 					` : ``}
@@ -712,6 +701,11 @@ function _ie_wire(container) {
 				if (action === "bbmm-inc-import") return await bbmm_importIncExcBundle();
 				if (action === "bbmm-exc-export") return await bbmm_exportIncExcBundle();
 				if (action === "bbmm-exc-import") return await bbmm_importIncExcBundle();
+
+				// Lock presets (bridged via globalThis to avoid a settings<->lock-presets import cycle)
+				if (action === "bbmm-lock-export") return await globalThis.bbmm?.bbmm_exportLockPresetsAll?.();
+				if (action === "bbmm-lock-import") return await globalThis.bbmm?.bbmm_importLockPresetsAll?.();
+
 				if (action === "bbmm-kb-export") {
 					const proceed = await new Promise((resolve) => {
 						const dlg = new foundry.applications.api.DialogV2({
@@ -1256,8 +1250,6 @@ Hooks.once("init", () => {
 		// ===== FLAGS ======
 			// Setting to hold module flags
 			game.settings.register(BBMM_ID, "bbmmFlags", {
-				name: LT._settings.bbmmFlags_name(),
-				hint: LT._settings.bbmmFlags_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -1268,9 +1260,7 @@ Hooks.once("init", () => {
 		// These do not need to be localized
 			// User Exclusions 
 			game.settings.register(BBMM_ID, "userExclusions", {
-				name: LT._settings.userExclusions_name(),
-				hint: LT._settings.userExclusions_hint(),
-				scope: "world",	
+				scope: "world",
 				config: false,	
 				type: Object,
 				default: { modules: [], settings: [] }
@@ -1278,8 +1268,6 @@ Hooks.once("init", () => {
 
 			// User Inclusions (hidden settings to include when saving presets)
 			game.settings.register(BBMM_ID, "userInclusions", {
-				name: LT._settings.userInclusions_name(),
-				hint: LT._settings.userInclusions_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -1288,8 +1276,6 @@ Hooks.once("init", () => {
 
 			// User scoped Settings presets
 			game.settings.register(BBMM_ID, SETTING_SETTINGS_PRESETS_U, {
-				//name: LT._settings.settingsPresetsUser_name(),
-				//hint: LT._settings.settingsPresetsUser_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
@@ -1298,8 +1284,6 @@ Hooks.once("init", () => {
 
 			// User scoped Module Presets
 			game.settings.register(BBMM_ID, MODULE_SETTING_PRESETS_U, {
-				//name:  LT._settings.modulePresetsUser_name(),
-				//hint: LT._settings.modulePresetsUser_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
@@ -1308,8 +1292,6 @@ Hooks.once("init", () => {
 
 			// World map of { [moduleId]: "x.y.z" } that we've marked as seen
 			game.settings.register(BBMM_ID, "seenChangelogs", {
-				name: LT._settings.seenChangelogs_name(),
-				hint: LT._settings.seenChangelogs_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -1318,8 +1300,6 @@ Hooks.once("init", () => {
 
 			// User map of soft-locked settings
 			game.settings.register(BBMM_ID, "userSettingSync", {
-				name: LT._settings.userSettingSync_name(),
-				hint: LT._settings.userSettingSync_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -1328,8 +1308,6 @@ Hooks.once("init", () => {
 
 			// User-scoped ledger: remembers which soft-lock value was last auto-applied per setting id
 			game.settings.register(BBMM_ID, "softLockLedger", {
-				//name: LT._settings.softLockLedger_name(),
-				//hint: LT._settings.softLockLedger_hint(),
 				scope: "user",
 				config: false,
 				type: Object,
@@ -1338,8 +1316,6 @@ Hooks.once("init", () => {
 
 			// persistant soft-lock rev map - Master list of soft lock values and revisions
 			game.settings.register(BBMM_ID, "softLockRevMap", {
-				name: LT._settings.softLockRevMap_name(),
-				hint: LT._settings.softLockRevMap_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -1348,46 +1324,28 @@ Hooks.once("init", () => {
 
 			// Controls Sync Storage
 			game.settings.register?.(BBMM_ID, "userControlSync", {
-				name: LT._settings.userControlSync_name(),
-				hint: LT._settings.userControlSync_hint(),
-				scope: "world", 
+				scope: "world",
 				config: false, 
 				default: {}
 			});
 
 			// Controls Sync RevMap
 			game.settings.register?.(BBMM_ID, "softLockRevMap_controls", {
-				name: LT._settings.softLockRevMap_controls_name(),
-				hint: LT._settings.softLockRevMap_controls_hint(),
-				scope: "world", 
+				scope: "world",
 				config: false, 
 				default: {}
 			});
 
 			// Ledger of soft-locked compendium entries per user
 			game.settings.register(BBMM_ID, "controlSoftLedger", {
-				name: LT._settings.controlSoftLedger_name(),
-				hint: LT._settings.controlSoftLedger_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
 				default: {}, // { userId: [ "compendium.action" ] }
 			});
 
-			// Module Management - Notes
-			game.settings.register("bbmm", "moduleNotes", {
-				name: LT._settings.moduleNotes_name(),
-				hint: LT._settings.moduleNotes_hint(),
-				scope: "world",
-				config: false,
-				type: Object,
-				default: {}
-			});
-
 			// temp config store
 			game.settings.register(BBMM_ID, "tempModConfig", {
-				name: LT._settings.tempModConfig_name(),
-				hint: LT._settings.tempModConfig_hint(),
 				scope: "world",
 				config: false,
 				type: Object,
@@ -1396,8 +1354,6 @@ Hooks.once("init", () => {
 
 			// Module Management - Module Locks
 			game.settings.register(BBMM_ID, "moduleLocks", {
-				name: game.i18n.localize("bbmm._settings.moduleLocksName"),
-				hint: game.i18n.localize("bbmm._settings.moduleLocksHint"),
 				scope: "world",
 				config: false,
 				type: Object,			
@@ -1422,8 +1378,6 @@ Hooks.once("init", () => {
 
 			// Remote message feed: last seen message revision (per-user)
 			game.settings.register(BBMM_ID, "lastMessageRev", {
-				name: "Last Message Revision",
-				hint: "Tracks the last BBMM remote message revision shown to this user.",
 				scope: "world",
 				config: false,
 				type: Number,

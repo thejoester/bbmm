@@ -363,15 +363,12 @@ class BBMMChangelogJournal extends foundry.applications.api.ApplicationV2 {
 		const startW = Math.max(MIN_W, Math.min(MAX_W, vvW));
 
 		const _vh = (window?.visualViewport?.height ?? window?.innerHeight ?? 900);
-		const _height = _vh < 800 ? 500 : 640;
+		const _height = _vh < 800 ? 620 : 800;
 
 		super({
 			id: "bbmm-changelog-journal",
-			window: { title: LT.changelog.window_title(), modal: true },
-			width: startW,
-			minWidth: MIN_W,
-			height: _height,
-			resizable: false,
+			window: { title: LT.changelog.window_title(), modal: true, resizable: false },
+			position: { width: startW, height: _height },
 			classes: ["bbmm-changelog-journal"]
 		});
 
@@ -967,74 +964,6 @@ async function _bbmmFetchChangelogText(url) {
 	}
 }
 
-/* ============================================================================
-	{UI}
-	Dialog 
-============================================================================ */
-async function _bbmmShowSingleChangelogDialog(entry) {
-	const { id, title, version, url } = entry;
-
-	// Load the text now so the dialog shows immediately
-	const raw = await _bbmmFetchChangelogText(url);
-
-	// render raw inside a <pre>. 
-	const esc = (s) => s
-		.replaceAll("&", "&amp;")
-		.replaceAll("<", "&lt;")
-		.replaceAll(">", "&gt;");
-
-	const content = `
-		<div class="bbmm-changelog-wrap" style="display:flex;flex-direction:column;gap:.5rem;max-height:60vh;">
-			<div style="font-weight:600;">${esc(title)} — v${esc(version)}</div>
-			<div style="opacity:.8;">Source: <a href="${url}" target="_blank" rel="noopener">${esc(url)}</a></div>
-			<pre style="flex:1;overflow:auto;padding:.5rem;border:1px solid #555;border-radius:.5rem;background:#111;white-space:pre-wrap;">${esc(raw)}</pre>
-			<label style="display:flex;align-items:center;gap:.5rem;">
-				<input type="checkbox" name="dontShowAgain" />
-				<span>${LT.changelog.dontShowAgain()}</span>
-			</label>
-		</div>
-	`;
-
-	return new Promise((resolve) => {
-		new foundry.applications.api.DialogV2({
-			window: { title: `Changelog — ${title}`, modal: true },
-			content,
-			buttons: [
-				{
-					label: "Mark Seen",
-					icon: "fa-solid fa-check",
-					callback: async (html) => {
-						try {
-							const checkbox = html.querySelector('input[name="dontShowAgain"]');
-							if (!checkbox?.checked) {
-								// Still mark seen if they click explicit "Mark Seen"
-							}
-							await _bbmmMarkChangelogSeen(id, version);
-							//ui.notifications?.info(`Marked ${title} v${version} as seen.`);
-							DL(`changelog.js | marked seen for ${id} -> ${version}`);
-						} catch (err) {
-							DL(3, `changelog.js | Mark seen failed for ${id}: ${err?.message || err}`, err);
-						}
-					}
-				},
-				{
-					label: LT.changelog.remind_later(),
-					icon: "fa-regular fa-clock",
-					callback: (html) => {
-						// If they ticked "Don’t show again", treat as Mark Seen
-						const checkbox = html.querySelector('input[name="dontShowAgain"]');
-						if (checkbox?.checked) {
-							_bbmmMarkChangelogSeen(id, version).catch(err => {
-								DL(3, `changelog.js | Mark seen (from 'Don't show again') failed for ${id}: ${err?.message || err}`, err);
-							});
-						}
-					}
-				}
-			]
-		}).render(true);
-		resolve();
-	});
-}
 
 /* ============================================================================
 	{HELPER}
@@ -1206,26 +1135,3 @@ export function openChangelogFilesManager() {
 	}
 }
 
-export async function BBMM_openChangelogFor(moduleId) {
-	try {
-		const mod = game.modules.get(moduleId);
-		if (!mod) {
-			// ui.notifications?.warn(`Module not found: ${moduleId}`);
-			return;
-		}
-		const url = await _bbmmFindChangelogURL(mod);
-		if (!url) {
-			//ui.notifications?.warn(`No changelog found for: ${mod.title || moduleId}`);
-			return;
-		}
-		await _bbmmShowSingleChangelogDialog({
-			id: moduleId,
-			title: mod.title || moduleId,
-			version: mod.version || "0.0.0",
-			url,
-			mod
-		});
-	} catch (err) {
-		DL(3, `changelog.js | BBMM_openChangelogFor() error: ${err?.message || err}`, err);
-	}
-}
