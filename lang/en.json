@@ -1,7 +1,10 @@
 {
 	"bbmm": {
+		"moduleName": "Big Bad Module Manager",
+		"moduleInit": "BBMM",
 		"copiedToClipboard": "Copied to clipboard.",
 		"failedCopyToClipboard": "Failed to copy to clipboard.",
+		"exclusionsNotAvailable": "Exclusions Manager is not available.",
 		"enabled": "Enabled",
 		"disabled": "Disabled",
 		"renamePreset": "Rename Preset",
@@ -48,7 +51,6 @@
 		"promptDeleteModulePreset": "Delete module preset", 
 		"modulePresetsBtn": "Module Presets",
 		"settingsPresetsBtn": "Settings Presets",
-		"lockPresetsBtn": "Lock Presets",
 		"promptReload": "Settings preset applied. Reload now to ensure everything initializes correctly",
 		"settingPresetExists": "A settings preset named <b>{name}</b> already exists",
 		"renameSettingPreset": "Rename Settings Preset",
@@ -193,6 +195,7 @@
 		"buttons": {
 			"yes": "Yes",
 			"ok": "OK",
+			"continue": "Continue",
 			"help": "Read Me",
 			"cancel": "Cancel",
 			"close": "Close",
