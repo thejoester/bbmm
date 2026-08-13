@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - **Module:**
-  - General cleanup and conolidation of codebase. Merged code in `macros.js` into relevent script files. Merged `inclusions.js` and `exclusiond.js` into one file `inclusions-exclusions.js`
+  - General cleanup and consolidation of codebase. Merged code in `macros.js` into relevant script files. Merged `inclusions.js` and `exclusions.js` into one file `inclusions-exclusions.js`
   - General cleanup of unused entries in `en.json`
 
 ## [1.4.3] - 2026-07-31
