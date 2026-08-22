@@ -48,7 +48,7 @@
 		"promptDeleteModulePreset": "Excluir Preset de Módulo", 
 		"modulePresetsBtn": "Presets de Módulo",
 		"settingsPresetsBtn": "Presets de Configurações",
-		"lockPresetsBtn": "Bloquear Presets",
+		"lockPresetsBtn": "Presets de Bloqueio",
 		"promptReload": "Preset de configurações aplicado. Recarregue o Foundry para garantir que tudo seja inicializado corretamente.",
 		"settingPresetExists": "Já existe um preset de configurações chamado <b>{name}</b>.",
 		"renameSettingPreset": "Renomear Preset de Configurações",
