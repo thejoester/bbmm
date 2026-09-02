@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.8-test1] - 2026-09-02
+
+### Fixed
+- **Soft locks:**
+  - Soft-locked client-scoped settings are now preserved per player across cache clears, different browsers, and different devices. Each player's chosen value, or the GM's recommendation if they never changed it, is stored durably and restored on login.
+  - A player changing a soft-locked setting no longer removes the soft lock for the rest of the table. Players who have not customized still receive the GM's recommended value.
+  - The same durable restore now applies to soft-locked keybindings.
+  - Soft-lock revisions now persist across unlock/relock, so re-applying a previously unlocked soft lock is no longer skipped as "already handled". 
+  - Players whose recorded revision drifted ahead of the current one self-heal on next login or push.
+
 ## [1.4.7] - 2026-08-27
 
 ### Changed
