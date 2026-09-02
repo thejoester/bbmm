@@ -274,7 +274,7 @@ async function svc_applyLockPreset(name, wipeFirst = false) {
 
 		if (lockType === "soft") {
 			const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
-			const newRev     = currentRev + 1;
+			const newRev = Math.max(Date.now(), currentRev + 1); // epoch-based monotonic rev
 			map[id]          = { namespace, key, value, requiresReload: !!cfg.requiresReload, soft: true, rev: newRev };
 			revMap[id]       = newRev;
 			revChanged       = true;

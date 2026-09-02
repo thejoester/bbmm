@@ -466,7 +466,7 @@ import { hlp_esc } from "./helpers.js";
 
 				// Enable: increment persistent rev (survives clears) then write map entry
 				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
-				const newRev = currentRev + 1;
+				const newRev = Math.max(Date.now(), currentRev + 1); // epoch-based monotonic rev
 
 				map[id] = {
 					namespace,
@@ -1501,6 +1501,7 @@ import { hlp_esc } from "./helpers.js";
 					const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
 					let applied = 0;
 					let needsReload = false;
+					let ledgerDirty = false;
 
 					for (const [id, ent] of Object.entries(map)) {
 						try {
@@ -1536,7 +1537,11 @@ import { hlp_esc } from "./helpers.js";
 							}
 
 							// Same rev, already handled. For client scope, restore the player's
-							// durable value if the live value drifted (cache clear / new browser).
+							// durable value ONLY when the live value has fallen back to the
+							// registered default (the signature of a cleared cache / new browser).
+							// Any other live value means the player has a current value pv may not
+							// have captured yet, so refresh pv instead of reverting. This avoids
+							// clobbering a fresh change and a reload loop on requiresReload settings.
 							if (isClient) {
 								const pvRaw = ledger[id]?.pv;
 								if (typeof pvRaw === "string") {
@@ -1544,11 +1549,20 @@ import { hlp_esc } from "./helpers.js";
 									try { desired = JSON.parse(pvRaw); } catch { desired = undefined; }
 									if (desired !== undefined) {
 										const live = game.settings.get(ns, key);
-										if (!objectsEqual(live, desired)) {
+										const def  = cfg.default;
+										const liveIsDefault = def !== undefined && objectsEqual(live, def);
+										if (liveIsDefault && !objectsEqual(desired, def)) {
+											// Cache cleared: setting reverted to default, restore player's value.
 											await game.settings.set(ns, key, desired);
 											applied++;
 											if (cfg.requiresReload) needsReload = true;
 											DL(`setting-sync.js |  SOFT login-apply: restored pv for ${id}`);
+										} else if (!objectsEqual(live, desired)) {
+											// Player has a live value pv missed; refresh pv, never revert or reload.
+											const prevL = (ledger[id] && typeof ledger[id] === "object") ? ledger[id] : {};
+											ledger[id] = { ...prevL, pv: JSON.stringify(live ?? null) };
+											ledgerDirty = true;
+											DL(`setting-sync.js |  SOFT login-apply: refreshed pv for ${id}`);
 										}
 									}
 								}
@@ -1558,7 +1572,7 @@ import { hlp_esc } from "./helpers.js";
 						}
 					}
 
-					if (applied > 0) {
+					if (applied > 0 || ledgerDirty) {
 						await game.settings.set(BBMM_ID, "softLockLedger", ledger);
 						DL(`setting-sync.js |  SOFT login-apply complete: applied=${applied}`);
 					}
@@ -2184,9 +2198,18 @@ import { hlp_esc } from "./helpers.js";
 						try { desired = JSON.parse(pvRaw); } catch { desired = undefined; }
 						if (desired !== undefined) {
 							const haveCur = _bbmmCtrlBindings(ns, action);
-							if (!_bbmmCtrlSame(haveCur, desired)) {
+							const kb = game.settings.get("core", "keybindings") || {};
+							const hasOverride = Object.prototype.hasOwnProperty.call(kb, id);
+							if (!hasOverride && !_bbmmCtrlSame(haveCur, desired)) {
+								// No override present (cache cleared / new device): restore bindings.
 								DL(1, `controls | restore pv ${id}`);
 								await _bbmmCtrlSetBindings(ns, action, desired);
+							} else if (hasOverride && !_bbmmCtrlSame(haveCur, desired)) {
+								// Player has a current override pv missed; refresh pv, never revert.
+								const prevL = (last && typeof last === "object") ? last : {};
+								ledger[lkey] = { ...prevL, pv: JSON.stringify(haveCur ?? []) };
+								await game.settings.set(BBMM_ID, "softLockLedger", ledger);
+								DL(1, `controls | refreshed pv ${id}`);
 							}
 						}
 					}
@@ -2243,7 +2266,7 @@ import { hlp_esc } from "./helpers.js";
 			const next = { ...(store[id] ?? {}) };
 			next.soft = { value: _bbmmCtrlBindings(ns, action) };
 			next.lock = null;
-			next.rev = (Number(next.rev) || 0) + 1;
+			next.rev = Math.max(Date.now(), (Number(next.rev) || 0) + 1); // epoch-based monotonic rev
 			store[id] = next;
 			revMap[id] = next.rev;
 			DL(`Soft lock APPLIED for ${id} (rev=${next.rev})`);
@@ -2513,7 +2536,7 @@ import { hlp_esc } from "./helpers.js";
 				hardCount++; needsRefresh = true;
 			} else if (lockType === "soft") {
 				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
-				const newRev     = currentRev + 1;
+				const newRev = Math.max(Date.now(), currentRev + 1); // epoch-based monotonic rev
 				map[id]          = { namespace, key, value, requiresReload: !!cfg.requiresReload, soft: true, rev: newRev };
 				revMap[id]       = newRev;
 				softPushes.push({ namespace, key, value, requiresReload: !!cfg.requiresReload, softRev: newRev });
@@ -3651,7 +3674,7 @@ class BBMMLockReport extends foundry.applications.api.ApplicationV2 {
 			if (entry.soft) {
 				// Bump rev so offline players re-apply on next login and online players accept the push
 				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
-				const newRev     = currentRev + 1;
+				const newRev = Math.max(Date.now(), currentRev + 1); // epoch-based monotonic rev
 				map[id]          = { ...entry, rev: newRev };
 				revMap[id]       = newRev;
 				mapChanged = true;
