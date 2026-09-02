@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] - 2026-08-27
+
+### Changed
+- **Localization:** 
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+## [1.4.6] - 2026-08-16
+
+### Changed
+- **Localization:** 
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
 ## [1.4.5] - 2026-08-08
 
 ### Added
@@ -12,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - **Module:**
-  - General cleanup and conolidation of codebase. Merged code in `macros.js` into relevent script files. Merged `inclusions.js` and `exclusiond.js` into one file `inclusions-exclusions.js`
+  - General cleanup and consolidation of codebase. Merged code in `macros.js` into relevant script files. Merged `inclusions.js` and `exclusions.js` into one file `inclusions-exclusions.js`
   - General cleanup of unused entries in `en.json`
 
 ## [1.4.3] - 2026-07-31
