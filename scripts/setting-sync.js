@@ -46,6 +46,135 @@ import { hlp_esc } from "./helpers.js";
 		}
 	}
 
+	/* Capture player values (pv) for soft-locked CLIENT settings ==================
+		Reads the committed live values and stores any that differ into the
+		user-scoped ledger as pv. Foundry fires no reliable per-set hook, so this
+		is called at commit points (settings close, and before a requiresReload
+		reload) where game.settings already holds the new values. Player-only. */
+	async function bbmmCaptureSoftLockPv() {
+		const captured = []; // declared out here so a mid-loop throw can still log partial work
+		try {
+			if (game.user?.isGM) return;
+			if (!bbmmIsSyncEnabled()) return;
+			const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
+			const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
+			for (const [id, ent] of Object.entries(map)) {
+				if (!ent?.soft) continue;
+				const cfg = game.settings.settings.get(id);
+				if (!cfg || cfg.scope !== "client") continue;
+				const dot = id.indexOf(".");
+				if (dot <= 0) continue;
+				const ns = id.slice(0, dot), key = id.slice(dot + 1);
+				let live;
+				try { live = game.settings.get(ns, key); } catch { continue; }
+				const liveStr = JSON.stringify(live ?? null);
+				const prev = (ledger[id] && typeof ledger[id] === "object") ? ledger[id] : {};
+				if (prev.pv !== liveStr) {
+					ledger[id] = { ...prev, pv: liveStr };
+					captured.push({ id, pv: liveStr });
+				}
+			}
+			if (captured.length) {
+				await game.settings.set(BBMM_ID, "softLockLedger", ledger);
+				DL(`setting-sync.js | capture pv: ${captured.length} setting(s)`, captured);
+			}
+		} catch (e) {
+			DL(2, `setting-sync.js | bbmmCaptureSoftLockPv(): failed after ${captured.length} captured`, { error: e, captured });
+		}
+	}
+
+	/* Wrap SettingsConfig.reloadConfirm so a player's soft-lock changes are saved
+		to pv BEFORE a requiresReload reload wipes the session. Guarded no-op if the
+		method is absent (older/newer cores). */
+	Hooks.once("setup", () => {
+		try {
+			const SC = foundry.applications?.settings?.SettingsConfig;
+			if (SC && typeof SC.reloadConfirm === "function" && !SC.__bbmmReloadWrapped) {
+				const _orig = SC.reloadConfirm.bind(SC);
+				SC.reloadConfirm = async function (...args) {
+					try { await bbmmCaptureSoftLockPv(); } catch (e) { DL(2, "setting-sync.js | reloadConfirm capture failed", e); }
+					return _orig(...args);
+				};
+				SC.__bbmmReloadWrapped = true;
+				DL("setting-sync.js | wrapped SettingsConfig.reloadConfirm for pv capture");
+			}
+		} catch (e) {
+			DL(2, "setting-sync.js | failed to wrap reloadConfirm", e);
+		}
+	});
+
+	// true while BBMM is applying keybindings itself; suppresses the capture wrap so
+	// our own restore/apply does not overwrite pv with a mid-apply value.
+	let _bbmmApplyingCtrl = false;
+	// true only while the Controls config is open; capture keybindings ONLY during
+	// active editing, so load-time restores and GM applies (config closed) never
+	// trigger a capture that would overwrite pv.
+	let _bbmmCtrlConfigOpen = false;
+
+	/* Capture player keybindings (pv) for soft-locked controls ====================
+		Keybindings save via the Controls config (no reload, no per-set hook), so
+		capture the committed bindings when that app closes. Player-only. */
+	async function bbmmCaptureCtrlPv() {
+		const captured = []; // declared out here so a mid-loop throw can still log partial work
+		try {
+			if (game.user?.isGM) return;
+			if (!_bbmmCtrlEnabled()) return;
+			const store = _bbmmCtrlGetStore();
+			const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
+			for (const [id, rec] of Object.entries(store)) {
+				if (!(rec && rec.soft)) continue;
+				const dot = id.lastIndexOf(".");
+				if (dot <= 0) continue;
+				const ns = id.slice(0, dot), action = id.slice(dot + 1);
+				let bindings;
+				try { bindings = _bbmmCtrlBindings(ns, action); } catch { continue; }
+				const bStr = JSON.stringify(bindings ?? []);
+				const lkey = `@ctrl:${id}`;
+				const prev = (ledger[lkey] && typeof ledger[lkey] === "object") ? ledger[lkey] : {};
+				if (prev.pv !== bStr) {
+					ledger[lkey] = { ...prev, pv: bStr };
+					captured.push({ id, pv: bStr });
+				}
+			}
+			if (captured.length) {
+				await game.settings.set(BBMM_ID, "softLockLedger", ledger);
+				DL(`setting-sync.js | capture ctrl pv: ${captured.length} binding(s)`, captured);
+			}
+		} catch (e) {
+			DL(2, `setting-sync.js | bbmmCaptureCtrlPv(): failed after ${captured.length} captured`, { error: e, captured });
+		}
+	}
+
+	// Track when the Controls config is open, and capture on close.
+	Hooks.on("renderControlsConfig", () => { _bbmmCtrlConfigOpen = true; });
+	Hooks.on("closeControlsConfig", async () => {
+		_bbmmCtrlConfigOpen = false;
+		await bbmmCaptureCtrlPv();
+	});
+
+	// Capture on each keybinding change too. ControlsConfig applies edits immediately
+	// via game.keybindings.set() (no submit, no hook), so wrap that method to capture
+	// pv the moment a binding is added/edited/deleted, before any refresh can lose it.
+	Hooks.once("ready", () => {
+		try {
+			const kb = game.keybindings;
+			if (kb && typeof kb.set === "function" && !kb.__bbmmSetWrapped) {
+				const _origSet = kb.set.bind(kb);
+				kb.set = async function (...args) {
+					const r = await _origSet(...args);
+					if (_bbmmCtrlConfigOpen && !_bbmmApplyingCtrl) {
+						try { await bbmmCaptureCtrlPv(); } catch (e) { DL(2, "setting-sync.js | keybindings.set capture failed", e); }
+					}
+					return r;
+				};
+				kb.__bbmmSetWrapped = true;
+				DL("setting-sync.js | wrapped game.keybindings.set for keybinding pv capture");
+			}
+		} catch (e) {
+			DL(2, "setting-sync.js | failed to wrap game.keybindings.set", e);
+		}
+	});
+
 	/* Update the lock icon =======================================================
 		Update the lock icon glyph + tint for a given state
 		States: "unlocked" | "lockSelected" | "softLock" | "lockAll"
@@ -433,6 +562,8 @@ import { hlp_esc } from "./helpers.js";
 			// Collect pushes to emit AFTER saving
 			const softPushes = [];
 			const hardPushes = [];
+			// batched op logs (one summary at the end instead of per-op lines)
+			const unlocked = [], softRemoved = [], softSet = [], hardLocked = [], softPushed = [], hardPushed = [];
 
 			// UNLOCK ops (explicit lock/soft removal)
 			for (const op of _bbmmPendingOps.filter(o => o.op === "unlock")) {
@@ -440,12 +571,12 @@ import { hlp_esc } from "./helpers.js";
 				if (map[id]) {
 					delete map[id];
 					mapChanged = true;
-					DL(`setting-sync.js |  bbmm-apply: UNLOCK ${id}`);
+					unlocked.push(id);
 				}
-				if (id in revMap) {
-					delete revMap[id];
-					revChanged = true;
-				}
+				// Keep revMap[id]: the soft rev is a monotonic counter that must survive
+				// unlock/relock so a re-lock always supersedes a player's recorded rev.
+				// Deleting it reset the rev to 1 and let re-locks be skipped as "already
+				// handled". Lock status lives in the map above, not here.
 			}
 
 			// SOFT ops (rev-aware)
@@ -459,14 +590,14 @@ import { hlp_esc } from "./helpers.js";
 					if (map[id]?.soft === true) {
 						delete map[id];
 						mapChanged = true;
-						DL(`setting-sync.js |  bbmm-apply: soft REMOVE ${id}`);
+						softRemoved.push(id);
 					}
 					continue;
 				}
 
 				// Enable: increment persistent rev (survives clears) then write map entry
 				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
-				const newRev = currentRev + 1;
+				const newRev = Math.max(Date.now(), currentRev + 1); // epoch-based monotonic rev
 
 				map[id] = {
 					namespace,
@@ -487,7 +618,7 @@ import { hlp_esc } from "./helpers.js";
 					softRev: newRev,
 					requiresReload: !!cfg?.requiresReload
 				});
-				DL(`setting-sync.js |  bbmm-apply: soft SET ${id} rev=${newRev}`, value);
+				softSet.push({ id, rev: newRev });
 			}
 
 			// HARD LOCK ops (always global, applies to every non-GM player)
@@ -504,7 +635,7 @@ import { hlp_esc } from "./helpers.js";
 						requiresReload: !!cfg?.requiresReload
 					};
 					mapChanged = true;
-					DL(`setting-sync.js |  bbmm-apply: lock ${id} (global)`);
+					hardLocked.push(id);
 				} catch (e) {
 					DL(2, "setting-sync.js |  bbmm-apply: lock loop error", e);
 				}
@@ -544,7 +675,7 @@ import { hlp_esc } from "./helpers.js";
 						targets,
 						requiresReload: sp.requiresReload
 					});
-					DL(`setting-sync.js |  bbmm-apply: soft PUSH ${sp.id} rev=${sp.softRev}`);
+					softPushed.push({ id: sp.id, rev: sp.softRev });
 				}
 			}
 
@@ -562,8 +693,12 @@ import { hlp_esc } from "./helpers.js";
 						requiresReload: !!game.settings.settings.get(id)?.requiresReload,
 						targets: null
 					});
-					DL(`setting-sync.js |  bbmm-apply: push ${id} (targets=all)`);
+					hardPushed.push(id);
 				}
+			}
+
+			if (unlocked.length || softRemoved.length || softSet.length || hardLocked.length || softPushed.length || hardPushed.length) {
+				DL("setting-sync.js | bbmm-apply: applied", { unlocked, softRemoved, softSet, hardLocked, softPushed, hardPushed });
 			}
 
 			_bbmmPendingOps.length = 0;
@@ -973,7 +1108,13 @@ import { hlp_esc } from "./helpers.js";
 		try {
 
 			if (!bbmmIsSyncEnabled()) return; // feature disabled?
-			if (!game.user?.isGM) return;
+
+			// Player: capture pv for soft-locked client settings on close (non-reload
+			// changes; requiresReload changes are captured by the reloadConfirm wrap).
+			if (!game.user?.isGM) {
+				await bbmmCaptureSoftLockPv();
+				return;
+			}
 
 			let map = game.settings.get(BBMM_ID, "userSettingSync") || {};
 			const ids = Object.keys(map);
@@ -1041,34 +1182,6 @@ import { hlp_esc } from "./helpers.js";
 			if (!bbmmIsSyncEnabled()) return;
 			if (game.user?.isGM) return;
 
-			// CONTROLS: if a PLAYER updates core.keybindings, mark any SOFT ctrl revs as handled
-			if (!game.user?.isGM && namespace === "core" && key === "keybindings") {
-				try {
-					const store = _bbmmCtrlGetStore();
-					const revMap = _bbmmCtrlGetRevMap() || {};
-					const ledger = game.settings.get(BBMM_ID, "softLockLedger") || {};
-					let wrote = false;
-
-					for (const [id, rec] of Object.entries(store)) {
-					if (!(rec && rec.soft)) continue;
-					const rev = Number(rec?.rev) || Number(revMap[id]) || 1;
-					const lkey = `@ctrl:${id}`;
-					const last = ledger[lkey];
-					const lastRev = (last && typeof last === "object" && Number.isInteger(last.r)) ? last.r : -1;
-
-					if (lastRev < rev) {
-						ledger[lkey] = { r: rev };
-						wrote = true;
-						DL(`controls | soft-ledger: player handled ${id} (rev=${rev})`);
-					}
-					}
-
-					if (wrote) await game.settings.set(BBMM_ID, "softLockLedger", ledger);
-				} catch (e) {
-					DL(2, "controls | soft-ledger mark on player change failed", e);
-				}
-			}
-
 			const id = `${namespace}.${key}`;
 			const cfg = game.settings.settings.get(id);
 			if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) return;
@@ -1077,9 +1190,12 @@ import { hlp_esc } from "./helpers.js";
 			const entry = map[id];
 			if (!entry) return; // not locked at all
 
-			// A lock entry means the setting is locked for every non-GM player.
+			// SOFT lock: advisory, never revert a player's change. pv is captured at
+			// commit points (settings close / reloadConfirm), not here; no reliable
+			// per-set hook fires for client settings.
+			if (entry.soft === true) return;
 
-			// Revert if different from GM value
+			// HARD lock: revert if different from GM value
 			const equal = objectsEqual(value, entry.value);
 			if (!equal) {
 				DL(`setting-sync.js |  bbmm-setting-lock: player attempted to change locked ${id}, reverting`);
@@ -1174,36 +1290,9 @@ import { hlp_esc } from "./helpers.js";
 						const icon = group.querySelector?.(".bbmm-lock-icon");
 						if (icon) _bbmmSetLockIconState(icon, "soft");
 
-						// Record ledger immediately when user tweaks the control (even before Save),
-						// and ask the GM to CLEAR the soft lock so it won't re-apply after reload.
-						try {
-							const rev = Number.isInteger(ent?.rev) ? ent.rev : 1;
-							const recValSerialized = JSON.stringify(ent?.value ?? null);
-							const inputs = group.querySelectorAll?.("input, select, textarea") || [];
-
-							const markHandledAndRequestClear = async () => {
-								try {
-									const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
-									ledger[id] = { v: recValSerialized, r: rev };
-									await game.settings.set(BBMM_ID, "softLockLedger", ledger);
-									DL(`setting-sync.js |  soft-ledger: handled rev=${rev} for ${id}`);
-
-									if (game.socket) {
-										game.socket.emit(BBMM_SYNC_CH, { t: "bbmm-soft-clear", id });
-										DL(`setting-sync.js |  soft-clear: requested for ${id}`);
-									}
-								} catch (e) {
-									DL(2, "setting-sync.js |  soft-ledger/clear failed", e);
-								}
-							};
-
-							for (const inp of inputs) {
-								inp.addEventListener("change", markHandledAndRequestClear, { once: true });
-								inp.addEventListener("input", markHandledAndRequestClear, { once: true });
-							}
-						} catch (e) {
-							DL(2, "setting-sync.js |  soft-clear listener attach failed", e);
-						}
+						// Player edits to a soft lock are captured durably in the setSetting
+						// hook (pv). No global soft-clear: one player's change must not remove
+						// the recommendation for the rest of the table.
 
 						continue;
 					}
@@ -1498,10 +1587,13 @@ import { hlp_esc } from "./helpers.js";
 			/* Apply pending SOFT locks at login (players only), deferred until modules
 			   finish registering: canvasReady, or a 2000ms fallback if the canvas is off. */
 			if (!game.user?.isGM) {
-				const _softLoginApply = async () => { try {
+				const _softLoginApply = async () => {
+					const setNew = [], restored = [], skippedUnreg = []; // out here so a throw logs partial
+					try {
 					const map    = game.settings.get(BBMM_ID, "userSettingSync") || {};
 					const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
 					let applied = 0;
+					let needsReload = false;
 
 					for (const [id, ent] of Object.entries(map)) {
 						try {
@@ -1512,32 +1604,82 @@ import { hlp_esc } from "./helpers.js";
 							const ns  = id.slice(0, dot);
 							const key = id.slice(dot + 1);
 
-							if (!game.settings.settings.get(id)) {
-								DL(`setting-sync.js |  SOFT login-apply skipped (unregistered): ${id}`);
+							const cfg = game.settings.settings.get(id);
+							if (!cfg) {
+								skippedUnreg.push(id);
+								continue;
+							}
+							const isClient = cfg.scope === "client";
+
+							const worldRev = Number.isInteger(ent.rev) ? ent.rev : 0;
+							let prevRev    = Number.isInteger(ledger[id]?.r) ? ledger[id].r : 0;
+							// self-heal: a recorded rev above the current world rev is stale (the
+							// rev was reset by an unlock on older code); re-evaluate from scratch.
+							if (prevRev > worldRev) prevRev = 0;
+
+							if (worldRev > prevRev) {
+								// New GM recommendation: apply it and set pv to the GM value, so a
+								// later cache clear restores the GM value, not the module default.
+								await game.settings.set(ns, key, ent.value);
+								ledger[id] = { v: JSON.stringify(ent.value ?? null), r: worldRev, pv: JSON.stringify(ent.value ?? null) };
+								applied++;
+								if (cfg.requiresReload) needsReload = true;
+								setNew.push({ id, rev: worldRev });
 								continue;
 							}
 
-							const worldRev = Number.isInteger(ent.rev) ? ent.rev : 0;
-							const prevRev  = Number.isInteger(ledger[id]?.r) ? ledger[id].r : 0;
-							if (worldRev <= prevRev) continue; // already up-to-date
-
-							await game.settings.set(ns, key, ent.value);
-
-							// Jump ledger directly to worldRev
-							ledger[id] = { v: JSON.stringify(ent.value ?? null), r: worldRev };
-							applied++;
-							DL(`setting-sync.js |  SOFT login-apply: set ${id} rev=${worldRev}`);
+							// Same rev, already handled. pv is the source of truth for this
+							// player's value: if the live setting does not match pv (e.g. a new
+							// browser/device with empty localStorage), set it to pv; else skip.
+							if (isClient) {
+								const pvRaw = ledger[id]?.pv;
+								if (typeof pvRaw === "string") {
+									let desired;
+									try { desired = JSON.parse(pvRaw); } catch { desired = undefined; }
+									if (desired !== undefined && !objectsEqual(game.settings.get(ns, key), desired)) {
+										await game.settings.set(ns, key, desired);
+										applied++;
+										if (cfg.requiresReload) needsReload = true;
+										restored.push(id);
+									}
+								}
+							}
 						} catch (eApply) {
 							DL(2, `setting-sync.js |  SOFT login-apply failed for ${id}`, eApply);
 						}
 					}
 
-					if (applied > 0) {
-						await game.settings.set(BBMM_ID, "softLockLedger", ledger);
-						DL(`setting-sync.js |  SOFT login-apply complete: applied=${applied}`);
+					if (applied > 0) await game.settings.set(BBMM_ID, "softLockLedger", ledger);
+					if (setNew.length || restored.length || skippedUnreg.length) {
+						DL(`setting-sync.js | SOFT login-apply: applied ${applied}`, { setNew, restored, skippedUnreg, needsReload });
+					}
+
+					if (needsReload) {
+						// Make sure keybinding restore finishes before the reload wipes the session.
+						try { await _bbmmCtrlPullApplyAll(); } catch (e) { DL(2, "setting-sync.js | pre-reload ctrl apply failed", e); }
+						if (hlp_shouldAutoForceReload()) {
+							try { ui.notifications?.warn?.(LT.sync.ReloadWarn()); } catch {}
+							setTimeout(() => { try { location.reload(); } catch {} }, 250);
+						} else {
+							try {
+								new foundry.applications.api.DialogV2({
+									window: { title: LT.sync.ReloadTitle(), modal: true },
+									content: `<p>${LT.sync.ReloadMsg()}</p>`,
+									buttons: [
+										{ action: "reload", label: LT.sync.ReloadNow(), icon: "fa-solid fa-arrows-rotate", default: true, callback: () => { try { location.reload(); } catch {} } },
+										{ action: "later",  label: LT.sync.ReloadLater(), icon: "fa-regular fa-clock", callback: () => {} }
+									],
+									submit: () => {},
+									rejectClose: false
+								}).render(true);
+							} catch (err) {
+								DL(2, "setting-sync.js |  SOFT login-apply: reload dialog failed", err);
+								try { ui.notifications?.warn?.(LT.sync.ReloadWarn()); } catch {}
+							}
+						}
 					}
 				} catch (e) {
-					DL(2, "setting-sync.js |  SOFT login-apply block failed", e);
+					DL(2, `setting-sync.js |  SOFT login-apply block failed (partial: set ${setNew.length}, restored ${restored.length})`, { error: e, setNew, restored, skippedUnreg });
 				} };
 
 				const noCanvas      = !!game.settings.get("core", "noCanvas");
@@ -1629,12 +1771,14 @@ import { hlp_esc } from "./helpers.js";
 
 			// Player: apply GM-enforced settings (initial), skip soft entries (soft = push-on-enable only)
 			const syncMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
-			console.log("[BBMM] Player login-apply: checking", Object.keys(syncMap).length, "locked settings");
+			DL(`setting-sync.js |  Player login-apply: checking ${Object.keys(syncMap).length} locked settings`);
 			const initialEntries = Object.values(syncMap);
 
 			// If there is a sync map - 
 			if (initialEntries.length) {
 				let changed = false, needsReload = false;
+				const checked = []; // one row per hard lock evaluated
+				const applied = []; // ids actually re-applied
 
 				for (const ent of initialEntries) {
 					try {
@@ -1644,24 +1788,23 @@ import { hlp_esc } from "./helpers.js";
 						// Soft locks are advisory: do NOT auto-apply here; they're handled above for login and by socket pushes
 						if (ent?.soft === true) continue;
 
-						// get current setting
+						const id = `${ent.namespace}.${ent.key}`;
 						const current = game.settings.get(ent.namespace, ent.key);
-						console.log(`[BBMM] checking ${ent.namespace}.${ent.key}: current=${JSON.stringify(current)} (${typeof current}), locked=${JSON.stringify(ent.value)} (${typeof ent.value}), equal=${objectsEqual(current, ent.value)}`);
-						// compare if different
-						if (!objectsEqual(current, ent.value)) {
-							DL(`setting-sync.js |  bbmm-setting-lock: apply ${ent.namespace}.${ent.key} ->`, ent.value);
-							// update setting
+						const equal = objectsEqual(current, ent.value);
+						checked.push({ id, current, locked: ent.value, equal });
+
+						if (!equal) {
 							await game.settings.set(ent.namespace, ent.key, ent.value);
 							changed = true;
-							if (ent.requiresReload || cfg.requiresReload) {
-								needsReload = true;
-								console.warn(`[BBMM] Reload required by locked setting: ${ent.namespace}.${ent.key} | locked value: ${JSON.stringify(ent.value)} (${typeof ent.value}) | was: ${JSON.stringify(current)} (${typeof current})`);
-							}
+							applied.push(id);
+							if (ent.requiresReload || cfg.requiresReload) needsReload = true;
 						}
 					} catch (err) {
 						DL(2, "setting-sync.js |  bbmm-setting-lock: apply error", err);
 					}
 				}
+
+				if (checked.length) DL(`setting-sync.js | hard-lock login-apply: checked ${checked.length}, applied ${applied.length}`, { checked, applied, needsReload });
 
 				// See if we need to reload
 				if (changed && needsReload) {
@@ -1690,7 +1833,10 @@ import { hlp_esc } from "./helpers.js";
 
 				game.socket.on(BBMM_SYNC_CH, async (msg) => {
 
-					// Setting Soft Clear
+					// Setting Soft Clear - DISABLED. Player edits to soft locks are now kept
+					// per-player (pv) in the ledger, so one player's change must not delete
+					// the soft lock for the whole table. Commented for one test cycle.
+					/*
 					if (msg?.t === "bbmm-soft-clear") {
 						// GM only: remove a soft-lock entry when a player changes that setting
 						if (!game.user?.isGM) return;
@@ -1712,6 +1858,7 @@ import { hlp_esc } from "./helpers.js";
 						}
 						return;	// handled
 					}
+					*/
 
 					// Setting Sync Push
 					if (msg?.t === "bbmm-sync-push") {
@@ -1732,7 +1879,10 @@ import { hlp_esc } from "./helpers.js";
 							try {
 								const ledger = game.settings.get(BBMM_ID, "softLockLedger") || {};
 								const entry = ledger[id];
-								const lastRev = (entry && typeof entry === "object" && Number.isInteger(entry.r)) ? entry.r : -1;
+								let lastRev = (entry && typeof entry === "object" && Number.isInteger(entry.r)) ? entry.r : -1;
+								// self-heal: a recorded rev above the pushed rev is stale (rev was
+								// reset); treat as unhandled so we re-apply.
+								if (Number.isInteger(softRev) && lastRev > softRev) lastRev = -1;
 
 								if (Number.isInteger(softRev)) {
 									if (lastRev >= softRev) {
@@ -1761,7 +1911,9 @@ import { hlp_esc } from "./helpers.js";
 								const prev = ledger[id];
 								const prevRev = (prev && typeof prev === "object" && Number.isInteger(prev.r)) ? prev.r : -1;
 								const recordRev = Number.isInteger(softRev) ? softRev : prevRev;
-								ledger[id] = { v: JSON.stringify(value ?? null), r: recordRev };
+								// Pushed GM value becomes the player's current effective value (pv),
+								// so a later cache clear restores it rather than the module default.
+								ledger[id] = { v: JSON.stringify(value ?? null), r: recordRev, pv: JSON.stringify(value ?? null) };
 								await game.settings.set(BBMM_ID, "softLockLedger", ledger);
 								DL(`setting-sync.js |  soft-ledger: marked evaluated rev=${recordRev} for ${id}`);
 							} catch (e) {
@@ -1774,7 +1926,7 @@ import { hlp_esc } from "./helpers.js";
 							await game.settings.set(namespace, key, value);
 
 							if (requiresReload || cfg.requiresReload) {
-								console.error(`[BBMM] SOCKET push reload triggered by: ${id} | locked value:`, value, `| was:`, current);
+								DL(`setting-sync.js |  SOCKET push reload triggered by: ${id}`, { value, was: current });
 								if (hlp_shouldAutoForceReload()) {
 									DL(`setting-sync.js | client push: autoForceReload enabled, reloading now (${id})`);
 									try { ui.notifications?.warn?.(LT.sync.ReloadWarn()); } catch {}
@@ -1813,6 +1965,7 @@ import { hlp_esc } from "./helpers.js";
 
 						const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
 						let changed = false, needsReload = false;
+						const appliedIds = [];
 
 						for (const ent of Object.values(map)) {
 							if (!ent || typeof ent.namespace !== "string" || typeof ent.key !== "string") continue;
@@ -1826,12 +1979,14 @@ import { hlp_esc } from "./helpers.js";
 
 							const current = game.settings.get(ent.namespace, ent.key);
 							if (!objectsEqual(current, ent.value)) {
-								DL(`setting-sync.js |  bbmm-setting-lock: trigger apply ${id} ->`, ent.value);
 								await game.settings.set(ent.namespace, ent.key, ent.value);
 								changed = true;
+								appliedIds.push(id);
 								if (ent.requiresReload || cfg.requiresReload) needsReload = true;
 							}
 						}
+
+						if (appliedIds.length) DL(`setting-sync.js | refresh: applied ${appliedIds.length}`, appliedIds);
 
 						if (changed && needsReload) {
 							if (hlp_shouldAutoForceReload()) {
@@ -2056,16 +2211,19 @@ import { hlp_esc } from "./helpers.js";
 		Updates via API when available, else patches settings blob.
 	============================================================================= */
 	async function _bbmmCtrlSetBindings(ns, action, arr) {
+		_bbmmApplyingCtrl = true; // suppress the capture wrap during our own apply
 		try {
 			const hasPerActionAPI = typeof game.keybindings?.reset === "function" &&
 									typeof game.keybindings?.set === "function";
 
 			if (hasPerActionAPI) {
-			// Modern API path
-			await game.keybindings.reset(ns, action);
-			for (const b of (arr ?? [])) {
-				if (b && b.key) await game.keybindings.set(ns, action, { key: b.key, modifiers: b.modifiers ?? [] });
-			}
+			// Modern API path: set ALL bindings for the action in a single call.
+			// Setting per-binding replaces the action each time, so a multi-key
+			// binding would collapse to just the last key.
+			const bindings = (arr ?? [])
+				.filter(b => b && b.key)
+				.map(b => ({ key: b.key, modifiers: Array.isArray(b.modifiers) ? b.modifiers.slice() : [] }));
+			await game.keybindings.set(ns, action, bindings);
 			return;
 			}
 
@@ -2077,6 +2235,8 @@ import { hlp_esc } from "./helpers.js";
 
 		} catch (err) {
 			DL(2, "setting-sync.js | ctrlSetBindings() failed", { ns, action, err });
+		} finally {
+			_bbmmApplyingCtrl = false;
 		}
 	}
 
@@ -2085,6 +2245,7 @@ import { hlp_esc } from "./helpers.js";
 		Players: update local keybindings to match GM-synced store.
 	============================================================================= */
 	async function _bbmmCtrlPullApplyAll() {
+		const appliedHard = [], restoredPv = [], appliedSoft = []; // out here so a throw logs partial
 		try {
 			if (!_bbmmCtrlEnabled()) return;
 			const store = _bbmmCtrlGetStore();
@@ -2101,7 +2262,7 @@ import { hlp_esc } from "./helpers.js";
 			if (rec?.lock?.value) {
 				const have = _bbmmCtrlBindings(ns, action);
 				if (!_bbmmCtrlSame(have, rec.lock.value)) {
-				DL(1, `controls | apply HARD ${id}`);
+				appliedHard.push(id);
 				await _bbmmCtrlSetBindings(ns, action, rec.lock.value);
 				}
 				continue;
@@ -2112,25 +2273,46 @@ import { hlp_esc } from "./helpers.js";
 				const rev = Number(rec?.rev) || Number(revMap[id]) || 1;
 				const lkey = `@ctrl:${id}`;
 				const last = ledger[lkey];
-				const lastRev = (last && typeof last === "object" && Number.isInteger(last.r)) ? last.r : -1;
+				let lastRev = (last && typeof last === "object" && Number.isInteger(last.r)) ? last.r : -1;
+				// self-heal: a recorded rev above the current rev is stale (rev was reset);
+				// treat as unhandled so we re-apply.
+				if (lastRev > rev) lastRev = -1;
 
-				// Already handled this rev? Skip.
-				if (lastRev >= rev) continue;
+				// Already handled this rev. Restore the player's durable bindings (pv)
+				// if the live bindings drifted (cache clear / new device), then skip.
+				if (lastRev >= rev) {
+					const pvRaw = (last && typeof last === "object") ? last.pv : undefined;
+					if (typeof pvRaw === "string") {
+						let desired;
+						try { desired = JSON.parse(pvRaw); } catch { desired = undefined; }
+						if (desired !== undefined) {
+							const haveCur = _bbmmCtrlBindings(ns, action);
+							if (!_bbmmCtrlSame(haveCur, desired)) {
+								restoredPv.push(id);
+								await _bbmmCtrlSetBindings(ns, action, desired);
+							}
+						}
+					}
+					continue;
+				}
 
-				// First time seeing this rev -> apply once, then mark ledger
+				// First time seeing this rev -> apply once, then mark ledger (pv = GM value)
 				const have = _bbmmCtrlBindings(ns, action);
 				if (!_bbmmCtrlSame(have, rec.soft.value)) {
-				DL(1, `controls | apply SOFT ${id} (rev=${rev})`);
+				appliedSoft.push({ id, rev });
 				await _bbmmCtrlSetBindings(ns, action, rec.soft.value);
 				}
 
-				// Mark handled so it won't re-apply on refresh/load
-				ledger[lkey] = { r: rev, v: JSON.stringify(rec.soft.value ?? []) };
+				// Mark handled so it won't re-apply on refresh/load (pv = GM value)
+				ledger[lkey] = { r: rev, v: JSON.stringify(rec.soft.value ?? []), pv: JSON.stringify(rec.soft.value ?? []) };
 				await game.settings.set(BBMM_ID, "softLockLedger", ledger);
 			}
 			}
+			if (appliedHard.length || restoredPv.length || appliedSoft.length) {
+				DL(1, `setting-sync.js | controls pull+apply: hard ${appliedHard.length}, soft ${appliedSoft.length}, restored ${restoredPv.length}`, { appliedHard, appliedSoft, restoredPv });
+			}
 		} catch (err) {
-			DL(2, "setting-sync.js | ctrlPullApplyAll() failed", err);
+			DL(2, `setting-sync.js | ctrlPullApplyAll() failed after hard ${appliedHard.length}/soft ${appliedSoft.length}/restored ${restoredPv.length}`, { error: err, appliedHard, appliedSoft, restoredPv });
 		}
 	}
 
@@ -2167,7 +2349,7 @@ import { hlp_esc } from "./helpers.js";
 			const next = { ...(store[id] ?? {}) };
 			next.soft = { value: _bbmmCtrlBindings(ns, action) };
 			next.lock = null;
-			next.rev = (Number(next.rev) || 0) + 1;
+			next.rev = Math.max(Date.now(), (Number(next.rev) || 0) + 1); // epoch-based monotonic rev
 			store[id] = next;
 			revMap[id] = next.rev;
 			DL(`Soft lock APPLIED for ${id} (rev=${next.rev})`);
@@ -2437,7 +2619,7 @@ import { hlp_esc } from "./helpers.js";
 				hardCount++; needsRefresh = true;
 			} else if (lockType === "soft") {
 				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
-				const newRev     = currentRev + 1;
+				const newRev = Math.max(Date.now(), currentRev + 1); // epoch-based monotonic rev
 				map[id]          = { namespace, key, value, requiresReload: !!cfg.requiresReload, soft: true, rev: newRev };
 				revMap[id]       = newRev;
 				softPushes.push({ namespace, key, value, requiresReload: !!cfg.requiresReload, softRev: newRev });
@@ -3575,7 +3757,7 @@ class BBMMLockReport extends foundry.applications.api.ApplicationV2 {
 			if (entry.soft) {
 				// Bump rev so offline players re-apply on next login and online players accept the push
 				const currentRev = Number.isInteger(revMap[id]) ? revMap[id] : 0;
-				const newRev     = currentRev + 1;
+				const newRev = Math.max(Date.now(), currentRev + 1); // epoch-based monotonic rev
 				map[id]          = { ...entry, rev: newRev };
 				revMap[id]       = newRev;
 				mapChanged = true;
