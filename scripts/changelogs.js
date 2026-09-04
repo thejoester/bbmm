@@ -894,6 +894,7 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 	const seen = game.settings.get(BBMM_ID, "seenChangelogs") || {}; 
 	const includeDisabled = game.settings.get(BBMM_ID, "checkDisabledModules");
 	const results = [];
+	const skipped = [];		// bucket, one summary instead of per-module skip lines
 
 	try {
 		for (const mod of game.modules) {
@@ -913,16 +914,17 @@ async function _bbmmCollectUpdatedModulesWithChangelogs() {
 
 				results.push({ id, title, version, prevSeen, url, mod });
 			} catch (errInner) {
-				DL(2, `changelog.js |  Changelog collect: skipping a module due to error: ${errInner?.message || errInner}`, errInner);
+				skipped.push({ id: mod?.id ?? null, message: errInner?.message || String(errInner) });
 			}
 		}
 	} catch (err) {
-		DL(2, `changelog.js |  Changelog collect: top-level error: ${err?.message || err}`, err);
+		DL(2, `changelog.js |  Changelog collect: top-level error: ${err?.message || err}`, { error: err, partial: { found: results.length, skipped: skipped.length } });
 	}
 
 	const end = performance.now();
 	const ms = (end - start).toFixed(1);
-	DL(`changelog.js |  changelog collector: finished scan in ${ms}ms (found ${results.length} modules)`);
+	DL(`changelog.js |  changelog collector: finished scan in ${ms}ms (found ${results.length} modules, skipped ${skipped.length})`);
+	if (skipped.length) DL(2, "changelog.js |  changelog collector: some modules skipped", { skipped });
 
 	return results;
 }
