@@ -182,6 +182,8 @@ function hlp_normalizeToEntries(bbmmExport) {
     DL("settings-presets.js | hlp_normalizeToEntries(): start");
 
     const entries = [];
+    const excludedModules = [];		// buckets, one summary instead of per-skip lines
+    const excludedSettings = [];
     try {
         const scopes = ["world", "client", "user"];
         for (const scope of scopes) {
@@ -191,9 +193,7 @@ function hlp_normalizeToEntries(bbmmExport) {
             for (const namespace of Object.keys(bucket)) {
                 // Skip whole module if excluded
                 if (isExcludedWith(skip, namespace)) {
-                    DL(
-                        `settings-presets.js | hlp_normalizeToEntries(): excluded module "${namespace}" (scope=${scope})`
-                    );
+                    excludedModules.push(`${namespace} (${scope})`);
                     continue;
                 }
 
@@ -203,9 +203,7 @@ function hlp_normalizeToEntries(bbmmExport) {
                 for (const key of Object.keys(settings)) {
                     // Skip specific setting if excluded
                     if (isExcludedWith(skip, namespace, key)) {
-                        DL(
-                            `settings-presets.js | hlp_normalizeToEntries(): excluded setting "${namespace}.${key}" (scope=${scope})`
-                        );
+                        excludedSettings.push(`${namespace}.${key} (${scope})`);
                         continue;
                     }
 
@@ -227,6 +225,11 @@ function hlp_normalizeToEntries(bbmmExport) {
         DL(3, "settings-presets.js | hlp_normalizeToEntries(): failed", {
             message: e?.message,
             stack: e?.stack,
+            partial: {
+                entries: entries.length,
+                excludedModules: excludedModules.length,
+                excludedSettings: excludedSettings.length,
+            },
         });
         throw e;
     }
@@ -243,6 +246,8 @@ function hlp_normalizeToEntries(bbmmExport) {
 
     DL("settings-presets.js | hlp_normalizeToEntries(): produced entries", {
         count: entries.length,
+        excludedModules,
+        excludedSettings,
     });
     return entries;
 }
@@ -585,8 +590,8 @@ async function svc_collectAllModuleSettings({ includeDisabled = false, includeHi
 
 	// Exclusions: persistent storage file =====================================
     try {
-		// Load and sanitize
-        const exc = hlp_sanitizeUserExclusions(	await hlp_fetchJSON(foundry.utils.getRoute("bbmm-data/user-exclusions.json")) );
+		// Load exclusions; the Array.isArray guards below tolerate any shape
+        const exc = await hlp_fetchJSON(foundry.utils.getRoute("bbmm-data/user-exclusions.json"));
         const excModules = Array.isArray(exc?.modules) ? exc.modules : [];
         const excSettings = Array.isArray(exc?.settings) ? exc.settings : [];
 
@@ -622,6 +627,8 @@ async function svc_collectAllModuleSettings({ includeDisabled = false, includeHi
     }
 
     // Collect settings ==============================================================
+    const excluded = [];		// buckets, one summary instead of per-setting lines
+    const failed = [];
     try {
         for (const def of game.settings.settings.values()) {
             const { namespace, key, scope } = def;
@@ -656,9 +663,7 @@ async function svc_collectAllModuleSettings({ includeDisabled = false, includeHi
                 isExcludedWith(skipMap, namespace) ||
                 isExcludedWith(skipMap, namespace, key)
             ) {
-                DL(
-                    `settings-presets.js | svc_collectAllModuleSettings(): excluded ${namespace}.${key}`
-                );
+                excluded.push(`${namespace}.${key}`);
                 continue;
             }
 
@@ -667,11 +672,7 @@ async function svc_collectAllModuleSettings({ includeDisabled = false, includeHi
             try {
                 value = game.settings.get(namespace, key);
             } catch (e) {
-                DL(
-                    2,
-                    `settings-presets.js | svc_collectAllModuleSettings(): get failed ${namespace}.${key}`,
-                    { message: e?.message }
-                );
+                failed.push({ id: `${namespace}.${key}`, reason: "get", message: e?.message });
                 continue;
             }
 
@@ -689,11 +690,7 @@ async function svc_collectAllModuleSettings({ includeDisabled = false, includeHi
                         ? hlp_toJsonSafe(value)
                         : value;
             } catch (e) {
-                DL(
-                    2,
-                    `settings-presets.js | svc_collectAllModuleSettings(): toJsonSafe failed ${namespace}.${key}`,
-                    { message: e?.message }
-                );
+                failed.push({ id: `${namespace}.${key}`, reason: "toJsonSafe", message: e?.message });
                 bucket[namespace][key] = value;
             }
         }
@@ -707,11 +704,15 @@ async function svc_collectAllModuleSettings({ includeDisabled = false, includeHi
                 client: countNs(out.client),
                 user: countNs(out.user),
             },
+            excluded: excluded.length,
+            failed: failed.length,
         });
+        if (failed.length) DL(2, "settings-presets.js | svc_collectAllModuleSettings(): some settings failed", { failed });
     } catch (e) {
         DL(3, "settings-presets.js | svc_collectAllModuleSettings(): FAILED", {
             message: e?.message,
             stack: e?.stack,
+            partial: { excluded: excluded.length, failed: failed.length },
         });
         throw e;
     }
@@ -750,15 +751,16 @@ async function svc_applySettingsExport(exportData) {
     const applied = [];
     const skipped = [];
     const missingModules = new Set();
+    const excluded = [];		// log buckets, one summary instead of per-entry lines
+    const hiddenSkipped = [];
+    const failed = [];
 
     for (const scope of scopes) {
         const tree = exportData[scope] || {};
         for (const [namespace, entries] of Object.entries(tree)) {
             // Exclude entire namespace first
             if (isExcludedWith(skip, namespace)) {
-                DL(
-                    `settings-presets.js | svc_applySettingsExport(): excluded module "${namespace}", skipping all keys in scope=${scope}`
-                );
+                excluded.push(`${namespace}.* (${scope})`);
                 continue;
             }
 
@@ -775,9 +777,7 @@ async function svc_applySettingsExport(exportData) {
             for (const [key, value] of Object.entries(entries)) {
                 // Exclude specific setting if needed
                 if (isExcludedWith(skip, namespace, key)) {
-                    DL(
-                        `settings-presets.js | svc_applySettingsExport(): excluded setting "${namespace}.${key}" (scope=${scope})`
-                    );
+                    excluded.push(`${namespace}.${key} (${scope})`);
                     continue;
                 }
 
@@ -800,9 +800,7 @@ async function svc_applySettingsExport(exportData) {
                         includedPairs.has(`${namespace}.${key}`) ||
                         includedModules.has(namespace);
                     if (!inInclusions) {
-                        DL(
-                            `settings-presets.js | svc_applySettingsExport(): skipped hidden setting "${namespace}.${key}" (not in inclusions)`
-                        );
+                        hiddenSkipped.push(`${namespace}.${key}`);
                         skipped.push(`${namespace}.${key}`);
                         continue;
                     }
@@ -856,16 +854,22 @@ async function svc_applySettingsExport(exportData) {
                     await game.settings.set(namespace, key, hydrated);
                     applied.push(`${namespace}.${key}`);
                 } catch (e) {
-                    DL(
-                        2,
-                        "settings-presets.js | svc_applySettingsExport(): set failed",
-                        { ns: namespace, key, message: e?.message }
-                    );
+                    failed.push({ id: `${namespace}.${key}`, message: e?.message });
                     skipped.push(`${namespace}.${key}`);
                 }
             }
         }
     }
+
+    DL("settings-presets.js | svc_applySettingsExport(): applied", {
+        applied: applied.length,
+        skipped: skipped.length,
+        missingModules: missingModules.size,
+        excluded: excluded.length,
+        hiddenSkipped: hiddenSkipped.length,
+        failed: failed.length,
+    });
+    if (failed.length) DL(2, "settings-presets.js | svc_applySettingsExport(): some sets failed", { failed });
 
     // Prompt reload
     const doReload = await foundry.applications.api.DialogV2.confirm({
@@ -1010,6 +1014,8 @@ async function svc_setSettingsPresets(obj) {
 /* Plan setting changes between live settings and a bbmm-export envelope */
 async function svc_planSettingsChanges(env) {
     const rows = [];
+    const excluded = [];		// buckets, one summary instead of per-skip lines
+    const hiddenSkipped = [];
     try {
         DL("settings-presets.js | svc_planSettingsChanges(): start");
 
@@ -1053,9 +1059,7 @@ async function svc_planSettingsChanges(env) {
 
                     // Skip specific setting if excluded
                     if (isExcludedWith(skipMap, ns, key)) {
-                        DL(
-                            `settings-presets.js | svc_planSettingsChanges(): excluded setting "${ns}.${key}" (scope=${scope})`
-                        );
+                        excluded.push(`${ns}.${key} (${scope})`);
                         continue;
                     }
 
@@ -1065,9 +1069,7 @@ async function svc_planSettingsChanges(env) {
                             planIncludedPairs.has(`${ns}.${key}`) ||
                             planIncludedModules.has(ns);
                         if (!inInclusions) {
-                            DL(
-                                `settings-presets.js | svc_planSettingsChanges(): skipped hidden setting "${ns}.${key}" (not in inclusions)`
-                            );
+                            hiddenSkipped.push(`${ns}.${key}`);
                             continue;
                         }
                     }
@@ -1090,12 +1092,17 @@ async function svc_planSettingsChanges(env) {
             }
         }
 
-        DL(
-            `settings-presets.js | svc_planSettingsChanges(): rows=${rows.length}`
-        );
+        DL("settings-presets.js | svc_planSettingsChanges(): done", {
+            rows: rows.length,
+            excluded: excluded.length,
+            hiddenSkipped: hiddenSkipped.length,
+        });
         return rows;
     } catch (err) {
-        DL(3, "settings-presets.js | svc_planSettingsChanges(): error", err);
+        DL(3, "settings-presets.js | svc_planSettingsChanges(): error", {
+            error: err,
+            partial: { rows: rows.length, excluded: excluded.length, hiddenSkipped: hiddenSkipped.length },
+        });
         return rows;
     }
 }

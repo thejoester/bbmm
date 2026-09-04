@@ -154,18 +154,20 @@ async function checkFolderMigration(){
 		}
 
 		// move packs into folder
+		const movedPacks = [];		// buckets, one summary instead of per-pack lines
+		const skippedPacks = [];
 		for (const name of BBMM_PACK_NAMES) {
 			const cid = `${BBMM_ID}.${name}`;
 			const pack = game.packs.get(cid);
-			if (!pack) { DL("settings.js | Pack not found, skipping:", cid); continue; }
+			if (!pack) { skippedPacks.push(cid); continue; }
 			await pack.configure({ folder: folder.id });
-			DL("settings.js | Moved pack into folder:", cid, "→", BBMM_COMP_FOLDER_NAME);
+			movedPacks.push(cid);
 		}
 
 		// update flag
 		await setMigrationFlag("folderMigration", true);
 		ui.compendium.render(true);
-		DL("settings.js | Compendium folder migration complete.");
+		DL("settings.js | Compendium folder migration complete.", { moved: movedPacks, skipped: skippedPacks });
 	} catch (err) {
 		DL(3, "settings.js | Compendium folder migration failed:", err?.message ?? err);
 	}
@@ -1659,6 +1661,9 @@ Hooks.once("ready", async () => {
 			"lock-presets.json":     {},
 		};
 
+		const seeded = [];		// buckets, one summary instead of per-file lines
+		const skippedExisting = [];
+		const failedSeeds = [];
 		for (const [filename, defaultData] of Object.entries(seeds)) {
 			// Check if the file already exists before seeding
 			let fileExists = false;
@@ -1670,18 +1675,20 @@ Hooks.once("ready", async () => {
 			}
 
 			if (fileExists) {
-				DL(`settings.js | ${filename} already exists, skipping seed`);
+				skippedExisting.push(filename);
 				continue;
 			}
 
 			try {
 				const file = new File([JSON.stringify(defaultData, null, 2)], filename, { type: "application/json" });
 				await foundry.applications.apps.FilePicker.implementation.upload("data", "bbmm-data", file, { notify: false });
-				DL(`settings.js | seeded ${filename}`);
+				seeded.push(filename);
 			} catch (err) {
-				DL(2, `settings.js | failed to seed ${filename}`, err);
+				failedSeeds.push({ filename, message: err?.message });
 			}
 		}
+		DL("settings.js | seed bbmm-data: done", { seeded, skippedExisting, failed: failedSeeds.length });
+		if (failedSeeds.length) DL(2, "settings.js | seed bbmm-data: some files failed", { failed: failedSeeds });
 	})();
 
 	await globalThis.bbmm._dataFilesReady;

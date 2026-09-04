@@ -537,6 +537,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		DL(`exclusions.js | AddSetting._warmVisiblePreviews(): warming ${toLoad.length} previews`);
 
 		let idx = 0;
+		const failed = [];		// bucket, one line in the done summary instead of per-item
 
 		const tick = () => {
 			const end = Math.min(idx + limitPerTick, toLoad.length);
@@ -592,7 +593,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 					r.__preview = "error";
 					r.__pretty = "error";
 					r.__valLoaded = true;
-					DL(2, "exclusions.js | AddSetting._warmVisiblePreviews(): value read failed", { ns: r.namespace, key: r.key, err: e });
+					failed.push({ ns: r.namespace, key: r.key, message: e?.message });
 				}
 			}
 
@@ -603,7 +604,11 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 
 			this._warmRunning = false;
 			this._warmTimer = null;
-			DL("exclusions.js | AddSetting._warmVisiblePreviews(): done");
+			DL("exclusions.js | AddSetting._warmVisiblePreviews(): done", {
+				warmed: toLoad.length,
+				failed: failed.length,
+			});
+			if (failed.length) DL(2, "exclusions.js | AddSetting._warmVisiblePreviews(): some previews failed", { failed });
 		};
 
 		tick();
@@ -745,6 +750,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 		try {
 			// Already-excluded pairs as a Set of "ns::key"
 			const excluded = this._getExistingPairsSet();
+				const failed = [];		// bucket, one line in the built summary instead of per-item
 			const rows = [];
 
 			for (const s of game.settings.settings.values()) {
@@ -800,7 +806,7 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 						__valLoaded: false
 					});
 				} catch (e1) {
-					DL(2, "exclusions.js | AddSetting._collectSettings() item failed", e1);
+					failed.push({ ns: String(s?.namespace ?? ""), key: String(s?.key ?? ""), message: e1?.message });
 				}
 			}
 
@@ -814,7 +820,8 @@ class BBMMAddSettingExclusionAppV2 extends foundry.applications.api.ApplicationV
 			);
 
 			this._rows = rows;
-			DL("exclusions.js | AddSetting._collectSettings(): built", { count: rows.length });
+			DL("exclusions.js | AddSetting._collectSettings(): built", { count: rows.length, failed: failed.length });
+				if (failed.length) DL(2, "exclusions.js | AddSetting._collectSettings(): some items failed", { failed });
 		} catch (e) {
 			DL(3, "exclusions.js | AddSetting._collectSettings(): failed to enumerate settings", e);
 			this._rows = [];

@@ -259,6 +259,7 @@ async function svc_applyLockPreset(name, wipeFirst = false) {
 	let revChanged = false;
 	const softPushes = [];
 	const hardPushes = [];
+	const failed = [];		// bucket, one summary instead of per-item read-fail lines
 
 	for (const { namespace, key, lockType } of valid) {
 		const id  = `${namespace}.${key}`;
@@ -267,7 +268,7 @@ async function svc_applyLockPreset(name, wipeFirst = false) {
 		try {
 			value = game.settings.get(namespace, key);
 		} catch (err) {
-			DL(2, `lock-presets.js | svc_applyLockPreset(): failed to read ${id}`, err);
+			failed.push({ id, message: err?.message });
 			skipped++;
 			continue;
 		}
@@ -323,6 +324,8 @@ async function svc_applyLockPreset(name, wipeFirst = false) {
 	}
 
 	const applied = valid.length - skipped;
+	DL("lock-presets.js | svc_applyLockPreset(): applied", { name, applied, skipped, soft: softPushes.length, hard: hardPushes.length, failed: failed.length });
+	if (failed.length) DL(2, "lock-presets.js | svc_applyLockPreset(): some settings failed to read", { failed });
 	ui.notifications.info(`${LT.lockPresets.loaded({ name, count: applied, skipped })}.`);
 }
 
