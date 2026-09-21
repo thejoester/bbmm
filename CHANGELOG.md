@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 - **Soft locks:**
-  - Fixed soft locks created in older versions that could get stuck and never reach players, so a player would keep their own value instead of the GM's recommendation. On the next GM login these older soft locks are refreshed automatically and pushed out to players, no action needed.
+  - Fixed bug causing soft locks created in older versions that could get stuck and never reach players, so a player would keep their own value instead of the GM's recommendation. On the next GM login these older soft locks are refreshed automatically and pushed out to players, no action needed.
 
 ## [1.4.8] - 2026-09-03
 
