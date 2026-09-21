@@ -1759,8 +1759,68 @@ import { hlp_esc } from "./helpers.js";
 					}
 				}
 
+				/* One-time, self-terminating migration for legacy soft locks.
+				   Older soft locks used a small incrementing rev (or none). Once a
+				   player's ledger recorded that small rev, login-apply's "worldRev >
+				   prevRev" gate never fires again, and the "same rev" path can't tell
+				   "never delivered" from a deliberate player override, so the lock is
+				   stuck. Bump every legacy rev to a fresh epoch so all players get one
+				   clean re-apply (which writes pv). Idempotent: epoch revs match nothing. */
+				const bbmmMigrateLegacySoftRevs = async () => {
+					try {
+						const LEGACY_REV_MAX = 1000000000000;	// epoch ms are ~1.7e12; anything below is a legacy counter
+
+						const map    = game.settings.get(BBMM_ID, "userSettingSync") || {};
+						const revMap = game.settings.get(BBMM_ID, "softLockRevMap") || {};
+						const migrated = [];
+						let lastRev = 0;
+
+						for (const [id, ent] of Object.entries(map)) {
+							if (!ent || ent.soft !== true) continue;
+							const rev = Number.isInteger(ent.rev) ? ent.rev : 0;
+							if (rev >= LEGACY_REV_MAX) continue;	// already epoch
+
+							const newRev = Math.max(Date.now(), lastRev + 1, rev + 1);	// monotonic, unique within loop
+							lastRev = newRev;
+							map[id]    = { ...ent, rev: newRev };
+							revMap[id] = newRev;
+							migrated.push({ id, oldRev: rev, newRev, namespace: ent.namespace, key: ent.key, value: ent.value, requiresReload: !!ent.requiresReload });
+						}
+
+						if (!migrated.length) {
+							DL("setting-sync.js | legacy-rev migration: nothing to migrate");
+							return;
+						}
+
+						await game.settings.set(BBMM_ID, "userSettingSync", map);
+						await game.settings.set(BBMM_ID, "softLockRevMap", revMap);
+						DL(1, `setting-sync.js | legacy-rev migration: bumped ${migrated.length} soft lock(s)`, migrated);
+
+						// Push to online players now; offline players heal on next login-apply.
+						if (game.socket) {
+							const targets = (game.users?.contents || []).filter(u => !u.isGM).map(u => u.id);
+							for (const m of migrated) {
+								game.socket.emit(BBMM_SYNC_CH, {
+									t: "bbmm-sync-push",
+									soft: true,
+									softRev: m.newRev,
+									namespace: m.namespace,
+									key: m.key,
+									value: m.value,
+									targets,
+									requiresReload: m.requiresReload
+								});
+							}
+						}
+						bbmmBroadcastTrigger();
+					} catch (err) {
+						DL(2, "setting-sync.js | legacy-rev migration: failed", err);
+					}
+				};
+
 				// GM: keep world map fresh, inject CSS, etc.
 				await bbmmResnapUserSync();
+				await bbmmMigrateLegacySoftRevs();
 
 				// One-time migration: convert legacy per-player (partial) locks to all-players
 				await checkPartialLockMigration();
