@@ -4,14 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.9] - 2026-09-21
+## [1.4.9-test1] - 2026-09-21
 
 ### Added
 - **Presets:** Left-click a preset's name in the module or settings preset lists to drop it into the name box above the list. Hit Save Current after and it overwrites that preset, so you no longer have to retype the name to update one.
 
 ### Fixed
 - **Soft locks:**
-  - Fixed soft locks created in older versions that could get stuck and never reach players, so a player would keep their own value instead of the GM's recommendation. On the next GM login these older soft locks are refreshed automatically and pushed out to players, no action needed.
+  - Fixed bug causing soft locks created in older versions that could get stuck and never reach players, so a player would keep their own value instead of the GM's recommendation. On the next GM login these older soft locks are refreshed automatically and pushed out to players, no action needed.
 
 ## [1.4.8] - 2026-09-03
 
