@@ -495,10 +495,9 @@ function _mp_buildContentHTML(list) {
 			const displayName = p.name.length > 40
 				? hlp_esc(p.name.slice(0, 37)) + "..."
 				: fullName;
-			const titleAttr = p.name.length > 40 ? ` title="${fullName}"` : "";
 			return `
 			<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
-				<td style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"${titleAttr}>${displayName}</td>
+				<td data-action="pick-name" data-preset-id="${hlp_esc(p.id)}" title="${fullName} (${hlp_esc(LT.clickNameToFill())})" style="padding:.25rem .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;">${displayName}</td>
 				<td style="padding:.25rem .5rem;">
 					<div style="display:flex;gap:.25rem;justify-content:flex-end;flex-wrap:wrap;">
 						<button type="button" data-action="load"    data-preset-id="${hlp_esc(p.id)}">${LT.buttons.load()}</button>
@@ -553,6 +552,19 @@ export async function mountModulePresets(container) {
 // getIndex() returns the current preset index so the single handler stays fresh.
 function _mp_wire(container, getIndex, rerender) {
 	container.addEventListener("click", async (ev) => {
+				// Left-click a preset name to fill the save field, so Save Current overwrites that preset
+				const nameCell = ev.target?.closest?.('[data-action="pick-name"]');
+				if (nameCell) {
+					const id = nameCell.dataset.presetId ?? "";
+					const p = id ? getIndex()[id] : null;
+					const input = container.querySelector('input[name="newName"]');
+					if (p && input) {
+						input.value = p.name;
+						input.focus();
+					}
+					return;
+				}
+
 				const btn = ev.target;
 				if (!(btn instanceof HTMLButtonElement)) return;
 
