@@ -9,6 +9,7 @@
 		"presetName": "Nome do Preset",
 		"newPresetName": "Nome do Novo Preset",
 		"savedPresets": "Presets Salvos",
+		"clickNameToFill": "Clique para preencher o campo de nome acima (salvar substituirá este preset)",
 		"warnUpdatePreset": "Selecione um preset para atualizar.",
 		"warnEnterName": "Por favor, insira um nome para o preset",
 		"titleReloadFoundry": "Recarregar Foundry?",
