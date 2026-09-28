@@ -50,7 +50,7 @@
 		"modulePresetsBtn": "Presets de Módulo",
 		"settingsPresetsBtn": "Presets de Configurações",
 		"lockPresetsBtn": "Bloquear Presets",
-		"promptReload": "Preset de configurações aplicado. Recarregue o Foundry para garantir que tudo seja inicializado corretamente.",
+		"promptReload": "Preset de configurações aplicado. Recarregar agora para garantir que tudo seja inicializado corretamente",
 		"settingPresetExists": "Já existe um preset de configurações chamado <b>{name}</b>.",
 		"renameSettingPreset": "Renomear Preset de Configurações",
 		"titleImportSettingsPreset": "BBMM — Importar Configurações para Preset",
