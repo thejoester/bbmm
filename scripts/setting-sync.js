@@ -48,9 +48,9 @@ import { hlp_esc } from "./helpers.js";
 
 	/* Capture player values (pv) for soft-locked CLIENT settings ==================
 		Reads the committed live values and stores any that differ into the
-		user-scoped ledger as pv. Foundry fires no reliable per-set hook, so this
-		is called at commit points (settings close, and before a requiresReload
-		reload) where game.settings already holds the new values. Player-only. */
+		user-scoped ledger as pv. This is called at settings close and before a
+		requiresReload reload, when game.settings holds the committed values.
+		Player-only. */
 	async function bbmmCaptureSoftLockPv() {
 		const captured = []; // declared out here so a mid-loop throw can still log partial work
 		try {
@@ -1174,44 +1174,50 @@ import { hlp_esc } from "./helpers.js";
 
 
 	/* ==========================================================================
-		{ HOOK: setSetting } player guard against changing locked settings
+		Player guard against changing locked settings
 	========================================================================== */
-	Hooks.on("setSetting", async (namespace, key, value) => {
+	const _bbmmPendingReverts = new Set();
+
+	function bbmmGetHardLockToRestore(id) {
+		if (!bbmmIsSyncEnabled() || game.user?.isGM) return;
+		const cfg = game.settings.settings.get(id);
+		if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) return;
+		const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
+		const entry = map[id];
+		if (!entry || entry.soft === true) return;
+		if (objectsEqual(game.settings.get(cfg.namespace, cfg.key), entry.value)) return;
+		return { namespace: cfg.namespace, key: cfg.key, value: entry.value };
+	}
+
+	function bbmmRestoreHardLock(id) {
 		try {
-
-			if (!bbmmIsSyncEnabled()) return;
-			if (game.user?.isGM) return;
-
-			const id = `${namespace}.${key}`;
-			const cfg = game.settings.settings.get(id);
-			if (!cfg || (cfg.scope !== "user" && cfg.scope !== "client")) return;
-
-			const map = game.settings.get(BBMM_ID, "userSettingSync") || {};
-			const entry = map[id];
-			if (!entry) return; // not locked at all
-
-			// SOFT lock: advisory, never revert a player's change. pv is captured at
-			// commit points (settings close / reloadConfirm), not here; no reliable
-			// per-set hook fires for client settings.
-			if (entry.soft === true) return;
-
-			// HARD lock: revert if different from GM value
-			const equal = objectsEqual(value, entry.value);
-			if (!equal) {
-				DL(`setting-sync.js |  bbmm-setting-lock: player attempted to change locked ${id}, reverting`);
-				setTimeout(async () => {
-					try {
-						await game.settings.set(namespace, key, entry.value);
-						ui.notifications?.warn?.(LT.sync.LockedByGM());
-					} catch (err) {
-						DL(2, "setting-sync.js |  bbmm-setting-lock: revert error", err);
-					}
-				}, 0);
-			}
+			if (_bbmmPendingReverts.has(id) || !bbmmGetHardLockToRestore(id)) return;
+			_bbmmPendingReverts.add(id);
+			setTimeout(async () => {
+				_bbmmPendingReverts.delete(id);
+				try {
+					// The GM may unlock the setting or change its value before this runs.
+					const entry = bbmmGetHardLockToRestore(id);
+					if (!entry) return;
+					await game.settings.set(entry.namespace, entry.key, foundry.utils.duplicate(entry.value));
+					DL(`setting-sync.js | bbmmRestoreHardLock(): reverted hard-locked ${id} to GM value`);
+					ui.notifications?.warn?.(${LT.sync.LockedByGM()});
+				} catch (err) {
+					DL(2, "setting-sync.js |  bbmm-setting-lock: revert error", err);
+				}
+			}, 0);
 		} catch (err) {
-			DL(2, "setting-sync.js |  bbmm-setting-lock: setSetting guard error", err);
+			DL(2, "setting-sync.js |  bbmm-setting-lock: setting guard error", err);
 		}
-	});
+	}
+
+	function bbmmRestoreUserSetting(setting) {
+		if (setting.user === game.user.id) bbmmRestoreHardLock(setting.key);
+	}
+
+	Hooks.on("clientSettingChanged", bbmmRestoreHardLock);
+	Hooks.on("createSetting", bbmmRestoreUserSetting);
+	Hooks.on("updateSetting", bbmmRestoreUserSetting);
 
 	/* ============================================================================
 			{ HOOK: renderSettingsConfig } 
@@ -1290,9 +1296,8 @@ import { hlp_esc } from "./helpers.js";
 						const icon = group.querySelector?.(".bbmm-lock-icon");
 						if (icon) _bbmmSetLockIconState(icon, "soft");
 
-						// Player edits to a soft lock are captured durably in the setSetting
-						// hook (pv). No global soft-clear: one player's change must not remove
-						// the recommendation for the rest of the table.
+						// Player edits to a soft lock are captured on settings close or reload.
+						// One player's change must not remove the recommendation for everyone.
 
 						continue;
 					}
