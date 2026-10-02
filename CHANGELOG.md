@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.10-test3] - 2026-10-01
+## [1.4.10] - 2026-10-01
 
 ### Fixed
 - **Enhanced module manager:** Clicking "Manage Modules" now reliably opens BBMM's enhanced window instead of the default one. Some other modules refresh the sidebar after load, which could quietly knock out the BBMM hook and send you back to the plain list. It now holds up through those refreshes.
