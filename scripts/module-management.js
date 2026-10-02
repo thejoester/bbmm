@@ -3003,39 +3003,29 @@ Hooks.on("renderSettings", (_app, rootEl) => {
 		const root = rootEl instanceof HTMLElement ? rootEl : (rootEl?.[0] ?? null);
 		if (!root) return;
 
-		// Already wired?
+		// Already wired? The listener is delegated on the persistent root element,
+		// so it survives inner re-renders that replace the button (e.g. another
+		// module calling ui.sidebar.render()). Binding directly to the button
+		// instead would silently stop working after any such re-render.
 		if (root.dataset.bbmmManageModulesBound === "1") return;
+		root.dataset.bbmmManageModulesBound = "1";
 
-		// Collect likely candidates across locales and core variants
-		const candidates = [
-			...root.querySelectorAll('button[data-action="moduleManagement"]'),
-			...root.querySelectorAll('button[data-action="manage-modules"]'),
-			// Locale-agnostic: Foundry v13 Settings menu uses data-app="modules"
-			...root.querySelectorAll('button[data-app="modules"], a[data-app="modules"]'),
-			...root.querySelectorAll('button, a')
-		];
-
-		const manageBtn = candidates.find(b => {
+		// Match the Manage Modules button across locales and core variants.
+		const _isManageBtn = (b) => {
+			if (!b) return false;
 			const label = (b.textContent || b.ariaLabel || "").trim().toLowerCase();
 			return (
 				b.matches('button[data-action="moduleManagement"], button[data-action="manage-modules"]') ||
 				b.matches('[data-app="modules"]') ||
 				/manage modules|gérer les modules|gestionar módulos|gestire moduli|module verwalten/.test(label)
 			);
-		});
+		};
 
-		if (!manageBtn) {
-			DL(2, 'renderSettings(): Manage Modules button not found (no selector matched).');
-			return;
-		}
-
-		// Mark once
-		manageBtn.dataset.bbmmRewired = "1";
-		root.dataset.bbmmManageModulesBound = "1";
-
-		// Click handler: Shift-click opens core; normal click opens BBMM.
-		manageBtn.addEventListener("click", (ev) => {
+		// Delegated capture-phase click: Shift-click falls through to core, normal click opens BBMM.
+		root.addEventListener("click", (ev) => {
 			try {
+				const btn = ev.target?.closest?.("button, a");
+				if (!btn || !root.contains(btn) || !_isManageBtn(btn)) return;
 				if (ev.shiftKey) return; // allow core behavior when Shift is held
 				ev.preventDefault();
 				ev.stopPropagation();
