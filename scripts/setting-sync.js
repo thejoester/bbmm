@@ -1201,7 +1201,7 @@ import { hlp_esc } from "./helpers.js";
 					if (!entry) return;
 					await game.settings.set(entry.namespace, entry.key, foundry.utils.duplicate(entry.value));
 					DL(`setting-sync.js | bbmmRestoreHardLock(): reverted hard-locked ${id} to GM value`);
-					ui.notifications?.warn?.(`${LT.sync.LockedByGM()} (${id})`);
+					ui.notifications?.warn?.(${LT.sync.LockedByGM()});
 				} catch (err) {
 					DL(2, "setting-sync.js |  bbmm-setting-lock: revert error", err);
 				}
