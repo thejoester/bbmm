@@ -4,11 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.10-test2] - 2026-10-01
+## [1.4.10-test3] - 2026-10-01
 
 ### Fixed
 - **Enhanced module manager:** Clicking "Manage Modules" now reliably opens BBMM's enhanced window instead of the default one. Some other modules refresh the sidebar after load, which could quietly knock out the BBMM hook and send you back to the plain list. It now holds up through those refreshes.
 - **Hard-locked settings:** Hard locks are now enforced no matter where a player changes the setting, including settings tucked away inside a module's own menu screen. Previously a locked setting hidden in a submenu could slip through; now it snaps back to the GM's value with a notice. Credit: [Taka](https://github.com/takaqiao)! 
+
+### Changed
+- **Localization:** 
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
 ## [1.4.9] - 2026-09-21
 
 ### Added
