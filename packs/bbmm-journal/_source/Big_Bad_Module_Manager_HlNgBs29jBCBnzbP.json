@@ -617,6 +617,84 @@
         "default": -1
       },
       "_key": "!journal.pages!HlNgBs29jBCBnzbP.4DlZdJ7OvnsDHuHk"
+    },
+    {
+      "sort": 319532,
+      "name": "Keybind Locks",
+      "type": "text",
+      "_id": "rik2w1mVrlMUwimo",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>Since keybinds are client settings by default, any time cache is cleared, or a new browser or computer is used, the keybinds reset to defaults. The <strong>Keybind Locks</strong> feature of BBMM allows a GM or Player to save keybinding preferences  that will be re-enforced on load so they stop reverting.</p><p>Pick any registered keybinding (Core or from a module), then either clear the binding, or set it to a key you prefer. </p><p>You'll find it as the <strong>Keybind Locks</strong> tab in the <a href=\"https://github.com/thejoester/bbmm/wiki/BBMM-Toolbox\">BBMM Toolbox</a>.</p><hr><h3>Lock types</h3><p><strong>Clear (unbind)</strong></p><blockquote><p>Keeps the action unbound. Use this for keys you never want assigned, so a module that tries to grab them on load can't.</p></blockquote><p><strong>Set to key</strong></p><blockquote><p>Forces the action to the key (or keys) you capture. You can add more than one binding for the same action, or remove one with the x on its chip.</p></blockquote><hr><h3>Adding a lock</h3><ol><li><p>Open the <strong>Keybind Locks</strong> tab and click <strong>Add</strong> in the section you want (Baseline or Personal).</p></li><li><p>Narrow the list with the namespace dropdown, or search by action name or by the key it's currently bound to.</p></li><li><p>Click the action to select it.</p></li><li><p>Choose <strong>Clear (unbind)</strong> or <strong>Set to key</strong>. For Set to key, capture at least one key.</p></li><li><p>Click <strong>Add Lock</strong>. The lock appears in the list; nothing is saved until you click <strong>Save &amp; Apply</strong>.</p></li></ol><hr><h3>Baseline vs. Personal</h3><p><strong>Baseline - applies to everyone (GM only)</strong></p><blockquote><p>Pushed to every connected player and re-applied on each client's load. Use this to set defaults for the whole table. A player's personal lock for the same action overrides it.</p></blockquote><p><strong>Personal - only you</strong></p><blockquote><p>Applies only to you and overrides the baseline for the same action. Every player (and the GM) can add personal locks, so you can tailor your own keys while still getting the GM's defaults for everything else.</p></blockquote><p>Players also see a read-only <strong>GM-Enforced Locks</strong> list, so it's clear which keys are coming from the GM.</p><hr><h3>Saving and pushing</h3><ul><li><p><strong>Save &amp; Apply</strong> stores your locks and applies them right away. Players: this saves your personal locks. GM: this also saves the baseline.</p></li><li><p><strong>Push to players</strong> (GM only) sends the current baseline to everyone online immediately, rather than waiting for their next load.</p></li></ul><p>Locks re-apply each load. You can still change a key during play; it resets on your next reload. Your personal locks always win over the GM's baseline.</p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "U2OCxXAmOSozc3K9": 3
+      },
+      "flags": {},
+      "_stats": {
+        "coreVersion": "14.369",
+        "systemId": "pf2e",
+        "systemVersion": "8.5.1",
+        "createdTime": 1793103255201,
+        "modifiedTime": 1793104063103,
+        "lastModifiedBy": "U2OCxXAmOSozc3K9",
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null
+      },
+      "_key": "!journal.pages!HlNgBs29jBCBnzbP.rik2w1mVrlMUwimo"
+    },
+    {
+      "sort": 650000,
+      "name": "Settings Change Notice",
+      "type": "text",
+      "_id": "LR8FKPSZJft8RdMP",
+      "system": {},
+      "title": {
+        "show": true,
+        "level": 1
+      },
+      "image": {},
+      "text": {
+        "format": 1,
+        "content": "<p>Settings change alerts watch for when your live world settings drift away from the last settings preset that you saved or loaded with BBMM. When BBMM spots a difference on load, it shows you a short alert naming the preset and how many settings changed, so you can decide whether to update the preset, save the new settings as a new preset, or restore the preset's values.</p>\n<p>It's a passive safety net. Nothing is changed or restored for you automatically. See below to learn more about this feature.</p>\n<hr>\n<h3>What this covers</h3>\n<p>The drift check only watches settings that are actually in your preset. The preset holds the settings you chose to track, so anything it reports is meaningful rather than noise. The flip side is that a setting left out of the preset can't be flagged as changed or brought back by reloading the preset.</p>\n<p>This matters most for the cache-clear case. If you're relying on a preset to restore your client settings after a reset, make sure that preset actually includes the client settings you care about, or they'll be lost with nothing to put them back.</p>\n<hr>\n<h3>Why am I seeing this?</h3>\n<img src=\"modules/bbmm/assets/readme/settings-change-alert.webp\">\n<p>BBMM is warning you because your current settings no longer match the settings preset you last saved or loaded. The alert tells you which preset was last loaded or saved, and how many settings differ, and lets you decide what to do about it.</p>\n<hr>\n<h3>Why settings drift</h3>\n<p><strong>You changed something</strong></p>\n<blockquote>\n    <p>Any setting you adjusted during play that is also tracked in your preset will show up as a difference. That is usually fine and expected; the alert is a reminder to update your preset, or save a new preset if you want to keep that change in a preset that you can use in other worlds, or to restore later.</p>\n</blockquote>\n<p><strong>A browser cache clear</strong></p>\n<blockquote>\n    <p><a href=\"https://foundryvtt.com/article/settings/\" title=\"FoundryVTT Settings Documentation\">Client-scoped settings live in your browser's local storage</a>, not in the world. If you clear your cache, switch browsers, or sign in from a different machine, those settings reset to their defaults. Because BBMM does not lock settings for the GM, nothing restores them automatically. This alert catches that on your next load and notifies you that settings have changed, so if you want you can reload that preset and restore the settings.</p>\n</blockquote>\n<hr>\n<h3>What you can do</h3>\n<p>The alert gives you a few actions:</p>\n<ul>\n    <li>\n        <p><strong>Review Changes </strong>opens a side-by-side preview of every setting that differs, labelled by scope (world, user, or client), so you can see exactly what changed.</p>\n    </li>\n    <li>\n        <p><strong>Open Presets</strong> will open the BBMM Toolbox to the settings presets tab, so that you can update the preset, save a new one, or restore the settings by loading the preset.</p>\n    </li>\n    <li>\n        <p><strong>Remind Me </strong>snoozes the alert until the next day (server time). It won't bother you again today, even across reloads, and checks again on your first load tomorrow. Use this when you'll deal with the drift later.</p>\n    </li>\n    <li>\n        <p><strong>Ignore</strong> hides the settings currently listed, so those specific settings won't alert again. Other settings, including ones that change later, will still alert. Saving or loading a preset clears the ignore list and re-arms the check for everything. It does not turn the feature off.</p>\n    </li>\n</ul>\n<hr>\n<h3>Turning it off</h3>\n<p>If you don't want this check at all, turn off <strong>Alert on Settings Drift</strong> in BBMM's module settings. It is on by default. <br></p>\n<img src=\"modules/bbmm/assets/readme/settings-drift-alert.webp\">\n<hr>\n<h3>Troubleshooting</h3>\n<p><strong>Issue: you are alerted to a changed setting immediately after applying a preset</strong></p>\n<blockquote>\n    <p>Some settings store structured data rather than a simple toggle or a single choice. A system or module update can change the shape of that data or its default values, so your live value no longer matches what the preset captured, even though you never touched the setting. When that happens, updating the preset re-captures the current shape and clears the alert.</p>\n</blockquote>\n<p><strong>Issue: you are constantly alerted about the same setting(s) every session</strong></p>\n<blockquote>\n    <p>If the same setting(s) come up as changed every single session, that is a sign the setting may not belong in your preset. Some settings store data that is transient, changing with world state, for example the World Time or the Combat Tracker data. When a setting keeps alerting every new session, consider removing it from the preset instead of re-saving it each load.</p>\n</blockquote>\n<p>If you would like help or advice about a particular setting, you can <a href=\"https://github.com/thejoester/bbmm/issues\" title=\"https://github.com/thejoester/bbmm/issues\">open an issue on my Github page</a>.</p>\n<hr>\n<h3>See Also:</h3>\n<p>@UUID[.mB68DCCQ83f9d3EQ]{Settings Presets}, @UUID[.XsS4wjBTXbMDeHpr]{Hidden settings}, @UUID[.1mPrapuBoNRZTWXo]{Inclusion / Exclusion Manager}</p>"
+      },
+      "video": {
+        "controls": true,
+        "volume": 0.5
+      },
+      "src": null,
+      "category": null,
+      "ownership": {
+        "default": -1,
+        "SdwuhO3tNzCAOylJ": 3
+      },
+      "flags": {},
+      "_stats": {
+        "coreVersion": "14.369",
+        "systemId": "dnd5e",
+        "systemVersion": "6.0.5",
+        "createdTime": 1793109890493,
+        "modifiedTime": 1793174430770,
+        "lastModifiedBy": "U2OCxXAmOSozc3K9",
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null
+      },
+      "_key": "!journal.pages!HlNgBs29jBCBnzbP.LR8FKPSZJft8RdMP"
     }
   ],
   "folder": null,

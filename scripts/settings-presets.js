@@ -1,5 +1,5 @@
-import { DL, BBMM_README_UUID, EXPORT_SKIP } from "./settings.js";
-import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, getSkipMap, isExcludedWith, hlp_injectHeaderHelpButton, toPreview, toPretty, copyPlainText } from "./helpers.js";
+import { DL, BBMM_README_UUID, BBMM_DRIFT_HELP_UUID, EXPORT_SKIP } from "./settings.js";
+import { hlp_esc, hlp_timestampStr, hlp_saveJSONFile, hlp_pickLocalJSONFile, hlp_normalizePresetName, getSkipMap, isExcludedWith, hlp_injectHeaderHelpButton, hlp_openManualByUuid, toPreview, toPretty, copyPlainText } from "./helpers.js";
 import { LT, BBMM_ID } from "./localization.js";
 const SETTING_SETTINGS_PRESETS = "settingsPresetsUser"; // user-scoped store defined in settings.js
 const SETTINGS_PRESETS_STORAGE_FILE = "settings-presets.json";
@@ -1011,6 +1011,30 @@ async function svc_setSettingsPresets(obj) {
     DL("settings-presets.js | svc_setSettingsPresets(): OK (GM storage path)");
 }
 
+/* Hydrate a stored preset into a bbmm-settings envelope { world, client, user }.
+   Mirrors the load/preview conversion: items/entries arrays become scope buckets,
+   an already-typed export is returned unchanged. Unregistered settings are dropped. */
+function hlp_presetToEnvelope(preset) {
+    if (!preset) return null;
+    if (preset.type) return preset;
+    const flat = Array.isArray(preset.items)
+        ? preset.items
+        : Array.isArray(preset.entries)
+        ? preset.entries
+        : null;
+    if (!flat) return preset;
+
+    const out = { type: "bbmm-settings", created: new Date().toISOString(), world: {}, client: {}, user: {} };
+    for (const e of flat) {
+        if (!e || typeof e.namespace !== "string" || typeof e.key !== "string") continue;
+        if (!hlp_isRegisteredSetting(e.namespace, e.key)) continue;
+        const scope = e.scope === "world" ? "world" : e.scope === "user" ? "user" : "client";
+        out[scope][e.namespace] ??= {};
+        out[scope][e.namespace][e.key] = e.value;
+    }
+    return out;
+}
+
 /* Plan setting changes between live settings and a bbmm-export envelope */
 async function svc_planSettingsChanges(env) {
     const rows = [];
@@ -1086,7 +1110,7 @@ async function svc_planSettingsChanges(env) {
                             cfg?.name && String(cfg.name).trim()
                                 ? String(cfg.name)
                                 : key;
-                        rows.push({ ns, key, name, current, next });
+                        rows.push({ ns, key, name, scope, current, next });
                     }
                 }
             }
@@ -1550,7 +1574,7 @@ function ui_openPresetPreview(rows, presetName = "") {
             })
             .filter((r) => r.__curText !== r.__nextText);
 
-        const COL = "130px 320px 1fr 1fr";
+        const COL = "70px 120px 300px 1fr 1fr";
         const CELL_STYLE = "padding:.25rem .5rem;min-width:0;overflow:hidden;";
         const LINE_LIMIT = 10;
         const PRE_STYLE = "margin:0;white-space:pre-wrap;word-break:break-word;";
@@ -1572,6 +1596,7 @@ function ui_openPresetPreview(rows, presetName = "") {
                 const expandable = curLines > LINE_LIMIT || nextLines > LINE_LIMIT;
                 return `
 			<div class="bbmm-pp-row" ${expandable ? `data-expandable="1"` : ""} style="${ROW_STYLE}${expandable ? "cursor:pointer;" : ""}">
+				<div style="${CELL_STYLE}white-space:nowrap;">${esc(r.scope ?? "")}</div>
 				<div style="${CELL_STYLE}white-space:nowrap;">${esc(r.ns)}</div>
 				<div style="${CELL_STYLE}word-break:break-word;">
 					<span data-tooltip="${esc(`${r.ns}.${r.key}`)}" title="${esc(`${r.ns}.${r.key}`)}" style="cursor:help;">${esc(game.i18n.localize(r.name) || r.key)}</span>
@@ -1592,7 +1617,7 @@ function ui_openPresetPreview(rows, presetName = "") {
                 ? `<p style="opacity:.75;margin:0;">${esc(LT.noChangesDetected?.() ?? "No changes detected.")}</p>`
                 : `<div style="border:1px solid var(--color-border,#444);border-radius:6px;overflow:hidden;">
 					<div style="display:grid;grid-template-columns:${COL};border-bottom:1px solid var(--color-border,#444);padding:.35rem .5rem;font-weight:600;font-size:12px;">
-						<div>Namespace</div><div>Setting</div><div>Current</div><div>New</div>
+						<div>Scope</div><div>Namespace</div><div>Setting</div><div>Current</div><div>New</div>
 					</div>
 					<div style="overflow-y:auto;overflow-x:hidden;max-height:60vh;">${body}</div>
 				</div>`
@@ -1621,7 +1646,7 @@ function ui_openPresetPreview(rows, presetName = "") {
             window: {
                 title: LT.titlePresetPreview?.() ?? "Preset changes preview",
             },
-            position: { width: Math.min(1200, window.innerWidth - 100) },
+            position: { width: Math.round(Math.min(1200, window.innerWidth - 100) * 0.8) },
             content,
             buttons: [
                 {
@@ -2256,6 +2281,9 @@ export async function mountSettingsPresetGM(container) {
                         `${LT.savedSettingsPreset({ name: res.name })}.`
                     );
 
+                    // Mark this preset as the drift baseline
+                    await svc_stampSettingsBaseline(res.name);
+
                     // Refresh list
                     rerender();
                     return;
@@ -2309,6 +2337,9 @@ export async function mountSettingsPresetGM(container) {
                     ui.notifications.info(
                         `${LT.updatedSettingsPreset({ name: selected })}.`
                     );
+
+                    // Mark this preset as the drift baseline
+                    await svc_stampSettingsBaseline(selected);
 
                     // Refresh list
                     rerender();
@@ -2430,6 +2461,12 @@ export async function mountSettingsPresetGM(container) {
                         );
                     }
 
+                    // Mark this preset as the drift baseline (current == preset after
+                    // apply). Stamp BEFORE applying: svc_applySettingsExport may
+                    // location.reload() when a reloadable setting changes, which would
+                    // otherwise pre-empt the stamp and leave the ignore/snooze flags set.
+                    await svc_stampSettingsBaseline(selected);
+
                     // Apply
                     await svc_applySettingsExport(payload);
                     return;
@@ -2451,51 +2488,8 @@ export async function mountSettingsPresetGM(container) {
                             `settings-presets.js | openSettingsPresetManager(): preview preset "${selected}"`
                         );
 
-                        // Build the same payload
-                        let payload = preset;
-                        const flat = Array.isArray(preset?.items)
-                            ? preset.items
-                            : Array.isArray(preset?.entries)
-                            ? preset.entries
-                            : null;
-
-                        if (!preset?.type && flat) {
-                            const out = {
-                                type: "bbmm-settings",
-                                created: new Date().toISOString(),
-                                world: {},
-                                client: {},
-                                user: {},
-                            };
-                            for (const e of flat) {
-                                if (
-                                    !e ||
-                                    typeof e.namespace !== "string" ||
-                                    typeof e.key !== "string"
-                                )
-                                    continue;
-
-                                // Skip unregistered
-                                if (
-                                    !hlp_isRegisteredSetting(e.namespace, e.key)
-                                )
-                                    continue;
-
-                                const scope =
-                                    e.scope === "world"
-                                        ? "world"
-                                        : e.scope === "user"
-                                        ? "user"
-                                        : "client";
-                                out[scope][e.namespace] ??= {};
-                                out[scope][e.namespace][e.key] = e.value;
-                            }
-                            payload = out;
-                            DL(
-                                `settings-presets.js | openSettingsPresetManager(): Preview hydrated preset "${selected}" with ${flat.length} entries`,
-                                payload
-                            );
-                        }
+                        // Build the same payload (items/entries -> envelope)
+                        const payload = hlp_presetToEnvelope(preset);
 
                         // Compute differences only (no writes)
                         const rows = await svc_planSettingsChanges(payload);
@@ -2577,6 +2571,9 @@ export async function mountSettingsPresetGM(container) {
 
                     await svc_setSettingsPresets(all);
 
+                    // Follow the rename if this preset was the drift baseline
+                    await svc_retargetSettingsBaseline(oldKey, finalKey);
+
                     ui.notifications.info(
                         `${LT.renameSettingPreset()}: "${oldKey}" -> "${finalKey}".`
                     );
@@ -2604,6 +2601,11 @@ export async function mountSettingsPresetGM(container) {
                     const all = svc_getSettingsPresets();
                     delete all[selected];
                     await svc_setSettingsPresets(all);
+
+                    // Drop the drift baseline if it pointed at the deleted preset
+                    const bl = (game.settings.get(BBMM_ID, "bbmmFlags") ?? {})[DRIFT_BASELINE_KEY];
+                    if (bl?.presetKey === selected) await svc_clearSettingsBaseline();
+
                     ui.notifications.info(
                         `${LT.deletedSettingsPreset({ name: selected })}.`
                     );
@@ -3134,6 +3136,222 @@ globalThis.bbmm.toolboxTools.push({
 });
 
 // Expose API + migrate presets on load (GM only)
+/* ==========================================================================
+	{SETTINGS DRIFT DETECTION}
+	The baseline pointer lives in bbmmFlags.settingsBaseline (world scope, so it
+	survives a client cache clear), GM-only. It is stamped whenever the GM saves,
+	updates, or loads a preset, and cleared if that preset is deleted. On ready the
+	GM's current settings are diffed against the baseline preset (bounded to the
+	preset's own entries), and a drift alert is shown if anything changed. BBMM
+	never enforces settings on the GM, so this is a passive nudge, never an
+	auto-apply. See _plans/bbmm-settings-drift-detection.md.
+========================================================================== */
+
+const DRIFT_BASELINE_KEY = "settingsBaseline";
+// Suppression lives in bbmmFlags so it survives reloads:
+//   driftSnoozeUntil  - "Remind Me": serverTime ms to stay quiet until (next day)
+//   driftIgnoreStamp  - "Ignore": baseline stampedAt to stay quiet for; a new save/load
+//                        re-stamps the baseline, so the alert resumes on its own
+
+// Merge one key into the world-scoped bbmmFlags bag (undefined value removes it).
+async function svc_mergeBbmmFlag(key, value) {
+	const current = foundry.utils.duplicate(game.settings.get(BBMM_ID, "bbmmFlags") ?? {});
+	if (value === undefined) delete current[key];
+	else current[key] = value;
+	await game.settings.set(BBMM_ID, "bbmmFlags", current);
+}
+
+// Record which preset is the drift baseline.
+async function svc_stampSettingsBaseline(presetKey) {
+	if (!game.user.isGM || !presetKey) return;
+	try {
+		await svc_mergeBbmmFlag(DRIFT_BASELINE_KEY, {
+			presetKey,
+			presetName: presetKey,
+			stampedAt: new Date().toISOString()
+		});
+		// A fresh baseline clears both suppressors so drift against it is reported again.
+		await svc_mergeBbmmFlag("driftSnoozeUntil", undefined);
+		await svc_mergeBbmmFlag("driftIgnoreStamp", undefined);
+		DL(`settings-presets.js | settings drift baseline stamped: "${presetKey}"`);
+	} catch (err) {
+		DL(2, "settings-presets.js | svc_stampSettingsBaseline() failed", err);
+	}
+}
+
+// Forget the baseline (its preset was deleted).
+async function svc_clearSettingsBaseline() {
+	if (!game.user.isGM) return;
+	try {
+		const flags = game.settings.get(BBMM_ID, "bbmmFlags") ?? {};
+		if (flags[DRIFT_BASELINE_KEY] == null) return;
+		await svc_mergeBbmmFlag(DRIFT_BASELINE_KEY, undefined);
+		DL("settings-presets.js | settings drift baseline cleared");
+	} catch (err) {
+		DL(2, "settings-presets.js | svc_clearSettingsBaseline() failed", err);
+	}
+}
+
+// Follow a rename: if the renamed preset was the baseline, point at the new key.
+async function svc_retargetSettingsBaseline(oldKey, newKey) {
+	if (!game.user.isGM || oldKey === newKey) return;
+	const flags = game.settings.get(BBMM_ID, "bbmmFlags") ?? {};
+	if (flags[DRIFT_BASELINE_KEY]?.presetKey === oldKey) await svc_stampSettingsBaseline(newKey);
+}
+
+// On ready (GM, feature enabled): diff current settings vs the baseline preset.
+async function svc_runSettingsDriftCheck() {
+	try {
+		if (!game.user.isGM) return;
+		if (!game.settings.get(BBMM_ID, "settingsDriftCheck")) return;
+
+		const flags = game.settings.get(BBMM_ID, "bbmmFlags") ?? {};
+
+		// Remind Me: stay quiet until the snooze (next day, server time) has passed.
+		if (flags.driftSnoozeUntil && game.time.serverTime < flags.driftSnoozeUntil) return;
+
+		const baseline = flags[DRIFT_BASELINE_KEY];
+		if (!baseline?.presetKey) { await svc_maybePromptDriftOnboarding(flags); return; }	// nothing stamped yet
+
+		// Ignore: stay quiet for this baseline until it is re-stamped by a save/load.
+		if (flags.driftIgnoreStamp && flags.driftIgnoreStamp === baseline.stampedAt) return;
+
+		const preset = svc_getSettingsPresets()?.[baseline.presetKey];
+		if (!preset) { await svc_clearSettingsBaseline(); return; }	// baselined preset gone
+
+		const env = hlp_presetToEnvelope(preset);
+		let rows = await svc_planSettingsChanges(env);
+
+		// Drop a locked setting from the alert ONLY when the lock is the reason it
+		// differs from the preset, i.e. the live value equals the lock's enforced
+		// value. That is un-resolvable phantom drift (the lock keeps re-applying its
+		// value). A value changed away from BOTH the lock and the preset is genuine
+		// drift and still alerts. svc_planSettingsChanges is left intact so the manual
+		// preview still shows every difference.
+		const lockMap = game.settings.get(BBMM_ID, "userSettingSync") || {};
+		const lockEnforced = [];
+		rows = rows.filter((r) => {
+			const lock = lockMap[`${r.ns}.${r.key}`];
+			if (!lock) return true;	// not locked -> real drift
+			let lockVal;
+			try { lockVal = hlp_toJsonSafe(lock.value); } catch { lockVal = lock.value; }
+			if (hlp_valuesEqual(r.current, lockVal)) { lockEnforced.push(`${r.ns}.${r.key}`); return false; }
+			return true;	// diverged from the lock too -> genuine drift
+		});
+		if (lockEnforced.length) DL(`settings-presets.js | drift check skipped ${lockEnforced.length} lock-enforced setting(s): ${lockEnforced.join(", ")}`);
+
+		if (!rows?.length) return;	// no drift
+
+		DL(`settings-presets.js | settings drift detected vs "${baseline.presetKey}" (${rows.length} change(s))`);
+		ui_showSettingsDriftAlert(baseline, rows, preset);
+	} catch (err) {
+		DL(2, "settings-presets.js | svc_runSettingsDriftCheck() failed", err);
+	}
+}
+
+// First-run nudge when no baseline exists yet: invite the GM to save/load a preset
+// so the feature has something to compare against. Shown once, then latched.
+async function svc_maybePromptDriftOnboarding(flags) {
+	if (flags.driftOnboardPrompted) return;	// already shown once
+	await svc_mergeBbmmFlag("driftOnboardPrompted", true);	// latch now, regardless of choice
+	try {
+		new foundry.applications.api.DialogV2({
+			window: { title: LT.drift.title(), icon: "fas fa-circle-info" },
+			position: { width: 480 },
+			content: `<p>${LT.drift.onboardBody()}</p>`,
+			buttons: [
+				{ action: "manager", label: LT.drift.btnManager(), default: true,
+					callback: () => { try { openSettingsPresetManager(); } catch (e) { DL(2, "drift onboard open manager failed", e); } } },
+				{ action: "later", label: LT.drift.btnLater(), callback: () => {} }
+			],
+			submit: () => {},
+			rejectClose: () => {}
+		}).render(true);
+	} catch (err) {
+		DL(2, "settings-presets.js | svc_maybePromptDriftOnboarding() failed", err);
+	}
+}
+
+// The drift alert. Actions live in the content (not the footer) so Review / Open
+// Presets / Why can open their windows without closing this one. Remind Me snoozes until
+// the next day; Ignore stays quiet for this baseline until the next save/load. Neither
+// disables the feature. Reload/update/save-new are done from the preset manager (Open
+// Presets), per the guidance text.
+function ui_showSettingsDriftAlert(baseline, rows, preset) {
+	const name = baseline.presetName || baseline.presetKey;
+	const counts = { world: 0, client: 0, user: 0 };
+	for (const r of rows) counts[r.scope] = (counts[r.scope] ?? 0) + 1;
+
+	const summary = LT.drift.summary({
+		name: hlp_esc(name),
+		count: rows.length,
+		world: counts.world, client: counts.client, user: counts.user
+	});
+	const showWhy = !!BBMM_DRIFT_HELP_UUID;
+
+	const content = `
+		<div style="display:flex;flex-direction:column;gap:.75rem;">
+			<p style="margin:0;">${summary}</p>
+			<div style="display:flex;flex-direction:column;gap:.4rem;">
+				<div style="display:flex;gap:.4rem;">
+					<button type="button" data-drift="review" style="flex:1;"><i class="fas fa-list"></i> ${LT.drift.btnReview()}</button>
+					<button type="button" data-drift="manager" style="flex:1;"><i class="fas fa-folder-open"></i> ${LT.drift.btnManager()}</button>
+				</div>
+				<div style="display:flex;gap:.4rem;">
+					<button type="button" data-drift="remind" style="flex:1;"><i class="fas fa-clock"></i> ${LT.drift.btnRemind()}</button>
+					<button type="button" data-drift="ignore" style="flex:1;"><i class="fas fa-bell-slash"></i> ${LT.drift.btnIgnore()}</button>
+					${showWhy ? `<button type="button" data-drift="why" style="flex:1;"><i class="fas fa-circle-question"></i> ${LT.drift.btnWhy()}</button>` : ""}
+				</div>
+			</div>
+		</div>`;
+
+	const hookId = Hooks.on("renderDialogV2", (app) => {
+		if (app.id !== "bbmm-drift-alert") return;
+		Hooks.off("renderDialogV2", hookId);
+
+		// Hide the required footer button; the window X closes the alert. Our actions
+		// live in the content so Review/Open/Why can open without closing this window.
+		app.element.querySelectorAll(".form-footer, .dialog-buttons")
+			.forEach((el) => el.style.setProperty("display", "none", "important"));
+
+		app.element.addEventListener("click", async (e) => {
+			const btn = e.target.closest("button[data-drift]");
+			if (!btn) return;
+			e.preventDefault();
+			const act = btn.dataset.drift;
+			try {
+				if (act === "review") { ui_openPresetPreview(rows, name); return; }			// keep alert open
+				if (act === "manager") { openSettingsPresetManager(); return; }				// keep alert open
+				if (act === "why") { hlp_openManualByUuid(BBMM_DRIFT_HELP_UUID); return; }	// keep alert open
+				if (act === "remind") {
+					// Snooze until the start of the next day (server time).
+					const d = new Date(game.time.serverTime);
+					d.setHours(24, 0, 0, 0);
+					await svc_mergeBbmmFlag("driftSnoozeUntil", d.getTime());
+					await app.close();
+					return;
+				}
+				if (act === "ignore") {
+					// Stay quiet for this baseline; a later save/load re-stamps it and re-arms.
+					await svc_mergeBbmmFlag("driftIgnoreStamp", baseline.stampedAt ?? new Date().toISOString());
+					ui.notifications.info(LT.drift.ignored());
+					await app.close();
+					return;
+				}
+			} catch (err) { DL(2, "settings-presets.js | drift alert action failed", { act, err }); }
+		});
+	});
+
+	new foundry.applications.api.DialogV2({
+		id: "bbmm-drift-alert",
+		window: { title: LT.drift.title(), icon: "fas fa-triangle-exclamation" },
+		position: { width: 500 },
+		content,
+		buttons: [{ action: "close", label: LT.buttons.close?.() ?? "Close", default: true }],
+		submit: () => "close"
+	}).render(true);
+}
+
 Hooks.once("ready", async () => {
     await (globalThis.bbmm?._dataFilesReady ?? Promise.resolve());
     const mod = game.modules.get(BBMM_ID);
@@ -3143,6 +3361,7 @@ Hooks.once("ready", async () => {
     mod.api.openPlayerSettingsPresetManager = openPlayerSettingsPresetManager;
     mod.api.loadSettingsPresets = svc_loadSettingsPresets;
     mod.api.openPresetInspector = openPresetInspector;
+    mod.api.runSettingsDriftCheck = svc_runSettingsDriftCheck;	// manual trigger for testing
 
     // Public namespace so macros can open the player manager
     globalThis.bbmm ??= {};
@@ -3156,6 +3375,9 @@ Hooks.once("ready", async () => {
         await svc_loadSettingsPresets();
 
         DL("settings-presets.js | ready: settings presets loaded");
+
+        // Warn if current settings have drifted from the baseline preset
+        await svc_runSettingsDriftCheck();
     } catch (err) {
         DL(
             3,
