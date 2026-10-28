@@ -17,6 +17,8 @@ import {
 export const MODULE_SETTING_PRESETS_U = "modulePresetsUser";  
 export const SETTING_SETTINGS_PRESETS_U = "settingsPresetsUser"; 
 export const BBMM_README_UUID = "Compendium.bbmm.bbmm-journal.JournalEntry.HlNgBs29jBCBnzbP";
+// Settings drift help page (JournalEntryPage in the bbmm-journal pack).
+export const BBMM_DRIFT_HELP_UUID = "Compendium.bbmm.bbmm-journal.JournalEntry.HlNgBs29jBCBnzbP.JournalEntryPage.LR8FKPSZJft8RdMP";
 
 // folder name for compendium organization
 const BBMM_COMP_FOLDER_NAME = "Big Bad Module Manager";
@@ -1324,26 +1326,14 @@ Hooks.once("init", () => {
 				default: {}
 			});
 
-			// Controls Sync Storage
-			game.settings.register?.(BBMM_ID, "userControlSync", {
-				scope: "world",
-				config: false, 
-				default: {}
-			});
-
-			// Controls Sync RevMap
-			game.settings.register?.(BBMM_ID, "softLockRevMap_controls", {
-				scope: "world",
-				config: false, 
-				default: {}
-			});
-
-			// Ledger of soft-locked compendium entries per user
-			game.settings.register(BBMM_ID, "controlSoftLedger", {
-				scope: "world",
+			// Keybinding Locks: per-user personal locks (user scope, server-side,
+			// survives cache clears, per-world; see scripts/keybinding-locks.js).
+			// GM baseline is an install-level data file, not a setting.
+			game.settings.register(BBMM_ID, "keybindLocksPersonal", {
+				scope: "user",
 				config: false,
-				type: Object,
-				default: {}, // { userId: [ "compendium.action" ] }
+				type: Array,
+				default: []
 			});
 
 			// temp config store
@@ -1577,6 +1567,17 @@ Hooks.once("init", () => {
 				scope: "world", config: true, type: Boolean, default: true
 			});
 			
+			// Alert GM when current settings drift from the last saved/loaded preset
+			game.settings.register(BBMM_ID, "settingsDriftCheck", {
+				name: LT._settings.settingsDriftCheckName(),
+				hint: LT._settings.settingsDriftCheckHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: true,
+				restricted: true
+			});
+
 			// Hide locked settings from players (vs. show disabled)
 			game.settings.register(BBMM_ID, "hideLockedSettings", {
 				name: LT._settings.hideLockedSettingsName(),

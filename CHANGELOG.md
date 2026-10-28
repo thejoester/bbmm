@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-test2] - 2026-10-27
+
+### Added
+- **Keybind Locks:** A new **Keybind Locks** tab in the BBMM Toolbox lets you pin keybindings in place so they stop reverting. Pick any registered keybinding (Core or from a module), then either clear it (keep it unbound) or force it to a key or keys you capture. Locks re-apply on every load, so a binding that keeps resetting will stay the way you set it.
+  - **GM baseline:** As GM you can set a baseline that applies to everyone at the table. **Save & Apply** saves the baseline and sends it to everyone online right away; **Push to players** re-sends the current baseline to online players at any time.
+  - **Personal locks:** Every player can add their own personal locks. A personal lock always wins over the GM's baseline for the same action, so players can tailor their own keys while the GM sets defaults for the rest.
+  - Players see a read-only list of the GM's enforced locks alongside their own, so it's clear which keys are coming from the GM.
+- **Settings Change Alerts:** BBMM can now let you know on load when your settings no longer match the last settings preset you saved or loaded. The alert shows what changed and lets you update the preset, save a new one, restore the preset's values, be reminded later, or ignore specific settings. On by default; you can turn it off any time with **Alert on Settings Drift** in BBMM's settings.
+
+### Changed
+- **Controls Sync replaced:** The old per-keybind soft-lock feature has been retired in favor of the new Keybind Locks. Any leftover data from the old keybinding soft-lock is cleaned up automatically on your first load, no action needed.
+
 ## [1.4.11] - 2026-10-03
 
 ### Fixed

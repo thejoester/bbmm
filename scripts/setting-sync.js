@@ -2,7 +2,7 @@
 	BBMM: Setting Lock / Sync
 ========================================================================== */
 
-import { DL } from "./settings.js";
+import { DL, injectBBMMHeaderButton } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
 import { hlp_esc } from "./helpers.js";
 
@@ -19,6 +19,16 @@ import { hlp_esc } from "./helpers.js";
 		try { return JSON.stringify(a) === JSON.stringify(b); } catch { return a === b; }
 	});
 	let _bbmmTriggerTimer = null; // For bbmmBroadcastTrigger()
+
+	// Share the control-binding primitives with keybinding-locks.js (BBMM rule:
+	// cross-file via globalThis.bbmm, never a direct import). Function declarations
+	// below are hoisted, so these references resolve at eval time.
+	globalThis.bbmm ??= {};
+	globalThis.bbmm.ctrl = {
+		bindings: (ns, action) => _bbmmCtrlBindings(ns, action),
+		setBindings: (ns, action, arr) => _bbmmCtrlSetBindings(ns, action, arr),
+		same: (a, b) => _bbmmCtrlSame(a, b)
+	};
 
 /* ============================================================================
         {SETTINGS SYNC HELPERS}
@@ -103,77 +113,9 @@ import { hlp_esc } from "./helpers.js";
 		}
 	});
 
-	// true while BBMM is applying keybindings itself; suppresses the capture wrap so
-	// our own restore/apply does not overwrite pv with a mid-apply value.
-	let _bbmmApplyingCtrl = false;
-	// true only while the Controls config is open; capture keybindings ONLY during
-	// active editing, so load-time restores and GM applies (config closed) never
-	// trigger a capture that would overwrite pv.
-	let _bbmmCtrlConfigOpen = false;
-
-	/* Capture player keybindings (pv) for soft-locked controls ====================
-		Keybindings save via the Controls config (no reload, no per-set hook), so
-		capture the committed bindings when that app closes. Player-only. */
-	async function bbmmCaptureCtrlPv() {
-		const captured = []; // declared out here so a mid-loop throw can still log partial work
-		try {
-			if (game.user?.isGM) return;
-			if (!_bbmmCtrlEnabled()) return;
-			const store = _bbmmCtrlGetStore();
-			const ledger = foundry.utils.duplicate(game.settings.get(BBMM_ID, "softLockLedger") || {});
-			for (const [id, rec] of Object.entries(store)) {
-				if (!(rec && rec.soft)) continue;
-				const dot = id.lastIndexOf(".");
-				if (dot <= 0) continue;
-				const ns = id.slice(0, dot), action = id.slice(dot + 1);
-				let bindings;
-				try { bindings = _bbmmCtrlBindings(ns, action); } catch { continue; }
-				const bStr = JSON.stringify(bindings ?? []);
-				const lkey = `@ctrl:${id}`;
-				const prev = (ledger[lkey] && typeof ledger[lkey] === "object") ? ledger[lkey] : {};
-				if (prev.pv !== bStr) {
-					ledger[lkey] = { ...prev, pv: bStr };
-					captured.push({ id, pv: bStr });
-				}
-			}
-			if (captured.length) {
-				await game.settings.set(BBMM_ID, "softLockLedger", ledger);
-				DL(`setting-sync.js | capture ctrl pv: ${captured.length} binding(s)`, captured);
-			}
-		} catch (e) {
-			DL(2, `setting-sync.js | bbmmCaptureCtrlPv(): failed after ${captured.length} captured`, { error: e, captured });
-		}
-	}
-
-	// Track when the Controls config is open, and capture on close.
-	Hooks.on("renderControlsConfig", () => { _bbmmCtrlConfigOpen = true; });
-	Hooks.on("closeControlsConfig", async () => {
-		_bbmmCtrlConfigOpen = false;
-		await bbmmCaptureCtrlPv();
-	});
-
-	// Capture on each keybinding change too. ControlsConfig applies edits immediately
-	// via game.keybindings.set() (no submit, no hook), so wrap that method to capture
-	// pv the moment a binding is added/edited/deleted, before any refresh can lose it.
-	Hooks.once("ready", () => {
-		try {
-			const kb = game.keybindings;
-			if (kb && typeof kb.set === "function" && !kb.__bbmmSetWrapped) {
-				const _origSet = kb.set.bind(kb);
-				kb.set = async function (...args) {
-					const r = await _origSet(...args);
-					if (_bbmmCtrlConfigOpen && !_bbmmApplyingCtrl) {
-						try { await bbmmCaptureCtrlPv(); } catch (e) { DL(2, "setting-sync.js | keybindings.set capture failed", e); }
-					}
-					return r;
-				};
-				kb.__bbmmSetWrapped = true;
-				DL("setting-sync.js | wrapped game.keybindings.set for keybinding pv capture");
-			}
-		} catch (e) {
-			DL(2, "setting-sync.js | failed to wrap game.keybindings.set", e);
-		}
-	});
+	// Keybinding soft-lock pv capture removed: keybinding locks now live in
+	// scripts/keybinding-locks.js (GM baseline + personal, re-applied each load,
+	// freely overridable). setting-sync.js keeps only the GM push/delivery path.
 
 	/* Update the lock icon =======================================================
 		Update the lock icon glyph + tint for a given state
@@ -204,21 +146,11 @@ import { hlp_esc } from "./helpers.js";
 					iconEl.className = "fa-regular fa-lock bbmm-pending bbmm-click";
 					iconEl.title = LT.lockDialog?.stageLock?.() || "Staged: soft lock";
 					break;
-				case "controlSoft":
-					// Use the proper class tokens (no leading dot) and keep the clickable marker so the icon stays visible
-					iconEl.className = "fa-solid fa-arrows-rotate bbmm-active bbmm-click";
-					iconEl.title = LT.sync.PushHintControls() + "\n" +
-						"• " + LT.sync.ClickPickUsers() + "\n" +
-						"• " + LT.sync.ShiftAll() + "\n" +
-						"• " + LT.sync.RightClearSoft();
-					break;
 				case "controlClear":
-					// Ensure the sync icon keeps the required FA style prefix and clickable marker
+					// Push icon on the native keybindings/controls window (GM only)
 					iconEl.className = "fa-solid fa-arrows-rotate bbmm-click";
 					iconEl.title = LT.sync.PushHintControls() + "\n" +
-						"• " + LT.sync.ClickPickUsers() + "\n" +
-						"• " + LT.sync.ShiftAll() + "\n" +
-						"• " + LT.sync.RightClearSoft();
+						"• " + LT.sync.ClickPickUsers();
 					break;
 				default:
 					iconEl.className = "fa-solid fa-lock-open bbmm-click";
@@ -1660,8 +1592,8 @@ import { hlp_esc } from "./helpers.js";
 					}
 
 					if (needsReload) {
-						// Make sure keybinding restore finishes before the reload wipes the session.
-						try { await _bbmmCtrlPullApplyAll(); } catch (e) { DL(2, "setting-sync.js | pre-reload ctrl apply failed", e); }
+						// Make sure keybinding locks re-apply before the reload wipes the session.
+						try { await globalThis.bbmm?.applyKeybindLocks?.(); } catch (e) { DL(2, "setting-sync.js | pre-reload keybind apply failed", e); }
 						if (hlp_shouldAutoForceReload()) {
 							try { ui.notifications?.warn?.(LT.sync.ReloadWarn()); } catch {}
 							setTimeout(() => { try { location.reload(); } catch {} }, 250);
@@ -2083,10 +2015,10 @@ import { hlp_esc } from "./helpers.js";
 						return;
 					}
 
-					// Controls refresh
+					// Keybinding locks refresh (GM changed the baseline): re-apply locks
 					if (msg?.t === "bbmm-ctrl-refresh") {
 						DL(1, "setting-sync.js | controls: socket refresh");
-						await _bbmmCtrlPullApplyAll();
+						await globalThis.bbmm?.applyKeybindLocks?.();
 					}
 
 					// Control Sync push (players only; apply immediately)
@@ -2101,17 +2033,7 @@ import { hlp_esc } from "./helpers.js";
 						const arr = Array.isArray(msg.value) ? msg.value : [];
 
 						try {
-							// Try modern API first
-							if (game.keybindings?.reset && game.keybindings?.set) {
-								await game.keybindings.reset(ns, action);
-								for (const b of arr) await game.keybindings.set(ns, action, b);
-							} else {
-								// Fallback: write into the core keybindings blob
-								const id = `${ns}.${action}`;
-								const blob = foundry.utils.duplicate(game.settings.get("core", "keybindings") || {});
-								blob[id] = arr.map(b => ({ key: b?.key, modifiers: (b?.modifiers ?? []).slice() }));
-								await game.settings.set("core", "keybindings", blob);
-							}
+							await _bbmmCtrlSetBindings(ns, action, arr);
 							ui.notifications?.info?.(LT.sync.Updated?.() || "Keybindings updated.");
 						} catch (err) {
 							DL(2, "ctrl push apply failed", { ns, action, err });
@@ -2130,62 +2052,10 @@ import { hlp_esc } from "./helpers.js";
 		{CONTROLS SYNC HELPERS}
 ============================================================================ */
 
-	/*  Get Control Soft-Lock Ledger ======================================= */
-	function _bbmmGetControlLedger() {
-		try {
-			return game.settings.get(BBMM_ID, "controlSoftLedger") ?? {};
-		} catch {
-			return {};
-		}
-	}
-
-	/*  Set Control Soft-Lock Ledger ======================================= */
-	async function _bbmmSetControlLedger(ledger) {
-		try {
-			return await game.settings.set(BBMM_ID, "controlSoftLedger", ledger);
-		} catch (err) {
-			DL(2, "setting-sync.js | failed to save controlSoftLedger", err);
-		}
-	}
-
 	/*  Build unique control ID =====================================================
 		Join namespace + action into a single string identifier.
 	============================================================================= */
 	function _bbmmCtrlId(ns, action) { return `${ns}.${action}`; }
-
-	/*  Get Control Sync store ======================================================
-		Fetch world-level storage object containing current control locks/sync state.
-		Returns {} if not yet set.
-	============================================================================= */
-	function _bbmmCtrlGetStore() {
-		try { return game.settings.get(BBMM_ID, "userControlSync") ?? {}; } catch { return {}; }
-	}
-
-	/*  Set Control Sync store ======================================================
-		Replace the world-level storage object with new contents.
-		Persists immediately via game.settings.
-	============================================================================= */
-	async function _bbmmCtrlSetStore(next) {
-		try { await game.settings.set(BBMM_ID, "userControlSync", next ?? {}); }
-		catch (err) { DL(2, "setting-sync.js | ctrlSetStore() failed", err); }
-	}
-
-	/*  Get Control Revision Map ====================================================
-		Returns persistent rev map used for soft-locks.
-		Tracks revision numbers per control for change detection.
-	============================================================================= */
-	function _bbmmCtrlGetRevMap() {
-		try { return game.settings.get(BBMM_ID, "softLockRevMap_controls") ?? {}; } catch { return {}; }
-	}
-
-	/*  Set Control Revision Map ====================================================
-		Update stored revision map for control soft-locks.
-		Saves to world settings.
-	============================================================================= */
-	async function _bbmmCtrlSetRevMap(map) {
-		try { await game.settings.set(BBMM_ID, "softLockRevMap_controls", map ?? {}); }
-		catch (err) { DL(2, "setting-sync.js | ctrlSetRevMap() failed", err); }
-	}
 
 	/*  Is Control Sync enabled? ====================================================
 		Returns true if GM has enabled control synchronization feature.
@@ -2276,7 +2146,6 @@ import { hlp_esc } from "./helpers.js";
 		Updates via API when available, else patches settings blob.
 	============================================================================= */
 	async function _bbmmCtrlSetBindings(ns, action, arr) {
-		_bbmmApplyingCtrl = true; // suppress the capture wrap during our own apply
 		try {
 			const hasPerActionAPI = typeof game.keybindings?.reset === "function" &&
 									typeof game.keybindings?.set === "function";
@@ -2300,84 +2169,6 @@ import { hlp_esc } from "./helpers.js";
 
 		} catch (err) {
 			DL(2, "setting-sync.js | ctrlSetBindings() failed", { ns, action, err });
-		} finally {
-			_bbmmApplyingCtrl = false;
-		}
-	}
-
-	/*  Pull + Apply all Control Sync state =========================================
-		GM: broadcasted changes force clients to re-apply control sync state.
-		Players: update local keybindings to match GM-synced store.
-	============================================================================= */
-	async function _bbmmCtrlPullApplyAll() {
-		const appliedHard = [], restoredPv = [], appliedSoft = []; // out here so a throw logs partial
-		try {
-			if (!_bbmmCtrlEnabled()) return;
-			const store = _bbmmCtrlGetStore();
-			const revMap = _bbmmCtrlGetRevMap() || {};
-			const ledger = game.settings.get(BBMM_ID, "softLockLedger") || {};
-
-			for (const [id, rec] of Object.entries(store)) {
-			const dot = id.lastIndexOf(".");
-			if (dot <= 0) continue;
-			const ns = id.slice(0, dot);
-			const action = id.slice(dot + 1);
-
-			// HARD LOCK: always enforce
-			if (rec?.lock?.value) {
-				const have = _bbmmCtrlBindings(ns, action);
-				if (!_bbmmCtrlSame(have, rec.lock.value)) {
-				appliedHard.push(id);
-				await _bbmmCtrlSetBindings(ns, action, rec.lock.value);
-				}
-				continue;
-			}
-
-			// SOFT LOCK: push once per rev, then never re-apply
-			if (rec?.soft?.value) {
-				const rev = Number(rec?.rev) || Number(revMap[id]) || 1;
-				const lkey = `@ctrl:${id}`;
-				const last = ledger[lkey];
-				let lastRev = (last && typeof last === "object" && Number.isInteger(last.r)) ? last.r : -1;
-				// self-heal: a recorded rev above the current rev is stale (rev was reset);
-				// treat as unhandled so we re-apply.
-				if (lastRev > rev) lastRev = -1;
-
-				// Already handled this rev. Restore the player's durable bindings (pv)
-				// if the live bindings drifted (cache clear / new device), then skip.
-				if (lastRev >= rev) {
-					const pvRaw = (last && typeof last === "object") ? last.pv : undefined;
-					if (typeof pvRaw === "string") {
-						let desired;
-						try { desired = JSON.parse(pvRaw); } catch { desired = undefined; }
-						if (desired !== undefined) {
-							const haveCur = _bbmmCtrlBindings(ns, action);
-							if (!_bbmmCtrlSame(haveCur, desired)) {
-								restoredPv.push(id);
-								await _bbmmCtrlSetBindings(ns, action, desired);
-							}
-						}
-					}
-					continue;
-				}
-
-				// First time seeing this rev -> apply once, then mark ledger (pv = GM value)
-				const have = _bbmmCtrlBindings(ns, action);
-				if (!_bbmmCtrlSame(have, rec.soft.value)) {
-				appliedSoft.push({ id, rev });
-				await _bbmmCtrlSetBindings(ns, action, rec.soft.value);
-				}
-
-				// Mark handled so it won't re-apply on refresh/load (pv = GM value)
-				ledger[lkey] = { r: rev, v: JSON.stringify(rec.soft.value ?? []), pv: JSON.stringify(rec.soft.value ?? []) };
-				await game.settings.set(BBMM_ID, "softLockLedger", ledger);
-			}
-			}
-			if (appliedHard.length || restoredPv.length || appliedSoft.length) {
-				DL(1, `setting-sync.js | controls pull+apply: hard ${appliedHard.length}, soft ${appliedSoft.length}, restored ${restoredPv.length}`, { appliedHard, appliedSoft, restoredPv });
-			}
-		} catch (err) {
-			DL(2, `setting-sync.js | ctrlPullApplyAll() failed after hard ${appliedHard.length}/soft ${appliedSoft.length}/restored ${restoredPv.length}`, { error: err, appliedHard, appliedSoft, restoredPv });
 		}
 	}
 
@@ -2402,64 +2193,8 @@ import { hlp_esc } from "./helpers.js";
 		Queue/update a soft lock entry for namespace+action.
 		Snapshot GM binding state, increment rev, save to store.
 	============================================================================= */
-	async function _bbmmCtrlGMSoft({ ns, action, iconEl = null }) {
-		try {
-			const id = _bbmmCtrlId(ns, action);
-			DL(`ctrlGMSoft(): start for ${id}`);
-
-			const store = _bbmmCtrlGetStore();
-			const revMap = _bbmmCtrlGetRevMap();
-
-			/* Apply Soft Lock ================================================== */
-			const next = { ...(store[id] ?? {}) };
-			next.soft = { value: _bbmmCtrlBindings(ns, action) };
-			next.lock = null;
-			next.rev = Math.max(Date.now(), (Number(next.rev) || 0) + 1); // epoch-based monotonic rev
-			store[id] = next;
-			revMap[id] = next.rev;
-			DL(`Soft lock APPLIED for ${id} (rev=${next.rev})`);
-
-			/* Persist store + revMap ============================================= */
-			await _bbmmCtrlSetStore(store);
-			await _bbmmCtrlSetRevMap(revMap);
-
-			/* Update Ledger (tracks which users have seen this soft lock)  */
-			try {
-				const ledger = _bbmmGetControlLedger();
-				const userId = game.user?.id;
-				if (userId) {
-					ledger[userId] ??= [];
-					if (!ledger[userId].includes(id)) ledger[userId].push(id);
-					await _bbmmSetControlLedger(ledger);
-				}
-			} catch (ledgerErr) {
-				DL(2, "ctrlGMSoft(): failed to update controlSoftLedger", ledgerErr);
-			}
-
-			/* Update UI icon (orange tint for soft lock) ======================== */
-			try {
-				if (iconEl) {
-					_bbmmSetLockIconState(iconEl, "controlSoft");
-				} else {
-					const sel = `.form-group[data-action-id="${ns}.${action}"] .bbmm-ctrlbar i.fa-arrows-rotate`;
-					const el = document.querySelector(sel);
-					if (el) _bbmmSetLockIconState(el, "controlSoft");
-				}
-			} catch (iconErr) {
-				DL(2, "ctrlGMSoft(): icon tint update failed", iconErr);
-			}
-
-			/* Notify and broadcast =========================================== */
-			ui.notifications?.info?.(LT.controlsSoftApplied());
-			game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
-			DL(`ctrlGMSoft(): broadcast bbmm-ctrl-refresh after soft lock for ${id}`);
-		} catch (err) {
-			DL(2, "setting-sync.js | ctrlGMSoft() failed", { ns, action, err });
-		}
-	}
-
 	/* ==========================================================================
-		Wire Control Config UI (Sync/Lock icons on the Controls window)
+		Wire Control Config UI (GM push icon on the Keybindings/Controls window)
 	========================================================================== */
 	function _bbmmCtrlWireConfig(app, html) {
 		try {
@@ -2525,53 +2260,17 @@ import { hlp_esc } from "./helpers.js";
 				syncIcon.setAttribute("role", "button");
 				syncIcon.setAttribute("tabindex", "0");
 				syncIcon.title =
-				LT.sync.PushHintControls() + "\n" +
-				"• " + LT.sync.ClickPickUsers() + "\n" +
-				"• " + LT.sync.ShiftAll() + "\n" +
-				"• " + LT.sync.RightClearSoft();
+					LT.sync.PushHintControls() + "\n" +
+					"• " + LT.sync.ClickPickUsers();
 
-				bar.appendChild(syncIcon);
+				_bbmmSetLockIconState(syncIcon, "controlClear");
 
-				// (Click/keyboard handlers handled later in this function; remove duplicate broken handlers)
-
-				// Highlight if currently soft-locked
-				const id = `${ns}.${action}`;
-				try {
-					const store = _bbmmCtrlGetStore();
-					DL(`setting-sync.js | controls: wiring ${id}`, store?.[id] ?? {});
-					if (store?.[id]?.soft?.value) {
-						_bbmmSetLockIconState(syncIcon, "controlSoft");
-					} else {
-						_bbmmSetLockIconState(syncIcon, "controlClear");
-					}
-				} catch {}
-
-
-				// LEFT CLICK -> open user picker, then push current bindings to the selected players
+				// LEFT CLICK -> pick players, push this action's current bindings to them now.
+				// Keybind sync keeps per-player targeting, unlike settings locks/sync.
 				syncIcon.addEventListener("click", async (ev) => {
 					try {
 						ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
 
-						if (ev.shiftKey) {
-							DL(`controls: ${ns}.${action} | soft-lock (Shift+Click)`);
-							await _bbmmCtrlGMSoft({ ns, action });
-
-							// Refresh icon state (we have syncIcon here!)
-							try {
-								const id = `${ns}.${action}`;
-								const store = _bbmmCtrlGetStore();
-								const state = store?.[id]?.soft?.value ? "controlSoft" : "controlClear";
-								_bbmmSetLockIconState(syncIcon, state);
-							} catch (err) {
-								DL(2, "ctrl soft-lock: failed to update icon state", err);
-							}
-
-							game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
-							return;
-						}
-
-						// CLICK => PICK PLAYERS AND PUSH CURRENT BINDINGS (no locks)
-						// Keybind sync keeps per-player targeting, unlike settings locks/sync.
 						DL(`controls: ${ns}.${action} | push to selected players`);
 						const cur = _bbmmCtrlBindings(ns, action); // snapshot current bindings
 
@@ -2601,32 +2300,9 @@ import { hlp_esc } from "./helpers.js";
 					}
 				});
 
-				// RIGHT CLICK -> clear soft lock for this control
-				syncIcon.addEventListener("contextmenu", async (ev) => {
-					ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
-
-					try {
-						const id = _bbmmCtrlId(ns, action);
-						const store = _bbmmCtrlGetStore();
-						const revMap = _bbmmCtrlGetRevMap();
-
-						if (store?.[id]?.soft) {
-							delete store[id].soft;
-							delete revMap[id];
-							await _bbmmCtrlSetStore(store);
-							await _bbmmCtrlSetRevMap(revMap);
-							_bbmmSetLockIconState(syncIcon, "controlClear");
-							ui.notifications?.info?.(`Soft lock cleared for ${ns}.${action}`);
-							game.socket?.emit?.(BBMM_SYNC_CH, { t: "bbmm-ctrl-refresh" });
-						}
-					} catch (err) {
-						DL(2, "setting-sync.js | failed to clear control soft lock (right click)", err);
-					}
-				});
-
 				// swallow context menu so we don't clash with Foundry's buttons
 				syncIcon.addEventListener("contextmenu", (ev) => {
-				ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+					ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
 				});
 
 				bar.appendChild(syncIcon);
@@ -3483,15 +3159,11 @@ import { hlp_esc } from "./helpers.js";
 	{ CONTROLS SYNC HOOKS}
 ============================================================================= */
 
-	Hooks.on("ready", async () => {
-		try {
-			if (!_bbmmCtrlEnabled()) return;
-			DL(1, "setting-sync.js | controls: ready pull+apply");
-			await _bbmmCtrlPullApplyAll();
-		} catch (err) { DL(2, "setting-sync.js | controls ready failed", err); }
-	});
+	// Keybinding locks re-apply on load is owned by scripts/keybinding-locks.js.
 
 	Hooks.on('renderKeybindingsConfig', (app, html) => {
+		// BBMM header button -> open Toolbox (everyone, independent of sync toggle)
+		try { injectBBMMHeaderButton(app?.element ?? html); } catch (e) { DL(2, 'renderKeybindingsConfig header button failed', e); }
 		try {
 			if (!_bbmmCtrlEnabled()) return;
 			_bbmmCtrlWireConfig(app, html);
@@ -3501,6 +3173,7 @@ import { hlp_esc } from "./helpers.js";
 	});
 
 	Hooks.on('renderControlsConfig', (app, html) => {
+		try { injectBBMMHeaderButton(app?.element ?? html); } catch (e) { DL(2, 'renderControlsConfig header button failed', e); }
 		try {
 			if (!_bbmmCtrlEnabled()) return; // controls sync disabled
 			_bbmmCtrlWireConfig(app, html);

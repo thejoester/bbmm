@@ -29,6 +29,7 @@ const BBMM_TB_ORDER = [
 	"lockPresets",		// Lock Presets
 	"exclusions",		// Inclusions / Exclusions
 	"lockManager",		// Settings Locks
+	"keybindLocks",		// Keybinding Locks
 	"tags",				// Tag Manager
 	"importExport",		// Import / Export
 	"utilities",		// Utilities (GM-only)
