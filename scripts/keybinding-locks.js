@@ -1,10 +1,9 @@
 /* ==========================================================================
 	BBMM: Keybinding Locks
 	GM baseline (install-level data file) + per-user personal locks, re-applied
-	on every load. Personal overrides the baseline. Ported from
-	joes-foundry-stuff/keybindingLocks.js, merged with BBMM's Control Sync:
-	delivery reuses the shared apply primitives on globalThis.bbmm.ctrl and the
-	existing bbmm-ctrl-refresh socket, so there is one keybinding system.
+	on every load. Personal overrides the baseline. Delivery reuses the shared
+	apply primitives on globalThis.bbmm.ctrl and the bbmm-ctrl-refresh socket,
+	so there is one keybinding system.
 
 	A "lock" entry: { id, namespace, action, mode: "clear"|"set", bindings: [] }
 	  - id        = full action id, e.g. "core.elevateToken"
@@ -252,7 +251,6 @@ function cleanLocks(arr) {
 	{ADD LOCK DIALOG}
 	Searchable picker: namespace filter + search (matches action name AND the
 	action's current key), pick an action, choose Clear or Set-to-key, then Add.
-	ApplicationV2 with template: null, markup built inline (BBMM house style).
 ========================================================================== */
 class BBMMKeybindLocksAddDialog extends foundry.applications.api.ApplicationV2 {
 

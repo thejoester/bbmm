@@ -50,7 +50,7 @@ async function hlp_verifyPresetsDir() {
 
 // Sanitize settings presets structure
 function hlp_sanitizeSettingsPresets(raw) {
-    // Don’t get cute: just ensure “object or empty object”
+    // just ensure object or empty object
     return raw && typeof raw === "object" ? raw : {};
 }
 
@@ -63,7 +63,7 @@ function hlp_sanitizeUserInclusions(raw) {
     };
 }
 
-// Read presets from persistent storage file ===========================
+// Read presets from persistent storage file 
 export async function hlp_readSettingsPresetsFromStorage() {
     try {
         const data = await hlp_fetchJSON(`bbmm-data/${SETTINGS_PRESETS_STORAGE_FILE}`);
@@ -75,7 +75,7 @@ export async function hlp_readSettingsPresetsFromStorage() {
     return null;
 }
 
-// Write presets to persistent storage file ============================
+// Write presets to persistent storage file 
 async function hlp_writeSettingsPresetsToStorage(obj) {
     const okDir = await hlp_verifyPresetsDir();
     if (!okDir) return false;
@@ -102,7 +102,7 @@ async function hlp_writeSettingsPresetsToStorage(obj) {
             if (s && s !== "[object Object]") return s;
         } catch {}
 
-        // Last resort: leave it alone (may stringify to {} but we've tried)
+        // Last resort: leave it alone (may stringify to {})
         return v;
     };
 
@@ -144,7 +144,7 @@ async function hlp_writeSettingsPresetsToStorage(obj) {
     }
 }
 
-/* Deep equals for settings values =====================================*/
+/* Deep equals for settings values */
 function hlp_valuesEqual(a, b) {
     try {
         if (foundry?.utils?.isPropertyEqual)
@@ -156,7 +156,7 @@ function hlp_valuesEqual(a, b) {
     }
 }
 
-/* V2 Window Registry ================================================== */
+/* V2 Window Registry */
 Hooks.on("renderDialogV2", (app) => {
     try {
         if (app?.id) BBMM_V2_WINDOWS.set(app.id, app);
@@ -165,7 +165,7 @@ Hooks.on("renderDialogV2", (app) => {
     }
 });
 
-/* V2 Window Unregistry ================================================ */
+/* V2 Window Unregistry */
 Hooks.on("closeDialogV2", (app) => {
     try {
         if (app?.id) BBMM_V2_WINDOWS.delete(app.id);
@@ -174,7 +174,6 @@ Hooks.on("closeDialogV2", (app) => {
     }
 });
 
-/* Normalize a bbmm-settings envelope to flat entries array ============= */
 function hlp_normalizeToEntries(bbmmExport) {
     // Build skip map once (EXPORT_SKIP + userExclusions)
     const skip = getSkipMap();
@@ -182,7 +181,7 @@ function hlp_normalizeToEntries(bbmmExport) {
     DL("settings-presets.js | hlp_normalizeToEntries(): start");
 
     const entries = [];
-    const excludedModules = [];		// buckets, one summary instead of per-skip lines
+    const excludedModules = [];		
     const excludedSettings = [];
     try {
         const scopes = ["world", "client", "user"];
@@ -720,7 +719,7 @@ async function svc_collectAllModuleSettings({ includeDisabled = false, includeHi
     return out;
 }
 
-/* Prompt for a local JSON file and parse it ========================== */
+/* Apply a bbmm-settings envelope to live settings ==================== */
 async function svc_applySettingsExport(exportData) {
     // Validate envelope
     if (!exportData || exportData.type !== "bbmm-settings") {
@@ -916,7 +915,7 @@ function svc_askSettingsPresetConflict(existingKey) {
     });
 }
 
-/* Export Preset to File ============================================== */
+/* Save a preset into the store ======================================= */
 async function svc_savePresetToSettings(presetName, selectedEntries) {
     try {
         // Ensure cache is loaded (GM: persistent storage, non-GM: user setting)
@@ -972,7 +971,7 @@ async function svc_saveSettingsPreset(name, payload) {
         }
     }
 
-    // Preserve"entries" flattening behavior
+    // Preserve "entries" flattening behavior
     const flatView = hlp_normalizeToEntries(storedPayload)?.entries ?? [];
     const stored = flatView.length
         ? { ...storedPayload, entries: flatView }
@@ -1131,8 +1130,7 @@ async function svc_planSettingsChanges(env) {
     }
 }
 
-// Load presets from store, =============================================
-// Load presets from store
+// Load the GM preset store from its persistent-storage JSON
 export async function svc_loadSettingsPresets(opts = {}) {
     const FN = "settings-presets.js | svc_loadSettingsPresets():";
 
@@ -2066,7 +2064,7 @@ class BBMMImportWizard extends AppV2 {
 }
 
 /* Settings Preset Manager (GM) ======================================== */
-// Toolbox pane: GM Settings Preset Manager (migrated from openSettingsPresetManager).
+// Toolbox pane: GM settings preset manager
 export async function mountSettingsPresetGM(container) {
     const root = container;
     let _index = {};
@@ -2639,7 +2637,7 @@ export async function mountSettingsPresetGM(container) {
 	branching, no hidden-settings warning, apply is ungated (it only ever
 	touches the player's own client/user settings).
 ======================================================================= */
-// Toolbox pane: Player Settings Preset Manager (migrated from openPlayerSettingsPresetManager).
+// Toolbox pane: player settings preset manager
 export async function mountSettingsPresetPlayer(container) {
     const root = container;
     let _index = {};
@@ -3135,7 +3133,6 @@ globalThis.bbmm.toolboxTools.push({
     mount: async (container) => { await mountSettingsPresets(container); }
 });
 
-// Expose API + migrate presets on load (GM only)
 /* ==========================================================================
 	{SETTINGS DRIFT DETECTION}
 	The baseline pointer lives in bbmmFlags.settingsBaseline (world scope, so it
@@ -3150,8 +3147,9 @@ globalThis.bbmm.toolboxTools.push({
 const DRIFT_BASELINE_KEY = "settingsBaseline";
 // Suppression lives in bbmmFlags so it survives reloads:
 //   driftSnoozeUntil  - "Remind Me": serverTime ms to stay quiet until (next day)
-//   driftIgnoreStamp  - "Ignore": baseline stampedAt to stay quiet for; a new save/load
-//                        re-stamps the baseline, so the alert resumes on its own
+//   driftIgnore       - "Ignore": { stamp, keys[] } - suppress only these "ns.key"
+//                        settings for the baseline named by stamp. A new save/load
+//                        re-stamps the baseline, so ignored settings resume on their own.
 
 // Merge one key into the world-scoped bbmmFlags bag (undefined value removes it).
 async function svc_mergeBbmmFlag(key, value) {
@@ -3172,7 +3170,7 @@ async function svc_stampSettingsBaseline(presetKey) {
 		});
 		// A fresh baseline clears both suppressors so drift against it is reported again.
 		await svc_mergeBbmmFlag("driftSnoozeUntil", undefined);
-		await svc_mergeBbmmFlag("driftIgnoreStamp", undefined);
+		await svc_mergeBbmmFlag("driftIgnore", undefined);
 		DL(`settings-presets.js | settings drift baseline stamped: "${presetKey}"`);
 	} catch (err) {
 		DL(2, "settings-presets.js | svc_stampSettingsBaseline() failed", err);
@@ -3213,9 +3211,6 @@ async function svc_runSettingsDriftCheck() {
 		const baseline = flags[DRIFT_BASELINE_KEY];
 		if (!baseline?.presetKey) { await svc_maybePromptDriftOnboarding(flags); return; }	// nothing stamped yet
 
-		// Ignore: stay quiet for this baseline until it is re-stamped by a save/load.
-		if (flags.driftIgnoreStamp && flags.driftIgnoreStamp === baseline.stampedAt) return;
-
 		const preset = svc_getSettingsPresets()?.[baseline.presetKey];
 		if (!preset) { await svc_clearSettingsBaseline(); return; }	// baselined preset gone
 
@@ -3240,9 +3235,20 @@ async function svc_runSettingsDriftCheck() {
 		});
 		if (lockEnforced.length) DL(`settings-presets.js | drift check skipped ${lockEnforced.length} lock-enforced setting(s): ${lockEnforced.join(", ")}`);
 
+		// Ignore: drop only the specific settings the GM chose to ignore for this
+		// baseline. Settings not on the list (including ones that drift later) still
+		// alert. The list is cleared when the baseline is re-stamped by a save/load.
+		const ign = flags.driftIgnore;
+		if (ign && ign.stamp === baseline.stampedAt && Array.isArray(ign.keys) && ign.keys.length) {
+			const ignSet = new Set(ign.keys);
+			const before = rows.length;
+			rows = rows.filter((r) => !ignSet.has(`${r.ns}.${r.key}`));
+			if (rows.length !== before) DL(`settings-presets.js | drift check skipped ${before - rows.length} ignored setting(s)`);
+		}
+
 		if (!rows?.length) return;	// no drift
 
-		DL(`settings-presets.js | settings drift detected vs "${baseline.presetKey}" (${rows.length} change(s))`);
+		DL(`settings-presets.js | settings drift detected vs "${baseline.presetKey}" (${rows.length} change(s)): ${rows.map((r) => `${r.ns}.${r.key}`).join(", ")}`);
 		ui_showSettingsDriftAlert(baseline, rows, preset);
 	} catch (err) {
 		DL(2, "settings-presets.js | svc_runSettingsDriftCheck() failed", err);
@@ -3332,8 +3338,14 @@ function ui_showSettingsDriftAlert(baseline, rows, preset) {
 					return;
 				}
 				if (act === "ignore") {
-					// Stay quiet for this baseline; a later save/load re-stamps it and re-arms.
-					await svc_mergeBbmmFlag("driftIgnoreStamp", baseline.stampedAt ?? new Date().toISOString());
+					// Ignore only the settings currently shown. Merge with anything already
+					// ignored for this baseline so a second Ignore doesn't drop the first set.
+					// A later save/load re-stamps the baseline and clears the list.
+					const stamp = baseline.stampedAt ?? new Date().toISOString();
+					const flags = game.settings.get(BBMM_ID, "bbmmFlags") ?? {};
+					const prev = (flags.driftIgnore?.stamp === stamp && Array.isArray(flags.driftIgnore?.keys)) ? flags.driftIgnore.keys : [];
+					const keys = [...new Set([...prev, ...rows.map((r) => `${r.ns}.${r.key}`)])];
+					await svc_mergeBbmmFlag("driftIgnore", { stamp, keys });
 					ui.notifications.info(LT.drift.ignored());
 					await app.close();
 					return;
@@ -3388,7 +3400,7 @@ Hooks.once("ready", async () => {
 });
 
 /* ==========================================================================
-	Settings Preset Inspector (moved from macros.js)
+	Settings Preset Inspector
 ========================================================================== */
 
 // Convert various preset formats into flat list of items
