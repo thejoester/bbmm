@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0-test2] - 2026-10-27
+## [1.5.0-test3] - 2026-10-27
 
 ### Added
 - **Keybind Locks:** A new **Keybind Locks** tab in the BBMM Toolbox lets you pin keybindings in place so they stop reverting. Pick any registered keybinding (Core or from a module), then either clear it (keep it unbound) or force it to a key or keys you capture. Locks re-apply on every load, so a binding that keeps resetting will stay the way you set it.
