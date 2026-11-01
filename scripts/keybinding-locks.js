@@ -292,7 +292,7 @@ class BBMMKeybindLocksAddDialog extends foundry.applications.api.ApplicationV2 {
 							`<span class="bbmm-kbla-keylist"></span>` +
 							`<button type="button" class="bbmm-kbla-capture"><i class="fas fa-keyboard"></i> ${LT.keybindLocks.addKey()}</button>` +
 						`</span>` +
-						`<button type="button" class="bbmm-kbla-cancel">${LT.keybindLocks.cancel()}</button>` +
+						`<button type="button" class="bbmm-kbla-cancel">${LT.keybindLocks.close()}</button>` +
 						`<button type="button" class="bbmm-kbla-add" disabled><i class="fas fa-plus"></i> ${LT.keybindLocks.addLock()}</button>` +
 					`</div>` +
 				`</div>` +
@@ -506,7 +506,21 @@ class BBMMKeybindLocksAddDialog extends foundry.applications.api.ApplicationV2 {
 			bindings: this._mode === "set" ? this._bindings : []
 		});
 		DL(`keybinding-locks.js | add dialog: added ${this._mode} lock for "${a.id}"`);
-		this.close();
+		ui.notifications.info(LT.keybindLocks.added({
+			mode: this._mode === "set" ? LT.keybindLocks.modeSet() : LT.keybindLocks.modeClear(),
+			name: a.name
+		}));
+
+		// Stay open for more adds: reset the selection but keep namespace + search filter.
+		this._selected = null;
+		this._mode = "clear";
+		this._bindings = [];
+		const modeSel = this.element.querySelector(".bbmm-kbla-mode");
+		if (modeSel) modeSel.value = this._mode;
+		this._renderList();
+		this._renderKeyList();
+		this._syncFooter();
+		this.element.querySelector(".bbmm-kbla-search")?.focus();
 	}
 }
 

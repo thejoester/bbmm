@@ -188,7 +188,8 @@
 				"clearAllModuleTags": "Clear all Module tags",
 				"keyBindingInspector": "Key Binding Inspector",
 				"resetChangelog": "Reset Changelog",
-				"viewChangelog": "View Changelog"
+				"viewChangelog": "View Changelog",
+				"environmentReport": "Environment Report"
 			}
 		},
 		"buttons": {
@@ -319,8 +320,20 @@
 			"noKeys": "No keys captured yet.",
 			"change": "Change",
 			"cancel": "Cancel",
+			"close": "Close",
 			"addLock": "Add Lock",
+			"added": "Added {mode} lock for {name}.",
 			"captureFirst": "Capture a key first, or choose Clear."
+		},
+		"envReport": {
+			"title": "Environment Report",
+			"copy": "Copy",
+			"download": "Download",
+			"downloadFailed": "Failed to download the report. See the console for details.",
+			"showAll": "Show all installed",
+			"markdown": "Markdown table",
+			"close": "Close",
+			"buildFailed": "Failed to build the environment report. See the console for details."
 		},
 		"drift": {
 			"title": "Settings Changed",
