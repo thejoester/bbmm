@@ -188,7 +188,8 @@
         		"clearAllModuleTags": "Limpar todas as tags de Módulos",
         		"keyBindingInspector": "Inspetor de Atalhos de Teclado",
         		"resetChangelog": "Redefinir Notas de Atualização",
-        		"viewChangelog": "Ver Notas de Atualização"
+        		"viewChangelog": "Ver Notas de Atualização",
+				"environmentReport": "Relatório do Ambiente"
       		}
     	},
 		"buttons": {
@@ -319,9 +320,21 @@
 			"noKeys": "Nenhuma tecla capturada ainda.",
 			"change": "Alterar",
 			"cancel": "Cancelar",
+			"close": "Fechar",
 			"addLock": "Adicionar Bloqueio",
+			"added": "Bloqueio do tipo {mode} adicionado para {name}.",
 			"captureFirst": "Capture uma tecla primeiro ou escolha Desativar."
 		},
+		"envReport": {
+      		"title": "Relatório do Ambiente",
+      		"copy": "Copiar",
+      		"download": "Download",
+      		"downloadFailed": "Não foi possível baixar o relatório. Consulte o console para obter mais detalhes.",
+      		"showAll": "Exibir Todos os Instalados",
+      		"markdown": "Tabela Markdown",
+      		"close": "Fechar",
+      		"buildFailed": "Não foi possível gerar o relatório do ambiente. Consulte o console para obter mais detalhes."
+    	},
 		"drift": {
 			"title": "Configurações Alteradas",
 			"summary": "Suas configurações atuais diferem do preset \"{name}\" - {count} alteração(ões) ({world} do mundo, {client} do cliente, {user} do usuário). Abra seus preset para carregar esta novamente e restaurá-la, atualizá-la para corresponder às configurações atuais ou salvar um novo preset.",
