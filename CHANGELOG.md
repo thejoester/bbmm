@@ -4,7 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+<<<<<<< Updated upstream
 ## [1.5.0-test3] - 2026-10-27
+=======
+## [1.5.2] - 2026-11-05
+
+### Added
+- **Module preset preview:** Applying a module preset now opens preview list showing moduleslist and which would change before committing. Modules that will be turned on appear at the top, those turned off at the bottom.
+  - Change in module state will be indicated with a green **+** if enabling a disabled module, or red **−** if disabling an enabled module, and a running count shows how many will be enabled, disabled, and left unchanged. 
+  - GM can adjust the selection, filter the list by name, then hit **Apply**. Prefer the old one-click behavior? 
+  - Turn off **Preview module preset before applying** in BBMM's settings and presets apply straight from a confirmation.
+
+### Changed
+- **Module presets respect locked modules:** Applying a module preset no longer affects modules you've locked in the Module Manager.
+  - If the "preview modules preset" option is disabled, it will indicate which modules are locked before applying preset. 
+
+## [1.5.1] - 2026-11-01
+
+### Added
+- **Environment Report:** A new **Environment Report** under Toolbox > Utilities gives you a one-click, copy/paste-ready snapshot of your setup for bug reports and Discord: Foundry version and build, your game system and version, your browser/OS, and every installed module with its version. It lists active modules by default (with a toggle to show everything, disabled modules marked), and you can copy it or download it as a file, in plain text or as a Markdown table.
+
+### Changed
+- **Keybind Locks:** Adding locks is now quicker. The Add Lock window stays open after you add one, so you can add several in a row, and a **Close** button dismisses it when you're done.
+- **Localization:** 
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
+
+## [1.5.0] - 2026-10-27
+>>>>>>> Stashed changes
 
 ### Added
 - **Keybind Locks:** A new **Keybind Locks** tab in the BBMM Toolbox lets you pin keybindings in place so they stop reverting. Pick any registered keybinding (Core or from a module), then either clear it (keep it unbound) or force it to a key or keys you capture. Locks re-apply on every load, so a binding that keeps resetting will stay the way you set it.
