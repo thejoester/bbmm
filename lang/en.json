@@ -14,6 +14,8 @@
 		"warnEnterName": "Please enter a preset name",
 		"titleReloadFoundry": "Reload Foundry?",
 		"promptReloadNow": "Preset applied. Reload now?",
+		"noteLabel": "NOTE!",
+		"lockedNotAffected": "The following modules were locked, therefore will not be affected:",
 		"warnSelectPresetDelete": "Select a preset to delete",
 		"deletedPreset": "Deleted preset",
 		"available": "Available",
@@ -162,6 +164,10 @@
 		"previewEnabled": "Enabled in preset",
 		"previewDisabled": "Disabled in preset",
 		"previewMissing": "Missing (not installed)",
+		"applyPreviewSummary": "Will enable {enable}, disable {disable} ({unchanged} unchanged)",
+		"lockedUnaffectedNote": "Locked modules will be unaffected",
+		"lockedTooltip": "Locked - will not be changed",
+		"filterModulesPlaceholder": "Filter modules…",
 		"toolbox": {
 			"title": "BBMM Toolbox",
 			"emptyNav": "No tools available.",
@@ -188,7 +194,8 @@
 				"clearAllModuleTags": "Clear all Module tags",
 				"keyBindingInspector": "Key Binding Inspector",
 				"resetChangelog": "Reset Changelog",
-				"viewChangelog": "View Changelog"
+				"viewChangelog": "View Changelog",
+				"environmentReport": "Environment Report"
 			}
 		},
 		"buttons": {
@@ -319,8 +326,20 @@
 			"noKeys": "No keys captured yet.",
 			"change": "Change",
 			"cancel": "Cancel",
+			"close": "Close",
 			"addLock": "Add Lock",
+			"added": "Added {mode} lock for {name}.",
 			"captureFirst": "Capture a key first, or choose Clear."
+		},
+		"envReport": {
+			"title": "Environment Report",
+			"copy": "Copy",
+			"download": "Download",
+			"downloadFailed": "Failed to download the report. See the console for details.",
+			"showAll": "Show all installed",
+			"markdown": "Markdown table",
+			"close": "Close",
+			"buildFailed": "Failed to build the environment report. See the console for details."
 		},
 		"drift": {
 			"title": "Settings Changed",
@@ -487,6 +506,8 @@
 			"disableFiltered": "Disable Filtered",
 			"promptEnableNewModulesName": "Prompt to enable newly installed modules",
 			"promptEnableNewModulesHint": "When enabled, BBMM will detect newly installed modules and ask the GM if they should be enabled.",
+			"previewModulePresetName": "Preview module preset before applying",
+			"previewModulePresetHint": "When enabled, loading a module preset opens an interactive list where you can review and adjust which modules will be enabled or disabled before applying. When disabled, the preset is applied directly after a confirmation.",
 			"newModulesTitle": "New modules detected",
 			"newModulesIntro": "BBMM detected {count} newly installed module(s). Select which ones to enable now.",
 			"newModulesEnableAndReload": "Enable and reload",
