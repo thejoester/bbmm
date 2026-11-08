@@ -1470,6 +1470,13 @@
 .theme-light .bbmm-kbla-wrap .bbmm-kbla-row:hover { background: rgba(0, 0, 0, 0.06); }
 .theme-light .bbmm-kbla-wrap .bbmm-kbla-row.selected { background: rgba(60, 120, 220, 0.18); }
 
+/* Environment Report dialog */
+.bbmm-env-wrap { display: flex; flex-direction: column; gap: .6rem; }
+.bbmm-env-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.bbmm-env-controls button { flex: 0 0 auto; white-space: nowrap; }
+.bbmm-env-toggle { display: inline-flex; align-items: center; gap: .3rem; font-size: .9em; opacity: .9; cursor: pointer; }
+.bbmm-env-text { width: 100%; min-height: 320px; resize: vertical; font-family: monospace; font-size: .85em; white-space: pre; overflow: auto; }
+
 .bbmm-kbla-wrap .bbmm-kbla-keylist { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; }
 .bbmm-kbla-wrap .bbmm-kbla-keyempty { opacity: 0.6; font-size: 0.85em; font-style: italic; }
 .bbmm-kbla-wrap .bbmm-kbla-keychip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 4px 1px 8px; border: 1px solid var(--color-border-light-tertiary, #888); border-radius: 10px; background: rgba(90, 140, 255, 0.18); font-family: monospace; font-size: 0.85em; white-space: nowrap; }
