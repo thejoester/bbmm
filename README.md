@@ -1,11 +1,13 @@
 # Big Bad Module Manager
 
-A module management tool for FoundryVTT. 
+A quality of life module management tool for FoundryVTT. 
 
 This module was originally inspired by [Module Management+](https://github.com/mouse0270/module-credits/).
 
 > [!NOTE]
 > Please [report any issues or feature requests here](https://github.com/thejoester/bbmm/issues)!
+
+Some have pointed out that This module shares some of the same features as the [Forien's Copy Environment](https://github.com/League-of-Foundry-Developers/foundryvtt-forien-copy-environment) module. This is somewhat true, but the approach it uses is different. See more in my discussion post [Forien's Copy Environment vs BBMM - A comparison](https://github.com/thejoester/bbmm/discussions/267).  
 
 <br/>
 <a href='https://ko-fi.com/thejoester/tip' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>

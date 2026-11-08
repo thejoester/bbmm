@@ -12,7 +12,7 @@
 
 import { DL, BBMM_README_UUID } from "./settings.js";
 import { LT, BBMM_ID } from "./localization.js";
-import { hlp_injectHeaderHelpButton, hlp_openManualByUuid } from "./helpers.js";
+import { hlp_injectHeaderHelpButton, hlp_openManualByUuid, hlp_esc, hlp_timestampStr, copyPlainText } from "./helpers.js";
 
 /* Group registry: label/icon for collapsible nav groups. */
 const BBMM_TB_GROUPS = {
@@ -47,8 +47,163 @@ const BBMM_TB_UTIL_MACROS = [
 	{ key: "clearAllModuleTags", uuid: "Compendium.bbmm.bbmm-macros.Macro.2hDprUWA8E5mr4J5" },
 	{ key: "keyBindingInspector", uuid: "Compendium.bbmm.bbmm-macros.Macro.cwDZlfhhZAZaUPER" },
 	{ key: "resetChangelog", uuid: "Compendium.bbmm.bbmm-macros.Macro.KKjNNKp07HamxcUO" },
-	{ key: "viewChangelog", uuid: "Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe" }
+	{ key: "viewChangelog", uuid: "Compendium.bbmm.bbmm-macros.Macro.RYwtyq1VXqfwSGZe" },
+	// Logic lives in source (BBMMEnvironmentReport), so call it directly, no pack macro.
+	{ key: "environmentReport", action: () => BBMMEnvironmentReport.open() }
 ];
+
+/* =========================================================================
+	Environment Report
+	One-click snapshot of the environment (Foundry version/build, system +
+	version, every installed module with version/active state, browser/OS)
+	formatted for pasting into a bug report or Discord. Opened from the
+	Utilities macro row above; exposed on the module API so the compendium
+	macro is a thin shell that calls openEnvironmentReport().
+========================================================================= */
+class BBMMEnvironmentReport {
+
+	// Gather everything the report shows; returned shape is formatter-agnostic.
+	static build() {
+		const foundry = {
+			version: game.version ?? "?",
+			build: game.release?.build ?? null,			// absent on older cores
+			channel: game.release?.channel ?? null
+		};
+		const system = {
+			id: game.system?.id ?? "?",
+			title: game.system?.title ?? game.system?.id ?? "?",
+			version: game.system?.version ?? "?"
+		};
+		const modules = [...game.modules.values()].map(m => ({
+			id: m.id,
+			title: m.title ?? m.id,
+			version: m.version ?? m.manifest?.version ?? "?",
+			active: m.active === true,
+			authors: Array.from(m.authors ?? []).map(a => a?.name ?? "").filter(Boolean).join(", ")
+		}));
+		modules.sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
+		return {
+			foundry, system, modules,
+			activeCount: modules.filter(m => m.active).length,
+			installedCount: modules.length,
+			userAgent: navigator?.userAgent ?? "?"
+		};
+	}
+
+	static _foundryLine(f) {
+		const extra = [];
+		if (f.build != null) extra.push(`build ${f.build}`);
+		if (f.channel) extra.push(f.channel);
+		return `Foundry VTT: ${f.version}${extra.length ? ` (${extra.join(", ")})` : ""}`;
+	}
+
+	static _countLabel(d) { return `${d.activeCount} active / ${d.installedCount} installed`; }
+
+	// showAll=false lists active modules only; disabled ones marked inline when shown.
+	static _visible(d, showAll) { return showAll ? d.modules : d.modules.filter(m => m.active); }
+
+	static _mdCell(s) { return String(s ?? "").replace(/\|/g, "\\|"); }
+
+	static formatPlain(d, { showAll = false } = {}) {
+		const lines = [
+			this._foundryLine(d.foundry),
+			`System: ${d.system.id} (${d.system.title}) ${d.system.version}`,
+			`Browser/OS: ${d.userAgent}`,
+			`Modules (${this._countLabel(d)}):`
+		];
+		for (const m of this._visible(d, showAll))
+			lines.push(`- ${m.id} (${m.title}) ${m.version}${m.active ? "" : " (disabled)"}`);
+		return lines.join("\n");
+	}
+
+	static formatMarkdown(d, { showAll = false } = {}) {
+		const lines = [
+			`**${this._foundryLine(d.foundry)}**`,
+			`**System:** ${d.system.id} (${d.system.title}) ${d.system.version}`,
+			`**Browser/OS:** ${d.userAgent}`,
+			``,
+			`**Modules (${this._countLabel(d)}):**`,
+			``,
+			`| Module | Title | Version | Active | Author |`,
+			`|---|---|---|---|---|`
+		];
+		for (const m of this._visible(d, showAll))
+			lines.push(`| ${this._mdCell(m.id)} | ${this._mdCell(m.title)} | ${this._mdCell(m.version)} | ${m.active ? "✓" : "✗"} | ${this._mdCell(m.authors)} |`);
+		return lines.join("\n");
+	}
+
+	static render(d, state) { return state.markdown ? this.formatMarkdown(d, state) : this.formatPlain(d, state); }
+
+	static _download(text, filename) {
+		try {
+			const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+			const url = URL.createObjectURL(blob);
+			const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+			a.style.display = "none";
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 2000);
+			DL(`toolbox.js | env report downloaded ${filename}`);
+		} catch (err) {
+			DL(3, "toolbox.js | env report download failed", err);
+			ui.notifications?.error(LT.envReport.downloadFailed());
+		}
+	}
+
+	// Report in a readonly <textarea>; content buttons (copy/download/toggles) are
+	// wired in the render hook so they don't submit/close. Footer Close dismisses it.
+	static open() {
+		const FN = "toolbox.js | BBMMEnvironmentReport.open():";
+		try {
+			const data = this.build();
+			const state = { showAll: false, markdown: false };
+			DL(`${FN} built report (${this._countLabel(data)})`);
+
+			const content =
+				`<div class="bbmm-env-wrap">` +
+					`<div class="bbmm-env-controls">` +
+						`<button type="button" class="bbmm-env-copy"><i class="fas fa-copy"></i> ${LT.envReport.copy()}</button>` +
+						`<button type="button" class="bbmm-env-download"><i class="fas fa-download"></i> ${LT.envReport.download()}</button>` +
+						`<label class="bbmm-env-toggle"><input type="checkbox" class="bbmm-env-showall" /> ${LT.envReport.showAll()}</label>` +
+						`<label class="bbmm-env-toggle"><input type="checkbox" class="bbmm-env-markdown" /> ${LT.envReport.markdown()}</label>` +
+					`</div>` +
+					`<textarea class="bbmm-env-text" readonly rows="20">${hlp_esc(this.render(data, state))}</textarea>` +
+				`</div>`;
+
+			const dlg = new foundry.applications.api.DialogV2({
+				window: { title: LT.envReport.title(), icon: "fas fa-circle-info", resizable: true },
+				position: { width: 680, height: "auto" },
+				content,
+				buttons: [{ action: "close", label: LT.envReport.close(), default: true }]
+			});
+
+			const onRender = (app) => {
+				if (app !== dlg) return;
+				Hooks.off("renderDialogV2", onRender);
+				const root = app.element;
+				const textarea = root.querySelector(".bbmm-env-text");
+				const reRender = () => { if (textarea) textarea.value = this.render(data, state); };
+
+				// copyPlainText() shows its own success/failure toast.
+				root.querySelector(".bbmm-env-copy")?.addEventListener("click", () => copyPlainText(this.render(data, state)));
+				root.querySelector(".bbmm-env-download")?.addEventListener("click", () => {
+					const ext = state.markdown ? "md" : "txt";
+					this._download(this.render(data, state), `bbmm-environment-${game.world?.id ?? "world"}-${hlp_timestampStr()}.${ext}`);
+				});
+				root.querySelector(".bbmm-env-showall")?.addEventListener("change", (ev) => { state.showAll = !!ev.target.checked; reRender(); });
+				root.querySelector(".bbmm-env-markdown")?.addEventListener("change", (ev) => { state.markdown = !!ev.target.checked; reRender(); });
+			};
+			Hooks.on("renderDialogV2", onRender);
+			dlg.render(true);
+		} catch (err) {
+			DL(3, `${FN} failed`, err);
+			ui.notifications?.error(LT.envReport.buildFailed());
+		}
+	}
+}
+
+const openEnvironmentReport = () => BBMMEnvironmentReport.open();
 
 /* Read the live registry, filtered to what the current user can see, in nav order. */
 function tb_visibleTools() {
@@ -73,8 +228,10 @@ async function tb_mountUtilities(container) {
 
 	const rows = BBMM_TB_UTIL_MACROS.map(m => {
 		const label = (() => { try { return LT.toolbox.util[m.key](); } catch { return m.key; } })();
+		// A row either runs a compendium macro (data-uuid) or a source handler (data-action).
+		const attr = m.action ? `data-action="${m.key}"` : `data-uuid="${m.uuid}"`;
 		return (
-			`<button type="button" class="bbmm-tb-util-row" data-uuid="${m.uuid}">` +
+			`<button type="button" class="bbmm-tb-util-row" ${attr}>` +
 				`<i class="fa-solid fa-play bbmm-tb-util-icon"></i>` +
 				`<span class="bbmm-tb-util-label">${label}</span>` +
 			`</button>`
@@ -90,6 +247,18 @@ async function tb_mountUtilities(container) {
 	const onClick = async (ev) => {
 		const btn = ev.target.closest?.(".bbmm-tb-util-row");
 		if (!btn) return;
+
+		// Source-handler rows run a function directly (no compendium macro).
+		const actionKey = btn.dataset.action;
+		if (actionKey) {
+			try { await BBMM_TB_UTIL_MACROS.find(m => m.key === actionKey)?.action?.(); }
+			catch (err) {
+				DL(3, `${FN} action failed for ${actionKey}`, err);
+				ui.notifications?.error(LT.toolbox.utilRunError());
+			}
+			return;
+		}
+
 		const uuid = btn.dataset.uuid;
 		try {
 			const macro = await fromUuid(uuid);
@@ -391,8 +560,9 @@ Hooks.once("init", () => {
 	try {
 		globalThis.bbmm ??= {};
 		globalThis.bbmm.openBBMMToolbox = openBBMMToolbox;
+		globalThis.bbmm.openEnvironmentReport = openEnvironmentReport;
 		const mod = game.modules.get(BBMM_ID);
-		if (mod) { mod.api = mod.api || {}; Object.assign(mod.api, { openBBMMToolbox }); }
+		if (mod) { mod.api = mod.api || {}; Object.assign(mod.api, { openBBMMToolbox, openEnvironmentReport }); }
 		DL("toolbox.js | init(): Toolbox API registered");
 	} catch (err) {
 		DL(3, "toolbox.js | init(): failed to register Toolbox API", err);
