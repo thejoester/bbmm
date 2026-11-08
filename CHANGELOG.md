@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.2-test1] - 2026-11-05
+## [1.5.2] - 2026-11-08
 
 ### Added
 - **Module preset preview:** Applying a module preset now opens preview list showing moduleslist and which would change before committing. Modules that will be turned on appear at the top, those turned off at the bottom.
@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 - **Module presets respect locked modules:** Applying a module preset no longer affects modules you've locked in the Module Manager.
   - If the "preview modules preset" option is disabled, it will indicate which modules are locked before applying preset. 
+- **Localization:** 
+  - Updated Brazilian Portuguese (pt-BR) localization. Thank you [Kharmans](https://github.com/Kharmans)!
 
 ## [1.5.1] - 2026-11-01
 
