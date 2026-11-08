@@ -1540,6 +1540,17 @@ Hooks.once("init", () => {
 				restricted: true
 			});
 
+			// Preview module preset before applying (interactive review window on Load)
+			game.settings.register(BBMM_ID, "previewModulePreset", {
+				name: LT.moduleManagement.previewModulePresetName(),
+				hint: LT.moduleManagement.previewModulePresetHint(),
+				scope: "world",
+				config: true,
+				type: Boolean,
+				default: true,
+				restricted: true
+			});
+
 			// Enable/disable BBMM user/client setting sync
 			game.settings.register(BBMM_ID, "enableUserSettingSync", {
 				name: LT.sync.EnableName(),

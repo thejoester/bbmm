@@ -286,9 +286,21 @@ function hlp_getEnabledModuleIds() {
 	return list;
 }
 
-// Read moduleConfiguration safely 
+// Read moduleConfiguration safely
 function hlp_getModuleConfig() {
 	return foundry.utils.duplicate(game.settings.get("core", "moduleConfiguration") || {});
+}
+
+// Read the set of locked module ids (shared with the Module Manager's moduleLocks)
+function hlp_getModuleLocks() {
+	try {
+		const raw = game.settings.get(BBMM_ID, "moduleLocks");
+		const arr = Array.isArray(raw) ? raw : [];
+		return new Set(arr.filter(id => typeof id === "string"));
+	} catch (err) {
+		DL(2, "module-presets.js | hlp_getModuleLocks(): failed, treating as no locks", err);
+		return new Set();
+	}
 }
 
 // Show dialog report of Import issues
@@ -351,20 +363,15 @@ async function showImportIssuesDialog({ unknown, depIssues }) {
 		
 }
 
-// Apply a set of enabled ids -> update core.moduleConfiguration 
-async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
-	const config = hlp_getModuleConfig();
-
-	// Start by disabling everything we manage (only modules, not systems)
-	for (const m of game.modules.values()) {
-		config[m.id] = false;
-	}
-	// Enable requested
+// Build the desired enabled/disabled state for every managed module from a preset's
+// enabled ids, pulling in required deps when asked. { [id]: boolean }
+function hlp_buildDesiredState(enabledIds, autoEnableDeps = true) {
+	const desired = {};
+	for (const m of game.modules.values()) desired[m.id] = false;
 	for (const id of enabledIds) {
-		if (game.modules.has(id)) config[id] = true;
+		if (game.modules.has(id)) desired[id] = true;
 	}
 
-	// Optionally pull in required deps
 	if (autoEnableDeps) {
 		const toEnable = new Set(enabledIds);
 		let changed;
@@ -377,7 +384,7 @@ async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 				for (const depId of requires) {
 					if (game.modules.has(depId) && !toEnable.has(depId)) {
 						toEnable.add(depId);
-						config[depId] = true;
+						desired[depId] = true;
 						changed = true;
 					}
 				}
@@ -385,7 +392,37 @@ async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
 		} while (changed);
 	}
 
+	return desired;
+}
+
+// Apply a set of enabled ids -> update core.moduleConfiguration.
+// Locked modules (moduleLocks) are never changed; their current state is kept.
+// Returns { skippedLocks: [{id, title}] } for locks whose state the preset would have flipped.
+async function applyEnabledIds(enabledIds, {autoEnableDeps = true} = {}) {
+	const locks = hlp_getModuleLocks();
+	const config = hlp_getModuleConfig();
+	const desired = hlp_buildDesiredState(enabledIds, autoEnableDeps);
+
+	// Write desired state, but never touch a locked module. Record locks the preset
+	// would have flipped so the caller can note them.
+	const skippedLocks = [];
+	for (const m of game.modules.values()) {
+		const id = m.id;
+		if (locks.has(id)) {
+			const current = !!m.active;
+			if (!!desired[id] !== current) skippedLocks.push({ id, title: m.title || id });
+			config[id] = current;	// keep locked module exactly as it is
+			continue;
+		}
+		config[id] = !!desired[id];
+	}
+
+	if (skippedLocks.length) {
+		DL("module-presets.js | applyEnabledIds(): locked modules skipped", skippedLocks.map(s => s.id));
+	}
+
 	await game.settings.set("core", "moduleConfiguration", config);
+	return { skippedLocks };
 }
 
 // Open a preview dialog showing which modules a preset will enable
@@ -457,6 +494,151 @@ function ui_openModulePresetPreview(preset) {
 		DL(3, "module-presets.js | ui_openModulePresetPreview(): error", err);
 		ui.notifications.error(`${LT.errors.errorOccured()}.`);
 	}
+}
+
+// Interactive apply window: review/adjust which modules a preset will enable or disable,
+// then apply. Resolves with the final array of enabled ids, or null if cancelled.
+// Locked modules show an orange lock, are forced to their current state, and are excluded
+// from the change counts (applyEnabledIds skips them regardless).
+function ui_openModulePresetApplyWindow(preset) {
+	return new Promise((resolve) => {
+		let settled = false;
+		const done = (val) => { if (!settled) { settled = true; resolve(val); } };
+
+		try {
+			const esc = hlp_esc;
+			const locks = hlp_getModuleLocks();
+			const presetIds = Array.isArray(preset?.modules) ? preset.modules : [];
+			const enabledIds = new Set(presetIds);
+			const desired = hlp_buildDesiredState(presetIds, true);
+
+			// Build rows for every installed module, plus any missing preset ids
+			const rows = [];
+			for (const m of game.modules) {
+				const id = m.id;
+				const current = !!m.active;
+				const locked = locks.has(id);
+				rows.push({ id, title: m.title || id, current, locked, checked: locked ? current : !!desired[id], missing: false });
+			}
+			for (const id of enabledIds) {
+				if (!game.modules.get(id)) rows.push({ id, title: id, current: false, locked: false, checked: false, missing: true });
+			}
+
+			// Initial order: to-be-enabled first, disabled next, missing last; then by title
+			const rank = (r) => r.missing ? 2 : (r.checked ? 0 : 1);
+			rows.sort((a, b) => (rank(a) - rank(b)) || a.title.localeCompare(b.title));
+
+			const hasLocked = rows.some(r => r.locked);
+
+			// Inline styles (a <style> block in DialogV2 content does not reliably apply)
+			const ROW_STYLE = "display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.5rem;padding:.2rem .5rem;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;";
+			const NAME_STYLE = "min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+			const BADGE_STYLE = "text-align:center;min-width:1.2rem;font-weight:700;";
+
+			const body = rows.map((r) => {
+				const rowExtra = (r.locked || r.missing) ? "cursor:default;" : "cursor:pointer;";
+				const rowOpacity = r.locked ? "opacity:.85;" : "";
+				const nameColor = r.missing ? "color:#f55;" : "";
+				// Locked rows show a lock icon in place of the checkbox
+				const firstCell = r.locked
+					? `<i class="fa-solid fa-lock" title="${esc(LT.lockedTooltip())}" style="color:orange;text-align:center;min-width:1rem;"></i>`
+					: `<input type="checkbox" class="bbmm-mpa-cb" ${r.checked ? "checked" : ""} ${r.missing ? "disabled" : ""}>`;
+				return `
+				<label class="bbmm-mpa-row" data-id="${esc(r.id)}" data-title="${esc(String(r.title).toLowerCase())}"
+					data-current="${r.current ? 1 : 0}" data-locked="${r.locked ? 1 : 0}" data-missing="${r.missing ? 1 : 0}"
+					title="${esc(r.id)}" style="${ROW_STYLE}${rowExtra}${rowOpacity}">
+					${firstCell}
+					<span style="${NAME_STYLE}${nameColor}">${esc(r.title)}</span>
+					<span class="bbmm-mpa-badge" style="${BADGE_STYLE}"></span>
+				</label>`;
+			}).join("");
+
+			const content = `
+				<div style="display:flex;flex-direction:column;gap:.5rem;min-width:360px;">
+					<input type="text" class="bbmm-mpa-filter" placeholder="${esc(LT.filterModulesPlaceholder())}" style="width:100%;">
+					<div class="bbmm-mpa-summary" style="font-weight:600;font-size:12px;"></div>
+					<div style="border:1px solid var(--color-border,#444);border-radius:6px;overflow-y:auto;overflow-x:hidden;max-height:42vh;">${body}</div>
+					${hasLocked ? `<div style="font-size:12px;"><b style="color:orange;">${esc(LT.noteLabel())}</b> ${esc(LT.lockedUnaffectedNote())}</div>` : ""}
+				</div>
+			`;
+
+			const dlg = new foundry.applications.api.DialogV2({
+				id: "bbmm-module-preset-apply",
+				window: { title: `${LT.titleApplyModulePreset()} - ${preset.displayName}` },
+				position: { width: Math.min(620, window.innerWidth - 100) },
+				content,
+				buttons: [
+					{ action: "apply", label: LT.buttons.apply(), default: true, callback: () => "apply" },
+					{ action: "cancel", label: LT.buttons.cancel(), callback: () => "cancel" }
+				],
+				submit: (result) => {
+					if (result !== "apply") return done(null);
+					const ids = [];
+					dlg.element?.querySelectorAll(".bbmm-mpa-row").forEach((row) => {
+						if (row.dataset.missing === "1") return;
+						const cb = row.querySelector(".bbmm-mpa-cb");
+						if (cb?.checked) ids.push(row.dataset.id);
+					});
+					done(ids);
+				},
+				rejectClose: false
+			});
+
+			const onRender = (app) => {
+				if (app !== dlg) return;
+				Hooks.off("renderDialogV2", onRender);
+
+				const root = app.element;
+				const summaryEl = root.querySelector(".bbmm-mpa-summary");
+
+				// Recolor badges inline + refresh the change summary from live checkbox state
+				const recompute = () => {
+					let en = 0, dis = 0, unch = 0;
+					root.querySelectorAll(".bbmm-mpa-row").forEach((row) => {
+						const badge = row.querySelector(".bbmm-mpa-badge");
+						if (row.dataset.missing === "1") { badge.textContent = "✖"; badge.style.color = "#f55"; return; }
+						if (row.dataset.locked === "1") { badge.textContent = ""; return; }	// lock icon is in the checkbox column
+						const current = row.dataset.current === "1";
+						const checked = !!row.querySelector(".bbmm-mpa-cb")?.checked;
+						if (checked && !current) { badge.textContent = "+"; badge.style.color = "#4caf50"; en++; }
+						else if (!checked && current) { badge.textContent = "−"; badge.style.color = "#f55"; dis++; }
+						else { badge.textContent = ""; badge.style.color = ""; unch++; }
+					});
+					if (summaryEl) summaryEl.textContent = LT.applyPreviewSummary({ enable: en, disable: dis, unchanged: unch });
+				};
+
+				root.querySelectorAll(".bbmm-mpa-cb").forEach((cb) => cb.addEventListener("change", recompute));
+
+				const filter = root.querySelector(".bbmm-mpa-filter");
+				filter?.addEventListener("input", () => {
+					const q = filter.value.trim().toLowerCase();
+					root.querySelectorAll(".bbmm-mpa-row").forEach((row) => {
+						const show = !q || row.dataset.title.includes(q);
+						row.style.display = show ? "grid" : "none";
+					});
+				});
+
+				recompute();
+			};
+
+			Hooks.on("renderDialogV2", onRender);
+
+			// Resolve null if the window is dismissed without pressing a button (X/Esc).
+			// Guarded by `settled`, so a button submit that already resolved is unaffected.
+			const onClose = (app) => {
+				if (app !== dlg) return;
+				Hooks.off("closeDialogV2", onClose);
+				done(null);
+			};
+			Hooks.on("closeDialogV2", onClose);
+
+			dlg.render(true);
+		} catch (err) {
+			DL(3, "module-presets.js | ui_openModulePresetApplyWindow(): error", err);
+			ui.notifications.error(`${LT.errors.errorOccured()}.`);
+			done(null);
+		}
+	});
 }
 
 //	Open the Module Presets manager (deep-links into the toolbox pane).
@@ -611,21 +793,57 @@ function _mp_wire(container, getIndex, rerender) {
 						const enabled = picked.modules || [];
 						DL("module-presets.js | load: applying preset", { name: picked.name, count: enabled.length });
 
-						const proceed = await foundry.applications.api.DialogV2.confirm({
-							window: { title: LT.titleApplyModulePreset() },
-							content: `<p>${LT.promptApplyModulePreset({ name: hlp_esc(picked.displayName) })}?</p>`,
-							modal: true,
-							ok: { label: LT.buttons.apply() }
-						});
-						if (!proceed) return;
+						let previewOn = true;
+						try { previewOn = !!game.settings.get(BBMM_ID, "previewModulePreset"); }
+						catch (e) { DL(2, "module-presets.js | load: previewModulePreset read failed, defaulting on", e); }
+
+						// Ids actually applied (the preset's, or the GM's adjusted selection from the window)
+						let idsToApply = enabled;
+
+						if (previewOn) {
+							// Interactive review window: shows locks, lets the GM adjust, returns the selection
+							const chosen = await ui_openModulePresetApplyWindow(picked);
+							if (chosen === null) return;	// cancelled
+							idsToApply = chosen;
+						} else {
+							// Plain confirm with the skipped-locks note (locks whose state this preset would flip)
+							let applyContent = `<p>${LT.promptApplyModulePreset({ name: hlp_esc(picked.displayName) })}?</p>`;
+							const locks = hlp_getModuleLocks();
+							const skippedLocks = [];
+							if (locks.size) {
+								const desired = hlp_buildDesiredState(enabled, true);
+								for (const m of game.modules.values()) {
+									if (locks.has(m.id) && (!!desired[m.id] !== !!m.active)) {
+										skippedLocks.push({ id: m.id, title: m.title || m.id });
+									}
+								}
+							}
+							if (skippedLocks.length) {
+								const items = skippedLocks
+									.map(s => `<li style="margin:.1rem 0;"><code>${hlp_esc(s.title)}</code></li>`)
+									.join("");
+								applyContent += `
+									<p style="margin:.5rem 0 0;"><b style="color:orange;">${LT.noteLabel()}</b> ${LT.lockedNotAffected()}</p>
+									<ul style="margin:.1rem 0 0;padding-left:1.25rem;max-height:400px;overflow-y:auto;">${items}</ul>
+								`;
+							}
+
+							const proceed = await foundry.applications.api.DialogV2.confirm({
+								window: { title: LT.titleApplyModulePreset() },
+								content: applyContent,
+								modal: true,
+								ok: { label: LT.buttons.apply() }
+							});
+							if (!proceed) return;
+						}
 
 						// Validate missing modules/dependencies before applying
-						const { unknown, depIssues } = hlp_validateModuleState(enabled);
+						const { unknown, depIssues } = hlp_validateModuleState(idsToApply);
 						if (unknown.length || depIssues.length) {
 							await showImportIssuesDialog({ unknown, depIssues });
 						}
 
-						await applyEnabledIds(enabled, { autoEnableDeps: true });
+						await applyEnabledIds(idsToApply, { autoEnableDeps: true });
 
 						const reload = await foundry.applications.api.DialogV2.confirm({
 							window: { title: LT.titleReloadFoundry() },
